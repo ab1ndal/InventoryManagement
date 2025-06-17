@@ -9,14 +9,32 @@ export default function Dashboard() {
   }, []);
 
   async function fetchStats() {
-    const { data: products } = await supabase.from("Products").select("*");
-    const { data: stock } = await supabase
-      .from("ProductSizeColors")
-      .select("*");
+    try {
+      const { data: products, error: productsError } = await supabase
+        .from("Products")
+        .select("*");
+      const { data: stock, error: stockError } = await supabase
+        .from("ProductSizeColors")
+        .select("*");
 
-    const lowStock = stock.filter((item) => item.Stock < 5).length;
+      if (productsError || stockError) {
+        console.error("Error fetching data:", productsError || stockError);
+        return;
+      }
 
-    setStats({ totalProducts: products.length, lowStock });
+      // If data is null or undefined, initialize with empty arrays
+      const safeProducts = products || [];
+      const safeStock = stock || [];
+
+      const lowStock = safeStock.filter((item) => item.Stock < 5).length;
+
+      setStats({
+        totalProducts: safeProducts.length,
+        lowStock,
+      });
+    } catch (error) {
+      console.error("Error in fetchStats:", error);
+    }
   }
 
   return (
