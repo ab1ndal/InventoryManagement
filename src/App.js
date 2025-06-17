@@ -1,28 +1,32 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import Products from "./pages/Products";
-import Inventory from "./pages/Inventory";
-import Orders from "./pages/Orders";
-import Returns from "./pages/Returns";
-import Navbar from "./components/Navbar";
+import React, { useEffect, useState } from "react";
+import { supabase } from "./supabaseClient";
+import ProductTable from "./components/ProductTable";
+import "./App.css";
 
-function App() {
-  return (
-    <Router>
-      <div className="flex">
-        <Navbar />
-        <main className="flex-grow p-4">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/returns" element={<Returns />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
-  );
-}
+const App = () => {
+  const [products, setProducts] = useState([]);
+  const [productsSizeColors, setProductsSizeColors] = useState([]);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchProductsSizeColors();
+  }, []);
+
+  async function fetchProducts() {
+    const { data, error } = await supabase.from("products").select("*");
+    if (!error) setProducts(data || []);
+    else console.log("error fetching products: ", error);
+  }
+
+  async function fetchProductsSizeColors() {
+    const { data, error } = await supabase
+      .from("productsizecolors")
+      .select("*");
+    if (!error) setProductsSizeColors(data || []);
+    else console.log("error fetching products size colors: ", error);
+  }
+
+  return <ProductTable products={products} variants={productsSizeColors} />;
+};
 
 export default App;

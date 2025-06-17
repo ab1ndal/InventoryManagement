@@ -1,3 +1,70 @@
+.variant-line {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+  padding: 2px 0;
+  flex-wrap: wrap;
+}
+
+.variant-part {
+  min-width: 160px; /* Adjust for visual balance */
+}
+
+.variant-separator {
+  color: #999;
+}
+.chevron-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.chevron-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.product-row:hover .chevron-icon {
+  stroke: #000;
+}
+
+.product-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Arial, sans-serif;
+  margin-top: 20px;
+}
+
+.product-table th,
+.product-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.product-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+  border-bottom: 2px solid #ccc;
+}
+
+/* Product row with a strong bottom border */
+.product-row {
+  border-bottom: 2px solid #aaa;
+}
+
+.product-row:hover {
+  background-color: #f0f8ff;
+}
+
+/* Variant rows - visually grouped with product */
+.variant-row td {
+  border-top: 1px dashed #ccc;
+  background-color: #f9f9f9;
+  padding-left: 40px;
+  font-style: italic;
+  color: #333;
+}
+
 .App {
   text-align: center;
 }
