@@ -26,7 +26,13 @@ const App = () => {
     else console.log("error fetching products size colors: ", error);
   }
 
-  return <ProductTable products={products} variants={productsSizeColors} />;
+  return (
+    <ProductTable
+      products={products}
+      variants={productsSizeColors}
+      onProductUpdate={fetchProducts}
+    />
+  );
 };
 
 export default App;
