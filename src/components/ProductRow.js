@@ -42,8 +42,8 @@ const ProductRow = ({ product, variants, onEdit }) => {
     setExpanded((prev) => !prev);
   };
 
-  const handleSave = async (updatedProduct) => {
-    await onEdit(updatedProduct); // 🔁 Forward save back to parent
+  const handleSave = async (updatedData) => {
+    await onEdit(updatedData); // 🔁 Forward save back to parent
     setOpen(false); // 🔐 Close dialog after saving
   };
 
@@ -88,6 +88,7 @@ const ProductRow = ({ product, variants, onEdit }) => {
         open={open}
         onClose={() => setOpen(false)}
         product={product}
+        variants={sizeColorRows}
         onSave={handleSave}
       />
     </>

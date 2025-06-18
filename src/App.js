@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import ProductTable from "./components/ProductTable";
+import { Toaster } from "./components/ui/toaster";
 import "./App.css";
 
 const App = () => {
@@ -26,12 +27,20 @@ const App = () => {
     else console.log("error fetching products size colors: ", error);
   }
 
+  const handleProductUpdate = async () => {
+    await fetchProducts();
+    await fetchProductsSizeColors();
+  };
+
   return (
-    <ProductTable
-      products={products}
-      variants={productsSizeColors}
-      onProductUpdate={fetchProducts}
-    />
+    <>
+      <ProductTable
+        products={products}
+        variants={productsSizeColors}
+        onProductUpdate={handleProductUpdate}
+      />
+      <Toaster />
+    </>
   );
 };
 
