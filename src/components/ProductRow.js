@@ -4,7 +4,7 @@ import ChevronIcon from "./ChevronIcon";
 import { Button } from "../components/ui/button";
 import ProductEditDialog from "./ProductEditDialog";
 
-const ProductRow = ({ product, variants, onEdit }) => {
+const ProductRow = ({ product, variants, onEdit, categories }) => {
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -59,7 +59,10 @@ const ProductRow = ({ product, variants, onEdit }) => {
           {product.productid}
         </td>
         <td>{product.name}</td>
-        <td>{product.categoryid}</td>
+        <td>
+          {categories.find((cat) => cat.categoryid === product.categoryid)
+            ?.name || "-"}
+        </td>
         <td>{product.fabric}</td>
         <td style={{ textAlign: "right" }}>{formatINRCurrency(purchase)}</td>
         <td style={{ textAlign: "right" }}>{formatINRCurrency(retail)}</td>
@@ -89,6 +92,7 @@ const ProductRow = ({ product, variants, onEdit }) => {
         onClose={() => setOpen(false)}
         product={product}
         variants={sizeColorRows}
+        categories={categories}
         onSave={handleSave}
       />
     </>

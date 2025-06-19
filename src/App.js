@@ -7,10 +7,12 @@ import "./App.css";
 const App = () => {
   const [products, setProducts] = useState([]);
   const [productsSizeColors, setProductsSizeColors] = useState([]);
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     fetchProducts();
     fetchProductsSizeColors();
+    fetchCategories();
   }, []);
 
   async function fetchProducts() {
@@ -27,6 +29,12 @@ const App = () => {
     else console.log("error fetching products size colors: ", error);
   }
 
+  async function fetchCategories() {
+    const { data, error } = await supabase.from("categories").select("*");
+    if (!error) setCategories(data || []);
+    else console.log("error fetching categories: ", error);
+  }
+
   const handleProductUpdate = async () => {
     await fetchProducts();
     await fetchProductsSizeColors();
@@ -37,6 +45,7 @@ const App = () => {
       <ProductTable
         products={products}
         variants={productsSizeColors}
+        categories={categories}
         onProductUpdate={handleProductUpdate}
       />
       <Toaster />

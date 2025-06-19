@@ -42,6 +42,7 @@ export default function ProductEditDialog({
   open,
   onClose,
   product,
+  categories = [],
   variants = [],
   onSave,
 }) {
@@ -155,7 +156,17 @@ export default function ProductEditDialog({
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <select
+                        {...field}
+                        className="w-full border rounded px-2 py-2 bg-white text-sm"
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map((cat) => (
+                          <option key={cat.categoryid} value={cat.categoryid}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
                     </FormControl>
                   </FormItem>
                 )}

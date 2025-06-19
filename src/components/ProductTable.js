@@ -3,7 +3,7 @@ import ProductRow from "./ProductRow";
 import { supabase } from "../supabaseClient";
 import { useToast } from "../components/hooks/use-toast";
 
-const ProductTable = ({ products, variants, onProductUpdate }) => {
+const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
   const { toast } = useToast();
 
   const sortedProducts = [...products].sort((a, b) => {
@@ -27,6 +27,7 @@ const ProductTable = ({ products, variants, onProductUpdate }) => {
           purchaseprice: productData.purchaseprice,
           retailprice: productData.retailprice,
           description: productData.description,
+          producturl: productData.producturl,
         })
         .eq("productid", productData.productid);
 
@@ -122,6 +123,7 @@ const ProductTable = ({ products, variants, onProductUpdate }) => {
           <ProductRow
             key={product.productid}
             product={product}
+            categories={categories}
             variants={variants}
             onEdit={handleProductSave}
           />
