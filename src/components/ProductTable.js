@@ -104,20 +104,21 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
     <table className="product-table">
       <thead>
         <tr>
-          <th>Product ID</th>
-          <th>Name</th>
-          <th>Category</th>
-          <th>Fabric</th>
-          <th>Purchase Price</th>
-          <th>Retail Price</th>
-          <th>Markup (%)</th>
-          <th>Sizes</th>
-          <th>Colors</th>
-          <th>Description</th>
-          <th>Total Stock</th>
-          <th>Actions</th>
+          <th className="w-32 text-center">Product ID</th>
+          <th className="w-48 text-center">Name</th>
+          <th className="w-40 text-center">Category</th>
+          <th className="w-32 text-center">Fabric</th>
+          <th className="w-24 text-center">Purchase Price</th>
+          <th className="w-24 text-center">Retail Price</th>
+          <th className="w-24 text-center">Markup (%)</th>
+          <th className="w-32 text-center">Sizes</th>
+          <th className="w-32 text-center">Colors</th>
+          <th className="w-64 text-center">Description</th>
+          <th className="w-28 text-center">Total Stock</th>
+          <th className="w-28 text-center">Actions</th>
         </tr>
       </thead>
+
       <tbody>
         {sortedProducts.map((product) => (
           <ProductRow
