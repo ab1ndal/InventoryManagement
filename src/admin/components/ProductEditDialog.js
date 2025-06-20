@@ -4,10 +4,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "../components/ui/dialog";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
+} from "../../components/ui/dialog";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import {
   Form,
   FormControl,
@@ -15,11 +15,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../components/ui/form";
+} from "../../components/ui/form";
 import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { toast } from "../components/hooks/use-toast";
+import { toast } from "../../components/hooks/use-toast";
 
 const variantSchema = z.object({
   size: z.string().min(1, "Size is required"),

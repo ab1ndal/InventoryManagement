@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import VariantRow from "./VariantRow";
 import ChevronIcon from "./ChevronIcon";
-import { Button } from "../components/ui/button";
+import { Button } from "../../components/ui/button";
 import ProductEditDialog from "./ProductEditDialog";
 
 const ProductRow = ({ product, variants, onEdit, categories }) => {

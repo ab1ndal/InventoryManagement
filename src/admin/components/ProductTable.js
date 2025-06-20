@@ -1,7 +1,7 @@
 import React from "react";
 import ProductRow from "./ProductRow";
-import { supabase } from "../supabaseClient";
-import { useToast } from "../components/hooks/use-toast";
+import { supabase } from "../../lib/supabaseClient";
+import { useToast } from "../../components/hooks/use-toast";
 
 const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
   const { toast } = useToast();
