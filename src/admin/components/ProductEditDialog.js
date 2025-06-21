@@ -20,6 +20,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "../../components/hooks/use-toast";
+import CustomDropdown from "../../components/CustomDropdown";
 
 const variantSchema = z.object({
   size: z.string().min(1, "Size is required"),
@@ -156,22 +157,22 @@ export default function ProductEditDialog({
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <FormControl>
-                      <select
-                        {...field}
-                        className="w-full border rounded px-2 py-2 bg-white text-sm"
-                      >
-                        <option value="">Select Category</option>
-                        {categories.map((cat) => (
-                          <option key={cat.categoryid} value={cat.categoryid}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
+                      <CustomDropdown
+                        value={field.value}
+                        onChange={field.onChange}
+                        options={[...categories]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((cat) => ({
+                            value: cat.categoryid,
+                            label: cat.name,
+                          }))}
+                        placeholder="Select Category"
+                      />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="fabric"
@@ -184,7 +185,6 @@ export default function ProductEditDialog({
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="purchaseprice"
@@ -205,7 +205,6 @@ export default function ProductEditDialog({
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="retailprice"

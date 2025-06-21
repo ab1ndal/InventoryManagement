@@ -1,4 +1,4 @@
-// src/admin/pages/Custom ersPage.js
+// src/admin/pages/CustomersPage.js
 import React from "react";
 
 export default function CustomersPage() {
