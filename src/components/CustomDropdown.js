@@ -4,6 +4,7 @@ export default function CustomDropdown({
   label,
   value,
   onChange,
+  onBlur,
   options = [],
   placeholder = "Select an option",
   className = "",
@@ -26,11 +27,12 @@ export default function CustomDropdown({
       ) {
         setOpen(false);
         setSearchTerm("");
+        if (onBlur) onBlur();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [onBlur]);
 
   const selectedLabel = options.find((opt) => opt.value === value)?.label;
 

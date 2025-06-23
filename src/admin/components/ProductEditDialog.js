@@ -68,6 +68,7 @@ export default function ProductEditDialog({
 
   useEffect(() => {
     if (product) {
+      hasEditedNameRef.current = false; // Reset manual edit tracking
       const mappedVariants = variants.map((variant) => ({
         size: variant.Size || variant.size || "",
         color: variant.Color || variant.color || "",
@@ -79,7 +80,7 @@ export default function ProductEditDialog({
         variants: mappedVariants,
       });
     }
-  }, [product, variants]);
+  }, [form, product, variants]);
 
   const handleSubmit = async (values) => {
     const { variants: updatedVariants = [] } = values;
@@ -116,11 +117,24 @@ export default function ProductEditDialog({
     name: "variants",
   });
 
+  const hasEditedNameRef = React.useRef(false);
+
+  useEffect(() => {
+    const subscription = form.watch((_, { name: changedField }) => {
+      if (changedField === "name") {
+        hasEditedNameRef.current = true;
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit Product</DialogTitle>
+          <DialogTitle>
+            {product?.productid ? "Edit Product" : "Add Product"}
+          </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -129,12 +143,101 @@ export default function ProductEditDialog({
             className="space-y-4"
           >
             {product?.productid && (
-              <div className="text-sm font-medium text-gray-500">
-                Product ID:{" "}
-                <span className="font-semibold">{product.productid}</span>
+              <div className="flex items-center justify-between text-sm font-medium text-gray-500">
+                <span>
+                  Product ID:{" "}
+                  <span className="font-semibold">{product.productid}</span>
+                </span>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={onClose}>
+                    Close
+                  </Button>
+                  <Button type="submit">Save</Button>
+                </div>
               </div>
             )}
 
+            <div className="grid grid-cols-3 gap-4 items-end">
+              <FormField
+                control={form.control}
+                name="categoryid"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <CustomDropdown
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={(e) => {
+                          field.onBlur?.(e); // preserve default blur behavior
+                          const categoryName =
+                            categories.find(
+                              (c) =>
+                                c.categoryid === form.getValues("categoryid")
+                            )?.name || "";
+                          const composedName = [
+                            form.getValues("fabric"),
+                            categoryName,
+                          ]
+                            .filter(Boolean)
+                            .join(" - ");
+                          form.setValue("name", composedName);
+                        }}
+                        options={[...categories]
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((cat) => ({
+                            value: cat.categoryid,
+                            label: cat.name,
+                          }))}
+                        placeholder="Select Category"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="fabric"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fabric</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        onBlur={(e) => {
+                          field.onBlur?.(e); // preserve default blur behavior
+                          const categoryName =
+                            categories.find(
+                              (c) =>
+                                c.categoryid === form.getValues("categoryid")
+                            )?.name || "";
+                          const composedName = [
+                            form.getValues("fabric"),
+                            categoryName,
+                          ]
+                            .filter(Boolean)
+                            .join(" - ");
+                          form.setValue("name", composedName);
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              {!product?.productid && (
+                <div className="flex gap-2 justify-end">
+                  <Button type="button" variant="outline" onClick={onClose}>
+                    Close
+                  </Button>
+                  <Button type="submit">Save</Button>
+                </div>
+              )}
+            </div>
+
+            {/* Name field in its own row */}
             <FormField
               control={form.control}
               name="name"
@@ -149,83 +252,46 @@ export default function ProductEditDialog({
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="categoryid"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <FormControl>
-                      <CustomDropdown
-                        value={field.value}
-                        onChange={field.onChange}
-                        options={[...categories]
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map((cat) => ({
-                            value: cat.categoryid,
-                            label: cat.name,
-                          }))}
-                        placeholder="Select Category"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="fabric"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fabric</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="purchaseprice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Purchase Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        value={formatINR(field.value)}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(/[^0-9]/g, "");
-                          field.onChange(Number(raw));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="retailprice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Retail Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        value={formatINR(field.value)}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(/[^0-9]/g, "");
-                          field.onChange(Number(raw));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="purchaseprice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Purchase Price</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      value={formatINR(field.value)}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, "");
+                        field.onChange(Number(raw));
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="retailprice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Retail Price</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      value={formatINR(field.value)}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, "");
+                        field.onChange(Number(raw));
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
