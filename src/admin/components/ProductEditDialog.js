@@ -386,7 +386,22 @@ export default function ProductEditDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => append({ size: "", color: "", stock: 0 })}
+                onClick={() => {
+                  const selectedCategoryId = form.getValues("categoryid");
+                  const selectedCategory = categories.find(
+                    (c) => c.categoryid === selectedCategoryId
+                  );
+                  const categoryName =
+                    selectedCategory?.name?.toLowerCase() || "";
+
+                  const presetCategories = ["saree"]; // lowercased for case-insensitive match
+
+                  if (presetCategories.includes(categoryName)) {
+                    append({ size: "Free-Size", color: "", stock: 0 });
+                  } else {
+                    append({ size: "", color: "", stock: 0 });
+                  }
+                }}
               >
                 + Add Variant
               </Button>
