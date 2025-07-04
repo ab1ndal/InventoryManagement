@@ -105,7 +105,6 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
       <thead>
         <tr>
           <th className="w-32 text-center">Product ID</th>
-          <th className="w-48 text-center">Name</th>
           <th className="w-40 text-center">Category</th>
           <th className="w-32 text-center">Fabric</th>
           <th className="w-24 text-center">Purchase Price</th>

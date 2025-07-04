@@ -58,7 +58,6 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
           <ChevronIcon expanded={expanded} />
           {product.productid}
         </td>
-        <td>{product.name}</td>
         <td>
           {categories.find((cat) => cat.categoryid === product.categoryid)
             ?.name || "-"}

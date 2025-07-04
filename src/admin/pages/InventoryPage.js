@@ -67,7 +67,7 @@ const InventoryPage = () => {
       const newProductId = `BC25${newNumericPart}`;
 
       const fullProduct = { ...productFields, productid: newProductId };
-      const { data: inserted, error: insertErr } = await supabase
+      const { error: insertErr } = await supabase
         .from("products")
         .insert([fullProduct])
         .select()

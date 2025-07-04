@@ -242,57 +242,79 @@ export default function ProductEditDialog({
               control={form.control}
               name="name"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+                <div className="hidden">
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </div>
               )}
             />
-
-            <FormField
-              control={form.control}
-              name="purchaseprice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Purchase Price</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="text"
-                      value={formatINR(field.value)}
-                      onChange={(e) => {
-                        const raw = e.target.value.replace(/[^0-9]/g, "");
-                        field.onChange(Number(raw));
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="retailprice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Retail Price</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="text"
-                      value={formatINR(field.value)}
-                      onChange={(e) => {
-                        const raw = e.target.value.replace(/[^0-9]/g, "");
-                        field.onChange(Number(raw));
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="purchaseprice"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Purchase Price</FormLabel>
+                      {/* Empty space to align with Auto button */}
+                      <span className="text-xs text-transparent">Auto</span>
+                    </div>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        value={formatINR(field.value)}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, "");
+                          field.onChange(Number(raw));
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="retailprice"
+                render={({ field }) => (
+                  <FormItem>
+                    {/* Label + Auto button */}
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Retail Price</FormLabel>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant="ghost"
+                        className="text-xs text-blue-600 hover:underline px-1 py-0"
+                        onClick={() => {
+                          const purchase = form.getValues("purchaseprice") || 0;
+                          const retail = Math.ceil(purchase * 2.5);
+                          form.setValue("retailprice", retail);
+                        }}
+                      >
+                        Auto
+                      </Button>
+                    </div>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        value={formatINR(field.value)}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, "");
+                          field.onChange(Number(raw));
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="description"
