@@ -18,6 +18,8 @@ import SignupPage from "./admin/pages/SignupPage";
 import ForgetPasswordPage from "./admin/pages/ForgetPasswordPage";
 import ResetPasswordPage from "./admin/pages/ResetPasswordPage";
 import { Toaster } from "sonner";
+import "react-datepicker/dist/react-datepicker.css";
+
 
 function App() {
   return (
