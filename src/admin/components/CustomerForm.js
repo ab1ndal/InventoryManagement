@@ -27,8 +27,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
+import CustomDropdown from "../../components/CustomDropdown";
 
 const formSchema = z.object({
+  referred_by: z.coerce.number().optional(),
   first_name: z.string().min(1),
   last_name: z.string().min(1),
   phone: z.string().regex(/^\+\d[\d\s]{9,20}$/, "Must start with country code"),
@@ -41,12 +43,13 @@ const formSchema = z.object({
 });
 
 export default function CustomerForm({
-    triggerLabel = "Add Customer",
-    triggerButton,
+  triggerLabel = "Add Customer",
+  triggerButton,
   onSubmit,
   defaultValues = {},
 }) {
   const [open, setOpen] = React.useState(false);
+  const [customers, setCustomers] = React.useState([]);
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -58,7 +61,7 @@ export default function CustomerForm({
       address: "",
       loyalty_tier: "bronze",
       date_of_birth: defaultValues.date_of_birth
-        ? new Date(defaultValues.date_of_birth + "T00:00:00+05:30")
+        ? new Date(defaultValues.date_of_birth + "T00:00:00")
         : null,
       gender: "",
       customer_notes: "",
@@ -89,7 +92,7 @@ export default function CustomerForm({
         phone: values.phone.replace(/\s/g, ""),
         customer_ulid: ulid,
         date_of_birth: values.date_of_birth
-          ? values.date_of_birth
+          ? values.date_of_birth.toISOString().split("T")[0]
           : null,
       };
 
@@ -111,6 +114,18 @@ export default function CustomerForm({
       toast.error("Error", { description: err.message });
     }
   };
+
+  React.useEffect(() => {
+    if (!open) return;
+
+    const fetchCustomers = async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("customerid, first_name, last_name, phone");
+      if (!error) setCustomers(data || []);
+    };
+    fetchCustomers();
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -172,8 +187,11 @@ export default function CustomerForm({
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input {...field}
-                      onChange={(e) => field.onChange(formatLivePhoneInput(e.target.value))}
+                      <Input
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(formatLivePhoneInput(e.target.value))
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -249,7 +267,7 @@ export default function CustomerForm({
                           showMonthDropdown
                           dropdownMode="select"
                           minDate={new Date("1950-01-01")}
-                          maxDate={new Date("2025-12-31")}
+                          maxDate={new Date()}
                           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
@@ -284,6 +302,37 @@ export default function CustomerForm({
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="referred_by"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Referred By</FormLabel>
+                  <FormControl>
+                    <CustomDropdown
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      options={customers
+                        .filter(
+                          (c) => c.customerid !== defaultValues.customerid
+                        )
+                        .sort((a, b) =>
+                          `${a.first_name} ${a.last_name}`.localeCompare(
+                            `${b.first_name} ${b.last_name}`
+                          )
+                        )
+                        .map((c) => ({
+                          value: c.customerid,
+                          label: `${c.first_name} ${c.last_name} | ${c.phone}`,
+                        }))}
+                      placeholder="Select Referrer"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               name="customer_notes"

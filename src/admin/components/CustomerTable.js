@@ -37,8 +37,8 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     first_name: "",
     last_name: "",
     phone: "",
+    referred_by: "",
     email: "",
-    gender: "",
     loyalty_tier: "",
   });
 
@@ -53,7 +53,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
   const fetchCustomers = async () => {
     const { data, error } = await supabase
       .from("customers")
-      .select("*")
+      .select("*, referred_by_data:referred_by(first_name, last_name)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -62,42 +62,53 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
       setCustomers(data || []);
     }
   };
-    
-    const handleDelete = async (customer_ulid) => {
-      const confirm = window.confirm(
-        "Are you sure you want to delete this customer?"
-      );
-      if (!confirm) return;
 
-      const { error } = await supabase
-        .from("customers")
-        .delete()
-        .eq("customer_ulid", customer_ulid);
+  const handleDelete = async (customer_ulid) => {
+    const confirm = window.confirm(
+      "Are you sure you want to delete this customer?"
+    );
+    if (!confirm) return;
 
-        if (error) {
-            toast.error("Error deleting customer", { description: error.message });
-      } else {
-        fetchCustomers(); // Refresh table
-        toast.success("Customer deleted successfully");
-      }
-    };
-    function formatPhoneNumber(phone) {
-        try {
-            const number = parsePhoneNumber(phone);
-            return number.formatInternational();
-        } catch (error) {
-            return phone;
-        }
+    const { error } = await supabase
+      .from("customers")
+      .delete()
+      .eq("customer_ulid", customer_ulid);
+
+    if (error) {
+      toast.error("Error deleting customer", { description: error.message });
+    } else {
+      fetchCustomers(); // Refresh table
+      toast.success("Customer deleted successfully");
     }
+  };
+  function formatPhoneNumber(phone) {
+    try {
+      const number = parsePhoneNumber(phone);
+      return number.formatInternational();
+    } catch (error) {
+      return phone;
+    }
+  }
 
   const filteredCustomers = customers.filter((c) => {
+    const referredName = c.referred_by_data
+      ? `${c.referred_by_data.first_name} ${c.referred_by_data.last_name}`
+      : "";
     return (
-      c.first_name?.toLowerCase().includes(filters.first_name.toLowerCase()) &&
-      c.last_name?.toLowerCase().includes(filters.last_name.toLowerCase()) &&
-      c.phone?.includes(filters.phone) &&
-      c.email?.toLowerCase().includes(filters.email.toLowerCase()) &&
-      c.gender?.toLowerCase().includes(filters.gender.toLowerCase()) &&
-      c.loyalty_tier?.toLowerCase().includes(filters.loyalty_tier.toLowerCase())
+      c.first_name
+        ?.toLowerCase()
+        .includes(filters.first_name?.toLowerCase() || "") &&
+      c.last_name
+        ?.toLowerCase()
+        .includes(filters.last_name?.toLowerCase() || "") &&
+      c.phone?.includes(filters.phone || "") &&
+      c.email?.toLowerCase().includes(filters.email?.toLowerCase() || "") &&
+      c.loyalty_tier
+        ?.toLowerCase()
+        .includes(filters.loyalty_tier?.toLowerCase() || "") &&
+      referredName
+        .toLowerCase()
+        .includes((filters.referred_by || "").toLowerCase().trim())
     );
   });
 
@@ -123,8 +134,8 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
               <th className="p-2 text-center w-[140px]">First Name</th>
               <th className="p-2 text-center w-[140px]">Last Name</th>
               <th className="p-2 text-center w-[180px]">Phone</th>
+              <th className="p-2 text-center w-[180px]">Referred By</th>
               <th className="p-2 text-center w-[200px]">Email</th>
-              <th className="p-2 text-center w-[50px]">Gender</th>
               <th className="p-2 text-center w-[50px]">DOB</th>
               <th className="p-2 text-center w-[50px]">Loyalty</th>
               <th className="p-2 text-center w-[50px]">Total Spend</th>
@@ -136,8 +147,8 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                 "first_name",
                 "last_name",
                 "phone",
+                "referred_by",
                 "email",
-                "gender",
                 "",
                 "loyalty_tier",
                 "",
@@ -185,11 +196,13 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                   <td className="p-2 text-center w-[180px]">
                     {formatPhoneNumber(customer.phone)}
                   </td>
+                  <td className="p-2 text-center w-[180px]">
+                    {customer.referred_by_data
+                      ? `${customer.referred_by_data.first_name} ${customer.referred_by_data.last_name}`
+                      : "-"}
+                  </td>
                   <td className="p-2 text-center w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
                     {customer.email}
-                  </td>
-                  <td className="p-2 text-center w-[50px]">
-                    {customer.gender}
                   </td>
                   <td className="p-2 text-center w-[50px]">
                     {customer.date_of_birth
