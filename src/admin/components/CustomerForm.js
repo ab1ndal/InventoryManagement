@@ -37,7 +37,12 @@ const formSchema = z.object({
   email: z.string().email().optional(),
   address: z.string().optional(),
   loyalty_tier: z.string().optional(),
-  date_of_birth: z.date().optional(),
+  date_of_birth: z.preprocess((val) => {
+    if (typeof val === "string" && val.trim() !== "") {
+      return new Date(val);
+    }
+    return val ?? null;
+  }, z.date().optional()),
   gender: z.string().optional(),
   customer_notes: z.string().optional(),
 });
@@ -94,6 +99,7 @@ export default function CustomerForm({
         date_of_birth: values.date_of_birth
           ? values.date_of_birth.toISOString().split("T")[0]
           : null,
+        referred_by: values.referred_by || null,
       };
 
       const { data, error } = await supabase
