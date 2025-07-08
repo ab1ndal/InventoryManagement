@@ -3,6 +3,8 @@ import VariantRow from "./VariantRow";
 import ChevronIcon from "./ChevronIcon";
 import { Button } from "../../components/ui/button";
 import ProductEditDialog from "./ProductEditDialog";
+import { EditButton, PrintButton } from "../../components/ActionButtons";
+import printLabel from "../../components/printLabel";
 
 const ProductRow = ({ product, variants, onEdit, categories }) => {
   const [expanded, setExpanded] = useState(false);
@@ -47,6 +49,37 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
     setOpen(false); // 🔐 Close dialog after saving
   };
 
+  const encodedPriceToCode = (price) => {
+    const map = {
+      1: "A",
+      2: "B",
+      3: "C",
+      4: "D",
+      5: "E",
+      6: "F",
+      7: "G",
+      8: "H",
+      9: "I",
+      0: "Z",
+    };
+    return (
+      "Z" +
+      price
+        .toString()
+        .split("")
+        .map((d) => map[d])
+        .join("")
+    );
+  };
+
+  const getDiscountInfo = (purchasePrice, retailPrice) => {
+    const discountedPrice = +(purchasePrice * 1.3).toFixed(2);
+    const discountPct = retailPrice
+      ? +(((retailPrice - discountedPrice) / retailPrice) * 100).toFixed(0)
+      : 0;
+    return { discountedPrice, discountPct };
+  };
+
   return (
     <>
       <tr
@@ -54,26 +87,38 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
         onClick={handleRowClick}
         style={{ cursor: "pointer" }}
       >
-        <td>
+        <td style={{ textAlign: "center" }}>
           <ChevronIcon expanded={expanded} />
           {product.productid}
         </td>
-        <td>
+        <td style={{ textAlign: "center" }}>
           {categories.find((cat) => cat.categoryid === product.categoryid)
             ?.name || "-"}
         </td>
-        <td>{product.fabric}</td>
-        <td style={{ textAlign: "right" }}>{formatINRCurrency(purchase)}</td>
-        <td style={{ textAlign: "right" }}>{formatINRCurrency(retail)}</td>
-        <td>{markup}%</td>
+        <td style={{ textAlign: "center" }}>{product.fabric}</td>
+        <td style={{ textAlign: "center" }}>
+          {formatINRCurrency(purchase)}
+          <br />
+          <span className="text-xs text-gray-500">
+            ({encodedPriceToCode(purchase)})
+          </span>
+        </td>
+        <td style={{ textAlign: "center" }}>{formatINRCurrency(retail)}</td>
+        <td style={{ textAlign: "center" }}>{markup}%</td>
+        <td style={{ textAlign: "center" }}>
+          {formatINRCurrency(getDiscountInfo(purchase, retail).discountedPrice)}
+          <br />
+          <span className="text-xs text-gray-500">
+            ({getDiscountInfo(purchase, retail).discountPct}% Off)
+          </span>
+        </td>
         <td>{uniqueSizes}</td>
         <td>{uniqueColors}</td>
         <td>{product.description}</td>
-        <td style={{ textAlign: "right" }}>{formatStock(totalStock)}</td>
+        <td style={{ textAlign: "center" }}>{formatStock(totalStock)}</td>
         <td>
-          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-            Edit
-          </Button>
+          <EditButton onClick={() => setOpen(true)} />
+          <PrintButton onClick={() => printLabel(product)} />
         </td>
       </tr>
 

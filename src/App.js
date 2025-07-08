@@ -19,11 +19,11 @@ import ForgetPasswordPage from "./admin/pages/ForgetPasswordPage";
 import ResetPasswordPage from "./admin/pages/ResetPasswordPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
-
+import { TooltipProvider } from "components/ui/tooltip";
 
 function App() {
   return (
-    <>
+    <TooltipProvider>
       <Router>
         <Routes>
           {/* Public Pages */}
@@ -50,7 +50,7 @@ function App() {
         </Routes>
       </Router>
       <Toaster position="bottom-right" richColors closeButton duration={2000} />
-    </>
+    </TooltipProvider>
   );
 }
 

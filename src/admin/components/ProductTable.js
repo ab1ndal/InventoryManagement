@@ -110,6 +110,7 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
           <th className="w-24 text-center">Purchase Price</th>
           <th className="w-24 text-center">Retail Price</th>
           <th className="w-24 text-center">Markup (%)</th>
+          <th className="w-24 text-center">Max Discount Price</th>
           <th className="w-32 text-center">Sizes</th>
           <th className="w-32 text-center">Colors</th>
           <th className="w-64 text-center">Description</th>
