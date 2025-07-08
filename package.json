@@ -20,6 +20,7 @@
     "date-fns": "^4.1.0",
     "libphonenumber-js": "^1.12.9",
     "lucide-react": "^0.516.0",
+    "qz-tray": "^2.2.5",
     "react": "^19.1.0",
     "react-datepicker": "^8.4.0",
     "react-dom": "^19.1.0",
