@@ -24,35 +24,35 @@ const encodePriceToCode = (price) => {
   );
 };
 
-// Generate ZPL string for 4cm x 2.5cm label
-const generateZPLLabel = (product) => {
-  const purchaseCode = encodePriceToCode(product.purchaseprice);
-  const retailPrice = `MRP: ₹${product.retailprice.toFixed(0)}`;
+// Generate TSPL string for 4cm x 2.5cm label
+const generateTSPLLabel = (product) => {
+  const purchaseCode = encodePriceToCode(Number(product.purchaseprice || 0));
+  const retailPrice = `MRP: ₹${Number(product.retailprice || 0).toFixed(0)}`;
+
   const productId = product.productid;
 
   return `
-^XA
-^PW640
-^LL320
-^CF0,30
-^FO20,10^FDBINDAL'S CREATION^FS
+SIZE 40 mm, 25 mm
+GAP 2 mm, 0
+DENSITY 8
+SPEED 4
+DIRECTION 1
+REFERENCE 0,0
+CLS
 
-^BY2,2,60
-^FO20,50^BCN,60,N,N,N^FD${productId}^FS
+TEXT 10,10,"0",0,1,1,"BINDAL'S CREATION"
+BARCODE 10,40,"128",40,1,0,2,2,"${productId}"
+TEXT 10,90,"0",0,1,1,"${productId}"
+TEXT 10,120,"0",0,1,1,"${purchaseCode}"
+TEXT 180,120,"0",0,1,1,"${retailPrice}"
 
-^CF0,35
-^FO20,120^FD${productId}^FS
-
-^CF0,30
-^FO20,160^FD${purchaseCode}^FS
-^FO300,160^FD${retailPrice}^FS
-^XZ
-  `.trim();
+PRINT 1
+`.trim();
 };
 
-// Send ZPL to printer via QZ Tray
-const printLabel = async (product, printerName = "Save as PDF") => {
-  const zpl = generateZPLLabel(product);
+// Send TSPL to printer via QZ Tray
+const printLabel = async (product, printerName = "TSC TTP-224 Pro") => {
+  const tspl = generateTSPLLabel(product);
 
   try {
     // Connect only if not already active
@@ -76,7 +76,7 @@ const printLabel = async (product, printerName = "Save as PDF") => {
       {
         type: "raw",
         format: "plain",
-        data: zpl,
+        data: tspl,
       },
     ]);
 

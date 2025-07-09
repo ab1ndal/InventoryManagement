@@ -315,22 +315,51 @@ export default function ProductEditDialog({
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <textarea
-                      {...field}
-                      rows={4}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              <div className="md:col-span-2">
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <textarea
+                          {...field}
+                          rows={8}
+                          className="w-full h-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="md:col-span-1">
+                {form.getValues("producturl") && (
+                  <div>
+                    <Label>Product Image</Label>
+                    <div className="mt-2 border rounded-md p-2 bg-muted w-fit">
+                      <img
+                        src={`${form.getValues(
+                          "producturl"
+                        )}/display/image.jpg`}
+                        alt="Product Preview"
+                        className="max-h-48 object-contain rounded"
+                        onError={(e) => {
+                          e.target.replaceWith(
+                            Object.assign(document.createElement("div"), {
+                              innerText: "No image found",
+                              className: "text-sm text-muted-foreground italic",
+                            })
+                          );
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             <FormField
               control={form.control}
