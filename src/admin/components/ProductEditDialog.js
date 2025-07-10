@@ -108,8 +108,6 @@ export default function ProductEditDialog({
         productid: product.productid,
       })),
     };
-    console.log("updated", updated);
-    console.log("deletedVariants", deletedVariants);
 
     onClose();
     await onSave(updated, deletedVariants);
