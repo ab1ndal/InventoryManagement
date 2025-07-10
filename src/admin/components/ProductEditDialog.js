@@ -23,6 +23,7 @@ import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
 
 const variantSchema = z.object({
+  variantid: z.string().optional(),
   size: z.string().min(1, "Size is required"),
   color: z.string().min(1, "Color is required"),
   stock: z.coerce.number().nonnegative(),
@@ -66,50 +67,52 @@ export default function ProductEditDialog({
     return `₹${Number(value).toLocaleString("en-IN")}`;
   };
 
+  const originalVariantsRef = React.useRef([]);
+
   useEffect(() => {
     if (product) {
       hasEditedNameRef.current = false; // Reset manual edit tracking
       const mappedVariants = variants.map((variant) => ({
-        size: variant.Size || variant.size || "",
-        color: variant.Color || variant.color || "",
-        stock: variant.Stock || variant.stock || 0,
+        variantid: variant.variantid || undefined,
+        size: variant.size || "",
+        color: variant.color || "",
+        stock: variant.stock || 0,
       }));
 
       form.reset({
         ...product,
         variants: mappedVariants,
       });
+      originalVariantsRef.current = mappedVariants;
     }
   }, [form, product, variants]);
 
   const handleSubmit = async (values) => {
-    const { variants: updatedVariants = [] } = values;
+    const updatedVariants = values.variants ?? [];
 
-    const seen = new Set();
-    const duplicates = updatedVariants.some((variant) => {
-      const key = `${variant.size}-${variant.color}`;
-      if (seen.has(key)) return true;
-      seen.add(key);
-      return false;
-    });
+    const getKey = (v) => v.variantid;
+    const originalKeys = new Set(
+      originalVariantsRef.current.map((v) => getKey(v))
+    );
+    const updatedKeys = new Set(updatedVariants.map((v) => getKey(v)));
 
-    if (duplicates) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Cannot have duplicate size/color combinations",
-      });
-      return;
-    }
+    const deletedVariants = [...originalKeys]
+      .filter((k) => k && !updatedKeys.has(k))
+      .map((variantid) => ({ variantid }));
 
     const updated = {
       ...product,
       ...values,
-      variants: values.variants ?? [],
+      variants: (updatedVariants ?? []).map((v) => ({
+        ...v,
+        productid: product.productid,
+      })),
     };
+    console.log("updated", updated);
+    console.log("deletedVariants", deletedVariants);
 
     onClose();
-    await onSave(updated);
+    await onSave(updated, deletedVariants);
   };
 
   const { fields, append, remove } = useFieldArray({
@@ -391,6 +394,10 @@ export default function ProductEditDialog({
                   key={field.id}
                   className="grid grid-cols-4 gap-2 items-end"
                 >
+                  <input
+                    type="hidden"
+                    {...form.register(`variants.${index}.variantid`)}
+                  />
                   <FormField
                     control={form.control}
                     name={`variants.${index}.size`}
@@ -447,11 +454,14 @@ export default function ProductEditDialog({
 
                   const presetCategories = ["saree"]; // lowercased for case-insensitive match
 
-                  if (presetCategories.includes(categoryName)) {
-                    append({ size: "Free-Size", color: "", stock: 0 });
-                  } else {
-                    append({ size: "", color: "", stock: 0 });
-                  }
+                  append({
+                    variantid: crypto.randomUUID(),
+                    size: presetCategories.includes(categoryName)
+                      ? "Free-Size"
+                      : "",
+                    color: "",
+                    stock: 0,
+                  });
                 }}
               >
                 + Add Variant

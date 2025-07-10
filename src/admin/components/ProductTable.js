@@ -79,7 +79,7 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
     return a.productid - b.productid;
   });
 
-  const handleProductSave = async (updatedProduct) => {
+  const handleProductSave = async (updatedProduct, deletedVariants = []) => {
     try {
       const { variants: updatedVariants = [], ...productData } = updatedProduct;
 
@@ -101,55 +101,46 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
         throw new Error(`Failed to update product: ${productError.message}`);
       }
 
-      // 2. Fetch existing variants
-      const { data: existingVariants = [], error: fetchError } = await supabase
-        .from("productsizecolors")
-        .select("*")
-        .eq("productid", productData.productid);
+      console.log("Product Table: Upsert:", updatedVariants);
 
-      if (fetchError) {
-        throw new Error(
-          `Failed to fetch existing variants: ${fetchError.message}`
-        );
-      }
-
-      // 3. Create maps for comparison
-      const key = (v) => `${v?.size || ""}-${v?.color || ""}`;
-      const existingMap = new Map(existingVariants.map((v) => [key(v), v]));
-      const updatedMap = new Map(updatedVariants.map((v) => [key(v), v]));
-
-      // 4. Upsert new or changed variants
-      const upserts = updatedVariants.map((v) => ({
-        ...v,
-        productid: productData.productid,
-      }));
+      // 2. Upsert variants using variantid
+      const upserts = (updatedVariants ?? [])
+        .filter((v) => v.size && v.color)
+        .map((v) => ({
+          variantid: v.variantid || undefined, // Preserve variantid if present
+          productid: productData.productid,
+          size: v.size,
+          color: v.color,
+          stock: v.stock ?? 0,
+        }));
+      console.log("Upserts", upserts);
 
       const { error: upsertError } = await supabase
         .from("productsizecolors")
-        .upsert(upserts, { onConflict: ["productid", "size", "color"] });
+        .upsert(upserts, { onConflict: ["variantid"] });
 
       if (upsertError) {
+        console.log(upsertError);
         throw new Error(`Failed to upsert variants: ${upsertError.message}`);
       }
 
-      // 5. Delete removed variants
-      const toDelete = Array.from(existingMap.keys()).filter(
-        (k) => !updatedMap.has(k)
+      console.log("Product Table Deletes:", deletedVariants);
+
+      // 3. Delete removed variants by variantid
+      await Promise.all(
+        deletedVariants.map(async ({ variantid }) => {
+          if (!variantid) return;
+          const { error: deleteError } = await supabase
+            .from("productsizecolors")
+            .delete()
+            .eq("variantid", variantid);
+
+          if (deleteError) {
+            console.log(deleteError);
+            throw new Error(`Failed to delete variant: ${deleteError.message}`);
+          }
+        })
       );
-
-      for (const delKey of toDelete) {
-        const [size, color] = delKey.split("-");
-        const { error: deleteError } = await supabase
-          .from("productsizecolors")
-          .delete()
-          .eq("productid", productData.productid)
-          .eq("size", size)
-          .eq("color", color);
-
-        if (deleteError) {
-          throw new Error(`Failed to delete variant: ${deleteError.message}`);
-        }
-      }
 
       if (onProductUpdate) await onProductUpdate();
       toast({
@@ -165,6 +156,7 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
       });
     }
   };
+
 
   useEffect(() => {
     setCurrentPage(0);

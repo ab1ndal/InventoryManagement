@@ -44,8 +44,8 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
     setExpanded((prev) => !prev);
   };
 
-  const handleSave = async (updatedData) => {
-    await onEdit(updatedData); // 🔁 Forward save back to parent
+  const handleSave = async (updatedData, deletedVariants) => {
+    await onEdit(updatedData, deletedVariants); // 🔁 Forward save back to parent
     setOpen(false); // 🔐 Close dialog after saving
   };
 
@@ -135,7 +135,10 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
         open={open}
         onClose={() => setOpen(false)}
         product={product}
-        variants={sizeColorRows}
+        variants={sizeColorRows.map((v) => ({
+          ...v,
+          variantid: v.variantid || crypto.randomUUID(),
+        }))}
         categories={categories}
         onSave={handleSave}
       />
