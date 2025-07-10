@@ -18,7 +18,7 @@ export default function SignupPage() {
       password,
     });
 
-    console.log("error", error);
+    //console.log("error", error);
 
     if (error) {
       sessionStorage.setItem(
@@ -42,10 +42,7 @@ export default function SignupPage() {
     }
   };
 
-
   useEffect(() => {
-    console.log("[SignupPage] useEffect");
-    console.log(sessionStorage.getItem("toastData"));
     const toastData = JSON.parse(sessionStorage.getItem("toastData"));
     if (toastData) {
       toast(toastData.title, {

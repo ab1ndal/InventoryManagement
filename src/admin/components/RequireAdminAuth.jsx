@@ -59,7 +59,7 @@ export default function RequireAdminAuth() {
     // Auth change listener
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        console.log("[RequireAdminAuth] Auth event:", _event, session);
+        //console.log("[RequireAdminAuth] Auth event:", _event, session);
         if (session) {
           setSession(session);
           checkUserRole(session);

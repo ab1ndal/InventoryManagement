@@ -17,7 +17,7 @@ export default function UserRegistration() {
           .single();
 
         if (profileData) {
-          console.log("[UserRegistration] Profile exists:", profileData);
+          //console.log("[UserRegistration] Profile exists:", profileData);
           return;
         }
 
@@ -64,13 +64,11 @@ export default function UserRegistration() {
           data: { session },
         } = await supabase.auth.getSession();
         if (session) {
-          console.log("[UserRegistration] Session restored after retry");
+          //console.log("[UserRegistration] Session restored after retry");
           handleUserRegistration(session);
           return;
         }
-        console.log(
-          `[UserRegistration] Waiting for session... retry ${attempts + 1}`
-        );
+        //console.log(`[UserRegistration] Waiting for session... retry ${attempts + 1}`);
         await new Promise((res) => setTimeout(res, 500));
         attempts++;
       }

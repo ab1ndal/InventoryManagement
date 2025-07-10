@@ -25,7 +25,7 @@ const InventoryPage = () => {
   async function fetchProducts() {
     const { data, error } = await supabase.from("products").select("*");
     if (!error) setProducts(data || []);
-    else console.log("error fetching products: ", error);
+    //else console.log("error fetching products: ", error);
   }
 
   async function fetchProductsSizeColors() {
@@ -33,13 +33,13 @@ const InventoryPage = () => {
       .from("productsizecolors")
       .select("*");
     if (!error) setProductsSizeColors(data || []);
-    else console.log("error fetching products size colors: ", error);
+    //else console.log("error fetching products size colors: ", error);
   }
 
   async function fetchCategories() {
     const { data, error } = await supabase.from("categories").select("*");
     if (!error) setCategories(data || []);
-    else console.log("error fetching categories: ", error);
+    //else console.log("error fetching categories: ", error);
   }
 
   const handleProductUpdate = async () => {

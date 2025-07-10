@@ -101,8 +101,6 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
         throw new Error(`Failed to update product: ${productError.message}`);
       }
 
-      console.log("Product Table: Upsert:", updatedVariants);
-
       // 2. Upsert variants using variantid
       const upserts = (updatedVariants ?? [])
         .filter((v) => v.size && v.color)
@@ -113,18 +111,14 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
           color: v.color,
           stock: v.stock ?? 0,
         }));
-      console.log("Upserts", upserts);
 
       const { error: upsertError } = await supabase
         .from("productsizecolors")
         .upsert(upserts, { onConflict: ["variantid"] });
 
       if (upsertError) {
-        console.log(upsertError);
         throw new Error(`Failed to upsert variants: ${upsertError.message}`);
       }
-
-      console.log("Product Table Deletes:", deletedVariants);
 
       // 3. Delete removed variants by variantid
       await Promise.all(
@@ -136,7 +130,6 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
             .eq("variantid", variantid);
 
           if (deleteError) {
-            console.log(deleteError);
             throw new Error(`Failed to delete variant: ${deleteError.message}`);
           }
         })
