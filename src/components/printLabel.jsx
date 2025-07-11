@@ -51,7 +51,7 @@ PRINT 1
 };
 
 // Send TSPL to printer via QZ Tray
-const printLabel = async (product, printerName = "TSC TTP-224 Pro") => {
+const printLabel = async (product, printerName = "TSC TTP-244 Pro") => {
   const tspl = generateTSPLLabel(product);
 
   try {
