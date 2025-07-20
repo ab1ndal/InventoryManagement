@@ -38,7 +38,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (error) {
-      console.log("Login Failed", error);
+      //console.log("Login Failed", error);
       sessionStorage.setItem("toastData", JSON.stringify({
         title: "Login Failed",
         description: error.message,
@@ -85,8 +85,6 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    console.log("[LoginPage] useEffect");
-    console.log(sessionStorage.getItem("toastData"));
     const toastData = JSON.parse(sessionStorage.getItem("toastData"));
     if (toastData) {
       toast(toastData.title, {

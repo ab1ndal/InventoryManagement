@@ -79,7 +79,7 @@ export default function UserRegistration() {
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        console.log("[UserRegistration] Auth change:", _event, session);
+        //console.log("[UserRegistration] Auth change:", _event, session);
         if (session) {
           handleUserRegistration(session);
         }
