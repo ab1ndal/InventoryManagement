@@ -17,7 +17,8 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
   });
 
   const [currentPage, setCurrentPage] = useState(0);
-  const rowsPerPage = 10;
+  const [inputPage, setInputPage] = useState((currentPage + 1).toString());
+  const rowsPerPage = 15;
 
   const filteredProducts = useMemo(() => {
     const result = products.filter((product) => {
@@ -150,13 +151,24 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
     }
   };
 
-
   useEffect(() => {
     setCurrentPage(0);
   }, [filters]);
+
+  useEffect(() => {
+    setInputPage((currentPage + 1).toString());
+  }, [currentPage]);
+
   const filterInputClass =
     "h-7 text-xs border-gray-300 bg-muted text-gray-800 placeholder-gray-400 text-center";
 
+  const handlePageInput = () => {
+    const newPage = parseInt(inputPage) - 1;
+    if (!isNaN(newPage) && newPage >= 0 && newPage < pageCount) {
+      setCurrentPage(newPage);
+    }
+    setInputPage((currentPage + 1).toString()); // reset to valid current page
+  };
   return (
     <div className="overflow-x-auto">
       <table className="product-table">
@@ -253,7 +265,15 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
           ))}
         </tbody>
       </table>
-      <div className="flex justify-center items-center gap-4 py-4">
+      <div className="flex justify-center items-center gap-2 py-4 flex-wrap text-sm text-gray-600">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage(0)}
+          disabled={currentPage === 0}
+        >
+          First
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -262,9 +282,25 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
         >
           Previous
         </Button>
-        <span className="text-sm text-gray-600">
-          Page {currentPage + 1} of {pageCount}
-        </span>
+        <div className="flex items-center gap-2">
+          <span>Page</span>
+          <Input
+            type="number"
+            className="h-7 w-16 text-center text-sm"
+            min={1}
+            max={pageCount}
+            value={inputPage}
+            onChange={(e) => setInputPage(e.target.value)}
+            onBlur={handlePageInput}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handlePageInput();
+              }
+            }}
+          />
+          <span>of {pageCount}</span>
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -276,6 +312,14 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
           disabled={(currentPage + 1) * rowsPerPage >= filteredProducts.length}
         >
           Next
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage(pageCount - 1)}
+          disabled={currentPage === pageCount - 1}
+        >
+          Last
         </Button>
       </div>
     </div>
