@@ -34,15 +34,13 @@ const formSchema = z.object({
   first_name: z.string().min(1),
   last_name: z.string().min(1),
   phone: z.string().regex(/^\+\d[\d\s]{9,20}$/, "Must start with country code"),
-  email: z.string().email().optional(),
+  email: z.string().email("Invalid email").or(z.literal("")).optional(),
   address: z.string().optional(),
   loyalty_tier: z.string().optional(),
-  date_of_birth: z.preprocess((val) => {
-    if (typeof val === "string" && val.trim() !== "") {
-      return new Date(val);
-    }
-    return val ?? null;
-  }, z.date().optional()),
+  date_of_birth: z.preprocess(
+    (val) => (val === "" || val === undefined ? null : new Date(val)),
+    z.date().nullable().optional()
+  ),
   gender: z.string().optional(),
   customer_notes: z.string().optional(),
 });
@@ -65,9 +63,11 @@ export default function CustomerForm({
       email: "",
       address: "",
       loyalty_tier: "bronze",
-      date_of_birth: defaultValues.date_of_birth
-        ? new Date(defaultValues.date_of_birth + "T00:00:00")
-        : null,
+      date_of_birth:
+        defaultValues.date_of_birth &&
+        !isNaN(new Date(defaultValues.date_of_birth))
+          ? new Date(defaultValues.date_of_birth)
+          : null,
       gender: "",
       customer_notes: "",
       ...defaultValues,
@@ -123,6 +123,20 @@ export default function CustomerForm({
 
   React.useEffect(() => {
     if (!open) return;
+
+    form.reset({
+      first_name: "",
+      last_name: "",
+      phone: "+91",
+      email: "",
+      address: "",
+      loyalty_tier: "bronze",
+      date_of_birth: null,
+      gender: "",
+      customer_notes: "",
+      referred_by: null,
+      ...defaultValues, // if you want to support edit mode too
+    });
 
     const fetchCustomers = async () => {
       const { data, error } = await supabase
@@ -266,7 +280,11 @@ export default function CustomerForm({
                     <FormControl>
                       <div className="mt-1">
                         <DatePicker
-                          selected={field.value}
+                          selected={
+                            field.value instanceof Date && !isNaN(field.value)
+                              ? field.value
+                              : null
+                          }
                           onChange={(date) => field.onChange(date)}
                           dateFormat="dd/MM/yyyy"
                           showYearDropdown

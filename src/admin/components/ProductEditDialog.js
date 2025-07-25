@@ -78,6 +78,7 @@ export default function ProductEditDialog({
         color: variant.color || "",
         stock: variant.stock || 0,
       }));
+      console.log(mappedVariants);
 
       form.reset({
         ...product,
@@ -108,7 +109,7 @@ export default function ProductEditDialog({
         productid: product.productid,
       })),
     };
-
+    console.log(values);
     onClose();
     await onSave(updated, deletedVariants);
   };
