@@ -15,6 +15,14 @@ const InventoryPage = () => {
   const [categories, setCategories] = useState([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { toast } = useToast();
+  const [filters, setFilters] = useState({
+    productid: "",
+    category: "",
+    fabric: "",
+    size: "",
+    color: "",
+    description: "",
+  });
 
   useEffect(() => {
     fetchProducts();
@@ -105,14 +113,29 @@ const InventoryPage = () => {
 
   return (
     <div>
-      <Button className="m-4" onClick={() => setAddDialogOpen(true)}>
-        + Add Product
-      </Button>
+      <div className="flex justify-between items-center m-4 gap-4">
+        <Button onClick={() => setAddDialogOpen(true)}>+ Add Product</Button>
+        <Button
+          variant="secondary"
+          onClick={() =>
+            setFilters({
+              productid: "",
+              category: "",
+              fabric: "",
+              size: "",
+              color: "",
+              description: "",
+            })
+          }
+        >
+          Clear Filters
+        </Button>
+      </div>
       <ProductTable
-        products={products}
-        variants={productsSizeColors}
         categories={categories}
         onProductUpdate={handleProductUpdate}
+        filters={filters}
+        setFilters={setFilters}
       />
       <Toaster />
       <ProductEditDialog

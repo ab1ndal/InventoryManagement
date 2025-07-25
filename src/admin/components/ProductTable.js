@@ -1,90 +1,159 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import ProductRow from "./ProductRow";
 import { supabase } from "../../lib/supabaseClient";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
+import { Loader2 } from "lucide-react";
 
-const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
+const ProductTable = ({ categories, onProductUpdate, filters, setFilters }) => {
   const { toast } = useToast();
-  const [filters, setFilters] = useState({
-    productid: "",
-    category: "",
-    fabric: "",
-    size: "",
-    color: "",
-    description: "",
-  });
 
   const [currentPage, setCurrentPage] = useState(0);
-  const [inputPage, setInputPage] = useState((currentPage + 1).toString());
+  const [inputPage, setInputPage] = useState("1");
   const rowsPerPage = 15;
+  const [products, setProducts] = useState([]);
+  const [variants, setVariants] = useState([]);
+  const [filteredProductIds, setFilteredProductIds] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const filteredProducts = useMemo(() => {
-    const result = products.filter((product) => {
-      const relatedVariants = variants.filter(
-        (v) => v.productid === product.productid
-      );
-      const hasMatchingSize = filters.size
-        ? relatedVariants.some((v) =>
-            (v.size || "").toLowerCase().includes(filters.size.toLowerCase())
-          )
-        : true;
-      const hasMatchingColor = filters.color
-        ? relatedVariants.some((v) =>
-            (v.color || "").toLowerCase().includes(filters.color.toLowerCase())
-          )
-        : true;
+  const fetchMatchingProductIds = async () => {
+    const batchSize = 1000;
+    let allIds = new Set();
+    let from = 0;
+    let done = false;
 
-      return (
-        product.productid
-          .toLowerCase()
-          .includes(filters.productid.toLowerCase()) &&
-        (
-          categories.find((cat) => cat.categoryid === product.categoryid)
-            ?.name || ""
-        )
-          .toLowerCase()
-          .includes(filters.category.toLowerCase()) &&
-        (product.fabric || "")
-          .toLowerCase()
-          .includes(filters.fabric.toLowerCase()) &&
-        (product.description || "")
-          .toLowerCase()
-          .includes(filters.description.toLowerCase()) &&
-        hasMatchingSize &&
-        hasMatchingColor
-      );
-    });
+    while (!done) {
+      let query = supabase
+        .from("products")
+        .select("productid, categoryid, fabric, description")
+        .range(from, from + batchSize - 1);
 
-    // ✅ Sort the filtered result
-    return [...result].sort((a, b) => {
-      if (typeof a.productid === "string") {
-        return a.productid.localeCompare(b.productid);
-      }
-      return a.productid - b.productid;
-    });
-  }, [products, variants, filters]);
+      const { data, error } = await query;
+      if (error || !data) break;
 
-  const paginatedProducts = useMemo(() => {
-    const startIndex = currentPage * rowsPerPage;
-    return filteredProducts.slice(startIndex, startIndex + rowsPerPage);
-  }, [filteredProducts, currentPage]);
+      const filtered = data.filter((p) => {
+        const matchesProductId = filters.productid
+          ? p.productid.toLowerCase().includes(filters.productid.toLowerCase())
+          : true;
+        const matchesFabric = filters.fabric
+          ? (p.fabric || "")
+              .toLowerCase()
+              .includes(filters.fabric.toLowerCase())
+          : true;
+        const matchesDesc = filters.description
+          ? (p.description || "")
+              .toLowerCase()
+              .includes(filters.description.toLowerCase())
+          : true;
+        const categoryName =
+          categories.find((cat) => cat.categoryid === p.categoryid)?.name || "";
+        const matchesCategory = filters.category
+          ? categoryName.toLowerCase().includes(filters.category.toLowerCase())
+          : true;
 
-  const pageCount = Math.ceil(filteredProducts.length / rowsPerPage);
+        return (
+          matchesProductId && matchesFabric && matchesDesc && matchesCategory
+        );
+      });
 
-  const sortedProducts = [...products].sort((a, b) => {
-    if (typeof a.productid === "string") {
-      return a.productid.localeCompare(b.productid);
+      filtered.forEach((p) => allIds.add(p.productid));
+
+      if (data.length < batchSize) done = true;
+      else from += batchSize;
     }
-    return a.productid - b.productid;
-  });
+
+    if (filters.size || filters.color) {
+      const { data: variantMatches } = await supabase
+        .from("productsizecolors")
+        .select("productid")
+        .or(
+          [
+            filters.size ? `size.ilike.%${filters.size}%` : "",
+            filters.color ? `color.ilike.%${filters.color}%` : "",
+          ]
+            .filter(Boolean)
+            .join(",")
+        );
+
+      if (variantMatches) {
+        const matchingFromVariants = new Set(
+          variantMatches.map((v) => v.productid)
+        );
+        allIds = new Set(
+          [...allIds].filter((id) => matchingFromVariants.has(id))
+        );
+      }
+    }
+
+    return [...allIds];
+  };
+
+  const fetchPaginatedProducts = async (productIds, page = 0) => {
+    const sortedIds = [...productIds].sort((a, b) => a.localeCompare(b));
+    const idsForPage = sortedIds.slice(
+      page * rowsPerPage,
+      (page + 1) * rowsPerPage
+    );
+    const { data: prods } = await supabase
+      .from("products")
+      .select("*")
+      .in("productid", idsForPage);
+    const { data: vars } = await supabase
+      .from("productsizecolors")
+      .select("*")
+      .in("productid", idsForPage);
+    return { products: prods || [], variants: vars || [] };
+  };
+
+  useEffect(() => {
+    const loadFilteredPaginated = async () => {
+      setLoading(true);
+      const matchingIds = await fetchMatchingProductIds();
+      setFilteredProductIds(matchingIds);
+      setCurrentPage(0);
+      const { products: pageProducts, variants: pageVariants } =
+        await fetchPaginatedProducts(matchingIds, 0);
+      setProducts(pageProducts);
+      setVariants(pageVariants);
+      setLoading(false);
+    };
+    loadFilteredPaginated();
+  }, [filters]);
+
+  useEffect(() => {
+    const loadPage = async () => {
+      setLoading(true);
+      const { products: pageProducts, variants: pageVariants } =
+        await fetchPaginatedProducts(filteredProductIds, currentPage);
+      setProducts(pageProducts);
+      setVariants(pageVariants);
+      setLoading(false);
+    };
+    if (filteredProductIds.length > 0) loadPage();
+  }, [currentPage]);
+
+  useEffect(() => {
+    setInputPage((currentPage + 1).toString());
+  }, [currentPage]);
+
+  const pageCount = Math.ceil(filteredProductIds.length / rowsPerPage);
+
+  const filterInputClass =
+    "h-7 text-xs border-gray-300 bg-muted text-gray-800 placeholder-gray-400 text-center";
+
+  const handlePageInput = () => {
+    const newPage = parseInt(inputPage) - 1;
+    if (!isNaN(newPage) && newPage >= 0 && newPage < pageCount) {
+      setCurrentPage(newPage);
+    }
+    setInputPage((currentPage + 1).toString());
+  };
 
   const handleProductSave = async (updatedProduct, deletedVariants = []) => {
     try {
       const { variants: updatedVariants = [], ...productData } = updatedProduct;
 
-      // 1. Update product info
       const { error: productError } = await supabase
         .from("products")
         .update({
@@ -98,15 +167,12 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
         })
         .eq("productid", productData.productid);
 
-      if (productError) {
-        throw new Error(`Failed to update product: ${productError.message}`);
-      }
+      if (productError) throw new Error(productError.message);
 
-      // 2. Upsert variants using variantid
-      const upserts = (updatedVariants ?? [])
+      const upserts = updatedVariants
         .filter((v) => v.size && v.color)
         .map((v) => ({
-          variantid: v.variantid || undefined, // Preserve variantid if present
+          variantid: v.variantid || undefined,
           productid: productData.productid,
           size: v.size,
           color: v.color,
@@ -117,11 +183,8 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
         .from("productsizecolors")
         .upsert(upserts, { onConflict: ["variantid"] });
 
-      if (upsertError) {
-        throw new Error(`Failed to upsert variants: ${upsertError.message}`);
-      }
+      if (upsertError) throw new Error(upsertError.message);
 
-      // 3. Delete removed variants by variantid
       await Promise.all(
         deletedVariants.map(async ({ variantid }) => {
           if (!variantid) return;
@@ -129,10 +192,7 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
             .from("productsizecolors")
             .delete()
             .eq("variantid", variantid);
-
-          if (deleteError) {
-            throw new Error(`Failed to delete variant: ${deleteError.message}`);
-          }
+          if (deleteError) throw new Error(deleteError.message);
         })
       );
 
@@ -146,29 +206,11 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
       toast({
         variant: "destructive",
         title: "Update Failed",
-        description: error.message || "Could not update product",
+        description: error.message,
       });
     }
   };
 
-  useEffect(() => {
-    setCurrentPage(0);
-  }, [filters]);
-
-  useEffect(() => {
-    setInputPage((currentPage + 1).toString());
-  }, [currentPage]);
-
-  const filterInputClass =
-    "h-7 text-xs border-gray-300 bg-muted text-gray-800 placeholder-gray-400 text-center";
-
-  const handlePageInput = () => {
-    const newPage = parseInt(inputPage) - 1;
-    if (!isNaN(newPage) && newPage >= 0 && newPage < pageCount) {
-      setCurrentPage(newPage);
-    }
-    setInputPage((currentPage + 1).toString()); // reset to valid current page
-  };
   return (
     <div className="overflow-x-auto">
       <table className="product-table">
@@ -191,7 +233,7 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
             <th>
               <Input
                 className={filterInputClass}
-                placeholder="ID"
+                placeholder="Product ID"
                 value={filters.productid}
                 onChange={(e) =>
                   setFilters({ ...filters, productid: e.target.value })
@@ -218,7 +260,10 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
                 }
               />
             </th>
-            <th colSpan={4}></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
             <th>
               <Input
                 className={filterInputClass}
@@ -249,20 +294,28 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
                 }
               />
             </th>
-            <th colSpan={2}></th>
+            <th></th>
+            <th></th>
           </tr>
         </thead>
-
         <tbody>
-          {paginatedProducts.map((product) => (
-            <ProductRow
-              key={product.productid}
-              product={product}
-              categories={categories}
-              variants={variants}
-              onEdit={handleProductSave}
-            />
-          ))}
+          {loading ? (
+            <tr>
+              <td colSpan={12} className="text-center py-6">
+                <Loader2 className="h-5 w-5 mx-auto animate-spin text-muted-foreground" />
+              </td>
+            </tr>
+          ) : (
+            products.map((product) => (
+              <ProductRow
+                key={product.productid}
+                product={product}
+                categories={categories}
+                variants={variants}
+                onEdit={handleProductSave}
+              />
+            ))
+          )}
         </tbody>
       </table>
       <div className="flex justify-center items-center gap-2 py-4 flex-wrap text-sm text-gray-600">
@@ -292,24 +345,15 @@ const ProductTable = ({ products, variants, categories, onProductUpdate }) => {
             value={inputPage}
             onChange={(e) => setInputPage(e.target.value)}
             onBlur={handlePageInput}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handlePageInput();
-              }
-            }}
+            onKeyDown={(e) => e.key === "Enter" && handlePageInput()}
           />
           <span>of {pageCount}</span>
         </div>
         <Button
           variant="outline"
           size="sm"
-          onClick={() =>
-            setCurrentPage((p) =>
-              (p + 1) * rowsPerPage >= filteredProducts.length ? p : p + 1
-            )
-          }
-          disabled={(currentPage + 1) * rowsPerPage >= filteredProducts.length}
+          onClick={() => setCurrentPage((p) => p + 1)}
+          disabled={currentPage + 1 >= pageCount}
         >
           Next
         </Button>
