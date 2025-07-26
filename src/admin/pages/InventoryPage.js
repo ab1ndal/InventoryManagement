@@ -1,5 +1,5 @@
 // src/admin/pages/InventoryPage.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import ProductTable from "../components/ProductTable";
 import ProductEditDialog from "../components/ProductEditDialog";
@@ -10,8 +10,7 @@ import { useToast } from "../../components/hooks/use-toast";
 import "../../App.css";
 
 const InventoryPage = () => {
-  const [products, setProducts] = useState([]);
-  const [productsSizeColors, setProductsSizeColors] = useState([]);
+  const [refreshFlag, setRefreshFlag] = useState(0);
   const [categories, setCategories] = useState([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -23,37 +22,18 @@ const InventoryPage = () => {
     color: "",
     description: "",
   });
+  const triggerRefresh = () => setRefreshFlag((prev) => prev + 1);
+  const tableRef = useRef(null);
 
   useEffect(() => {
-    fetchProducts();
-    fetchProductsSizeColors();
     fetchCategories();
   }, []);
-
-  async function fetchProducts() {
-    const { data, error } = await supabase.from("products").select("*");
-    if (!error) setProducts(data || []);
-    //else console.log("error fetching products: ", error);
-  }
-
-  async function fetchProductsSizeColors() {
-    const { data, error } = await supabase
-      .from("productsizecolors")
-      .select("*");
-    if (!error) setProductsSizeColors(data || []);
-    //else console.log("error fetching products size colors: ", error);
-  }
 
   async function fetchCategories() {
     const { data, error } = await supabase.from("categories").select("*");
     if (!error) setCategories(data || []);
     //else console.log("error fetching categories: ", error);
   }
-
-  const handleProductUpdate = async () => {
-    await fetchProducts();
-    await fetchProductsSizeColors();
-  };
 
   const handleAddProduct = async (newProductData) => {
     try {
@@ -83,8 +63,10 @@ const InventoryPage = () => {
 
       if (insertErr) throw new Error("Product insert failed");
 
+      let variantData = [];
+
       if (variants.length) {
-        const variantData = variants.map((v) => ({
+        variantData = variants.map((v) => ({
           ...v,
           productid: newProductId,
         }));
@@ -96,7 +78,10 @@ const InventoryPage = () => {
         if (varErr) throw new Error("Variants insert failed");
       }
 
-      await handleProductUpdate();
+      if (tableRef.current?.addProductToTable) {
+        tableRef.current.addProductToTable(fullProduct, variantData);
+      }
+
       toast({
         title: "Product Added",
         description: `Successfully added ${fullProduct.name}`,
@@ -132,10 +117,15 @@ const InventoryPage = () => {
         </Button>
       </div>
       <ProductTable
+        ref={tableRef}
         categories={categories}
-        onProductUpdate={handleProductUpdate}
+        onProductUpdate={triggerRefresh}
         filters={filters}
         setFilters={setFilters}
+        refreshFlag={refreshFlag}
+        onProductAdd={(productid) => {
+          console.log("Added product: ", productid);
+        }}
       />
       <Toaster />
       <ProductEditDialog

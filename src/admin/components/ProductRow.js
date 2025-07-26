@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import VariantRow from "./VariantRow";
 import ChevronIcon from "./ChevronIcon";
-import { Button } from "../../components/ui/button";
 import ProductEditDialog from "./ProductEditDialog";
 import { EditButton, PrintButton } from "../../components/ActionButtons";
 import printLabel from "../../components/printLabel";
