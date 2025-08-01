@@ -14,11 +14,9 @@ import {
   FormControl,
   FormLabel,
 } from "../../components/ui/form";
-import { formatDate } from "../../utility/dateFormat"
-import { formatLivePhoneInput } from "../../utility/formatPhone"
+import { formatLivePhoneInput } from "../../utility/formatPhone";
 import { toast } from "sonner";
 import { z } from "zod";
-import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import {
   Dialog,
@@ -31,16 +29,12 @@ import CustomDropdown from "../../components/CustomDropdown";
 
 const formSchema = z.object({
   referred_by: z.coerce.number().optional(),
-  first_name: z.string().min(1),
-  last_name: z.string().min(1),
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
   phone: z.string().regex(/^\+\d[\d\s]{9,20}$/, "Must start with country code"),
   email: z.string().email("Invalid email").or(z.literal("")).optional(),
   address: z.string().optional(),
   loyalty_tier: z.string().optional(),
-  date_of_birth: z.preprocess(
-    (val) => (val === "" || val === undefined ? null : new Date(val)),
-    z.date().nullable().optional()
-  ),
   gender: z.string().optional(),
   customer_notes: z.string().optional(),
 });
@@ -63,11 +57,6 @@ export default function CustomerForm({
       email: "",
       address: "",
       loyalty_tier: "bronze",
-      date_of_birth:
-        defaultValues.date_of_birth &&
-        !isNaN(new Date(defaultValues.date_of_birth))
-          ? new Date(defaultValues.date_of_birth)
-          : null,
       gender: "",
       customer_notes: "",
       ...defaultValues,
@@ -96,9 +85,6 @@ export default function CustomerForm({
         ...values,
         phone: values.phone.replace(/\s/g, ""),
         customer_ulid: ulid,
-        date_of_birth: values.date_of_birth
-          ? values.date_of_birth.toISOString().split("T")[0]
-          : null,
         referred_by: values.referred_by || null,
       };
 
@@ -131,7 +117,6 @@ export default function CustomerForm({
       email: "",
       address: "",
       loyalty_tier: "bronze",
-      date_of_birth: null,
       gender: "",
       customer_notes: "",
       referred_by: null,
@@ -178,7 +163,7 @@ export default function CustomerForm({
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input {...field} placeholder="Enter First Name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -191,7 +176,7 @@ export default function CustomerForm({
                   <FormItem>
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Input {...field} placeholder="Enter Last Name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -225,7 +210,11 @@ export default function CustomerForm({
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input {...field} type="email" />
+                      <Input
+                        {...field}
+                        placeholder="Enter Email"
+                        type="email"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -233,15 +222,41 @@ export default function CustomerForm({
               />
             </div>
 
+            <FormField
+              name="address"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Enter Address" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
               <FormField
-                name="address"
+                name="gender"
                 control={form.control}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>Gender</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <select
+                        {...field}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">Select</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                        <option value="Prefer not to say">
+                          Prefer not to say
+                        </option>
+                        <option value="Unknown">Unknown</option>
+                      </select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -269,63 +284,6 @@ export default function CustomerForm({
                 )}
               />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                name="date_of_birth"
-                control={form.control}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date of Birth</FormLabel>
-                    <FormControl>
-                      <div className="mt-1">
-                        <DatePicker
-                          selected={
-                            field.value instanceof Date && !isNaN(field.value)
-                              ? field.value
-                              : null
-                          }
-                          onChange={(date) => field.onChange(date)}
-                          dateFormat="dd/MM/yyyy"
-                          showYearDropdown
-                          showMonthDropdown
-                          dropdownMode="select"
-                          minDate={new Date("1950-01-01")}
-                          maxDate={new Date()}
-                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                name="gender"
-                control={form.control}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Gender</FormLabel>
-                    <FormControl>
-                      <select
-                        {...field}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      >
-                        <option value="">Select</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                        <option value="Other">Other</option>
-                        <option value="Prefer not to say">
-                          Prefer not to say
-                        </option>
-                        <option value="Unknown">Unknown</option>
-                      </select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
             <FormField
               control={form.control}
               name="referred_by"
@@ -335,21 +293,26 @@ export default function CustomerForm({
                   <FormControl>
                     <CustomDropdown
                       value={field.value}
-                      onChange={field.onChange}
+                      onChange={(val) =>
+                        field.onChange(val === "" ? null : val)
+                      }
                       onBlur={field.onBlur}
-                      options={customers
-                        .filter(
-                          (c) => c.customerid !== defaultValues.customerid
-                        )
-                        .sort((a, b) =>
-                          `${a.first_name} ${a.last_name}`.localeCompare(
-                            `${b.first_name} ${b.last_name}`
+                      options={[
+                        { value: "", label: "None" },
+                        ...customers
+                          .filter(
+                            (c) => c.customerid !== defaultValues.customerid
                           )
-                        )
-                        .map((c) => ({
-                          value: c.customerid,
-                          label: `${c.first_name} ${c.last_name} | ${c.phone}`,
-                        }))}
+                          .sort((a, b) =>
+                            `${a.first_name} ${a.last_name}`.localeCompare(
+                              `${b.first_name} ${b.last_name}`
+                            )
+                          )
+                          .map((c) => ({
+                            value: c.customerid,
+                            label: `${c.first_name} ${c.last_name} | ${c.phone}`,
+                          })),
+                      ]}
                       placeholder="Select Referrer"
                     />
                   </FormControl>

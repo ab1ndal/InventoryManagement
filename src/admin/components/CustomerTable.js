@@ -136,7 +136,6 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
               <th className="p-2 text-center w-[180px]">Phone</th>
               <th className="p-2 text-center w-[180px]">Referred By</th>
               <th className="p-2 text-center w-[200px]">Email</th>
-              <th className="p-2 text-center w-[50px]">DOB</th>
               <th className="p-2 text-center w-[50px]">Loyalty</th>
               <th className="p-2 text-center w-[50px]">Total Spend</th>
               <th className="p-2 text-center w-[50px]">Last Purchase</th>
@@ -149,7 +148,6 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                 "phone",
                 "referred_by",
                 "email",
-                "",
                 "loyalty_tier",
                 "",
                 "",
@@ -204,11 +202,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                   <td className="p-2 text-center w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
                     {customer.email}
                   </td>
-                  <td className="p-2 text-center w-[50px]">
-                    {customer.date_of_birth
-                      ? formatDate(customer.date_of_birth)
-                      : "-"}
-                  </td>
+
                   <td className="p-2 text-center w-[50px]">
                     <Tooltip>
                       <TooltipTrigger asChild>
