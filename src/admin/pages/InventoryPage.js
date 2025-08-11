@@ -49,28 +49,13 @@ const InventoryPage = () => {
       }
     );
     if (error) throw error;
-    const nextId = `${prefix}${String(maxNum + 1).padStart(3, "0")}`;
+    const nextId = `BC${String(maxNum + 1).padStart(3, "0")}`;
     return nextId;
   }
 
   const handleAddProduct = async (newProductData) => {
     try {
       const { variants = [], ...productFields } = newProductData;
-
-      //const { data: existing, error: fetchErr } = await supabase
-      //  .from("products")
-      //  .select("productid")
-      //  .like("productid", "BC25%");
-
-      //if (fetchErr) throw new Error("Failed to fetch product IDs");
-
-      //const maxId = existing
-      //  .map((p) => parseInt(p.productid?.replace("BC25", "") || 0, 10))
-      //  .filter((n) => !isNaN(n))
-      //  .reduce((a, b) => Math.max(a, b), 0);
-
-      //const newNumericPart = (maxId + 1).toString().padStart(3, "0");
-      //const newProductId = `BC25${newNumericPart}`;
       const newProductId = await getNextProductId();
 
       const fullProduct = { ...productFields, productid: newProductId };
