@@ -7,7 +7,10 @@ import {
 } from "react-router-dom";
 import AdminLayout from "./admin/components/AdminLayout";
 import InventoryPage from "./admin/pages/InventoryPage";
-import SalesPage from "./admin/pages/SalesPage";
+import BillingPage from "./admin/pages/BillingPage";
+import VoucherPage from "./admin/pages/VoucherPage";
+import DiscountPage from "./admin/pages/DiscountPage";
+import ExchangePage from "./admin/pages/ExchangePage";
 import CustomersPage from "./admin/pages/CustomersPage";
 import SuppliersPage from "./admin/pages/SuppliersPage";
 import LoginPage from "./admin/pages/LoginPage";
@@ -41,7 +44,10 @@ function App() {
           <Route path="/admin" element={<RequireAdminAuth />}>
             <Route element={<AdminLayout />}>
               <Route path="inventory" element={<InventoryPage />} />
-              <Route path="sales" element={<SalesPage />} />
+              <Route path="bills" element={<BillingPage />} />
+              <Route path="vouchers" element={<VoucherPage />} />
+              <Route path="discounts" element={<DiscountPage />} />
+              <Route path="exchanges" element={<ExchangePage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="suppliers" element={<SuppliersPage />} />
               <Route path="users" element={<UserManagement />} />

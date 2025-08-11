@@ -35,24 +35,43 @@ const InventoryPage = () => {
     //else console.log("error fetching categories: ", error);
   }
 
+  function getYearPrefix(date = new Date()) {
+    const yy = String(date.getFullYear()).slice(-2);
+    return `BC${yy}`;
+  }
+
+  async function getNextProductId() {
+    const prefix = getYearPrefix(); // "BC25" then "BC26" next year
+    const { data: maxNum, error } = await supabase.rpc(
+      "get_max_product_suffix",
+      {
+        p_prefix: prefix,
+      }
+    );
+    if (error) throw error;
+    const nextId = `${prefix}${String(maxNum + 1).padStart(3, "0")}`;
+    return nextId;
+  }
+
   const handleAddProduct = async (newProductData) => {
     try {
       const { variants = [], ...productFields } = newProductData;
 
-      const { data: existing, error: fetchErr } = await supabase
-        .from("products")
-        .select("productid")
-        .like("productid", "BC25%");
+      //const { data: existing, error: fetchErr } = await supabase
+      //  .from("products")
+      //  .select("productid")
+      //  .like("productid", "BC25%");
 
-      if (fetchErr) throw new Error("Failed to fetch product IDs");
+      //if (fetchErr) throw new Error("Failed to fetch product IDs");
 
-      const maxId = existing
-        .map((p) => parseInt(p.productid?.replace("BC25", "") || 0, 10))
-        .filter((n) => !isNaN(n))
-        .reduce((a, b) => Math.max(a, b), 0);
+      //const maxId = existing
+      //  .map((p) => parseInt(p.productid?.replace("BC25", "") || 0, 10))
+      //  .filter((n) => !isNaN(n))
+      //  .reduce((a, b) => Math.max(a, b), 0);
 
-      const newNumericPart = (maxId + 1).toString().padStart(3, "0");
-      const newProductId = `BC25${newNumericPart}`;
+      //const newNumericPart = (maxId + 1).toString().padStart(3, "0");
+      //const newProductId = `BC25${newNumericPart}`;
+      const newProductId = await getNextProductId();
 
       const fullProduct = { ...productFields, productid: newProductId };
       const { error: insertErr } = await supabase
