@@ -87,14 +87,14 @@ const InventoryPage = () => {
       }
 
       toast({
-        title: "Product Added",
+        title: `Product Added - ${fullProduct.productid}`,
         description: `Successfully added ${fullProduct.name}`,
       });
     } catch (err) {
       console.error(err);
       toast({
         variant: "destructive",
-        title: "Add Failed",
+        title: "Adding Product Failed",
         description: err.message,
       });
     }
