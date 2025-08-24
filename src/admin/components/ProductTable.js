@@ -3,6 +3,8 @@ import React, {
   forwardRef,
   useState,
   useEffect,
+  useRef,
+  useCallback,
 } from "react";
 import ProductRow from "./ProductRow";
 import { supabase } from "../../lib/supabaseClient";
@@ -32,58 +34,75 @@ const ProductTable = forwardRef(
     const [variants, setVariants] = useState([]);
     const [filteredProductIds, setFilteredProductIds] = useState([]);
     const [loading, setLoading] = useState(false);
+    const keyCache = useRef(new Map());
 
     useImperativeHandle(ref, () => ({
       addProductToTable,
       updateProductInTable,
     }));
 
-    const fetchMatchingProductIds = async () => {
+    const productIdSortKey = useCallback((id) => {
+      const cache = keyCache.current;
+      const cached = cache.get(id);
+      if (cached) return cached;
+      const m = /^BC(\d{2})(\d+)$/.exec(id);
+      const key = m ? m[1] + m[2].padStart(6, "0") : "ZZ" + id;
+      cache.set(id, key);
+      return key;
+    }, []);
+
+    const fetchMatchingProductIds = useCallback(async () => {
       const batchSize = 1000;
-      let allIds = new Set();
+      const allIds = new Set();
       let from = 0;
       let done = false;
 
       while (!done) {
-        let query = supabase
+        const { data, error } = await supabase
           .from("products")
           .select("productid, categoryid, fabric, description")
           .range(from, from + batchSize - 1);
 
-        const { data, error } = await query;
         if (error || !data) break;
 
-        const filtered = data.filter((p) => {
+        for (const p of data) {
           const matchesProductId = filters.productid
             ? p.productid
                 .toLowerCase()
                 .includes(filters.productid.toLowerCase())
             : true;
+
           const matchesFabric = filters.fabric
             ? (p.fabric || "")
                 .toLowerCase()
                 .includes(filters.fabric.toLowerCase())
             : true;
+
           const matchesDesc = filters.description
             ? (p.description || "")
                 .toLowerCase()
                 .includes(filters.description.toLowerCase())
             : true;
+
           const categoryName =
             categories.find((cat) => cat.categoryid === p.categoryid)?.name ||
             "";
+
           const matchesCategory = filters.category
             ? categoryName
                 .toLowerCase()
                 .includes(filters.category.toLowerCase())
             : true;
 
-          return (
-            matchesProductId && matchesFabric && matchesDesc && matchesCategory
-          );
-        });
-
-        filtered.forEach((p) => allIds.add(p.productid));
+          if (
+            matchesProductId &&
+            matchesFabric &&
+            matchesDesc &&
+            matchesCategory
+          ) {
+            allIds.add(p.productid);
+          }
+        }
 
         if (data.length < batchSize) done = true;
         else from += batchSize;
@@ -106,31 +125,60 @@ const ProductTable = forwardRef(
           const matchingFromVariants = new Set(
             variantMatches.map((v) => v.productid)
           );
-          allIds = new Set(
-            [...allIds].filter((id) => matchingFromVariants.has(id))
-          );
+          for (const id of Array.from(allIds)) {
+            if (!matchingFromVariants.has(id)) allIds.delete(id);
+          }
         }
       }
 
-      return [...allIds];
-    };
+      return Array.from(allIds);
+    }, [
+      filters.productid,
+      filters.fabric,
+      filters.description,
+      filters.category,
+      filters.size,
+      filters.color,
+      categories,
+    ]);
 
-    const fetchPaginatedProducts = async (productIds, page = 0) => {
-      const sortedIds = [...productIds].sort((a, b) => a.localeCompare(b));
-      const idsForPage = sortedIds.slice(
-        page * rowsPerPage,
-        (page + 1) * rowsPerPage
-      );
-      const { data: prods } = await supabase
-        .from("products")
-        .select("*")
-        .in("productid", idsForPage);
-      const { data: vars } = await supabase
-        .from("productsizecolors")
-        .select("*")
-        .in("productid", idsForPage);
-      return { products: prods || [], variants: vars || [] };
-    };
+    const fetchPaginatedProducts = useCallback(
+      async (productIds, page = 0) => {
+        const uniqueIds = Array.from(new Set(productIds));
+        const keyed = uniqueIds.map((id) => ({
+          id,
+          key: productIdSortKey(id),
+        }));
+        keyed.sort((a, b) => a.key.localeCompare(b.key));
+        const sortedIds = keyed.map((x) => x.id);
+
+        const idsForPage = sortedIds.slice(
+          page * rowsPerPage,
+          (page + 1) * rowsPerPage
+        );
+        if (idsForPage.length === 0) return { products: [], variants: [] };
+
+        const { data: prods } = await supabase
+          .from("products")
+          .select("*")
+          .in("productid", idsForPage);
+
+        const { data: vars } = await supabase
+          .from("productsizecolors")
+          .select("*")
+          .in("productid", idsForPage);
+
+        const pos = new Map(idsForPage.map((id, i) => [id, i]));
+        const byPageOrder = (a, b) =>
+          (pos.get(a.productid) ?? 0) - (pos.get(b.productid) ?? 0);
+
+        const prodsOrdered = (prods ?? []).slice().sort(byPageOrder);
+        const varsOrdered = (vars ?? []).slice().sort(byPageOrder);
+
+        return { products: prodsOrdered, variants: varsOrdered };
+      },
+      [rowsPerPage, productIdSortKey]
+    );
 
     useEffect(() => {
       const loadFilteredPaginated = async () => {
@@ -145,7 +193,7 @@ const ProductTable = forwardRef(
         setLoading(false);
       };
       loadFilteredPaginated();
-    }, [filters, refreshFlag]);
+    }, [filters, refreshFlag, fetchMatchingProductIds, fetchPaginatedProducts]);
 
     useEffect(() => {
       const loadPage = async () => {
@@ -157,7 +205,7 @@ const ProductTable = forwardRef(
         setLoading(false);
       };
       if (filteredProductIds.length > 0) loadPage();
-    }, [currentPage]);
+    }, [currentPage, filteredProductIds, fetchPaginatedProducts]);
 
     useEffect(() => {
       setInputPage((currentPage + 1).toString());

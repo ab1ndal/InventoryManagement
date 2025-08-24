@@ -41,15 +41,24 @@ const InventoryPage = () => {
   }
 
   async function getNextProductId() {
-    const prefix = getYearPrefix(); // "BC25" then "BC26" next year
+    const prefix = getYearPrefix(); // "BC25"
     const { data: maxNum, error } = await supabase.rpc(
       "get_max_product_suffix",
-      {
-        p_prefix: prefix,
-      }
+      { p_prefix: prefix }
     );
     if (error) throw error;
-    const nextId = `BC${String(maxNum + 1).padStart(3, "0")}`;
+
+    // maxNum is like 25999 for ID "BC25999"
+    const yearDigits = prefix.slice(2); // "25"
+    const maxStr = maxNum ? String(maxNum) : ""; // "25999" or ""
+    const suffixNow = maxStr.startsWith(yearDigits)
+      ? parseInt(maxStr.slice(yearDigits.length) || "0", 10)
+      : 0;
+
+    const nextSuffix = suffixNow + 1; // 1000 after 999
+    const nextId = `${prefix}${String(nextSuffix).padStart(3, "0")}`;
+    // After BC25999 this yields BC251000
+
     return nextId;
   }
 
