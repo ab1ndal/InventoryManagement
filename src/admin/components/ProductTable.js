@@ -102,8 +102,6 @@ const ProductTable = forwardRef(
             (filters.purchaseMax === "" ||
               p.purchaseprice <= Number(filters.purchaseMax));
 
-          console.log(filters.purchaseMin, filters.purchaseMax);
-
           const matchesRetail =
             (filters.retailMin === "" ||
               p.retailprice >= Number(filters.retailMin)) &&
@@ -116,10 +114,6 @@ const ProductTable = forwardRef(
               discountPrice >= Number(filters.discountPriceMin)) &&
             (filters.discountPriceMax === "" ||
               discountPrice <= Number(filters.discountPriceMax));
-
-          console.log("matchesPurchase", matchesPurchase);
-          console.log("matchesRetail", matchesRetail);
-          console.log("matchesDiscountPrice", matchesDiscountPrice);
 
           if (
             matchesProductId &&
