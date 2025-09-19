@@ -21,6 +21,11 @@ export default function Navbar() {
           </Link>
         </li>
         <li>
+          <Link to="/mockups" className="hover:underline">
+            Mockups
+          </Link>
+        </li>
+        <li>
           <Link to="/orders" className="hover:underline">
             Orders
           </Link>

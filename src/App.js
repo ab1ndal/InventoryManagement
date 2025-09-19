@@ -23,6 +23,7 @@ import ResetPasswordPage from "./admin/pages/ResetPasswordPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
 import { TooltipProvider } from "components/ui/tooltip";
+import MockupPage from "./admin/pages/MockupPage";
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
               <Route path="vouchers" element={<VoucherPage />} />
               <Route path="discounts" element={<DiscountPage />} />
               <Route path="exchanges" element={<ExchangePage />} />
+              <Route path="mockups" element={<MockupPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="suppliers" element={<SuppliersPage />} />
               <Route path="users" element={<UserManagement />} />

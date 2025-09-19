@@ -6,6 +6,7 @@ import { toast } from "sonner";
 const navItems = [
   { label: "Users", path: "/admin/users" },
   { label: "Inventory", path: "/admin/inventory" },
+  { label: "Mockups", path: "/admin/mockups" },
   { label: "Bills", path: "/admin/bills" },
   { label: "Vouchers", path: "/admin/vouchers" },
   { label: "Discounts", path: "/admin/discounts" },
