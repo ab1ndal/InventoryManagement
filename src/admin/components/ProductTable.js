@@ -60,7 +60,9 @@ const ProductTable = forwardRef(
       while (!done) {
         const { data, error } = await supabase
           .from("products")
-          .select("productid, categoryid, fabric, description")
+          .select(
+            "productid, categoryid, fabric, description, purchaseprice, retailprice"
+          )
           .range(from, from + batchSize - 1);
 
         if (error || !data) break;
@@ -94,11 +96,39 @@ const ProductTable = forwardRef(
                 .includes(filters.category.toLowerCase())
             : true;
 
+          const matchesPurchase =
+            (filters.purchaseMin === "" ||
+              p.purchaseprice >= Number(filters.purchaseMin)) &&
+            (filters.purchaseMax === "" ||
+              p.purchaseprice <= Number(filters.purchaseMax));
+
+          console.log(filters.purchaseMin, filters.purchaseMax);
+
+          const matchesRetail =
+            (filters.retailMin === "" ||
+              p.retailprice >= Number(filters.retailMin)) &&
+            (filters.retailMax === "" ||
+              p.retailprice <= Number(filters.retailMax));
+
+          const discountPrice = p.purchaseprice * 1.3;
+          const matchesDiscountPrice =
+            (filters.discountPriceMin === "" ||
+              discountPrice >= Number(filters.discountPriceMin)) &&
+            (filters.discountPriceMax === "" ||
+              discountPrice <= Number(filters.discountPriceMax));
+
+          console.log("matchesPurchase", matchesPurchase);
+          console.log("matchesRetail", matchesRetail);
+          console.log("matchesDiscountPrice", matchesDiscountPrice);
+
           if (
             matchesProductId &&
             matchesFabric &&
             matchesDesc &&
-            matchesCategory
+            matchesCategory &&
+            matchesPurchase &&
+            matchesRetail &&
+            matchesDiscountPrice
           ) {
             allIds.add(p.productid);
           }
@@ -108,25 +138,40 @@ const ProductTable = forwardRef(
         else from += batchSize;
       }
 
-      if (filters.size || filters.color) {
-        const { data: variantMatches } = await supabase
-          .from("productsizecolors")
-          .select("productid")
-          .or(
-            [
-              filters.size ? `size.ilike.%${filters.size}%` : "",
-              filters.color ? `color.ilike.%${filters.color}%` : "",
-            ]
-              .filter(Boolean)
-              .join(",")
-          );
+      if (
+        filters.size ||
+        filters.color ||
+        filters.stockMin ||
+        filters.stockMax
+      ) {
+        const stockMinNumber =
+          filters.stockMin !== "" && filters.stockMin != null
+            ? Number(filters.stockMin)
+            : null;
+        const stockMaxNumber =
+          filters.stockMax !== "" && filters.stockMax != null
+            ? Number(filters.stockMax)
+            : null;
+        const conditions = [];
+        if (filters.size) conditions.push(`size.ilike.%${filters.size}%`);
+        if (filters.color) conditions.push(`color.ilike.%${filters.color}%`);
+        if (stockMinNumber !== null && !Number.isNaN(stockMinNumber))
+          conditions.push(`stock.gte.${stockMinNumber}`);
+        if (stockMaxNumber !== null && !Number.isNaN(stockMaxNumber))
+          conditions.push(`stock.lte.${stockMaxNumber}`);
+        if (conditions.length > 0) {
+          const { data: variantMatches } = await supabase
+            .from("productsizecolors")
+            .select("productid")
+            .or(conditions.join(","));
 
-        if (variantMatches) {
-          const matchingFromVariants = new Set(
-            variantMatches.map((v) => v.productid)
-          );
-          for (const id of Array.from(allIds)) {
-            if (!matchingFromVariants.has(id)) allIds.delete(id);
+          if (variantMatches) {
+            const matchingFromVariants = new Set(
+              variantMatches.map((v) => v.productid)
+            );
+            for (const id of Array.from(allIds)) {
+              if (!matchingFromVariants.has(id)) allIds.delete(id);
+            }
           }
         }
       }
@@ -140,6 +185,14 @@ const ProductTable = forwardRef(
       filters.size,
       filters.color,
       categories,
+      filters.discountPriceMin,
+      filters.discountPriceMax,
+      filters.purchaseMin,
+      filters.purchaseMax,
+      filters.retailMin,
+      filters.retailMax,
+      filters.stockMin,
+      filters.stockMax,
     ]);
 
     const fetchPaginatedProducts = useCallback(
@@ -370,10 +423,88 @@ const ProductTable = forwardRef(
                   }
                 />
               </th>
+              <th>
+                <div className="flex flex-col gap-1">
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Min"
+                    value={filters.purchaseMin ?? ""}
+                    onChange={(e) =>
+                      setFilters({ ...filters, purchaseMin: e.target.value })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Max"
+                    value={filters.purchaseMax ?? ""}
+                    onChange={(e) =>
+                      setFilters({ ...filters, purchaseMax: e.target.value })
+                    }
+                  />
+                </div>
+              </th>
+
+              <th>
+                <div className="flex flex-col gap-1">
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Min"
+                    value={filters.retailMin ?? ""}
+                    onChange={(e) =>
+                      setFilters({ ...filters, retailMin: e.target.value })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Max"
+                    value={filters.retailMax ?? ""}
+                    onChange={(e) =>
+                      setFilters({ ...filters, retailMax: e.target.value })
+                    }
+                  />
+                </div>
+              </th>
+
               <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
+              <th>
+                <div className="flex flex-col gap-1">
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Min"
+                    value={filters.discountPriceMin ?? ""}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        discountPriceMin: e.target.value,
+                      })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Max"
+                    value={filters.discountPriceMax ?? ""}
+                    onChange={(e) =>
+                      setFilters({
+                        ...filters,
+                        discountPriceMax: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </th>
+
               <th>
                 <Input
                   className={filterInputClass}
@@ -404,7 +535,31 @@ const ProductTable = forwardRef(
                   }
                 />
               </th>
-              <th></th>
+              <th>
+                <div className="flex flex-col gap-1">
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Min"
+                    value={filters.stockMin ?? ""}
+                    onChange={(e) =>
+                      setFilters({ ...filters, stockMin: e.target.value })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    step="any"
+                    className={filterInputClass}
+                    placeholder="Max"
+                    value={filters.stockMax ?? ""}
+                    onChange={(e) =>
+                      setFilters({ ...filters, stockMax: e.target.value })
+                    }
+                  />
+                </div>
+              </th>
+
               <th></th>
             </tr>
           </thead>

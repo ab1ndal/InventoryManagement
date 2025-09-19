@@ -21,6 +21,14 @@ const InventoryPage = () => {
     size: "",
     color: "",
     description: "",
+    purchaseMin: "",
+    purchaseMax: "",
+    retailMin: "",
+    retailMax: "",
+    discountPriceMin: "",
+    discountPriceMax: "",
+    stockMin: "",
+    stockMax: "",
   });
   const triggerRefresh = () => setRefreshFlag((prev) => prev + 1);
   const tableRef = useRef(null);
@@ -123,6 +131,14 @@ const InventoryPage = () => {
               size: "",
               color: "",
               description: "",
+              purchaseMin: "",
+              purchaseMax: "",
+              retailMin: "",
+              retailMax: "",
+              discountPriceMin: "",
+              discountPriceMax: "",
+              stockMin: "",
+              stockMax: "",
             })
           }
         >
