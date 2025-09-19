@@ -539,22 +539,30 @@ const ProductTable = forwardRef(
                 <div className="flex flex-col gap-1">
                   <Input
                     type="number"
-                    step="any"
+                    step={1}
+                    min={0}
                     className={filterInputClass}
                     placeholder="Min"
                     value={filters.stockMin ?? ""}
                     onChange={(e) =>
-                      setFilters({ ...filters, stockMin: e.target.value })
+                      setFilters({
+                        ...filters,
+                        stockMin: parseInt(e.target.value),
+                      })
                     }
                   />
                   <Input
                     type="number"
-                    step="any"
+                    step={1}
+                    min={0}
                     className={filterInputClass}
                     placeholder="Max"
                     value={filters.stockMax ?? ""}
                     onChange={(e) =>
-                      setFilters({ ...filters, stockMax: e.target.value })
+                      setFilters({
+                        ...filters,
+                        stockMax: parseInt(e.target.value),
+                      })
                     }
                   />
                 </div>
