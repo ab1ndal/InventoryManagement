@@ -239,162 +239,197 @@ useEffect(() => {
           Clear Filters
         </Button>
       </div>
-      <table className="product-table">
-        <thead>
-          <tr>
-            <th className="w-32 text-center">Product ID</th>
-            <th className="w-32 text-center">Purchase Z Code</th>
-            <th className="w-32 text-center">Category</th>
-            <th className="w-32 text-center">Fabric</th>
-            <th className="w-40 text-center">Sizes</th>
-            <th className="w-40 text-center">Colors</th>
-            <th className="w-24 text-center">Redo</th>
-            <th className="w-24 text-center">Base Mockup</th>
-            <th className="w-24 text-center">File Mockup</th>
-            <th className="w-24 text-center">Mockup</th>
-            <th className="w-24 text-center">Video</th>
-            <th className="w-24 text-center">IG Post</th>
-            <th className="w-24 text-center">IG Reel</th>
-            <th className="w-24 text-center">WhatsApp</th>
-            <th className="w-36 text-center">Last IG Post</th>
-            <th className="w-40 text-center">Last WhatsApp Post</th>
-          </tr>
-          {stats && (
-            <tr className="text-xs text-gray-600">
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th></th>
-              <th className="text-center">
-                {stats.redo_true}/{stats.total_count}
-              </th>
-              <th className="text-center">
-                {stats.base_mockup_true}/{stats.total_count}
-              </th>
-              <th className="text-center">
-                {stats.file_mockup_true}/{stats.total_count}
-              </th>
-              <th className="text-center">
-                {stats.mockup_true}/{stats.total_count}
-              </th>
-              <th className="text-center">
-                {stats.video_true}/{stats.total_count}
-              </th>
-              <th className="text-center">
-                {stats.ig_post_true}/{stats.total_count}
-              </th>
-              <th className="text-center">
-                {stats.ig_reel_true}/{stats.total_count}
-              </th>
-              <th className="text-center">
-                {stats.whatsapp_true}/{stats.total_count}
-              </th>
-              <th></th>
-              <th></th>
-            </tr>
-          )}
-          {/* filter row */}
-          <tr>
-            <th>
-              <Input
-                className={filterInputClass}
-                placeholder="Product ID"
-                value={filters.productid}
-                onChange={(e) =>
-                  setFilters({ ...filters, productid: e.target.value })
-                }
-              />
-            </th>
-            <th></th>
-            <th>
-              <Input
-                className={filterInputClass}
-                placeholder="Category"
-                value={filters.category}
-                onChange={(e) =>
-                  setFilters({ ...filters, category: e.target.value })
-                }
-              />
-            </th>
-            <th>
-              <Input
-                className={filterInputClass}
-                placeholder="Fabric"
-                value={filters.fabric}
-                onChange={(e) =>
-                  setFilters({ ...filters, fabric: e.target.value })
-                }
-              />
-            </th>
-            <th>
-              <Input
-                className={filterInputClass}
-                placeholder="Size"
-                value={filters.size}
-                onChange={(e) =>
-                  setFilters({ ...filters, size: e.target.value })
-                }
-              />
-            </th>
-            <th>
-              <Input
-                className={filterInputClass}
-                placeholder="Color"
-                value={filters.color}
-                onChange={(e) =>
-                  setFilters({ ...filters, color: e.target.value })
-                }
-              />
-            </th>
-            {[
-              "redo",
-              "base_mockup",
-              "file_mockup",
-              "mockup",
-              "video",
-              "ig_post",
-              "ig_reel",
-              "whatsapp",
-            ].map((f) => (
-              <th key={f}>
-                <select
-                  className="h-7 text-xs border-gray-300 bg-muted text-gray-800 text-center"
-                  value={filters[f]}
-                  onChange={(e) =>
-                    setFilters({ ...filters, [f]: e.target.value })
-                  }
-                >
-                  <option value="">All</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </th>
-            ))}
-            <th></th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
+      <div className="overflow-y-auto max-h-[80vh]">
+        <table className="product-table w-full border-collapse">
+          <thead className="bg-gray-100">
             <tr>
-              <td colSpan={16} className="text-center py-6">
-                <Loader2 className="h-5 w-5 mx-auto animate-spin text-muted-foreground" />
-              </td>
+              <th className="sticky top-0 z-30 bg-gray-100 w-32 text-center">
+                Product ID
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-32 text-center">
+                Purchase Z Code
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-32 text-center">
+                Category
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-32 text-center">
+                Fabric
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-40 text-center">
+                Sizes
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-40 text-center">
+                Colors
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                Redo
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                Base Mockup
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                File Mockup
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                Mockup
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                Video
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                IG Post
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                IG Reel
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
+                WhatsApp
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-36 text-center">
+                Last IG Post
+              </th>
+              <th className="sticky top-0 z-30 bg-gray-100 w-40 text-center">
+                Last WhatsApp Post
+              </th>
             </tr>
-          ) : (
-            rows.map((row) => (
-              <MockupRow
-                key={row.productid}
-                row={row}
-                onToggle={onToggle}
-                canEdit={canEdit}
-              />
-            ))
-          )}
-        </tbody>
-      </table>
+            {stats && (
+              <tr className="text-xs text-gray-600">
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.redo_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.base_mockup_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.file_mockup_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.mockup_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.video_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.ig_post_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.ig_reel_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                  {stats.whatsapp_true}/{stats.total_count}
+                </th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky top-20 z-20 bg-gray-100"></th>
+              </tr>
+            )}
+            {/* filter row */}
+            <tr>
+              <th className="sticky top-28 z-10 bg-gray-100">
+                <Input
+                  className={filterInputClass}
+                  placeholder="Product ID"
+                  value={filters.productid}
+                  onChange={(e) =>
+                    setFilters({ ...filters, productid: e.target.value })
+                  }
+                />
+              </th>
+              <th className="sticky top-28 z-10 bg-gray-100"></th>
+              <th className="sticky top-28 z-10 bg-gray-100">
+                <Input
+                  className={filterInputClass}
+                  placeholder="Category"
+                  value={filters.category}
+                  onChange={(e) =>
+                    setFilters({ ...filters, category: e.target.value })
+                  }
+                />
+              </th>
+              <th className="sticky top-28 z-10 bg-gray-100">
+                <Input
+                  className={filterInputClass}
+                  placeholder="Fabric"
+                  value={filters.fabric}
+                  onChange={(e) =>
+                    setFilters({ ...filters, fabric: e.target.value })
+                  }
+                />
+              </th>
+              <th className="sticky top-28 z-10 bg-gray-100">
+                <Input
+                  className={filterInputClass}
+                  placeholder="Size"
+                  value={filters.size}
+                  onChange={(e) =>
+                    setFilters({ ...filters, size: e.target.value })
+                  }
+                />
+              </th>
+              <th className="sticky top-28 z-10 bg-gray-100">
+                <Input
+                  className={filterInputClass}
+                  placeholder="Color"
+                  value={filters.color}
+                  onChange={(e) =>
+                    setFilters({ ...filters, color: e.target.value })
+                  }
+                />
+              </th>
+              {[
+                "redo",
+                "base_mockup",
+                "file_mockup",
+                "mockup",
+                "video",
+                "ig_post",
+                "ig_reel",
+                "whatsapp",
+              ].map((f) => (
+                <th key={f} className="sticky top-28 z-10 bg-gray-100">
+                  <select
+                    className="sticky top-10 h-7 text-xs border-gray-300 bg-muted text-gray-800 text-center"
+                    value={filters[f]}
+                    onChange={(e) =>
+                      setFilters({ ...filters, [f]: e.target.value })
+                    }
+                  >
+                    <option value="">All</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </th>
+              ))}
+              <th className="sticky top-28 z-10 bg-gray-100"></th>
+              <th className="sticky top-28 z-10 bg-gray-100"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={16} className="text-center py-6">
+                  <Loader2 className="h-5 w-5 mx-auto animate-spin text-muted-foreground" />
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <MockupRow
+                  key={row.productid}
+                  row={row}
+                  onToggle={onToggle}
+                  canEdit={canEdit}
+                />
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {/* pagination */}
       <div className="flex justify-center items-center gap-2 py-4 flex-wrap text-sm text-gray-600">
