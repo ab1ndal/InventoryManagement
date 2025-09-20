@@ -300,7 +300,6 @@ useEffect(() => {
                 <th className="sticky top-20 z-20 bg-gray-100"></th>
                 <th className="sticky top-20 z-20 bg-gray-100"></th>
                 <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
                 <th className="sticky top-20 z-20 bg-gray-100 text-center">
                   {stats.redo_true}/{stats.total_count}
                 </th>
