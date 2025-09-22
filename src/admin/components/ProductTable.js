@@ -25,6 +25,7 @@ const ProductTable = forwardRef(
     },
     ref
   ) => {
+    console.log("Filters: ", filters);
     const { toast } = useToast();
 
     const [currentPage, setCurrentPage] = useState(0);
@@ -131,63 +132,74 @@ const ProductTable = forwardRef(
         if (data.length < batchSize) done = true;
         else from += batchSize;
       }
+      const hasText = (s) => typeof s === "string" && s.trim() !== "";
+      const isNumberSet = (v) => v !== "" && v != null;
 
       if (
-        filters.size ||
-        filters.color ||
-        filters.stockMin ||
-        filters.stockMax
+        hasText(filters.size) ||
+        hasText(filters.color) ||
+        isNumberSet(filters.stockMin) ||
+        isNumberSet(filters.stockMax)
       ) {
-        const stockMinNumber =
-          filters.stockMin !== "" && filters.stockMin != null
-            ? Number(filters.stockMin)
+        const toNumberOrNull = (val) =>
+          val !== "" && val != null && !Number.isNaN(Number(val))
+            ? Number(val)
             : null;
-        const stockMaxNumber =
-          filters.stockMax !== "" && filters.stockMax != null
-            ? Number(filters.stockMax)
-            : null;
-        const conditions = [];
-        if (filters.size) conditions.push(`size.ilike.%${filters.size}%`);
-        if (filters.color) conditions.push(`color.ilike.%${filters.color}%`);
-        if (stockMinNumber !== null && !Number.isNaN(stockMinNumber))
-          conditions.push(`stock.gte.${stockMinNumber}`);
-        if (stockMaxNumber !== null && !Number.isNaN(stockMaxNumber))
-          conditions.push(`stock.lte.${stockMaxNumber}`);
-        if (conditions.length > 0) {
-          const { data: variantMatches } = await supabase
-            .from("productsizecolors")
-            .select("productid")
-            .or(conditions.join(","));
+        const stockMinNumber = toNumberOrNull(filters.stockMin);
+        const stockMaxNumber = toNumberOrNull(filters.stockMax);
 
-          if (variantMatches) {
-            const matchingFromVariants = new Set(
-              variantMatches.map((v) => v.productid)
-            );
-            for (const id of Array.from(allIds)) {
-              if (!matchingFromVariants.has(id)) allIds.delete(id);
+        let query = supabase.from("productsizecolors").select("productid");
+
+        console.log("Filters: ", filters);
+
+        if (filters.size) query = query.ilike("size", `%${filters.size}%`);
+        if (filters.color) {
+          const colorFilters = filters.color
+            .split(",")
+            .map((c) => c.trim())
+            .filter((c) => c.length > 0);
+
+          if (colorFilters.length > 1) {
+            // OR across multiple colors
+            const orConditions = colorFilters
+              .map((c) => `color.ilike.%${c}%`)
+              .join(",");
+            query = query.or(orConditions);
+          } else {
+            query = query.ilike("color", `%${colorFilters[0]}%`);
+          }
+        }
+
+        // Stock range filters
+        if (stockMinNumber !== null) {
+          query = query.gte("stock", stockMinNumber);
+        }
+        if (stockMaxNumber !== null) {
+          query = query.lte("stock", stockMaxNumber);
+        }
+
+        console.log("Query: ", query);
+        const { data: variantMatches, error } = await query;
+
+        if (error) {
+          console.log("ProductSizeColors Error: ", error);
+        }
+
+        if (variantMatches) {
+          const matchingFromVariants = new Set(
+            variantMatches.map((v) => v.productid)
+          );
+          // Intersect variant matches with product-level matches
+          for (const id of Array.from(allIds)) {
+            if (!matchingFromVariants.has(id)) {
+              allIds.delete(id);
             }
           }
         }
       }
 
       return Array.from(allIds);
-    }, [
-      filters.productid,
-      filters.fabric,
-      filters.description,
-      filters.category,
-      filters.size,
-      filters.color,
-      categories,
-      filters.discountPriceMin,
-      filters.discountPriceMax,
-      filters.purchaseMin,
-      filters.purchaseMax,
-      filters.retailMin,
-      filters.retailMax,
-      filters.stockMin,
-      filters.stockMax,
-    ]);
+    }, [filters, categories]);
 
     const fetchPaginatedProducts = useCallback(
       async (productIds, page = 0) => {
@@ -541,7 +553,7 @@ const ProductTable = forwardRef(
                     onChange={(e) =>
                       setFilters({
                         ...filters,
-                        stockMin: parseInt(e.target.value),
+                        stockMin: e.target.value,
                       })
                     }
                   />
@@ -555,7 +567,7 @@ const ProductTable = forwardRef(
                     onChange={(e) =>
                       setFilters({
                         ...filters,
-                        stockMax: parseInt(e.target.value),
+                        stockMax: e.target.value,
                       })
                     }
                   />
