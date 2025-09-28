@@ -1,7 +1,7 @@
 // src/admin/pages/BillingPage.js
 import React, { useState } from "react";
 import BillTable from "../components/BillTable";
-import BillingForm from "../components/BillForm";
+import BillingForm from "../components/billing/BillingForm";
 import { Button } from "../../components/ui/button";
 
 export default function BillingPage() {
