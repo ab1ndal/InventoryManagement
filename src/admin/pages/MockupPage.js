@@ -2,8 +2,15 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import MockupTable from "../components/MockupTable";
-import { Toaster } from "../../components/ui/toaster";
+//import { Toaster } from "../../components/ui/toaster";
 import { Button } from "../../components/ui/button";
+import MockupGraphsPage from "./MockupGraphsPage";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "../../components/ui/tabs";
 
 export default function MockupPage() {
   const [role, setRole] = useState(null);
@@ -45,15 +52,28 @@ export default function MockupPage() {
   const canEdit = role === "superadmin";
 
   return (
-    <div>
+    <div className="p-4">
       <div className="flex justify-between items-center m-4 gap-4">
         <h1 className="text-xl font-semibold">Mockup Tracker</h1>
         <Button variant="secondary" onClick={() => window.location.reload()}>
           Refresh
         </Button>
       </div>
-      <MockupTable canEdit={canEdit} />
-      <Toaster />
+
+      <Tabs defaultValue="table">
+        <TabsList>
+          <TabsTrigger value="table">Table</TabsTrigger>
+          <TabsTrigger value="graphs">Graphs</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="table">
+          <MockupTable canEdit={canEdit} />
+        </TabsContent>
+
+        <TabsContent value="graphs">
+          <MockupGraphsPage /> {/* Sankey diagram + counts */}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

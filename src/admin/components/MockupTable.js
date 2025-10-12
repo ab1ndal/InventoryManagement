@@ -5,12 +5,12 @@ import MockupRow from "./MockupRow";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Loader2 } from "lucide-react";
-import { useToast } from "../../components/hooks/use-toast";
+//import { useToast } from "../../components/hooks/use-toast";
 
 const ROWS_PER_PAGE = 100;
 
 export default function MockupTable({ canEdit }) {
-  const { toast } = useToast();
+  //const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -50,165 +50,164 @@ export default function MockupTable({ canEdit }) {
     setInputPage(String(currentPage + 1));
   }, [currentPage]);
 
-useEffect(() => {
-  const run = async () => {
-    setLoading(true);
-    try {
-      // start building query
-      let baseQuery = supabase.from("mockups_view");
+  useEffect(() => {
+    const run = async () => {
+      setLoading(true);
+      try {
+        // start building query
+        let baseQuery = supabase.from("mockups_view");
 
-      // apply filters to row query
-      const applyFilters = (q) => {
-        if (filters.productid)
-          q = q.ilike("productid", `%${filters.productid}%`);
-        if (filters.category) q = q.ilike("category", `%${filters.category}%`);
-        if (filters.fabric) q = q.ilike("fabric", `%${filters.fabric}%`);
-        if (filters.size) q = q.ilike("sizes", `%${filters.size}%`);
-        if (filters.color) q = q.ilike("colors", `%${filters.color}%`);
+        // apply filters to row query
+        const applyFilters = (q) => {
+          if (filters.productid)
+            q = q.ilike("productid", `%${filters.productid}%`);
+          if (filters.category)
+            q = q.ilike("category", `%${filters.category}%`);
+          if (filters.fabric) q = q.ilike("fabric", `%${filters.fabric}%`);
+          if (filters.size) q = q.ilike("sizes", `%${filters.size}%`);
+          if (filters.color) q = q.ilike("colors", `%${filters.color}%`);
 
-        [
-          "redo",
-          "base_mockup",
-          "file_mockup",
-          "mockup",
-          "video",
-          "ig_post",
-          "ig_reel",
-          "whatsapp",
-        ].forEach((field) => {
-          const val = (filters[field] || "").toLowerCase();
-          if (val === "true") q = q.eq(field, true);
-          if (val === "false") q = q.eq(field, false);
-        });
-        return q;
-      };
+          [
+            "redo",
+            "base_mockup",
+            "file_mockup",
+            "mockup",
+            "video",
+            "ig_post",
+            "ig_reel",
+            "whatsapp",
+          ].forEach((field) => {
+            const val = (filters[field] || "").toLowerCase();
+            if (val === "true") q = q.eq(field, true);
+            if (val === "false") q = q.eq(field, false);
+          });
+          return q;
+        };
 
-      // add ordering and pagination
-      const from = currentPage * ROWS_PER_PAGE;
-      const to = from + ROWS_PER_PAGE - 1;
+        // add ordering and pagination
+        const from = currentPage * ROWS_PER_PAGE;
+        const to = from + ROWS_PER_PAGE - 1;
 
-      let rowQuery = applyFilters(
-        baseQuery
-          .select("*", { count: "exact" })
-          .order("year_code", { ascending: true })
-          .order("product_num", { ascending: true })
-          .range(from, to)
-      );
+        let rowQuery = applyFilters(
+          baseQuery
+            .select("*", { count: "exact" })
+            .order("year_code", { ascending: true })
+            .order("product_num", { ascending: true })
+            .range(from, to)
+        );
 
-      // run both queries in parallel: rows + stats RPC
-      const [
-        { data: rowData, error: rowErr, count },
-        { data: statsData, error: statsErr },
-      ] = await Promise.all([
-        rowQuery,
-        supabase
-          .rpc("mockups_stats_filtered", {
-            _productid: filters.productid || null,
-            _category: filters.category || null,
-            _fabric: filters.fabric || null,
-            _size: filters.size || null,
-            _color: filters.color || null,
-            _redo:
-              filters.redo === "true"
-                ? true
-                : filters.redo === "false"
-                ? false
-                : null,
-            _base_mockup:
-              filters.base_mockup === "true"
-                ? true
-                : filters.base_mockup === "false"
-                ? false
-                : null,
-            _file_mockup:
-              filters.file_mockup === "true"
-                ? true
-                : filters.file_mockup === "false"
-                ? false
-                : null,
-            _mockup:
-              filters.mockup === "true"
-                ? true
-                : filters.mockup === "false"
-                ? false
-                : null,
-            _video:
-              filters.video === "true"
-                ? true
-                : filters.video === "false"
-                ? false
-                : null,
-            _ig_post:
-              filters.ig_post === "true"
-                ? true
-                : filters.ig_post === "false"
-                ? false
-                : null,
-            _ig_reel:
-              filters.ig_reel === "true"
-                ? true
-                : filters.ig_reel === "false"
-                ? false
-                : null,
-            _whatsapp:
-              filters.whatsapp === "true"
-                ? true
-                : filters.whatsapp === "false"
-                ? false
-                : null,
-          })
-          .single(),
-      ]);
+        // run both queries in parallel: rows + stats RPC
+        const [
+          { data: rowData, error: rowErr, count },
+          { data: statsData, error: statsErr },
+        ] = await Promise.all([
+          rowQuery,
+          supabase
+            .rpc("mockups_stats_filtered", {
+              _productid: filters.productid || null,
+              _category: filters.category || null,
+              _fabric: filters.fabric || null,
+              _size: filters.size || null,
+              _color: filters.color || null,
+              _redo:
+                filters.redo === "true"
+                  ? true
+                  : filters.redo === "false"
+                  ? false
+                  : null,
+              _base_mockup:
+                filters.base_mockup === "true"
+                  ? true
+                  : filters.base_mockup === "false"
+                  ? false
+                  : null,
+              _file_mockup:
+                filters.file_mockup === "true"
+                  ? true
+                  : filters.file_mockup === "false"
+                  ? false
+                  : null,
+              _mockup:
+                filters.mockup === "true"
+                  ? true
+                  : filters.mockup === "false"
+                  ? false
+                  : null,
+              _video:
+                filters.video === "true"
+                  ? true
+                  : filters.video === "false"
+                  ? false
+                  : null,
+              _ig_post:
+                filters.ig_post === "true"
+                  ? true
+                  : filters.ig_post === "false"
+                  ? false
+                  : null,
+              _ig_reel:
+                filters.ig_reel === "true"
+                  ? true
+                  : filters.ig_reel === "false"
+                  ? false
+                  : null,
+              _whatsapp:
+                filters.whatsapp === "true"
+                  ? true
+                  : filters.whatsapp === "false"
+                  ? false
+                  : null,
+            })
+            .single(),
+        ]);
 
-      if (rowErr) throw new Error(rowErr.message);
-      if (statsErr) throw new Error(statsErr.message);
+        if (rowErr) throw new Error(rowErr.message);
+        if (statsErr) throw new Error(statsErr.message);
 
-      setRows(rowData || []);
-      setTotalCount(count || 0);
-      setStats(statsData || null);
-    } catch (err) {
-      console.error(err);
-      toast({
-        variant: "destructive",
-        title: "Load failed",
-        description: err.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+        setRows(rowData || []);
+        setTotalCount(count || 0);
+        setStats(statsData || null);
+      } catch (err) {
+        console.error(err);
+        //toast({
+        //  variant: "destructive",
+        //  title: "Load failed",
+        //  description: err.message,
+        //});
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  run();
-}, [currentPage, filters, toast]);
+    run();
+  }, [currentPage, filters]);
+const onToggle = async (productid, field, value) => {
+  try {
+    const patch = { [field]: value };
+    if (field === "ig_post")
+      patch.ig_post_date = value ? new Date().toISOString() : null;
+    if (field === "whatsapp")
+      patch.whatsapp_post_date = value ? new Date().toISOString() : null;
 
+    const { error } = await supabase
+      .from("mockups")
+      .update(patch)
+      .eq("productid", productid);
+    if (error) throw new Error(error.message);
 
-  const onToggle = async (productid, field, value) => {
-    try {
-      const patch = { [field]: value };
-      if (field === "ig_post")
-        patch.ig_post_date = value ? new Date().toISOString() : null;
-      if (field === "whatsapp")
-        patch.whatsapp_post_date = value ? new Date().toISOString() : null;
-
-      const { error } = await supabase
-        .from("mockups")
-        .update(patch)
-        .eq("productid", productid);
-      if (error) throw new Error(error.message);
-
-      setRows((prev) =>
-        prev.map((r) => (r.productid === productid ? { ...r, ...patch } : r))
-      );
-      toast({ title: "Saved" });
-    } catch (err) {
-      console.error(err);
-      toast({
-        variant: "destructive",
-        title: "Save failed",
-        description: err.message,
-      });
-    }
-  };
+    setRows((prev) =>
+      prev.map((r) => (r.productid === productid ? { ...r, ...patch } : r))
+    );
+    //toast({ title: "Saved" });
+  } catch (err) {
+    console.error(err);
+    //toast({
+    //  variant: "destructive",
+    //  title: "Save failed",
+    //  description: err.message,
+    //});
+  }
+};
 
   const filterInputClass =
     "h-7 text-xs border-gray-300 bg-muted text-gray-800 placeholder-gray-400 text-center";

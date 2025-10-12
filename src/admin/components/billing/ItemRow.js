@@ -11,12 +11,12 @@ import { Button } from "../../../components/ui/button";
 export default function ItemRow({ item, onUpdate, onRemove }) {
   return (
     <tr className="border-t">
-      <td className="p-2">{item.product_name || "Unnamed"}</td>
+      <td className="p-2">{item.product.name || "Unnamed"}</td>
       <td className="p-2 text-right">
         <Input
           type="number"
           min={1}
-          value={item.quantity}
+          value={item.q}
           onChange={(e) =>
             onUpdate(item._id, {
               quantity: parseInt(e.target.value || "1", 10),
