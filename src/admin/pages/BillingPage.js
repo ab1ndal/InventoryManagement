@@ -5,7 +5,14 @@ import BillingForm from "../components/billing/BillingForm";
 import { Button } from "../../components/ui/button";
 
 export default function BillingPage() {
+  const [formOpen, setFormOpen] = useState(false);
   const [activeBillId, setActiveBillId] = useState(null);
+  const [refreshTable, setRefreshTable] = useState(0);
+
+  const handleBillEdit = (id) => {
+    setActiveBillId(id);
+    setFormOpen(true);
+  };
 
   return (
     <div className="p-6 space-y-6">

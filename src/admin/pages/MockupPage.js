@@ -5,6 +5,7 @@ import MockupTable from "../components/MockupTable";
 //import { Toaster } from "../../components/ui/toaster";
 import { Button } from "../../components/ui/button";
 import MockupGraphsPage from "./MockupGraphsPage";
+import TotalValuePage from "./TotalValuePage";
 import {
   Tabs,
   TabsList,
@@ -64,6 +65,7 @@ export default function MockupPage() {
         <TabsList>
           <TabsTrigger value="table">Table</TabsTrigger>
           <TabsTrigger value="graphs">Graphs</TabsTrigger>
+          <TabsTrigger value="value">Total Value</TabsTrigger>
         </TabsList>
 
         <TabsContent value="table">
@@ -72,6 +74,9 @@ export default function MockupPage() {
 
         <TabsContent value="graphs">
           <MockupGraphsPage /> {/* Sankey diagram + counts */}
+        </TabsContent>
+        <TabsContent value="value">
+          <TotalValuePage />
         </TabsContent>
       </Tabs>
     </div>
