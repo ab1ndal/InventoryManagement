@@ -10,6 +10,7 @@ import {
 } from "../../../components/ui/select";
 import { Button } from "../../../components/ui/button";
 import { supabase } from "../../../lib/supabaseClient";
+import { v4 as uuidv4 } from "uuid";
 
 export default function InventoryPicker({ onPicked, initialVal }) {
   const [query, setQuery] = useState(initialVal?.product?.productid || "");
@@ -205,6 +206,7 @@ export default function InventoryPicker({ onPicked, initialVal }) {
             disabled={!variantId || !!error}
             onClick={() =>
               onPicked({
+                _id: uuidv4(),
                 product: selected,
                 variantid: variantId,
                 quantity: qty,

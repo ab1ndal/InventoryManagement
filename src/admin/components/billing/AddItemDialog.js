@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "../../../components/ui/dialog";
 import {
   Tabs,
@@ -28,6 +29,9 @@ export default function AddItemDialog({ onAdd }) {
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Add Product</DialogTitle>
+          <DialogDescription>
+            Select a product from inventory or add a manual item
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="inventory">
           <TabsList className="grid w-full grid-cols-2">

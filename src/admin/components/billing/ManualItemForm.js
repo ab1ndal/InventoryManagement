@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Input } from "../../../components/ui/input";
 import { Button } from "../../../components/ui/button";
+import { v4 as uuidv4 } from "uuid";
 
 export default function ManualItemForm({ onAdd }) {
   const [category, setCategory] = useState("");
@@ -42,6 +43,7 @@ export default function ManualItemForm({ onAdd }) {
       <Button
         onClick={() =>
           onAdd({
+            _id: uuidv4(),
             manual_category: category,
             manual_name: name,
             manual_code: code,
