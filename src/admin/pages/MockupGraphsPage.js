@@ -32,8 +32,11 @@ export default function MockupOverlayPercentBars() {
   if (loading) return <div className="p-6">Loading…</div>;
   if (!statsByCat.length) return <div className="p-6">No stats found</div>;
 
-  const categories = statsByCat.map((d) => d.category);
+  console.log(statsByCat);
+
+  const categories = statsByCat.map((d) => String(d.category ?? "").trim());
   const totals = statsByCat.map((d) => d.total_count);
+  const plotHeight = Math.max(700, categories.length * 24);
 
   const basePct = statsByCat.map((d) =>
     d.total_count ? (d.base_mockup_true / d.total_count) * 100 : 0
@@ -125,8 +128,13 @@ export default function MockupOverlayPercentBars() {
   const layoutCommon = {
     barmode: "overlay",
     xaxis: { title: "% of Total", range: [0, 100] },
-    yaxis: { title: "Category" },
-    margin: { l: 180, b: 60 },
+    yaxis: {
+      title: "Category",
+      type: "category",
+      categoryorder: "array",
+      categoryarray: categories,
+    },
+    margin: { l: 180, b: 60, r: 140 },
     legend: {
       orientation: "h",
       yanchor: "top",
@@ -142,6 +150,7 @@ export default function MockupOverlayPercentBars() {
 
       {/* Chart 1: Base vs Mockup */}
       <Plot
+        key={`base-mockup-${categories.join("|")}`}
         data={[
           {
             type: "bar",
@@ -184,11 +193,12 @@ export default function MockupOverlayPercentBars() {
           annotations: annotationsBaseMock,
           title: "Base vs Mockup Completion",
         }}
-        style={{ width: "100%", height: 700 }}
-          />
-          
+        style={{ width: "100%", height: plotHeight }}
+      />
+
       {/* Chart 2: Base vs File */}
       <Plot
+        key={`base-file-${categories.join("|")}`}
         data={[
           {
             type: "bar",
@@ -231,7 +241,7 @@ export default function MockupOverlayPercentBars() {
           annotations: annotationsBaseFile,
           title: "Base vs File Mockup Completion",
         }}
-        style={{ width: "100%", height: 700 }}
+        style={{ width: "100%", height: plotHeight }}
       />
     </div>
   );
