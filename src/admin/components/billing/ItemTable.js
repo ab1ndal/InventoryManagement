@@ -1,10 +1,9 @@
 import ItemRow from "./ItemRow";
-import { ScrollArea } from "../../../components/ui/scroll-area";
 
-export default function ItemTable({ items, setItems }) {
+export default function ItemTable({ items, setItems, onEdit }) {
   const updateItem = (id, patch) => {
     setItems((prev) =>
-      prev.map((it) => (it._id === id ? { ...it, ...patch } : it))
+      prev.map((it) => (it._id === id ? { ...it, ...patch } : it)),
     );
   };
   const removeItem = (id) => {
@@ -12,21 +11,21 @@ export default function ItemTable({ items, setItems }) {
   };
 
   return (
-    <div className="rounded-2xl border">
-      <ScrollArea className="max-h-[360px]">
-        <table className="w-full text-sm">
+    <div className="rounded-2xl border overflow-x-auto">
+      <div className="max-h-[360px] overflow-y-auto">
+        <table className="w-full text-sm whitespace-nowrap">
           <thead className="sticky top-0 bg-muted/50">
             <tr>
-              <th className="p-2 text-left">Name</th>
-              <th className="p-2 text-right">Qty</th>
-              <th className="p-2 text-right">MRP</th>
-              <th className="p-2 text-right">Disc%</th>
-              <th className="p-2 text-right">Stitch</th>
-              <th className="p-2 text-right">GST%</th>
-              <th className="p-2 text-right">Subtotal</th>
-              <th className="p-2 text-right">GST Amt</th>
-              <th className="p-2 text-right">Total</th>
-              <th className="p-2 text-right">Actions</th>
+              <th className="px-2 py-1.5 text-left font-medium">Product ID</th>
+              <th className="px-2 py-1.5 text-center font-medium">Qty</th>
+              <th className="px-2 py-1.5 text-center font-medium">MRP</th>
+              <th className="px-2 py-1.5 text-center font-medium">Disc%</th>
+              <th className="px-2 py-1.5 text-center font-medium">Alt. Amt</th>
+              <th className="px-2 py-1.5 text-center font-medium">GST%</th>
+              <th className="px-2 py-1.5 text-center font-medium">Subtotal</th>
+              <th className="px-2 py-1.5 text-center font-medium">GST Amt</th>
+              <th className="px-2 py-1.5 text-center font-medium">Total</th>
+              <th className="px-2 py-1.5 text-center font-medium">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -36,6 +35,7 @@ export default function ItemTable({ items, setItems }) {
                 item={it}
                 onUpdate={updateItem}
                 onRemove={removeItem}
+                onEdit={onEdit}
               />
             ))}
             {items.length === 0 && (
@@ -47,7 +47,7 @@ export default function ItemTable({ items, setItems }) {
             )}
           </tbody>
         </table>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

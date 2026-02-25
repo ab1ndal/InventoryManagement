@@ -13,22 +13,38 @@ import { supabase } from "../../../lib/supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
 export default function InventoryPicker({ onPicked, initialVal }) {
-  const [query, setQuery] = useState(initialVal?.product?.productid || "");
+  const isEditing = !!initialVal;
+
+  const [query, setQuery] = useState(initialVal?.productid || "");
   const [results, setResults] = useState([]);
-  const [selected, setSelected] = useState(initialVal?.product || null);
+  const [selected, setSelected] = useState(null);
   const [variants, setVariants] = useState([]);
   const [variantId, setVariantId] = useState(initialVal?.variantid || null);
   const [qty, setQty] = useState(initialVal?.quantity || 1);
   const [error, setError] = useState("");
 
   const [alterationCharge, setAlterationCharge] = useState(
-    initialVal?.alt_charge || 0
+    initialVal?.alteration_charge || 0
   );
   const [gstRate, setGstRate] = useState(initialVal?.gstRate || null);
-  const [discount, setDiscount] = useState(initialVal?.discount || 0);
+  const [discount, setDiscount] = useState(initialVal?.quickDiscountPct || 0);
 
-  // Search products only after 6 characters
+  // When editing, load the full product from Supabase on mount
   useEffect(() => {
+    if (!initialVal?.productid) return;
+    supabase
+      .from("products")
+      .select("productid, categoryid, purchaseprice, retailprice, name")
+      .eq("productid", initialVal.productid)
+      .single()
+      .then(({ data }) => {
+        if (data) setSelected(data);
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Search products only after 6 characters (skip when editing and selected is already loaded)
+  useEffect(() => {
+    if (isEditing && selected) return;
     const run = async () => {
       if (query.length < 6) {
         setResults([]);
@@ -43,7 +59,7 @@ export default function InventoryPicker({ onPicked, initialVal }) {
     };
     const t = setTimeout(run, 300);
     return () => clearTimeout(t);
-  }, [query]);
+  }, [query, isEditing, selected]);
 
   // Load variants for selected product
   useEffect(() => {
@@ -69,15 +85,15 @@ export default function InventoryPicker({ onPicked, initialVal }) {
     }
   }, [qty, variantId, variants]);
 
+  // Auto-compute GST only when adding new items (not editing)
   useEffect(() => {
+    if (isEditing) return;
     if (!selected) return;
 
     const basePrice = selected.retailprice || 0;
-    const totalBase = basePrice * (1 - discount / 100) + alterationCharge;
+    const totalBase = basePrice * (1 - discount / 100) + Number(alterationCharge);
 
     let autoGst = 18;
-
-    // lower GST for Saree / Suit or < 2500
     if (
       selected.categoryid === "SA" ||
       selected.categoryid === "ST" ||
@@ -86,7 +102,7 @@ export default function InventoryPicker({ onPicked, initialVal }) {
       autoGst = 5;
     }
     setGstRate(autoGst);
-  }, [selected, qty, discount, alterationCharge]);
+  }, [selected, qty, discount, alterationCharge, isEditing]);
 
   return (
     <div className="grid gap-4">
@@ -96,7 +112,13 @@ export default function InventoryPicker({ onPicked, initialVal }) {
         <Input
           placeholder="Enter Product ID..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (selected && e.target.value !== selected.productid) {
+              setSelected(null);
+              setVariantId(null);
+            }
+          }}
         />
       </div>
 
@@ -121,6 +143,10 @@ export default function InventoryPicker({ onPicked, initialVal }) {
 
       {selected && (
         <>
+          <div className="text-sm text-muted-foreground">
+            {selected.name} — MRP: ₹{selected.retailprice?.toLocaleString("en-IN")}
+          </div>
+
           {/* Variant selector */}
           <div className="grid gap-1">
             <Label>Variant</Label>
@@ -157,32 +183,34 @@ export default function InventoryPicker({ onPicked, initialVal }) {
 
           {/* Alteration charge */}
           <div className="grid gap-1">
-            <Label>Alteration Charges</Label>
+            <Label>Alteration / Stitching Charges</Label>
             <Input
               type="number"
               min={0}
-              placeholder="Alteration Charges"
+              placeholder="Alteration / Stitching Charges"
               value={alterationCharge}
               onChange={(e) => setAlterationCharge(e.target.value)}
             />
           </div>
 
-          {/* Discount input */}
+          {/* Discount selector */}
           <div className="grid gap-1">
             <Label>Discount (%)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={20}
-              placeholder="Discount %"
-              value={discount}
-              onChange={(e) => {
-                let val = e.target.value;
-                if (val && Number(val) > 20) val = 20; // enforce max
-                if (val && Number(val) < 0) val = 0; // enforce min
-                setDiscount(val);
-              }}
-            />
+            <Select
+              value={String(discount)}
+              onValueChange={(v) => setDiscount(Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[0, 5, 10, 15, 20].map((p) => (
+                  <SelectItem key={p} value={String(p)}>
+                    {p}%
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* GST selector */}
@@ -204,19 +232,27 @@ export default function InventoryPicker({ onPicked, initialVal }) {
 
           <Button
             disabled={!variantId || !!error}
-            onClick={() =>
+            onClick={() => {
+              const chosenVariant = variants.find((v) => v.variantid === variantId);
               onPicked({
                 _id: uuidv4(),
-                product: selected,
+                source: "inventory",
+                productid: selected.productid,
                 variantid: variantId,
-                quantity: qty,
-                alt_charge: Number(alterationCharge) || 0,
-                discount: Number(discount) || 0,
+                product_name: selected.name,
+                category: selected.categoryid,
+                size: chosenVariant?.size || null,
+                color: chosenVariant?.color || null,
+                stock: chosenVariant?.stock ?? null,
+                quantity: Number(qty),
+                mrp: Number(selected.retailprice || 0),
+                quickDiscountPct: Number(discount) || 0,
                 gstRate: gstRate,
-              })
-            }
+                alteration_charge: Number(alterationCharge) || 0,
+              });
+            }}
           >
-            Add
+            {isEditing ? "Update" : "Add"}
           </Button>
         </>
       )}

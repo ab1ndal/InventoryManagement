@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { computeBillTotals } from "./billUtils";
 import { Button } from "../../../components/ui/button";
 import {
   Card,
@@ -8,7 +9,7 @@ import {
 } from "../../../components/ui/card";
 import { Label } from "../../../components/ui/label";
 //import { Textarea } from "../../../components/ui/textarea";
-//import { supabase } from "../../../lib/supabaseClient";
+import { supabase } from "../../../lib/supabaseClient";
 import { useToast } from "../../../components/hooks/use-toast";
 
 import CustomerSelector from "./CustomerSelector";
@@ -34,30 +35,47 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [allDiscounts, setAllDiscounts] = useState([]);
   const [selectedCodes, setSelectedCodes] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
-    // TODO: load discounts from supabase
-    if (!open) {
+    if (open) {
+      loadDiscounts();
+    } else {
       setItems([]);
       setSelectedCodes([]);
       setSelectedCustomerId(null);
       setNotes("");
       setAllDiscounts([]);
       setIsSaving(false);
+      setEditingItem(null);
     }
   }, [open]);
 
-  const computed = useMemo(() => {
-    // TODO: import and use computeBillTotals logic
-    return {
-      itemsSubtotal: 0,
-      itemLevelDiscountTotal: 0,
-      overallDiscount: 0,
-      taxableTotal: 0,
-      gstTotal: 0,
-      grandTotal: 0,
-    };
-  }, [items, selectedCodes, allDiscounts]);
+  const loadDiscounts = async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("discounts")
+      .select("id, code, type, value, max_discount, category, once_per_customer, exclusive, auto_apply, min_total, start_date, end_date, active")
+      .eq("active", true);
+    if (error) {
+      console.error("Error loading discounts:", error.message);
+      toast({ title: "Could not load discounts", description: error.message, variant: "destructive" });
+      return;
+    }
+    const valid = (data || []).filter((d) => {
+      if (d.start_date && d.start_date > today) return false;
+      if (d.end_date && d.end_date < today) return false;
+      return true;
+    });
+    setAllDiscounts(valid);
+    const autoCodes = valid.filter((d) => d.auto_apply).map((d) => d.code);
+    setSelectedCodes(autoCodes);
+  };
+
+  const computed = useMemo(
+    () => computeBillTotals(items, selectedCodes, allDiscounts),
+    [items, selectedCodes, allDiscounts]
+  );
 
   const handleSaveDraft = async () => {
     setIsSaving(true);
@@ -89,7 +107,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+      <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto bg-white">
         <DialogHeader>
           <DialogTitle>
             {billId ? `Edit Bill #${billId}` : "New Bill"}
@@ -123,8 +141,28 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
                   onAdd={(item) => setItems((prev) => [...prev, item])}
                 />
               </div>
-              <ItemTable items={items} setItems={setItems} />
+              <ItemTable
+                items={items}
+                setItems={setItems}
+                onEdit={(id) => setEditingItem(items.find((it) => it._id === id) ?? null)}
+              />
             </section>
+
+            {/* Edit item dialog — opened programmatically from the pencil icon */}
+            {editingItem && (
+              <AddItemDialog
+                key={editingItem._id}
+                open={!!editingItem}
+                onOpenChange={(o) => { if (!o) setEditingItem(null); }}
+                editItem={editingItem}
+                onUpdate={(updated) => {
+                  setItems((prev) =>
+                    prev.map((it) => (it._id === updated._id ? updated : it))
+                  );
+                  setEditingItem(null);
+                }}
+              />
+            )}
 
             {/* Discounts */}
             <section className="space-y-2">

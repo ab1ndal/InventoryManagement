@@ -7,33 +7,51 @@ import {
   SelectItem,
 } from "../../../components/ui/select";
 import { Button } from "../../../components/ui/button";
+import { Pencil, Trash2 } from "lucide-react";
+import { priceItem, money } from "./billUtils";
 
-export default function ItemRow({ item, onUpdate, onRemove }) {
+export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
+  const pricing = priceItem(item);
+
   return (
-    <tr className="border-t">
-      <td className="p-2">{item.product.name || "Unnamed"}</td>
-      <td className="p-2 text-right">
+    <tr className="border-t text-xs">
+      <td className="px-2 py-1">
+        <div className="font-medium">
+          {item.productid || item.manual_code || "—"}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {item.product_name || item.manual_name || item.category || "—"}
+        </div>
+        {(item.color || item.size) && (
+          <div className="text-xs text-muted-foreground">
+            {[item.color, item.size].filter(Boolean).join(" / ")}
+          </div>
+        )}
+      </td>
+      <td className="px-2 py-1 text-center">
         <Input
           type="number"
           min={1}
-          value={item.q}
+          value={item.quantity}
           onChange={(e) =>
             onUpdate(item._id, {
               quantity: parseInt(e.target.value || "1", 10),
             })
           }
-          className="h-8 w-20 text-right"
+          className="h-7 w-14 mx-auto text-center"
         />
       </td>
-      <td className="p-2 text-right">{item.mrp}</td>
-      <td className="p-2 text-right">
+      <td className="px-2 py-1 text-s text-center tabular-nums">
+        {money(item.mrp)}
+      </td>
+      <td className="px-2 py-1 text-center">
         <Select
           value={String(item.quickDiscountPct || 0)}
           onValueChange={(v) =>
             onUpdate(item._id, { quickDiscountPct: Number(v) })
           }
         >
-          <SelectTrigger className="h-8 w-24">
+          <SelectTrigger className="h-7 w-20 mx-auto">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -45,15 +63,56 @@ export default function ItemRow({ item, onUpdate, onRemove }) {
           </SelectContent>
         </Select>
       </td>
-      <td className="p-2 text-right">{item.stitching_charge}</td>
-      <td className="p-2 text-right">{item.gstRate}</td>
-      <td className="p-2 text-right">—</td>
-      <td className="p-2 text-right">—</td>
-      <td className="p-2 text-right">—</td>
-      <td className="p-2 text-right">
-        <Button variant="ghost" size="sm" onClick={() => onRemove(item._id)}>
-          Remove
-        </Button>
+      <td className="px-2 py-1 text-center">
+        {money(item.alteration_charge) || 0}
+      </td>
+      <td className="px-2 py-1 text-center">
+        <Select
+          value={String(item.gstRate ?? 18)}
+          onValueChange={(v) => onUpdate(item._id, { gstRate: Number(v) })}
+        >
+          <SelectTrigger className="h-7 w-16 mx-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[5, 18].map((r) => (
+              <SelectItem key={r} value={String(r)}>
+                {r}%
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </td>
+      <td className="px-2 py-1 text-center tabular-nums">
+        {money(pricing.subtotal)}
+      </td>
+      <td className="px-2 py-1 text-center tabular-nums">
+        {money(pricing.gst_amount)}
+      </td>
+      <td className="px-2 py-1 text-center font-medium tabular-nums">
+        {money(pricing.total)}
+      </td>
+      <td className="px-2 py-1 text-center">
+        <div className="flex justify-center gap-1">
+          {onEdit && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => onEdit(item._id)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            onClick={() => onRemove(item._id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </td>
     </tr>
   );
