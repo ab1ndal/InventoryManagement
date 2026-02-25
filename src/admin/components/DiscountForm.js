@@ -6,7 +6,6 @@ import { z } from "zod";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/checkbox";
-import { format } from "date-fns";
 
 const discountSchema = z.object({
   id: z.number().optional(),
@@ -32,11 +31,7 @@ const discountSchema = z.object({
 });
 
 export default function DiscountForm({ defaultValues, onSubmit, onCancel }) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm({
+  const { register, handleSubmit } = useForm({
     resolver: zodResolver(discountSchema),
     defaultValues: defaultValues || {
       type: "flat",

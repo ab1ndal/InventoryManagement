@@ -16,38 +16,38 @@ export default function BillTable({ onEdit }) {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "" });
 
-  const loadBills = async () => {
-    setLoading(true);
-    let query = supabase
-      .from("bills")
-      .select(
-        "billid, customerid, orderdate, totalamount, gst_total, discount_total, finalized",
-        { count: "exact" }
-      )
-      .order("orderdate", { ascending: false })
-      .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE - 1);
-
-    if (filters.search) {
-      query = query.eq("billid", filters.search);
-    }
-
-    const { data, error, count } = await query;
-    if (error) {
-      toast({
-        title: "Error loading bills",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      setBills(data || []);
-      setTotalCount(count || 0);
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
+    const loadBills = async () => {
+      setLoading(true);
+      let query = supabase
+        .from("bills")
+        .select(
+          "billid, customerid, orderdate, totalamount, gst_total, discount_total, finalized",
+          { count: "exact" }
+        )
+        .order("orderdate", { ascending: false })
+        .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE - 1);
+
+      if (filters.search) {
+        query = query.eq("billid", filters.search);
+      }
+
+      const { data, error, count } = await query;
+      if (error) {
+        toast({
+          title: "Error loading bills",
+          description: error.message,
+          variant: "destructive",
+        });
+      } else {
+        setBills(data || []);
+        setTotalCount(count || 0);
+      }
+      setLoading(false);
+    };
+
     loadBills();
-  }, [page, filters]);
+  }, [page, filters, toast]);
 
   const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE);
 

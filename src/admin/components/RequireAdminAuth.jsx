@@ -76,6 +76,7 @@ export default function RequireAdminAuth() {
     return () => {
       listener.subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 

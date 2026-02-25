@@ -2,7 +2,6 @@
 import React, { useState } from "react";
 import CustomerTable from "../components/CustomerTable";
 import CustomerForm from "../components/CustomerForm";
-import { Button } from "../../components/ui/button";
 
 export default function CustomersPage() {
   const [formOpen, setFormOpen] = useState(false);

@@ -1,5 +1,5 @@
 // src/admin/pages/DiscountPage.js
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import DiscountForm from "../components/DiscountForm";
 import DiscountTable from "../components/DiscountTable";
 import { Button } from "../../components/ui/button";

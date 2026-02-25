@@ -16,21 +16,6 @@ import {
 } from "../../components/ui/tooltip";
 import { toast } from "sonner";
 
-function getBadgeClass(tier) {
-  switch (tier) {
-    case "Bronze":
-      return "bg-amber-300 text-black";
-    case "Silver":
-      return "bg-gray-300 text-black";
-    case "Gold":
-      return "bg-yellow-400 text-black";
-    case "Platinum":
-      return "bg-blue-300 text-black";
-    default:
-      return "border border-gray-300 text-gray-600";
-  }
-}
-
 export default function CustomerTable({ onEditCustomer, refreshSignal }) {
   const [customers, setCustomers] = useState([]);
   const [filters, setFilters] = useState({
@@ -42,7 +27,6 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     loyalty_tier: "",
   });
 
-  const [editCustomer, setEditCustomer] = useState(null);
   const [page, setPage] = useState(1);
   const rowsPerPage = 15;
 
