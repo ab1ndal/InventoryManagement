@@ -33,10 +33,7 @@ export default function BillingPage() {
       </div>
       <BillTable
         key={refreshTable}
-        onEdit={(id) => {
-          setActiveBillId(id);
-          setDialogOpen(true);
-        }}
+        onEdit={handleBillEdit}
       />
       <BillingForm
         key={activeBillId}
