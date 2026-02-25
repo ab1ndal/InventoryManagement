@@ -38,9 +38,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [editingItem, setEditingItem] = useState(null);
 
   useEffect(() => {
-    if (open) {
-      loadDiscounts();
-    } else {
+    if (!open) {
       setItems([]);
       setSelectedCodes([]);
       setSelectedCustomerId(null);
@@ -48,29 +46,40 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setAllDiscounts([]);
       setIsSaving(false);
       setEditingItem(null);
-    }
-  }, [open]);
-
-  const loadDiscounts = async () => {
-    const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
-      .from("discounts")
-      .select("id, code, type, value, max_discount, category, once_per_customer, exclusive, auto_apply, min_total, start_date, end_date, active")
-      .eq("active", true);
-    if (error) {
-      console.error("Error loading discounts:", error.message);
-      toast({ title: "Could not load discounts", description: error.message, variant: "destructive" });
       return;
     }
-    const valid = (data || []).filter((d) => {
-      if (d.start_date && d.start_date > today) return false;
-      if (d.end_date && d.end_date < today) return false;
-      return true;
-    });
-    setAllDiscounts(valid);
-    const autoCodes = valid.filter((d) => d.auto_apply).map((d) => d.code);
-    setSelectedCodes(autoCodes);
-  };
+
+    const loadDiscounts = async () => {
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("discounts")
+        .select(
+          "id, code, type, value, max_discount, category, once_per_customer, exclusive, auto_apply, min_total, start_date, end_date, active",
+        )
+        .eq("active", true);
+      if (error) {
+        console.error("Error loading discounts:", error.message);
+        toast({
+          title: "Could not load discounts",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+      const valid = (data || []).filter((d) => {
+        if (d.start_date && d.start_date > today) return false;
+        if (d.end_date && d.end_date < today) return false;
+        return true;
+      });
+      setAllDiscounts(valid);
+      const autoCodes = valid.filter((d) => d.auto_apply).map((d) => d.code);
+      setSelectedCodes(autoCodes);
+    };
+
+    loadDiscounts();
+  }, [open, toast]);
+
+
 
   const computed = useMemo(
     () => computeBillTotals(items, selectedCodes, allDiscounts),
