@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "milestone": "v1.0",
+  "milestone_name": "Update Billing",
+  "workflow": {
+    "research": true,
+    "commit_docs": true
+  },
+  "models": {
+    "researcher": "sonnet",
+    "synthesizer": "sonnet",
+    "roadmapper": "sonnet"
+  }
+}
