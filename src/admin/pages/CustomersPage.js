@@ -1,5 +1,5 @@
 // src/admin/pages/CustomersPage.js
-import React, { useState } from "react";
+import { useState } from "react";
 import CustomerTable from "../components/CustomerTable";
 import CustomerForm from "../components/CustomerForm";
 

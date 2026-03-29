@@ -1,28 +1,40 @@
 // src/admin/pages/DiscountPage.js
-import React, { useState } from "react";
+import { useState } from "react";
 import DiscountForm from "../components/DiscountForm";
 import DiscountTable from "../components/DiscountTable";
 import { Button } from "../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../../components/ui/dialog";
 
 export default function DiscountPage() {
-  const [showForm, setShowForm] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedDiscount, setSelectedDiscount] = useState(null);
   const [refresh, setRefresh] = useState(false);
 
   const handleCreate = () => {
     setSelectedDiscount(null);
-    setShowForm(true);
+    setDialogOpen(true);
   };
 
   const handleEdit = (discount) => {
     setSelectedDiscount(discount);
-    setShowForm(true);
+    setDialogOpen(true);
   };
 
   const handleSuccess = () => {
-    setShowForm(false);
+    setDialogOpen(false);
     setSelectedDiscount(null);
-    setRefresh(!refresh);
+    setRefresh((r) => !r);
+  };
+
+  const handleClose = () => {
+    setDialogOpen(false);
+    setSelectedDiscount(null);
   };
 
   return (
@@ -31,15 +43,29 @@ export default function DiscountPage() {
         <h2 className="text-2xl font-bold">Discounts</h2>
         <Button onClick={handleCreate}>Add Discount</Button>
       </div>
-      {showForm && (
-        <DiscountForm
-          selectedDiscount={selectedDiscount}
-          onSuccess={handleSuccess}
-        />
-      )}
-      <div className="mt-6">
-        <DiscountTable onEdit={handleEdit} refresh={refresh} />
-      </div>
+
+      <DiscountTable onEdit={handleEdit} refresh={refresh} />
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDiscount ? "Edit Discount" : "Add Discount"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedDiscount
+                ? `Editing discount${selectedDiscount.code ? ` "${selectedDiscount.code}"` : ""}`
+                : "Fill in the details below to create a new discount."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DiscountForm
+            defaultValues={selectedDiscount}
+            onSuccess={handleSuccess}
+            onCancel={handleClose}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

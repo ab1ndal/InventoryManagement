@@ -7,11 +7,12 @@
 ---
 
 <user_constraints>
+
 ## User Constraints (from CONTEXT.md)
 
 ### Locked Decisions
 
-- **D-01 (Out-of-Stock Policy):** Block the save if any inventory item's qty exceeds available stock. Show an error listing the specific items and available qty. Staff must fix quantities before saving. Negative stock is not allowed.
+- **D-01 (Out-of-Stock Policy):** Block the save if any inventory item's qty exceeds available stock. Show an error listing the specific items and available qty. Staff must fix quantities before saving. Negative stock is not allowed. This should also be monitored while entering the SKU in the bill as a form validation.
 - **D-02 (Discount Code Persistence on Draft):** Add an `applied_codes text[]` column to the `bills` table in Phase 1 (schema migration). On draft save, persist the `selectedCodes` array to this column. On draft load (BILL-03), restore `selectedCodes` from `bills.applied_codes`.
 - **D-03 (BillTable Status Display):** Add a Status column to BillTable showing a badge (Draft / Finalized / Cancelled) based on `paymentstatus`. Replace the raw `finalized` boolean display with this badge. Include `paymentstatus` in the Phase 1 select query.
 
@@ -25,21 +26,22 @@
 ### Deferred Ideas (OUT OF SCOPE)
 
 - **Phase 4 Enhancement:** When cancelling a bill, offer 2 choices: (1) Issue a store credit voucher (default), or (2) Reverse payment in the original payment mode. — This is Phase 4 scope (BILL-05, VOUCH-01). Capture this in Phase 4 context.
-</user_constraints>
+  </user_constraints>
 
 ---
 
 <phase_requirements>
+
 ## Phase Requirements
 
-| ID | Description | Research Support |
-|----|-------------|------------------|
-| BILL-01 | User can save a new bill as Draft (inserts `bills` + `bill_items`, `paymentstatus='draft'`) | Schema verified, `handleSaveDraft` stub located, `computeBillTotals` output maps directly to insert fields |
-| BILL-02 | User can update an existing Draft bill (reconciles `bill_items`, adjusts stock delta) | Delete-and-reinsert pattern confirmed; stock delta algorithm documented below |
-| BILL-03 | User can load an existing bill into BillingForm (customer, items, salespersons, applied discounts pre-populated) | `billId` prop exists on BillingForm; `useEffect` on `open` is the correct insertion point; `applied_codes` migration required |
-| STOCK-01 | Saving a Draft subtracts quantity from `productsizecolors.stock` for each inventory item (variantid present) | `productsizecolors` schema confirmed; `variantid` UUID column is the FK; stock integer column present |
-| STOCK-02 | Updating a Draft reconciles stock — restores old quantities and subtracts new quantities for changed items | Requires fetching pre-existing `bill_items` before delete; delta computed client-side and applied per-variantid |
-</phase_requirements>
+| ID                    | Description                                                                                                      | Research Support                                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| BILL-01               | User can save a new bill as Draft (inserts `bills` + `bill_items`, `paymentstatus='draft'`)                | Schema verified,`handleSaveDraft` stub located, `computeBillTotals` output maps directly to insert fields                         |
+| BILL-02               | User can update an existing Draft bill (reconciles `bill_items`, adjusts stock delta)                          | Delete-and-reinsert pattern confirmed; stock delta algorithm documented below                                                         |
+| BILL-03               | User can load an existing bill into BillingForm (customer, items, salespersons, applied discounts pre-populated) | `billId` prop exists on BillingForm; `useEffect` on `open` is the correct insertion point; `applied_codes` migration required |
+| STOCK-01              | Saving a Draft subtracts quantity from `productsizecolors.stock` for each inventory item (variantid present)   | `productsizecolors` schema confirmed; `variantid` UUID column is the FK; stock integer column present                             |
+| STOCK-02              | Updating a Draft reconciles stock — restores old quantities and subtracts new quantities for changed items      | Requires fetching pre-existing `bill_items` before delete; delta computed client-side and applied per-variantid                     |
+| </phase_requirements> |                                                                                                                  |                                                                                                                                       |
 
 ---
 
@@ -57,15 +59,15 @@ The BillingPage already passes `activeBillId` state but does NOT currently forwa
 
 ## Project Constraints (from CLAUDE.md)
 
-| Directive | Impact on Phase 1 |
-|-----------|-------------------|
-| All DB access direct from component via `supabase` client — no API layer | `handleSaveDraft` calls `supabase.from(...)` directly; no service wrapper needed |
-| `useToast()` for user feedback | Use `toast({ title, description, variant })` pattern already in BillingForm |
-| `setIsSaving(true)` / `finally { setIsSaving(false) }` pattern | Extend the existing `handleSaveDraft` try/catch/finally — don't restructure |
-| `refreshFlag` / counter toggle pattern for re-fetches | BillingPage uses `key={refreshTable}` on BillTable — calling `onSubmit()` triggers it |
-| Schema migrations go in `schema/migration_*.sql` files, NOT inline edits to `initial_schema.sql` | `applied_codes` column must be a separate `schema/migration_01_applied_codes.sql` |
-| Shadcn/ui + Tailwind for status badges | Use Shadcn `Badge` component for Draft / Finalized / Cancelled in BillTable |
-| Path alias `@/*` maps to `src/*` | Use `@/components/ui/badge` etc. |
+| Directive                                                                                            | Impact on Phase 1                                                                          |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| All DB access direct from component via `supabase` client — no API layer                          | `handleSaveDraft` calls `supabase.from(...)` directly; no service wrapper needed       |
+| `useToast()` for user feedback                                                                     | Use `toast({ title, description, variant })` pattern already in BillingForm              |
+| `setIsSaving(true)` / `finally { setIsSaving(false) }` pattern                                   | Extend the existing `handleSaveDraft` try/catch/finally — don't restructure             |
+| `refreshFlag` / counter toggle pattern for re-fetches                                              | BillingPage uses `key={refreshTable}` on BillTable — calling `onSubmit()` triggers it |
+| Schema migrations go in `schema/migration_*.sql` files, NOT inline edits to `initial_schema.sql` | `applied_codes` column must be a separate `schema/migration_01_applied_codes.sql`      |
+| Shadcn/ui + Tailwind for status badges                                                               | Use Shadcn `Badge` component for Draft / Finalized / Cancelled in BillTable              |
+| Path alias `@/*` maps to `src/*`                                                                 | Use `@/components/ui/badge` etc.                                                         |
 
 ---
 
@@ -73,12 +75,12 @@ The BillingPage already passes `activeBillId` state but does NOT currently forwa
 
 ### Core (already installed — no new dependencies needed for this phase)
 
-| Library | Version | Purpose | Role in Phase 1 |
-|---------|---------|---------|-----------------|
-| `@supabase/supabase-js` | Already installed | DB reads/writes | All inserts, updates, selects |
-| React 19 | Already installed | Component framework | State management, effects |
-| Shadcn/ui `Badge` | Already installed (Radix-based) | Status pill in BillTable | Draft / Finalized / Cancelled |
-| Sonner / `useToast` | Already installed | Toast notifications | Success + error feedback |
+| Library                   | Version                         | Purpose                  | Role in Phase 1               |
+| ------------------------- | ------------------------------- | ------------------------ | ----------------------------- |
+| `@supabase/supabase-js` | Already installed               | DB reads/writes          | All inserts, updates, selects |
+| React 19                  | Already installed               | Component framework      | State management, effects     |
+| Shadcn/ui `Badge`       | Already installed (Radix-based) | Status pill in BillTable | Draft / Finalized / Cancelled |
+| Sonner /`useToast`      | Already installed               | Toast notifications      | Success + error feedback      |
 
 **No new packages required for Phase 1.** The `Badge` component from `src/components/ui/badge.tsx` is available in this Shadcn/ui project — verify it exists before planning that task.
 
@@ -339,63 +341,69 @@ ALTER TABLE public.bills ADD COLUMN applied_codes text[] DEFAULT '{}';
 
 ### Confirmed existing schema facts (HIGH confidence — verified from `initial_schema.sql`)
 
-| Fact | Verified |
-|------|----------|
-| `bills.paymentstatus` is `character varying(20)` — accepts 'draft', 'finalized', 'cancelled' | Yes |
-| `bills.finalized` is `boolean DEFAULT false` | Yes |
-| `bills.applied_codes` does NOT exist yet | Yes — must be added via migration |
-| `bill_items.variantid` is nullable UUID with FK to `productsizecolors.variantid` | Yes |
-| `bill_items` has ON DELETE CASCADE from `bills` | Yes |
-| `productsizecolors.stock` is `integer NOT NULL DEFAULT 0` | Yes |
-| `discount_usage` table exists with `billid`, `customerid`, `code` FK columns | Yes |
+| Fact                                                                                              | Verified                           |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `bills.paymentstatus` is `character varying(20)` — accepts 'draft', 'finalized', 'cancelled' | Yes                                |
+| `bills.finalized` is `boolean DEFAULT false`                                                  | Yes                                |
+| `bills.applied_codes` does NOT exist yet                                                        | Yes — must be added via migration |
+| `bill_items.variantid` is nullable UUID with FK to `productsizecolors.variantid`              | Yes                                |
+| `bill_items` has ON DELETE CASCADE from `bills`                                               | Yes                                |
+| `productsizecolors.stock` is `integer NOT NULL DEFAULT 0`                                     | Yes                                |
+| `discount_usage` table exists with `billid`, `customerid`, `code` FK columns              | Yes                                |
 
 ---
 
 ## Don't Hand-Roll
 
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| Toast notifications | Custom alert/modal | `useToast()` already imported in BillingForm | Project-standard, already wired |
-| Total amount calculations | Custom math in handler | `computeBillTotals(items, selectedCodes, allDiscounts)` in billUtils.js | Already handles all discount types, GST allocation, rounding |
-| Per-item pricing | Inline arithmetic | `priceItem(it)` from billUtils.js | Handles alteration charges, quick discount, GST |
-| Status badge styling | Custom CSS | Shadcn `Badge` component with variant prop | Consistent UI, already available |
-| Supabase client initialization | Re-create client | `src/lib/supabaseClient.js` singleton | Already imports and configures client |
+| Problem                        | Don't Build            | Use Instead                                                               | Why                                                          |
+| ------------------------------ | ---------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Toast notifications            | Custom alert/modal     | `useToast()` already imported in BillingForm                            | Project-standard, already wired                              |
+| Total amount calculations      | Custom math in handler | `computeBillTotals(items, selectedCodes, allDiscounts)` in billUtils.js | Already handles all discount types, GST allocation, rounding |
+| Per-item pricing               | Inline arithmetic      | `priceItem(it)` from billUtils.js                                       | Handles alteration charges, quick discount, GST              |
+| Status badge styling           | Custom CSS             | Shadcn `Badge` component with variant prop                              | Consistent UI, already available                             |
+| Supabase client initialization | Re-create client       | `src/lib/supabaseClient.js` singleton                                   | Already imports and configures client                        |
 
 ---
 
 ## Common Pitfalls
 
 ### Pitfall 1: Stock Check Race Condition
+
 **What goes wrong:** Stock is read, validated, then bill is inserted — by the time stock is decremented another concurrent save (unlikely in retail but possible) could have consumed that stock.
 **Why it happens:** No DB-level transaction from the client.
 **How to avoid:** For this single-user retail context, client-side validation before write is acceptable. The pre-save read and write happen in the same async handler with no `await` gaps between validation and the first write. If atomic guarantees are needed, a Supabase DB function (RPC) could wrap the whole operation.
 **Warning signs:** Stock going negative after concurrent saves.
 
 ### Pitfall 2: `applied_codes` Migration Not Run
+
 **What goes wrong:** Insert to `bills` fails with "column applied_codes of relation bills does not exist".
 **Why it happens:** The migration SQL has not been executed in the Supabase dashboard before the code lands.
 **How to avoid:** The migration must be run first. The plan wave that implements BILL-01 must depend on the wave that creates the migration file. The migration file itself does not auto-apply — it requires manual execution in the Supabase dashboard (or Supabase CLI migration).
 **Warning signs:** Supabase insert error referencing `applied_codes`.
 
 ### Pitfall 3: `billId` Not Passed to BillingForm
+
 **What goes wrong:** Edit button opens a blank form instead of pre-populated form. `billId` is `null` inside BillingForm even when editing.
 **Why it happens:** BillingPage passes `key={activeBillId}` but NOT `billId={activeBillId}` to BillingForm (verified by code inspection).
 **How to avoid:** Fix is one line in BillingPage.js. This must be done as part of BILL-03 implementation.
 **Warning signs:** `billId` prop is undefined in BillingForm even when editing a real bill.
 
 ### Pitfall 4: `useEffect` Load Order — Discounts Override Applied Codes
+
 **What goes wrong:** When loading an existing draft for edit, the auto-apply discount logic in the existing `useEffect` sets `selectedCodes` from `auto_apply` discounts — overwriting the `applied_codes` restored from the bill.
 **Why it happens:** The `open` useEffect sets `autoCodes` and calls `setSelectedCodes(autoCodes)` every time the dialog opens. The load-for-edit logic must run after this and override with `bill.applied_codes`.
 **How to avoid:** Either separate the two useEffects (one for discounts, one for bill data — ensure bill load runs second), or merge them and conditionally set selectedCodes from `bill.applied_codes` when `billId` is set.
 **Warning signs:** Applied discount codes reset to auto-apply defaults when opening an existing draft.
 
 ### Pitfall 5: `quickDiscountPct` Not Recoverable from `discount_total`
+
 **What goes wrong:** Item-level discounts appear as 0% when loading a bill for edit, because `bill_items.discount_total` stores a flat amount, not a percentage.
 **Why it happens:** `normalizeItem()` reads `quickDiscountPct` to compute the displayed discount. After loading from DB, this field is not present.
 **How to avoid:** Back-calculate: `quickDiscountPct = (discount_total / (mrp * quantity)) * 100`. Round to 2 decimal places. If `mrp * quantity === 0`, set to 0.
 **Warning signs:** Items show 0% item discount in the form even though they had discounts when originally saved.
 
 ### Pitfall 6: Dangling `bills` Row on Partial Failure
+
 **What goes wrong:** `bills` row is inserted but `bill_items` insert fails — a draft bill with no items exists in the DB.
 **Why it happens:** No client-side transaction support in Supabase JS client.
 **How to avoid:** In the catch block, if `bills` insert succeeded but `bill_items` failed, delete the bills row: `await supabase.from("bills").delete().eq("billid", newBillId)`. This is a best-effort cleanup.
@@ -413,23 +421,23 @@ Step 2.6: SKIPPED — Phase 1 is purely code and config changes. All dependencie
 
 ### Test Framework
 
-| Property | Value |
-|----------|-------|
-| Framework | Jest + React Testing Library (via Create React App) |
-| Config file | None — CRA built-in |
-| Quick run command | `npm test -- --watchAll=false --testPathPattern="billUtils"` |
-| Full suite command | `npm test -- --watchAll=false` |
+| Property           | Value                                                          |
+| ------------------ | -------------------------------------------------------------- |
+| Framework          | Jest + React Testing Library (via Create React App)            |
+| Config file        | None — CRA built-in                                           |
+| Quick run command  | `npm test -- --watchAll=false --testPathPattern="billUtils"` |
+| Full suite command | `npm test -- --watchAll=false`                               |
 
 ### Phase Requirements → Test Map
 
-| Req ID | Behavior | Test Type | Automated Command | File Exists? |
-|--------|----------|-----------|-------------------|-------------|
-| BILL-01 | `computeBillTotals` output maps correctly to `bills` row fields | unit | `npm test -- --watchAll=false --testPathPattern="billUtils"` | Wave 0 |
-| BILL-01 | `priceItem` computes subtotal, gst_amount, total correctly | unit | `npm test -- --watchAll=false --testPathPattern="billUtils"` | Wave 0 |
-| BILL-02 | Stock delta calculation: old qty restored, new qty subtracted | unit | `npm test -- --watchAll=false --testPathPattern="stockDelta"` | Wave 0 |
-| BILL-03 | `quickDiscountPct` back-calculation from flat discount_total | unit | `npm test -- --watchAll=false --testPathPattern="billUtils"` | Wave 0 |
-| STOCK-01 | Only inventory items (variantid present) trigger stock decrement | unit | `npm test -- --watchAll=false --testPathPattern="billUtils"` | Wave 0 |
-| STOCK-02 | Delta map correctly handles item removal and qty changes | unit | `npm test -- --watchAll=false --testPathPattern="stockDelta"` | Wave 0 |
+| Req ID   | Behavior                                                            | Test Type | Automated Command                                               | File Exists? |
+| -------- | ------------------------------------------------------------------- | --------- | --------------------------------------------------------------- | ------------ |
+| BILL-01  | `computeBillTotals` output maps correctly to `bills` row fields | unit      | `npm test -- --watchAll=false --testPathPattern="billUtils"`  | Wave 0       |
+| BILL-01  | `priceItem` computes subtotal, gst_amount, total correctly        | unit      | `npm test -- --watchAll=false --testPathPattern="billUtils"`  | Wave 0       |
+| BILL-02  | Stock delta calculation: old qty restored, new qty subtracted       | unit      | `npm test -- --watchAll=false --testPathPattern="stockDelta"` | Wave 0       |
+| BILL-03  | `quickDiscountPct` back-calculation from flat discount_total      | unit      | `npm test -- --watchAll=false --testPathPattern="billUtils"`  | Wave 0       |
+| STOCK-01 | Only inventory items (variantid present) trigger stock decrement    | unit      | `npm test -- --watchAll=false --testPathPattern="billUtils"`  | Wave 0       |
+| STOCK-02 | Delta map correctly handles item removal and qty changes            | unit      | `npm test -- --watchAll=false --testPathPattern="stockDelta"` | Wave 0       |
 
 **Note:** Supabase integration (actual DB writes) is manual-only. React component rendering tests require heavy mocking of Supabase; not required for this phase — unit tests on the pure utility functions (billUtils.js) provide the highest-value automated coverage.
 
@@ -513,27 +521,28 @@ Step 2.6: SKIPPED — Phase 1 is purely code and config changes. All dependencie
 
 ## State of the Art
 
-| Old Approach | Current Approach | Notes |
-|--------------|------------------|-------|
-| `finalized` boolean for status display in BillTable | `paymentstatus` text field badge (D-03) | BillTable currently uses `finalized` — must be updated |
-| QZ Tray for printing | `window.print()` (Phase 3) | Out of scope for Phase 1 |
-| No stock reservation on draft | Stock subtracted immediately on Draft save | Core Phase 1 requirement |
+| Old Approach                                          | Current Approach                           | Notes                                                     |
+| ----------------------------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| `finalized` boolean for status display in BillTable | `paymentstatus` text field badge (D-03)  | BillTable currently uses `finalized` — must be updated |
+| QZ Tray for printing                                  | `window.print()` (Phase 3)               | Out of scope for Phase 1                                  |
+| No stock reservation on draft                         | Stock subtracted immediately on Draft save | Core Phase 1 requirement                                  |
 
 ---
 
 ## Open Questions
 
 1. **Stock decrement method: direct update vs. RPC**
+
    - What we know: `productsizecolors.stock` is an integer. Direct update (`SET stock = stock - qty`) works in Supabase from the client.
    - What's unclear: Does the project have an existing RPC for stock operations? (Not visible in `initial_schema.sql` — RPCs are defined separately in Supabase.)
    - Recommendation: Use `supabase.from("productsizecolors").update({ stock: currentStock - qty })` with a pre-read value. Sufficient for single-user retail context. If concurrency becomes an issue, add an RPC in a later phase.
-
 2. **`discount_usage` rows on Draft save**
+
    - What we know: `discount_usage` has a FK to `customers(customerid)` NOT NULL — it requires a customerid. BILL-01 does not require a customer.
    - What's unclear: Should `discount_usage` rows be inserted on Draft save, or only on Finalize?
    - Recommendation: Insert `discount_usage` only on Finalize (Phase 3). On Draft, only persist `applied_codes text[]` to `bills`. This avoids the nullable customer problem and matches the intent of "usage" (usage = completed transaction).
-
 3. **Item `_id` field for loaded bill items**
+
    - What we know: BillingForm uses `_id` as a React key and for edit targeting (`it._id === id`). Freshly added items get a client-generated `_id`.
    - What's unclear: When loading from DB, what should `_id` be? `bill_item_id` (integer) or a new UUID?
    - Recommendation: Use `String(bi.bill_item_id)` as `_id` when loading from DB. This is stable, unique, and avoids UUID generation cost.
@@ -566,6 +575,7 @@ Step 2.6: SKIPPED — Phase 1 is purely code and config changes. All dependencie
 ## Metadata
 
 **Confidence breakdown:**
+
 - Standard stack: HIGH — confirmed by reading source files directly; no new packages needed
 - Schema facts: HIGH — read from `initial_schema.sql` directly
 - Architecture patterns: HIGH — derived from existing codebase patterns in BillingForm, BillingPage, BillTable
