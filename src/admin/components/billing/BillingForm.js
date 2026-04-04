@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { computeBillTotals } from "./billUtils";
-import { buildBillItemsPayload } from "./stockHelpers";
+import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { Button } from "../../../components/ui/button";
 import {
   Card,
@@ -80,7 +80,53 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     loadDiscounts();
   }, [open, toast]);
 
+  useEffect(() => {
+    if (!open || !billId) return;
+    const loadBill = async () => {
+      try {
+        // Fetch bill header
+        const { data: bill, error: billErr } = await supabase
+          .from("bills")
+          .select("customerid, notes, applied_codes")
+          .eq("billid", billId)
+          .single();
+        if (billErr) throw billErr;
 
+        // Fetch bill items
+        const { data: billItems, error: itemsErr } = await supabase
+          .from("bill_items")
+          .select("*")
+          .eq("billid", billId);
+        if (itemsErr) throw itemsErr;
+
+        // Set form state from bill
+        setSelectedCustomerId(bill.customerid || null);
+        setNotes(bill.notes || "");
+
+        // Override auto-apply codes with saved applied_codes (D-02 + Pitfall 4)
+        if (bill.applied_codes && bill.applied_codes.length > 0) {
+          setSelectedCodes(bill.applied_codes);
+        }
+
+        // Reconstruct items to match BillingForm item shape
+        setItems((billItems || []).map(bi => ({
+          _id: String(bi.bill_item_id),
+          variantid: bi.variantid || null,
+          product_name: bi.product_name || "",
+          product_code: bi.product_code || null,
+          category: bi.category || null,
+          quantity: bi.quantity,
+          mrp: bi.mrp,
+          alteration_charge: bi.alteration_charge || 0,
+          quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
+          gstRate: bi.gst_rate ?? 18,
+        })));
+      } catch (e) {
+        toast({ title: "Error loading bill", description: e.message, variant: "destructive" });
+      }
+    };
+    loadBill();
+  }, [open, billId, toast]);
 
   const computed = useMemo(
     () => computeBillTotals(items, selectedCodes, allDiscounts),
@@ -92,8 +138,100 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     setIsSaving(true);
     try {
       if (billId) {
-        // TODO: Plan 03 — draft update with stock reconciliation (BILL-02 + STOCK-02)
-        toast({ title: "Draft update not yet implemented", variant: "destructive" });
+        // BILL-02 + STOCK-02: Draft update with stock reconciliation
+
+        // Step A: Validate items exist
+        if (items.length === 0) {
+          toast({ title: "Error", description: "Add at least one item", variant: "destructive" });
+          return;
+        }
+
+        // Step B: Fetch existing bill_items for stock delta computation
+        const { data: existingItems, error: fetchErr } = await supabase
+          .from("bill_items")
+          .select("variantid, quantity")
+          .eq("billid", billId)
+          .not("variantid", "is", null);
+        if (fetchErr) throw new Error("Could not fetch existing items: " + fetchErr.message);
+
+        const newInventoryItems = items.filter(it => it.variantid);
+
+        // Step C: Compute stock delta
+        const deltaMap = computeStockDelta(existingItems || [], newInventoryItems);
+
+        // Step D: Fetch current stock for all affected variants (union of old + new variantids)
+        const allVariantIds = Object.keys(deltaMap);
+        let stockMap = {};
+        if (allVariantIds.length > 0) {
+          const { data: stockData, error: stockErr } = await supabase
+            .from("productsizecolors")
+            .select("variantid, stock, size, color")
+            .in("variantid", allVariantIds);
+          if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+          stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
+        }
+
+        // Step E: Validate stock — for items being added or increased, check available stock
+        // Available = current_stock + old_qty_restored (delta for that variant from old items)
+        // We need: final stock = current_stock + delta >= 0
+        const stockErrors = [];
+        for (const [vid, delta] of Object.entries(deltaMap)) {
+          const currentStock = stockMap[vid]?.stock ?? 0;
+          const finalStock = currentStock + delta;
+          if (finalStock < 0) {
+            const item = newInventoryItems.find(it => it.variantid === vid);
+            const name = item?.product_name || vid;
+            const size = stockMap[vid]?.size || "";
+            const color = stockMap[vid]?.color || "";
+            stockErrors.push(`${name} (${size}/${color}): would result in ${finalStock} stock`);
+          }
+        }
+        if (stockErrors.length > 0) {
+          toast({ title: "Insufficient stock", description: stockErrors.join("\n"), variant: "destructive" });
+          return;
+        }
+
+        // Step F: Delete old bill_items
+        const { error: delErr } = await supabase.from("bill_items").delete().eq("billid", billId);
+        if (delErr) throw new Error("Failed to remove old items: " + delErr.message);
+
+        // Step G: Insert new bill_items
+        const billItemsPayload = buildBillItemsPayload(billId, items);
+        const { error: insErr } = await supabase.from("bill_items").insert(billItemsPayload);
+        if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
+
+        // Step H: Update bills row
+        const { error: updErr } = await supabase
+          .from("bills")
+          .update({
+            customerid: selectedCustomerId || null,
+            notes: notes || null,
+            totalamount: computed.grandTotal,
+            gst_total: computed.gstTotal,
+            discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
+            taxable_total: computed.taxableTotal,
+            applied_codes: selectedCodes,
+          })
+          .eq("billid", billId);
+        if (updErr) throw new Error("Failed to update bill: " + updErr.message);
+
+        // Step I: Apply stock deltas
+        for (const [vid, delta] of Object.entries(deltaMap)) {
+          if (delta === 0) continue;
+          const currentStock = stockMap[vid]?.stock ?? 0;
+          const { error: stockUpdateErr } = await supabase
+            .from("productsizecolors")
+            .update({ stock: currentStock + delta })
+            .eq("variantid", vid);
+          if (stockUpdateErr) {
+            console.error("Stock update failed for", vid, stockUpdateErr);
+          }
+        }
+
+        // Step J: Success
+        toast({ title: `Draft saved — Bill #${billId}` });
+        onOpenChange?.(false);
+        onSubmit?.();
         return;
       }
 
