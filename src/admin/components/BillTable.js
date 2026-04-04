@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
@@ -22,7 +23,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, customerid, orderdate, totalamount, gst_total, discount_total, finalized",
+          "billid, customerid, orderdate, totalamount, gst_total, discount_total, paymentstatus",
           { count: "exact" }
         )
         .order("orderdate", { ascending: false })
@@ -104,7 +105,13 @@ export default function BillTable({ onEdit }) {
                     ₹{(b.discount_total || 0).toFixed(2)}
                   </td>
                   <td className="p-2 text-center">
-                    {b.finalized ? "Finalized" : "Draft"}
+                    <Badge variant={
+                      b.paymentstatus === "finalized" ? "default" :
+                      b.paymentstatus === "cancelled" ? "destructive" : "secondary"
+                    }>
+                      {b.paymentstatus === "finalized" ? "Finalized" :
+                       b.paymentstatus === "cancelled" ? "Cancelled" : "Draft"}
+                    </Badge>
                   </td>
                   <td className="p-2 text-center">
                     <Button
