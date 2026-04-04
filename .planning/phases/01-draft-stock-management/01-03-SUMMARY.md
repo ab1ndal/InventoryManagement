@@ -49,8 +49,8 @@ patterns-established:
 requirements-completed: [BILL-02, BILL-03, STOCK-02]
 
 # Metrics
-duration: 15min
-completed: 2026-04-03
+duration: 30min
+completed: 2026-04-04
 ---
 
 # Phase 01 Plan 03: Draft Stock Management — Edit & Status Badge Summary
@@ -59,10 +59,10 @@ completed: 2026-04-03
 
 ## Performance
 
-- **Duration:** ~15 min
+- **Duration:** ~30 min (including bug fixes and human verification)
 - **Started:** 2026-04-03
-- **Completed:** 2026-04-03
-- **Tasks:** 2 of 3 (Task 3 = human-verify checkpoint, pending)
+- **Completed:** 2026-04-04
+- **Tasks:** 3 of 3 (all tasks complete, human verification approved)
 - **Files modified:** 2
 
 ## Accomplishments
@@ -75,6 +75,9 @@ completed: 2026-04-03
 
 1. **Task 1: Draft update with stock reconciliation + Load-for-edit** - `0a0619b` (feat)
 2. **Task 2: BillTable status badge and paymentstatus query** - `c1f8604` (feat)
+3. **Bug fix: productid field mapping and resilient applied_codes load** - `53ea491` (fix)
+4. **Bug fix: account for reserved stock when editing a draft bill item** - `a495eea` (fix)
+5. **Task 3: End-to-end verification** - approved by human (no code changes)
 
 ## Files Created/Modified
 
@@ -88,7 +91,33 @@ completed: 2026-04-03
 
 ## Deviations from Plan
 
-None - plan executed exactly as written.
+### Auto-fixed Issues
+
+**1. [Rule 1 - Bug] Fixed productid field mapping in load-for-edit**
+- **Found during:** Task 3 (human verification)
+- **Issue:** BillingForm load-for-edit was not mapping the `productid` field from `bill_items`, causing incorrect item identification when editing
+- **Fix:** Added correct `productid` field mapping during item reconstruction in `loadBill`
+- **Files modified:** `src/admin/components/billing/BillingForm.js`
+- **Committed in:** `53ea491`
+
+**2. [Rule 1 - Bug] Fixed applied_codes load to be resilient to null/missing values**
+- **Found during:** Task 3 (human verification)
+- **Issue:** `applied_codes` load would error or misbehave when the field was null or not yet populated on older bills
+- **Fix:** Added null-safe guard so applied_codes only overrides auto-apply codes when the value is a non-empty array
+- **Files modified:** `src/admin/components/billing/BillingForm.js`
+- **Committed in:** `53ea491`
+
+**3. [Rule 1 - Bug] Accounted for reserved stock when editing a draft bill item**
+- **Found during:** Task 3 (human verification)
+- **Issue:** Stock validation for draft edit was checking raw `stock` from `productsizecolors` without accounting for the fact that the current draft already has some of that stock reserved — this caused false "insufficient stock" errors when keeping or increasing quantities on an item already in the draft
+- **Fix:** When computing available stock for validation, the delta-based check correctly uses `current_stock + delta >= 0`, which implicitly accounts for the existing reservation. Verification confirmed this logic is correct.
+- **Files modified:** `src/admin/components/billing/BillingForm.js`
+- **Committed in:** `a495eea`
+
+---
+
+**Total deviations:** 3 auto-fixed (all Rule 1 - Bug, discovered during human verification)
+**Impact on plan:** All fixes were necessary for correct end-to-end behavior. No scope creep.
 
 ## Issues Encountered
 
@@ -101,16 +130,17 @@ Run `schema/migration_01_applied_codes.sql` in the Supabase dashboard SQL editor
 
 ## Next Phase Readiness
 
-- Phase 1 automated implementation complete — draft create, edit, stock management, and status badges all implemented
-- Pending: Task 3 human-verify checkpoint confirms end-to-end behavior in production Supabase
-- After Task 3 verification, Phase 1 is complete and Phase 2 (finalize/cancel/PDF) can begin
+- Phase 1 complete — draft create, edit, stock management, and status badges all implemented and verified by human
+- All 6 verification steps approved: new draft save, stock decrement, edit pre-population, draft update with stock reconciliation, BillTable Draft badge, out-of-stock error toast
+- Phase 2 (Form Polish & Schema Additions) can begin: fix dropdown opacity, complete manual items, add salesperson support
 
 ## Self-Check: PASSED
 
 - `src/admin/components/billing/BillingForm.js` — exists and contains all required patterns
 - `src/admin/components/BillTable.js` — exists and contains Badge, paymentstatus
-- Commits 0a0619b and c1f8604 exist in git log
+- Commits 0a0619b, c1f8604, 53ea491, a495eea all exist in git log
+- Human verification approved all 6 end-to-end criteria
 
 ---
 *Phase: 01-draft-stock-management*
-*Completed: 2026-04-03*
+*Completed: 2026-04-04*
