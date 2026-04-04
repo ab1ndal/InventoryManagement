@@ -21,7 +21,7 @@
 
 Plans:
 - [x] 01-01-PLAN.md — Foundation: schema migration, test scaffolds, stock/bill helper module
-- [ ] 01-02-PLAN.md — New draft save with stock validation and decrement (BILL-01, STOCK-01)
+- [x] 01-02-PLAN.md — New draft save with stock validation and decrement (BILL-01, STOCK-01)
 - [ ] 01-03-PLAN.md — Draft update, load-for-edit, BillTable status badge (BILL-02, BILL-03, STOCK-02, D-03)
 
 **Success criteria:**
