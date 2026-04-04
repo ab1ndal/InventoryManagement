@@ -11,16 +11,16 @@ Bills follow this lifecycle:
 
 ## BILL — Core Persistence
 
-- [ ] **BILL-01**: User can save a new bill as Draft (inserts `bills` + `bill_items`, `paymentstatus='draft'`)
-- [ ] **BILL-02**: User can update an existing Draft bill (reconciles `bill_items`, adjusts stock delta)
-- [ ] **BILL-03**: User can load an existing bill into BillingForm (customer, items, salespersons, applied discounts pre-populated)
+- [x] **BILL-01**: User can save a new bill as Draft (inserts `bills` + `bill_items`, `paymentstatus='draft'`)
+- [x] **BILL-02**: User can update an existing Draft bill (reconciles `bill_items`, adjusts stock delta)
+- [x] **BILL-03**: User can load an existing bill into BillingForm (customer, items, salespersons, applied discounts pre-populated)
 - [ ] **BILL-04**: User can Finalize a draft bill (requires payment info, sets `finalized=true`, `paymentstatus='finalized'`, records discount usage)
 - [ ] **BILL-05**: User can Cancel a bill (sets `paymentstatus='cancelled'`, restores stock, issues voucher)
 
 ## STOCK — Inventory Management
 
-- [ ] **STOCK-01**: Saving a Draft subtracts quantity from `productsizecolors.stock` for each inventory item (variantid present)
-- [ ] **STOCK-02**: Updating a Draft reconciles stock — restores old quantities and subtracts new quantities for changed items
+- [x] **STOCK-01**: Saving a Draft subtracts quantity from `productsizecolors.stock` for each inventory item (variantid present)
+- [x] **STOCK-02**: Updating a Draft reconciles stock — restores old quantities and subtracts new quantities for changed items
 - [ ] **STOCK-03**: Cancelling a bill restores stock for all inventory items on that bill
 
 ## CUST — Customer Tracking
