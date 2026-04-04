@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { computeBillTotals } from "./billUtils";
+import { buildBillItemsPayload } from "./stockHelpers";
 import { Button } from "../../../components/ui/button";
 import {
   Card,
@@ -86,11 +87,89 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     [items, selectedCodes, allDiscounts]
   );
 
+  // BILL-01 + STOCK-01: New draft save | BILL-02 + STOCK-02: Draft update (Plan 03)
   const handleSaveDraft = async () => {
     setIsSaving(true);
     try {
-      // TODO: save to supabase
-      toast({ title: "Draft saved" });
+      if (billId) {
+        // TODO: Plan 03 — draft update with stock reconciliation (BILL-02 + STOCK-02)
+        toast({ title: "Draft update not yet implemented", variant: "destructive" });
+        return;
+      }
+
+      // New draft path
+      if (items.length === 0) {
+        toast({ title: "Error", description: "Add at least one item", variant: "destructive" });
+        return;
+      }
+
+      // Step B - Stock validation per D-01
+      const inventoryItems = items.filter(it => it.variantid);
+      let stockMap = {};
+      if (inventoryItems.length > 0) {
+        const variantIds = inventoryItems.map(it => it.variantid);
+        const { data: stockData, error: stockErr } = await supabase
+          .from("productsizecolors")
+          .select("variantid, stock, size, color")
+          .in("variantid", variantIds);
+        if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+
+        stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
+        const outOfStock = inventoryItems.filter(it => {
+          const available = stockMap[it.variantid]?.stock ?? 0;
+          return it.quantity > available;
+        });
+        if (outOfStock.length > 0) {
+          const details = outOfStock.map(it => {
+            const avail = stockMap[it.variantid]?.stock ?? 0;
+            return `${it.product_name} (${stockMap[it.variantid]?.size || ''}/${stockMap[it.variantid]?.color || ''}): requested ${it.quantity}, available ${avail}`;
+          }).join("\n");
+          toast({ title: "Insufficient stock", description: details, variant: "destructive" });
+          return;
+        }
+      }
+
+      // Step C - Insert bills row
+      const { data: bill, error: billError } = await supabase
+        .from("bills")
+        .insert({
+          customerid: selectedCustomerId || null,
+          notes: notes || null,
+          totalamount: computed.grandTotal,
+          gst_total: computed.gstTotal,
+          discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
+          taxable_total: computed.taxableTotal,
+          paymentstatus: "draft",
+          finalized: false,
+          applied_codes: selectedCodes,
+        })
+        .select("billid")
+        .single();
+      if (billError) throw new Error("Failed to save bill: " + billError.message);
+
+      // Step D - Insert bill_items
+      const billItemsPayload = buildBillItemsPayload(bill.billid, items);
+      const { error: itemsError } = await supabase.from("bill_items").insert(billItemsPayload);
+      if (itemsError) {
+        // Best-effort cleanup of dangling bills row (Pitfall 6)
+        await supabase.from("bills").delete().eq("billid", bill.billid);
+        throw new Error("Failed to save bill items: " + itemsError.message);
+      }
+
+      // Step E - Decrement stock for inventory items
+      for (const it of inventoryItems) {
+        const currentStock = stockMap[it.variantid]?.stock ?? 0;
+        const { error: stockUpdateErr } = await supabase
+          .from("productsizecolors")
+          .update({ stock: currentStock - it.quantity })
+          .eq("variantid", it.variantid);
+        if (stockUpdateErr) {
+          console.error("Stock update failed for", it.variantid, stockUpdateErr);
+        }
+      }
+
+      // Step F - Success
+      toast({ title: `Draft saved — Bill #${bill.billid}` });
       onOpenChange?.(false);
       onSubmit?.();
     } catch (e) {
