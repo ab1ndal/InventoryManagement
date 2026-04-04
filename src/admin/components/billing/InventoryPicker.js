@@ -71,6 +71,16 @@ export default function InventoryPicker({ onPicked, initialVal }) {
       .then(({ data }) => setVariants(data || []));
   }, [selected]);
 
+  // When editing, the original variant's stock is effectively higher by the original quantity
+  // (that stock is already reserved by this draft bill, so it's available to reassign)
+  const originalVariantId = isEditing ? initialVal?.variantid : null;
+  const originalQty = isEditing ? (initialVal?.quantity || 0) : 0;
+
+  const effectiveStock = (variant) => {
+    const bonus = variant.variantid === originalVariantId ? originalQty : 0;
+    return variant.stock + bonus;
+  };
+
   // Validate quantity
   useEffect(() => {
     if (!variantId || !qty) {
@@ -78,12 +88,12 @@ export default function InventoryPicker({ onPicked, initialVal }) {
       return;
     }
     const chosenVariant = variants.find((v) => v.variantid === variantId);
-    if (chosenVariant && qty > chosenVariant.stock) {
-      setError(`Only ${chosenVariant.stock} left in stock`);
+    if (chosenVariant && qty > effectiveStock(chosenVariant)) {
+      setError(`Only ${effectiveStock(chosenVariant)} left in stock`);
     } else {
       setError("");
     }
-  }, [qty, variantId, variants]);
+  }, [qty, variantId, variants]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-compute GST only when adding new items (not editing)
   useEffect(() => {
@@ -159,9 +169,9 @@ export default function InventoryPicker({ onPicked, initialVal }) {
                   <SelectItem
                     key={v.variantid}
                     value={v.variantid}
-                    disabled={v.stock <= 0}
+                    disabled={effectiveStock(v) <= 0}
                   >
-                    {v.color} | {v.size} | (Stock: {v.stock})
+                    {v.color} | {v.size} | (Stock: {effectiveStock(v)})
                   </SelectItem>
                 ))}
               </SelectContent>
