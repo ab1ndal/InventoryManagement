@@ -17,6 +17,13 @@
 
 **Requirements:** BILL-01, BILL-02, BILL-03, STOCK-01, STOCK-02
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Foundation: schema migration, test scaffolds, stock/bill helper module
+- [ ] 01-02-PLAN.md — New draft save with stock validation and decrement (BILL-01, STOCK-01)
+- [ ] 01-03-PLAN.md — Draft update, load-for-edit, BillTable status badge (BILL-02, BILL-03, STOCK-02, D-03)
+
 **Success criteria:**
 1. "Save Draft" inserts a `bills` row (`paymentstatus='draft'`, `finalized=false`) and `bill_items` rows; toast confirms with bill ID
 2. Inventory items' stock in `productsizecolors` is decremented by qty on draft save
