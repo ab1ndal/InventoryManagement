@@ -49,7 +49,7 @@ export function buildBillItemsPayload(billid, items) {
       mrp: it.mrp,
       variantid: it.variantid || null,
       product_name: it.product_name || it.name || "",
-      product_code: it.product_code || null,
+      product_code: it.productid || it.product_code || null,
       category: it.category || null,
       alteration_charge: it.alteration_charge || 0,
       discount_total: priced.itemDisc,

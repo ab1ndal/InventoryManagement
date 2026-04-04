@@ -84,13 +84,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     if (!open || !billId) return;
     const loadBill = async () => {
       try {
-        // Fetch bill header
+        // Fetch bill header (customerid + notes only — applied_codes fetched separately for resilience)
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select("customerid, notes, applied_codes")
+          .select("customerid, notes")
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
+
+        // Fetch applied_codes separately — column may not exist if migration not yet run
+        const { data: codesRow } = await supabase
+          .from("bills")
+          .select("applied_codes")
+          .eq("billid", billId)
+          .single();
 
         // Fetch bill items
         const { data: billItems, error: itemsErr } = await supabase
@@ -104,16 +111,18 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         setNotes(bill.notes || "");
 
         // Override auto-apply codes with saved applied_codes (D-02 + Pitfall 4)
-        if (bill.applied_codes && bill.applied_codes.length > 0) {
-          setSelectedCodes(bill.applied_codes);
+        const savedCodes = codesRow?.applied_codes;
+        if (savedCodes && savedCodes.length > 0) {
+          setSelectedCodes(savedCodes);
         }
 
-        // Reconstruct items to match BillingForm item shape
+        // Reconstruct items — product_code in DB stores the BC-format productid for inventory items
         setItems((billItems || []).map(bi => ({
           _id: String(bi.bill_item_id),
+          source: bi.variantid ? "inventory" : "manual",
           variantid: bi.variantid || null,
+          productid: bi.product_code || null,
           product_name: bi.product_name || "",
-          product_code: bi.product_code || null,
           category: bi.category || null,
           quantity: bi.quantity,
           mrp: bi.mrp,
