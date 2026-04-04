@@ -37,6 +37,7 @@ export default function BillingPage() {
       />
       <BillingForm
         key={activeBillId}
+        billId={activeBillId}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSubmit={handleFormSubmit}
