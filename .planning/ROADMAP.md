@@ -4,7 +4,7 @@
 
 | # | Phase | Goal | Requirements | Criteria |
 |---|-------|------|--------------|----------|
-| 1 | Draft & Stock | Save/update draft bills with live inventory reservation | BILL-01, BILL-02, BILL-03, STOCK-01, STOCK-02 | 4 |
+| 1 | Draft & Stock | 3/3 | Complete   | 2026-04-04 |
 | 2 | Form Polish | Fix UI issues, manual items, salesperson input, schema additions | UI-01, UI-02, UI-03, SCHEMA-01, SCHEMA-02 | 4 |
 | 3 | Finalize & PDF | Payment info, customer spend update, PDF invoice saved to storage | BILL-04, CUST-01, PRINT-01–04 | 5 |
 | 4 | Cancel & Voucher | Cancel bill, restore stock, issue & print voucher PDF | BILL-05, STOCK-03, VOUCH-01, VOUCH-02 | 4 |
@@ -17,12 +17,12 @@
 
 **Requirements:** BILL-01, BILL-02, BILL-03, STOCK-01, STOCK-02
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 01-01-PLAN.md — Foundation: schema migration, test scaffolds, stock/bill helper module
 - [x] 01-02-PLAN.md — New draft save with stock validation and decrement (BILL-01, STOCK-01)
-- [ ] 01-03-PLAN.md — Draft update, load-for-edit, BillTable status badge (BILL-02, BILL-03, STOCK-02, D-03)
+- [x] 01-03-PLAN.md — Draft update, load-for-edit, BillTable status badge (BILL-02, BILL-03, STOCK-02, D-03)
 
 **Success criteria:**
 1. "Save Draft" inserts a `bills` row (`paymentstatus='draft'`, `finalized=false`) and `bill_items` rows; toast confirms with bill ID
