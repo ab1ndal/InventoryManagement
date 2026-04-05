@@ -19,6 +19,7 @@ import AddItemDialog from "./AddItemDialog";
 import DiscountSelector from "./DiscountSelector";
 import Summary from "./Summary";
 import Notes from "./Notes";
+import SalespersonSelector from "./SalespersonSelector";
 import {
   Dialog,
   //  DialogTrigger,
@@ -37,6 +38,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [selectedCodes, setSelectedCodes] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [selectedSalespersonIds, setSelectedSalespersonIds] = useState([]);
 
   useEffect(() => {
     if (!open) {
@@ -47,6 +49,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setAllDiscounts([]);
       setIsSaving(false);
       setEditingItem(null);
+      setSelectedSalespersonIds([]);
       return;
     }
 
@@ -105,6 +108,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           .select("*")
           .eq("billid", billId);
         if (itemsErr) throw itemsErr;
+
+        // Fetch salesperson associations
+        const { data: spData } = await supabase
+          .from("bill_salespersons")
+          .select("salesperson_id")
+          .eq("billid", billId);
+        setSelectedSalespersonIds((spData || []).map(r => r.salesperson_id));
 
         // Set form state from bill
         setSelectedCustomerId(bill.customerid || null);
@@ -224,6 +234,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           .eq("billid", billId);
         if (updErr) throw new Error("Failed to update bill: " + updErr.message);
 
+        // Reconcile salesperson associations
+        const { error: spDelErr } = await supabase.from("bill_salespersons").delete().eq("billid", billId);
+        if (spDelErr) console.error("Failed to clear salespersons:", spDelErr.message);
+        if (selectedSalespersonIds.length > 0) {
+          const spPayload = selectedSalespersonIds.map(spId => ({ billid: billId, salesperson_id: spId }));
+          const { error: spInsErr } = await supabase.from("bill_salespersons").insert(spPayload);
+          if (spInsErr) console.error("Failed to save salespersons:", spInsErr.message);
+        }
+
         // Step I: Apply stock deltas
         for (const [vid, delta] of Object.entries(deltaMap)) {
           if (delta === 0) continue;
@@ -303,6 +322,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         throw new Error("Failed to save bill items: " + itemsError.message);
       }
 
+      // Save salesperson associations
+      if (selectedSalespersonIds.length > 0) {
+        const spPayload = selectedSalespersonIds.map(spId => ({
+          billid: bill.billid,
+          salesperson_id: spId,
+        }));
+        const { error: spErr } = await supabase.from("bill_salespersons").insert(spPayload);
+        if (spErr) console.error("Failed to save salespersons:", spErr.message);
+      }
+
       // Step E - Decrement stock for inventory items
       for (const it of inventoryItems) {
         const currentStock = stockMap[it.variantid]?.stock ?? 0;
@@ -365,6 +394,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               <CustomerSelector
                 selectedCustomerId={selectedCustomerId}
                 setSelectedCustomerId={setSelectedCustomerId}
+              />
+            </section>
+
+            {/* Salesperson(s) */}
+            <section className="grid gap-3">
+              <SalespersonSelector
+                selectedIds={selectedSalespersonIds}
+                setSelectedIds={setSelectedSalespersonIds}
               />
             </section>
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Button } from "../../../components/ui/button";
@@ -9,9 +9,19 @@ import {
   SelectContent,
   SelectItem,
 } from "../../../components/ui/select";
+import { supabase } from "../../../lib/supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
+// Decode Z-encoded cost price: "ZABCD" → 1234
+function decodeZCode(str) {
+  const s = String(str || "").toUpperCase().trim();
+  if (!s.startsWith("Z") || s.length < 2) return Number(s) || 0;
+  const rev = { A: "1", B: "2", C: "3", D: "4", E: "5", F: "6", G: "7", H: "8", I: "9", Z: "0" };
+  return Number(s.slice(1).split("").map(ch => rev[ch] ?? "0").join("")) || 0;
+}
+
 export default function ManualItemForm({ onAdd, initialVal }) {
+  const [categories, setCategories] = useState([]);
   const [category, setCategory] = useState(
     initialVal?.category || initialVal?.manual_category || ""
   );
@@ -23,13 +33,24 @@ export default function ManualItemForm({ onAdd, initialVal }) {
   const [color, setColor] = useState(initialVal?.color || "");
   const [qty, setQty] = useState(initialVal?.quantity || 1);
   const [mrp, setMrp] = useState(initialVal?.mrp || 0);
+  const [discountPct, setDiscountPct] = useState(
+    initialVal?.quickDiscountPct ?? 0
+  );
   const [alterationCharge, setAlterationCharge] = useState(
     initialVal?.alteration_charge || 0
   );
   const [gstRate, setGstRate] = useState(
     String(initialVal?.gstRate ?? 18)
   );
-  const [costPrice, setCostPrice] = useState(initialVal?.cost_price || 0);
+  const [zCode, setZCode] = useState(initialVal?.cost_price || "");
+
+  useEffect(() => {
+    supabase
+      .from("categories")
+      .select("id, name")
+      .order("name")
+      .then(({ data }) => setCategories(data || []));
+  }, []);
 
   function handleSubmit() {
     onAdd({
@@ -44,11 +65,12 @@ export default function ManualItemForm({ onAdd, initialVal }) {
       color: color || null,
       quantity: qty,
       mrp: Number(mrp || 0),
-      quickDiscountPct: initialVal?.quickDiscountPct ?? 0,
+      quickDiscountPct: Number(discountPct) || 0,
       gstRate: Number(gstRate),
       alteration_charge: Number(alterationCharge) || 0,
-      cost_price: Number(costPrice) || 0,
+      cost_price: decodeZCode(zCode),
     });
+    // Retain values — do not reset state
   }
 
   return (
@@ -61,11 +83,18 @@ export default function ManualItemForm({ onAdd, initialVal }) {
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-1">
             <Label>Category</Label>
-            <Input
-              placeholder="e.g. Shirt"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.name}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-1">
             <Label>
@@ -130,6 +159,17 @@ export default function ManualItemForm({ onAdd, initialVal }) {
             />
           </div>
           <div className="grid gap-1">
+            <Label>Discount %</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="0"
+              value={discountPct}
+              onChange={(e) => setDiscountPct(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1">
             <Label>Alteration Charge (Rs)</Label>
             <Input
               type="number"
@@ -154,15 +194,14 @@ export default function ManualItemForm({ onAdd, initialVal }) {
             </Select>
           </div>
           <div className="grid gap-1 col-span-2">
-            <Label>Z Code (Rs)</Label>
+            <Label>Z Code</Label>
             <Input
-              type="number"
-              placeholder="Cost price"
-              value={costPrice}
-              onChange={(e) => setCostPrice(e.target.value)}
+              placeholder="e.g. ZABCD"
+              value={zCode}
+              onChange={(e) => setZCode(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Internal only — not shown to customer
+              Enter encoded (ZABCD) or numeric — internal only
             </p>
           </div>
         </div>
