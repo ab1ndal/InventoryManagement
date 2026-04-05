@@ -53,6 +53,7 @@ async function getNextManualItemId() {
 
 export default function ManualItemForm({ onAdd, initialVal }) {
   const { toast } = useToast();
+  const isEditing = !!initialVal;
   const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -76,7 +77,17 @@ export default function ManualItemForm({ onAdd, initialVal }) {
       .from("categories")
       .select("categoryid, name")
       .order("name")
-      .then(({ data }) => setCategories(data || []));
+      .then(({ data }) => {
+        const list = data || [];
+        setCategories(list);
+        // When editing, resolve categoryid from the stored category name
+        // (bill_items stores name, not categoryid)
+        if (!categoryId && initialVal?.category) {
+          const match = list.find((c) => c.name === initialVal.category);
+          if (match) setCategoryId(match.categoryid);
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSubmit() {
@@ -84,21 +95,27 @@ export default function ManualItemForm({ onAdd, initialVal }) {
     setSaving(true);
     try {
       const purchasePrice = decodeZCode(zCode);
-      const manualItemId = await getNextManualItemId();
+      const categoryName = categories.find((c) => c.categoryid === categoryId)?.name || initialVal?.category || null;
 
-      // Insert into manual_items table
-      const { error } = await supabase.from("manual_items").insert({
-        manual_item_id: manualItemId,
-        name: name.trim(),
-        categoryid: categoryId || null,
-        size: size || null,
-        color: color || null,
-        purchase_price: purchasePrice,
-        mrp: Number(mrp) || 0,
-      });
-      if (error) throw new Error(error.message);
-
-      const categoryName = categories.find((c) => c.categoryid === categoryId)?.name || null;
+      let manualItemId;
+      if (isEditing) {
+        // Editing an existing bill item — reuse the existing BCX ID, don't insert again
+        manualItemId = initialVal.productid || initialVal.manual_code || null;
+      } else {
+        // New manual item — generate BCX ID and insert into manual_items
+        manualItemId = await getNextManualItemId();
+        const { error } = await supabase.from("manual_items").insert({
+          manual_item_id: manualItemId,
+          name: name.trim(),
+          categoryid: categoryId || null,
+          size: size || null,
+          color: color || null,
+          purchase_price: purchasePrice,
+          mrp: Number(mrp) || 0,
+        });
+        if (error) throw new Error(error.message);
+        toast({ title: `Manual item added — ${manualItemId}` });
+      }
 
       onAdd({
         _id: uuidv4(),
@@ -119,8 +136,6 @@ export default function ManualItemForm({ onAdd, initialVal }) {
         alteration_charge: Number(alterationCharge) || 0,
         cost_price: purchasePrice,
       });
-
-      toast({ title: `Manual item added — ${manualItemId}` });
       // Retain values — do not reset state
     } catch (e) {
       toast({ title: "Failed to add item", description: e.message, variant: "destructive" });

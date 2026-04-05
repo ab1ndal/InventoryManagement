@@ -2,6 +2,14 @@ import { useState, useMemo, useEffect } from "react";
 import { computeBillTotals } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "../../../components/ui/select";
 import {
   Card,
   CardContent,
@@ -39,6 +47,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [isSaving, setIsSaving] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [selectedSalespersonIds, setSelectedSalespersonIds] = useState([]);
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   useEffect(() => {
     if (!open) {
@@ -50,6 +60,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setIsSaving(false);
       setEditingItem(null);
       setSelectedSalespersonIds([]);
+      setPaymentMethod("");
+      setPaymentAmount("");
       return;
     }
 
@@ -90,7 +102,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         // Fetch bill header (customerid + notes only — applied_codes fetched separately for resilience)
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select("customerid, notes")
+          .select("customerid, notes, payment_method, payment_amount")
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
@@ -119,6 +131,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         // Set form state from bill
         setSelectedCustomerId(bill.customerid || null);
         setNotes(bill.notes || "");
+        setPaymentMethod(bill.payment_method || "");
+        setPaymentAmount(bill.payment_amount ?? "");
 
         // Override auto-apply codes with saved applied_codes (D-02 + Pitfall 4)
         const savedCodes = codesRow?.applied_codes;
@@ -230,6 +244,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
             taxable_total: computed.taxableTotal,
             applied_codes: selectedCodes,
+            payment_method: paymentMethod || null,
+            payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
           })
           .eq("billid", billId);
         if (updErr) throw new Error("Failed to update bill: " + updErr.message);
@@ -308,6 +324,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           paymentstatus: "draft",
           finalized: false,
           applied_codes: selectedCodes,
+          payment_method: paymentMethod || null,
+          payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
         })
         .select("billid")
         .single();
@@ -454,6 +472,30 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
 
             {/* Notes */}
             <Notes notes={notes} setNotes={setNotes} />
+
+            {/* Payment */}
+            <section className="space-y-2">
+              <Label>Payment</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="mixed">Mixed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  placeholder="Amount received"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                />
+              </div>
+            </section>
 
             {/* Summary */}
             <Summary computed={computed} />
