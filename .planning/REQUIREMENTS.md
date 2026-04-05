@@ -29,14 +29,14 @@ Bills follow this lifecycle:
 
 ## UI — Form Improvements
 
-- [ ] **UI-01**: Dropdowns in BillingForm render with correct opacity (no transparent/washed-out background)
-- [ ] **UI-02**: Manual item form has full field parity with inventory items: name, product code (optional), category, size, color, qty, MRP, alteration charge, GST rate
+- [x] **UI-01**: Dropdowns in BillingForm render with correct opacity (no transparent/washed-out background)
+- [x] **UI-02**: Manual item form has full field parity with inventory items: name, product code (optional), category, size, color, qty, MRP, alteration charge, GST rate
 - [x] **UI-03**: Bill form includes a Salesperson(s) selector — staff can associate one or more salespersons with the sale
 
 ## SCHEMA — Database Additions
 
-- [ ] **SCHEMA-01**: Add `payment_method` (text: cash/card/upi/mixed) and `payment_amount` (numeric) columns to `bills`
-- [ ] **SCHEMA-02**: Add `salespersons` table (salesperson_id serial, name text, active boolean) and `bill_salespersons` junction table (billid FK, salesperson_id FK)
+- [x] **SCHEMA-01**: Add `payment_method` (text: cash/card/upi/mixed) and `payment_amount` (numeric) columns to `bills`
+- [x] **SCHEMA-02**: Add `salespersons` table (salesperson_id serial, name text, active boolean) and `bill_salespersons` junction table (billid FK, salesperson_id FK)
 
 ## PRINT — PDF Invoice
 
