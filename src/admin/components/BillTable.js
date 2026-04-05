@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil, FileText, Trash2 } from "lucide-react";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 
@@ -23,7 +23,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, customerid, orderdate, totalamount, gst_total, discount_total, paymentstatus",
+          "billid, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, paymentstatus",
           { count: "exact" }
         )
         .order("orderdate", { ascending: false })
@@ -91,7 +91,9 @@ export default function BillTable({ onEdit }) {
               {bills.map((b) => (
                 <tr key={b.billid} className="border-t">
                   <td className="p-2">{b.billid}</td>
-                  <td className="p-2">{b.customerid || "—"}</td>
+                  <td className="p-2">
+                    {b.customers ? `${b.customers.first_name} ${b.customers.last_name}` : "—"}
+                  </td>
                   <td className="p-2">
                     {b.orderdate ? new Date(b.orderdate).toLocaleString() : "—"}
                   </td>
@@ -113,14 +115,35 @@ export default function BillTable({ onEdit }) {
                        b.paymentstatus === "cancelled" ? "Cancelled" : "Draft"}
                     </Badge>
                   </td>
-                  <td className="p-2 text-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onEdit(b.billid)}
-                    >
-                      Edit
-                    </Button>
+                  <td className="p-2">
+                    <div className="flex gap-1 justify-center">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => onEdit(b.billid)}
+                        title="Edit bill"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled
+                        className="opacity-40 cursor-not-allowed"
+                        title="Available after finalize"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled
+                        className="opacity-40 cursor-not-allowed"
+                        title="Available in Phase 4"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
