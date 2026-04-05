@@ -1,6 +1,6 @@
 # Roadmap — v1.0 Update Billing
 
-**4 phases** | **20 requirements mapped** | All covered ✓
+**4 phases** | **20 requirements mapped** | All covered ��
 
 | # | Phase | Goal | Requirements | Criteria |
 |---|-------|------|--------------|----------|
@@ -46,9 +46,16 @@ Plans:
 
 **Requirements:** UI-01, UI-02, UI-03, SCHEMA-01, SCHEMA-02
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Schema migrations, SelectTrigger opacity fix, ManualItemForm rewrite (SCHEMA-01, SCHEMA-02, UI-01, UI-02)
+- [ ] 02-02-PLAN.md — SalespersonSelector component, BillTable polish with customer name and icon actions (UI-03)
+- [ ] 02-03-PLAN.md — Wire salespersons and cost_price into BillingForm save/update/load (UI-03, SCHEMA-01, SCHEMA-02)
+
 **Success criteria:**
 1. All dropdowns/selects in BillingForm have solid, opaque backgrounds (no washed-out/transparent look)
-2. Manual item form has: name (required), product code (optional), category, size, color, qty, MRP, alteration charge, GST rate — identical UX to inventory-sourced items
+2. Manual item form has: name (required), product code (optional), category, size, color, qty, MRP, alteration charge, GST rate ��� identical UX to inventory-sourced items
 3. Bill form has a Salesperson(s) multi-select; selected names are saved to `bill_salespersons`
 4. `payment_method` and `payment_amount` columns exist on `bills` table (SQL migration script provided)
 5. `salespersons` and `bill_salespersons` tables exist (SQL migration script provided)
