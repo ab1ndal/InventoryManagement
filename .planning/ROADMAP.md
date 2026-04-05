@@ -49,8 +49,8 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Schema migrations, SelectTrigger opacity fix, ManualItemForm rewrite (SCHEMA-01, SCHEMA-02, UI-01, UI-02)
-- [ ] 02-02-PLAN.md — SalespersonSelector component, BillTable polish with customer name and icon actions (UI-03)
+- [x] 02-01-PLAN.md — Schema migrations, SelectTrigger opacity fix, ManualItemForm rewrite (SCHEMA-01, SCHEMA-02, UI-01, UI-02)
+- [x] 02-02-PLAN.md — SalespersonSelector component, BillTable polish with customer name and icon actions (UI-03)
 - [ ] 02-03-PLAN.md — Wire salespersons and cost_price into BillingForm save/update/load (UI-03, SCHEMA-01, SCHEMA-02)
 
 **Success criteria:**

@@ -31,7 +31,7 @@ Bills follow this lifecycle:
 
 - [ ] **UI-01**: Dropdowns in BillingForm render with correct opacity (no transparent/washed-out background)
 - [ ] **UI-02**: Manual item form has full field parity with inventory items: name, product code (optional), category, size, color, qty, MRP, alteration charge, GST rate
-- [ ] **UI-03**: Bill form includes a Salesperson(s) selector — staff can associate one or more salespersons with the sale
+- [x] **UI-03**: Bill form includes a Salesperson(s) selector — staff can associate one or more salespersons with the sale
 
 ## SCHEMA — Database Additions
 
