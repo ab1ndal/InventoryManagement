@@ -92,7 +92,7 @@ export default function DiscountTable({ onEdit, refresh }) {
         </thead>
         <tbody>
           {discounts.map((d) => (
-            <tr key={d.id} className="border-t">
+            <tr key={d.id} className="border-t hover:bg-gray-70">
               <td className="px-2 py-1 text-center">{d.code || "—"}</td>
               <td className="px-2 py-1 text-center">
                 {discountTypeLabels[d.type] || d.type}
@@ -130,19 +130,25 @@ export default function DiscountTable({ onEdit, refresh }) {
                   variant="outline"
                   size="sm"
                   onClick={() => handleEditRules(d)}
+                  className="group"
                 >
-                  <Code className="h-4 w-4 text-gray-500" />
+                  <Code className="h-4 w-4 text-gray-400 group-hover:text-gray-900 transition-colors duration-200" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => onEdit(d)}>
-                  {/* Edit button - Color should be gold and hover should be blue*/}
-                  <Pencil className="h-4 w-4 text-yellow-500 hover:text-blue-500" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEdit(d)}
+                  className="group"
+                >
+                  <Pencil className="h-4 w-4 text-yellow-500 group-hover:text-blue-500 transition-colors duration-200" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleDelete(d.id)}
+                  className="group"
                 >
-                  <Trash2 className="h-4 w-4 text-red-500 hover:text-red-700" />
+                  <Trash2 className="h-4 w-4 text-red-500 group-hover:text-red-700 transition-colors duration-200" />
                 </Button>
               </td>
             </tr>
