@@ -10,72 +10,128 @@ import {
   SelectItem,
 } from "../../../components/ui/select";
 import { supabase } from "../../../lib/supabaseClient";
+import { useToast } from "../../../components/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
 
-// Decode Z-encoded cost price: "ZABCD" → 1234
+// Encode numeric cost price to Z-code: 1234 → "ZABCD"
+function encodePriceToZCode(price) {
+  const map = { 1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F", 7: "G", 8: "H", 9: "I", 0: "Z" };
+  const digits = Number(price || 0).toString().split("");
+  return "Z" + digits.map((d) => map[d] ?? "Z").join("");
+}
+
+// Decode Z-code to numeric cost price: "ZABCD" → 1234
 function decodeZCode(str) {
   const s = String(str || "").toUpperCase().trim();
   if (!s.startsWith("Z") || s.length < 2) return Number(s) || 0;
   const rev = { A: "1", B: "2", C: "3", D: "4", E: "5", F: "6", G: "7", H: "8", I: "9", Z: "0" };
-  return Number(s.slice(1).split("").map(ch => rev[ch] ?? "0").join("")) || 0;
+  return Number(s.slice(1).split("").map((ch) => rev[ch] ?? "0").join("")) || 0;
+}
+
+function getBCXPrefix(date = new Date()) {
+  const yy = String(date.getFullYear()).slice(-2);
+  return `BCX${yy}`;
+}
+
+async function getNextManualItemId() {
+  const prefix = getBCXPrefix();
+  const { data: maxNum, error } = await supabase.rpc("get_max_manual_item_suffix", {
+    p_prefix: prefix,
+  });
+  if (error) throw new Error("Could not generate item ID: " + error.message);
+
+  const yearDigits = prefix.slice(3); // "25"
+  const maxStr = maxNum ? String(maxNum) : "";
+  const suffixNow =
+    maxStr.startsWith(yearDigits)
+      ? parseInt(maxStr.slice(yearDigits.length) || "0", 10)
+      : 0;
+
+  const nextSuffix = suffixNow + 1;
+  return `${prefix}${String(nextSuffix).padStart(3, "0")}`;
 }
 
 export default function ManualItemForm({ onAdd, initialVal }) {
+  const { toast } = useToast();
   const [categories, setCategories] = useState([]);
-  const [category, setCategory] = useState(
-    initialVal?.category || initialVal?.manual_category || ""
-  );
-  const [name, setName] = useState(
-    initialVal?.product_name || initialVal?.manual_name || ""
-  );
-  const [code, setCode] = useState(initialVal?.manual_code || "");
+  const [saving, setSaving] = useState(false);
+
+  // Form fields — mirroring product entry
+  const [categoryId, setCategoryId] = useState(initialVal?.categoryid || "");
+  const [name, setName] = useState(initialVal?.product_name || initialVal?.manual_name || "");
   const [size, setSize] = useState(initialVal?.size || "");
   const [color, setColor] = useState(initialVal?.color || "");
   const [qty, setQty] = useState(initialVal?.quantity || 1);
-  const [mrp, setMrp] = useState(initialVal?.mrp || 0);
-  const [discountPct, setDiscountPct] = useState(
-    initialVal?.quickDiscountPct ?? 0
+  const [mrp, setMrp] = useState(initialVal?.mrp || "");
+  const [discountPct, setDiscountPct] = useState(initialVal?.quickDiscountPct ?? 0);
+  const [alterationCharge, setAlterationCharge] = useState(initialVal?.alteration_charge || "");
+  const [gstRate, setGstRate] = useState(String(initialVal?.gstRate ?? 18));
+  // Z Code: show encoded if we have a stored cost_price, otherwise blank
+  const [zCode, setZCode] = useState(
+    initialVal?.cost_price ? encodePriceToZCode(initialVal.cost_price) : ""
   );
-  const [alterationCharge, setAlterationCharge] = useState(
-    initialVal?.alteration_charge || 0
-  );
-  const [gstRate, setGstRate] = useState(
-    String(initialVal?.gstRate ?? 18)
-  );
-  const [zCode, setZCode] = useState(initialVal?.cost_price || "");
 
   useEffect(() => {
     supabase
       .from("categories")
-      .select("id, name")
+      .select("categoryid, name")
       .order("name")
       .then(({ data }) => setCategories(data || []));
   }, []);
 
-  function handleSubmit() {
-    onAdd({
-      _id: uuidv4(),
-      source: "manual",
-      manual_category: category || null,
-      manual_name: name || null,
-      manual_code: code || null,
-      category: category || null,
-      product_name: name || null,
-      size: size || null,
-      color: color || null,
-      quantity: qty,
-      mrp: Number(mrp || 0),
-      quickDiscountPct: Number(discountPct) || 0,
-      gstRate: Number(gstRate),
-      alteration_charge: Number(alterationCharge) || 0,
-      cost_price: decodeZCode(zCode),
-    });
-    // Retain values — do not reset state
+  async function handleSubmit() {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      const purchasePrice = decodeZCode(zCode);
+      const manualItemId = await getNextManualItemId();
+
+      // Insert into manual_items table
+      const { error } = await supabase.from("manual_items").insert({
+        manual_item_id: manualItemId,
+        name: name.trim(),
+        categoryid: categoryId || null,
+        size: size || null,
+        color: color || null,
+        purchase_price: purchasePrice,
+        mrp: Number(mrp) || 0,
+      });
+      if (error) throw new Error(error.message);
+
+      const categoryName = categories.find((c) => c.categoryid === categoryId)?.name || null;
+
+      onAdd({
+        _id: uuidv4(),
+        source: "manual",
+        productid: manualItemId,
+        product_name: name.trim(),
+        manual_name: name.trim(),
+        manual_code: manualItemId,
+        categoryid: categoryId || null,
+        category: categoryName,
+        manual_category: categoryName,
+        size: size || null,
+        color: color || null,
+        quantity: Number(qty) || 1,
+        mrp: Number(mrp) || 0,
+        quickDiscountPct: Number(discountPct) || 0,
+        gstRate: Number(gstRate),
+        alteration_charge: Number(alterationCharge) || 0,
+        cost_price: purchasePrice,
+      });
+
+      toast({ title: `Manual item added — ${manualItemId}` });
+      // Retain values — do not reset state
+    } catch (e) {
+      toast({ title: "Failed to add item", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="grid gap-4">
-      {/* Item Details section */}
+      {/* Item Details */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
           Item Details
@@ -83,13 +139,13 @@ export default function ManualItemForm({ onAdd, initialVal }) {
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-1">
             <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger>
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.name}>
+                  <SelectItem key={c.categoryid} value={c.categoryid}>
                     {c.name}
                   </SelectItem>
                 ))}
@@ -107,14 +163,6 @@ export default function ManualItemForm({ onAdd, initialVal }) {
             />
           </div>
           <div className="grid gap-1">
-            <Label>Product Code</Label>
-            <Input
-              placeholder="Optional"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-1">
             <Label>Size</Label>
             <Input
               placeholder="e.g. L, 42"
@@ -122,7 +170,7 @@ export default function ManualItemForm({ onAdd, initialVal }) {
               onChange={(e) => setSize(e.target.value)}
             />
           </div>
-          <div className="grid gap-1 col-span-2">
+          <div className="grid gap-1">
             <Label>Color</Label>
             <Input
               placeholder="e.g. Navy Blue"
@@ -133,7 +181,7 @@ export default function ManualItemForm({ onAdd, initialVal }) {
         </div>
       </div>
 
-      {/* Pricing section */}
+      {/* Pricing */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
           Pricing
@@ -144,9 +192,8 @@ export default function ManualItemForm({ onAdd, initialVal }) {
             <Input
               type="number"
               min={1}
-              placeholder="1"
               value={qty}
-              onChange={(e) => setQty(parseInt(e.target.value || "1", 10))}
+              onChange={(e) => setQty(e.target.value)}
             />
           </div>
           <div className="grid gap-1">
@@ -193,22 +240,20 @@ export default function ManualItemForm({ onAdd, initialVal }) {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1 col-span-2">
-            <Label>Z Code</Label>
+          <div className="grid gap-1">
+            <Label>Z Code (Purchase Price)</Label>
             <Input
               placeholder="e.g. ZABCD"
               value={zCode}
-              onChange={(e) => setZCode(e.target.value)}
+              onChange={(e) => setZCode(e.target.value.toUpperCase())}
             />
-            <p className="text-xs text-muted-foreground">
-              Enter encoded (ZABCD) or numeric — internal only
-            </p>
+            <p className="text-xs text-muted-foreground">Internal only — not shown to customer</p>
           </div>
         </div>
       </div>
 
-      <Button onClick={handleSubmit} disabled={!name.trim()}>
-        {initialVal ? "Update Item" : "Add Item"}
+      <Button onClick={handleSubmit} disabled={!name.trim() || saving}>
+        {saving ? "Adding..." : "Add Item"}
       </Button>
     </div>
   );

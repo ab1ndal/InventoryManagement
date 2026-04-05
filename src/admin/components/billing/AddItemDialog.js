@@ -33,6 +33,7 @@ export default function AddItemDialog({
   onOpenChange: controlledOnOpenChange,
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(null);
   const isEditing = !!editItem;
 
   const open = controlledOpen !== undefined ? controlledOpen : uncontrolledOpen;
@@ -45,10 +46,14 @@ export default function AddItemDialog({
   const handleConfirm = (item) => {
     if (isEditing) {
       onUpdate({ ...item, _id: editItem._id });
+      setOpen(false);
+    } else if ((activeTab ?? defaultTab) === "manual") {
+      // Manual items: add to bill but keep dialog open so values are retained
+      onAdd(item);
     } else {
       onAdd(item);
+      setOpen(false);
     }
-    setOpen(false);
   };
 
   return (
@@ -67,7 +72,7 @@ export default function AddItemDialog({
               : "Select a product from inventory or add a manual item"}
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue={defaultTab}>
+        <Tabs defaultValue={defaultTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="inventory">From Inventory</TabsTrigger>
             <TabsTrigger value="manual">Manual Item</TabsTrigger>
