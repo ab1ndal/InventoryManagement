@@ -55,18 +55,21 @@ Source: Existing BillingForm `space-y-6` / `gap-3` / `space-y-3` patterns observ
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
+| Invoice detail (invoice fine print) | 11px | 400 (regular) | 1.4 |
 | Body | 14px | 400 (regular) | 1.5 |
-| Label | 14px | 500 (medium) | 1.4 |
 | Heading (card title) | 16px | 600 (semibold) | 1.2 |
-| Display (invoice store name) | 20px | 700 (bold) | 1.2 |
+| Display (invoice store name) | 20px | 600 (semibold) | 1.2 |
 
 Notes:
+- Exactly 4 sizes declared: 11px, 14px, 16px, 20px
+- Exactly 2 weights declared: 400 (body/inputs/invoice line items) and 600 (labels/headings/display/invoice column headers)
 - `h1, h2, h3` globally set to `font-semibold text-gray-900` via src/index.css
-- Invoice store name ("BINDAL'S CREATION") renders at 20px bold, all-caps — matches physical bill style
+- Invoice store name ("BINDAL'S CREATION") renders at 20px weight 600, all-caps — 20px size provides sufficient hierarchy without needing a third weight
+- Invoice tagline ("A COMPLETE RANGE OF FAMILY WEAR") renders at 11px weight 400, muted gray
+- Invoice address, phone, GSTIN render at 11px weight 400 (except GSTIN label: 11px weight 600)
 - Invoice section labels (S.No., Particulars, Qty, Rate, Amount) render at 11px weight 600 to compress into A4
 - Invoice line items render at 11px weight 400 — maximizes rows per page
-- Two weights used in app UI: 400 (body/inputs) and 600 (semibold labels/headings)
-- Invoice uses a third weight (700) only inside InvoiceView for the store name header
+- App UI label elements use 14px weight 600 (semibold) rather than a separate medium weight
 
 Source: src/index.css global styles; sample_bill.jpg column header proportions; RESEARCH.md InvoiceView A4 spec.
 
@@ -86,6 +89,8 @@ Accent reserved for:
 - "Confirm & Finalize" button inside confirmation Dialog
 - "Print Invoice" icon button in BillTable for finalized rows (FileText icon, primary color)
 
+Primary focal point: "Finalize" button in BillingForm footer — the only accent-colored element on the screen.
+
 Semantic colors:
 - Success toast (bill saved, bill finalized): default toast, no color override — plain title-only toast
 - Error/destructive toast: `variant: "destructive"` (dc2626 background) — used for all validation failures
@@ -103,7 +108,7 @@ Components used in this phase (all from existing shadcn installation):
 | Component | File | New in Phase 3? | Usage |
 |-----------|------|-----------------|-------|
 | Dialog | src/components/ui/dialog.tsx | No (extend) | Finalize confirmation dialog — nested inside BillingForm's outer Dialog |
-| Button | src/components/ui/button.tsx | No | "Finalize", "Confirm & Finalize", "Cancel" |
+| Button | src/components/ui/button.tsx | No | "Finalize", "Confirm & Finalize", "Keep Editing" |
 | Badge | src/components/ui/badge.tsx | No | Payment method display in confirmation dialog |
 | Table | src/components/ui/table.tsx | No | InvoiceView line items table |
 | Card, CardContent | src/components/ui/card.tsx | No | InvoiceView section wrapper |
@@ -146,7 +151,7 @@ Content to display:
 - Payment Method: {cash | card | upi | mixed} — displayed as capitalized text
 - Amount Received: ₹{paymentAmount}
 - "Confirm & Finalize" button — primary, full-width or right-aligned
-- "Cancel" button — ghost variant, left of confirm
+- "Keep Editing" button — ghost variant, left of confirm (communicates: clicking returns user to the form)
 
 Interaction sequence on "Confirm & Finalize":
 1. `setIsSaving(true)` — disables both buttons
@@ -199,17 +204,17 @@ The InvoiceView component renders an A4-proportioned invoice for html2canvas cap
 ### Sections (top to bottom)
 
 1. **Store Header** (center-aligned)
-   - Store name: "BINDAL'S CREATION" — 20px bold, letter-spacing wide, all-caps
-   - Tagline: "A COMPLETE RANGE OF FAMILY WEAR" — 12px regular, muted gray
-   - Address: "58 Sihani Gate Market, Ghaziabad 201001" — 11px regular
-   - Phone: "+91 9810873280 | +91 9810121438" — 11px regular
-   - GSTIN: "GSTIN: 09ABVPB4203A1Z4" — 11px semibold (required for GST compliance)
+   - Store name: "BINDAL'S CREATION" — 20px weight 600, letter-spacing wide, all-caps
+   - Tagline: "A COMPLETE RANGE OF FAMILY WEAR" — 11px weight 400, muted gray
+   - Address: "58 Sihani Gate Market, Ghaziabad 201001" — 11px weight 400
+   - Phone: "+91 9810873280 | +91 9810121438" — 11px weight 400
+   - GSTIN: "GSTIN: 09ABVPB4203A1Z4" — 11px weight 600 (required for GST compliance)
    - Divider line: 1px solid #e5e7eb
 
 2. **Bill Metadata** (two-column layout, left and right)
    - Left: Bill No: {billId}, Date: {DD/MM/YYYY}
    - Right: Customer: {name}, Salesperson(s): {comma-separated names}
-   - Font: 11px regular, labels at weight 600
+   - Font: 11px weight 400, labels at weight 600
 
 3. **Line Items Table**
    - Columns: S.No. | Particulars | Size | Color | Qty | Rate (MRP) | Disc | GST% | Taxable | CGST | SGST | Amount
@@ -226,7 +231,7 @@ The InvoiceView component renders an A4-proportioned invoice for html2canvas cap
 4. **Totals Section** (right-aligned)
    - Item Subtotal (sum of Amount column)
    - Overall Discount: -{₹overallDiscount} (if any codes applied, show code names)
-   - Grand Total: ₹{grandTotal} — 14px bold
+   - Grand Total: ₹{grandTotal} — 14px weight 600
    - GST Summary: Total CGST: ₹X | Total SGST: ₹Y
 
 5. **Payment Footer**
@@ -250,7 +255,7 @@ Source: sample_bill.jpg visual reference; D-04/D-05 constants from CONTEXT.md; P
 | Confirmation dialog title | "Confirm Finalize" |
 | Confirmation dialog description | "This action cannot be undone." |
 | Confirm action button | "Confirm & Finalize" |
-| Cancel button in dialog | "Cancel" |
+| Cancel button in dialog | "Keep Editing" |
 | Saving state label | "Saving..." |
 | Success toast | "Bill #{billId} finalized" |
 | PDF opened notification | (none — PDF opens silently in new tab) |
