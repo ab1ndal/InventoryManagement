@@ -88,12 +88,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         return true;
       });
       setAllDiscounts(valid);
-      const autoCodes = valid.filter((d) => d.auto_apply).map((d) => d.code);
-      setSelectedCodes(autoCodes);
+      // Only auto-apply on new bills — edits load codes from saved applied_codes
+      if (!billId) {
+        const autoCodes = valid.filter((d) => d.auto_apply).map((d) => d.code);
+        setSelectedCodes(autoCodes);
+      }
     };
 
     loadDiscounts();
-  }, [open, toast]);
+  }, [open, toast, billId]);
 
   useEffect(() => {
     if (!open || !billId) return;
@@ -134,11 +137,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         setPaymentMethod(bill.payment_method || "");
         setPaymentAmount(bill.payment_amount ?? "");
 
-        // Override auto-apply codes with saved applied_codes (D-02 + Pitfall 4)
+        // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts
         const savedCodes = codesRow?.applied_codes;
-        if (savedCodes && savedCodes.length > 0) {
-          setSelectedCodes(savedCodes);
-        }
+        setSelectedCodes(savedCodes || []);
 
         // Reconstruct items — product_code in DB stores the BC-format productid for inventory items
         setItems((billItems || []).map(bi => ({
@@ -374,6 +375,21 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   };
 
   const handleFinalize = async () => {
+    // Validate payment amount is within ₹100 of grand total
+    const paidAmt = Number(paymentAmount);
+    if (!paymentMethod || !paymentAmount) {
+      toast({ title: "Payment required", description: "Select a payment method and enter the amount received before finalizing.", variant: "destructive" });
+      return;
+    }
+    if (Math.abs(paidAmt - computed.grandTotal) > 100) {
+      const diff = (paidAmt - computed.grandTotal).toFixed(2);
+      const msg = diff > 0
+        ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${computed.grandTotal.toFixed(2)}).`
+        : `Amount received is ₹${Math.abs(diff)} short of the total (₹${computed.grandTotal.toFixed(2)}).`;
+      toast({ title: "Payment mismatch", description: msg + " Must be within ₹100.", variant: "destructive" });
+      return;
+    }
+
     setIsSaving(true);
     try {
       // TODO: finalize bill in supabase
@@ -488,12 +504,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
                     <SelectItem value="mixed">Mixed</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input
-                  type="number"
-                  placeholder="Amount received"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">₹</span>
+                  <Input
+                    type="number"
+                    placeholder="Amount received"
+                    className="pl-7"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                  />
+                </div>
               </div>
             </section>
 

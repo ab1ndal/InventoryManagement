@@ -42,9 +42,9 @@ export default function InventoryPicker({ onPicked, initialVal }) {
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Search products only after 6 characters (skip when editing and selected is already loaded)
+  // Search products only after 6 characters (skip once a product is selected)
   useEffect(() => {
-    if (isEditing && selected) return;
+    if (selected) return;
     const run = async () => {
       if (query.length < 6) {
         setResults([]);
