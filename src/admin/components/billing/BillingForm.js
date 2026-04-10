@@ -55,6 +55,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const invoiceRef = useRef(null);
   const [customerName, setCustomerName] = useState("");
   const [salespersonNames, setSalespersonNames] = useState([]);
+  const [billDate, setBillDate] = useState(null);
 
   useEffect(() => {
     if (!open) {
@@ -111,7 +112,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         // Fetch bill header (customerid + notes only — applied_codes fetched separately for resilience)
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select("customerid, notes, payment_method, payment_amount")
+          .select("customerid, notes, payment_method, payment_amount, created_at")
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
@@ -142,6 +143,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         setNotes(bill.notes || "");
         setPaymentMethod(bill.payment_method || "");
         setPaymentAmount(bill.payment_amount ?? "");
+        setBillDate(bill.created_at ? new Date(bill.created_at) : new Date());
 
         // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts
         const savedCodes = codesRow?.applied_codes;
@@ -646,7 +648,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         <InvoiceView
           ref={invoiceRef}
           billId={billId}
-          billDate={new Date()}
+          billDate={billDate ?? new Date()}
           customerName={customerName}
           salespersonNames={salespersonNames}
           items={items}
