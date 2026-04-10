@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { computeBillTotals } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { Button } from "../../../components/ui/button";
@@ -28,6 +28,8 @@ import DiscountSelector from "./DiscountSelector";
 import Summary from "./Summary";
 import Notes from "./Notes";
 import SalespersonSelector from "./SalespersonSelector";
+import InvoiceView from "./InvoiceView";
+import { generateInvoicePdf } from "./generateInvoicePdf";
 import {
   Dialog,
   //  DialogTrigger,
@@ -50,6 +52,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const invoiceRef = useRef(null);
+  const [customerName, setCustomerName] = useState("");
+  const [salespersonNames, setSalespersonNames] = useState([]);
 
   useEffect(() => {
     if (!open) {
@@ -162,6 +167,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     };
     loadBill();
   }, [open, billId, toast]);
+
+  // Fetch customer display name for InvoiceView
+  useEffect(() => {
+    if (!selectedCustomerId) { setCustomerName(""); return; }
+    supabase.from('customers').select('name').eq('customerid', selectedCustomerId).single()
+      .then(({ data }) => setCustomerName(data?.name ?? ""));
+  }, [selectedCustomerId]);
+
+  // Fetch salesperson display names for InvoiceView
+  useEffect(() => {
+    if (!selectedSalespersonIds?.length) { setSalespersonNames([]); return; }
+    supabase.from('salespersons').select('name').in('salesperson_id', selectedSalespersonIds)
+      .then(({ data }) => setSalespersonNames((data ?? []).map(r => r.name)));
+  }, [selectedSalespersonIds]);
 
   const computed = useMemo(
     () => computeBillTotals(items, selectedCodes, allDiscounts),
@@ -445,6 +464,39 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         if (duErr) throw duErr;
       }
 
+      // Steps 5-7: PDF generate + upload + pdf_url update
+      let pdfUrl = null;
+      try {
+        if (!invoiceRef.current) throw new Error("InvoiceView ref missing");
+        const blob = await generateInvoicePdf(invoiceRef.current);
+        const path = `bill-${billId}.pdf`;
+        const { error: upErr } = await supabase.storage
+          .from('invoices')
+          .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from('invoices').getPublicUrl(path);
+        pdfUrl = urlData?.publicUrl ?? null;
+        if (pdfUrl) {
+          const { error: urlErr } = await supabase
+            .from('bills')
+            .update({ pdf_url: pdfUrl })
+            .eq('billid', billId);
+          if (urlErr) throw urlErr;
+        }
+      } catch (pdfErr) {
+        toast({
+          title: "PDF generation failed",
+          description: "Bill is finalized. You can reprint from the Bill List.",
+          variant: "destructive",
+        });
+      }
+
+      // Step 8: open PDF in new tab if we got a URL
+      if (pdfUrl) {
+        window.open(pdfUrl, '_blank');
+      }
+
+      // Steps 9-10: success toast + close
       toast({ title: `Bill #${billId} finalized` });
       setConfirmOpen(false);
       onOpenChange?.(false);
@@ -588,6 +640,22 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           </CardContent>
         </Card>
       </DialogContent>
+
+      {/* Off-screen InvoiceView for html2canvas PDF capture */}
+      <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
+        <InvoiceView
+          ref={invoiceRef}
+          billId={billId}
+          billDate={new Date()}
+          customerName={customerName}
+          salespersonNames={salespersonNames}
+          items={items}
+          computed={computed}
+          paymentMethod={paymentMethod}
+          paymentAmount={paymentAmount}
+          appliedCodes={selectedCodes}
+        />
+      </div>
 
       {/* Finalize Confirmation Dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
