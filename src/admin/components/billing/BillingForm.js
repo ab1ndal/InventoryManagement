@@ -49,6 +49,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [selectedSalespersonIds, setSelectedSalespersonIds] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -374,8 +375,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     }
   };
 
-  const handleFinalize = async () => {
-    // Validate payment amount is within ₹100 of grand total
+  const openFinalizeConfirm = () => {
+    // D-06: Customer required to finalize
+    if (!selectedCustomerId) {
+      toast({ title: "Customer required", description: "A customer must be selected before finalizing.", variant: "destructive" });
+      return;
+    }
+    // Validate payment fields
     const paidAmt = Number(paymentAmount);
     if (!paymentMethod || !paymentAmount) {
       toast({ title: "Payment required", description: "Select a payment method and enter the amount received before finalizing.", variant: "destructive" });
@@ -389,11 +395,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       toast({ title: "Payment mismatch", description: msg + " Must be within ₹100.", variant: "destructive" });
       return;
     }
+    setConfirmOpen(true);
+  };
 
+  const handleConfirmFinalize = async () => {
     setIsSaving(true);
     try {
-      // TODO: finalize bill in supabase
-      toast({ title: "Bill finalized" });
+      // TODO Task 3: DB finalize sequence
+      toast({ title: `Bill #${billId} finalized` });
+      setConfirmOpen(false);
       onOpenChange?.(false);
       onSubmit?.();
     } catch (e) {
@@ -528,13 +538,34 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               <Button disabled={isSaving} onClick={handleSaveDraft}>
                 {isSaving ? "Saving..." : "Save Draft"}
               </Button>
-              <Button disabled={isSaving} onClick={handleFinalize}>
+              <Button disabled={isSaving} onClick={openFinalizeConfirm}>
                 {isSaving ? "Saving..." : "Finalize"}
               </Button>
             </div>
           </CardContent>
         </Card>
       </DialogContent>
+
+      {/* Finalize Confirmation Dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Finalize</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
+            <div><span className="font-semibold">Customer:</span> {selectedCustomerId ?? "—"}</div>
+            <div><span className="font-semibold">Grand Total:</span> ₹{computed.grandTotal.toFixed(2)}</div>
+            <div><span className="font-semibold">Payment Method:</span> {paymentMethod}</div>
+            <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" disabled={isSaving} onClick={() => setConfirmOpen(false)}>Keep Editing</Button>
+            <Button disabled={isSaving} onClick={handleConfirmFinalize}>{isSaving ? "Saving..." : "Confirm & Finalize"}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
