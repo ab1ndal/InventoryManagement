@@ -399,9 +399,52 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   };
 
   const handleConfirmFinalize = async () => {
+    // Guard: bill must be saved as a draft first
+    if (!billId) {
+      toast({ title: "Error", description: "Cannot finalize a bill that has not been saved as a draft yet.", variant: "destructive" });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      // TODO Task 3: DB finalize sequence
+      // Step 1: Update bills row
+      const { error: billErr } = await supabase
+        .from('bills')
+        .update({
+          finalized: true,
+          paymentstatus: 'finalized',
+          payment_method: paymentMethod,
+          payment_amount: Number(paymentAmount),
+        })
+        .eq('billid', billId);
+      if (billErr) throw billErr;
+
+      // Step 2: Update customer total_spend + last_purchased_at (D-07 — always runs per D-06 guarantee)
+      const { data: custRow, error: custFetchErr } = await supabase
+        .from('customers')
+        .select('total_spend')
+        .eq('customerid', selectedCustomerId)
+        .single();
+      if (custFetchErr) throw custFetchErr;
+      const newTotal = Number(custRow?.total_spend ?? 0) + Number(computed.grandTotal);
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const { error: custUpdErr } = await supabase
+        .from('customers')
+        .update({ total_spend: newTotal, last_purchased_at: today })
+        .eq('customerid', selectedCustomerId);
+      if (custUpdErr) throw custUpdErr;
+
+      // Step 3: Insert discount_usage rows for each applied code
+      if (selectedCodes && selectedCodes.length > 0) {
+        const usageRows = selectedCodes.map(code => ({
+          customerid: selectedCustomerId,
+          code,
+          billid: billId,
+        }));
+        const { error: duErr } = await supabase.from('discount_usage').insert(usageRows);
+        if (duErr) throw duErr;
+      }
+
       toast({ title: `Bill #${billId} finalized` });
       setConfirmOpen(false);
       onOpenChange?.(false);
