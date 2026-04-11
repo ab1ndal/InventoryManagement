@@ -114,6 +114,12 @@ Plans:
 
 **Requirements:** BILL-05, STOCK-03, VOUCH-01, VOUCH-02
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Bill cancellation flow: Cancel button in BillTable, confirm + resolution dialogs, stock restore, store credit issuance, return receipt PDF (BILL-05, STOCK-03, VOUCH-01, VOUCH-02)
+- [ ] 04-02-PLAN.md — BillingForm store credit auto-apply + promotional voucher redemption, Summary deduction rows, finalize sequence updates (VOUCH-01, VOUCH-02)
+
 **Success criteria:**
 1. Cancel button (on Draft or Finalized bills) shows confirmation dialog before proceeding
 2. Cancelled bill: `paymentstatus='cancelled'`, stock restored for all inventory items, BillTable shows "Cancelled" badge
