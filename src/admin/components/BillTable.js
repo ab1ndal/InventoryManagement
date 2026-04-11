@@ -65,6 +65,13 @@ export default function BillTable({ onEdit }) {
   };
 
   const restoreStockForBill = async (billId) => {
+    // TODO(CR-02): This restore uses a non-atomic read-modify-write pattern. Concurrent
+    // finalize/cancel operations between the read and write can silently corrupt stock counts.
+    // Fix: create a Supabase RPC `adjust_stock(p_variantid uuid, p_delta integer)` that performs
+    // an atomic `UPDATE productsizecolors SET stock = stock + p_delta WHERE variantid = p_variantid`
+    // and replace the block below with:
+    //   await supabase.rpc('adjust_stock', { p_variantid: bi.variantid, p_delta: bi.quantity });
+    // See schema/migration_adjust_stock.sql for the required migration.
     const { data: billItems } = await supabase
       .from("bill_items")
       .select("variantid, quantity")
