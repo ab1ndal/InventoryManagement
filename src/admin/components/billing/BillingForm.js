@@ -58,6 +58,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [salespersonNames, setSalespersonNames] = useState([]);
   const [billDate, setBillDate] = useState(null);
   const [effectiveBillId, setEffectiveBillId] = useState(null);
+  const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
+  const [customerStoreCreditBalance, setCustomerStoreCreditBalance] = useState(0);
+  const [voucherCode, setVoucherCode] = useState("");
+  const [appliedVoucher, setAppliedVoucher] = useState(null); // { voucher_id, value }
+  const [voucherError, setVoucherError] = useState("");
+  const [voucherLoading, setVoucherLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -73,6 +79,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setPaymentAmount("");
       setCustomerDisplayText("");
       setEffectiveBillId(null);
+      setAppliedStoreCredit(0);
+      setCustomerStoreCreditBalance(0);
+      setVoucherCode("");
+      setAppliedVoucher(null);
+      setVoucherError("");
+      setVoucherLoading(false);
       return;
     }
 
@@ -206,6 +218,31 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       });
   }, [selectedCustomerId]);
 
+  // D-16: Auto-apply store credit when customer changes
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setCustomerStoreCreditBalance(0);
+      setAppliedStoreCredit(0);
+      return;
+    }
+    supabase
+      .from('customers')
+      .select('store_credit')
+      .eq('customerid', selectedCustomerId)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          setCustomerStoreCreditBalance(0);
+          setAppliedStoreCredit(0);
+          return;
+        }
+        const balance = Number(data.store_credit ?? 0);
+        setCustomerStoreCreditBalance(balance);
+        // Auto-apply the full balance; Summary/computation will clamp to grandTotal
+        setAppliedStoreCredit(balance);
+      });
+  }, [selectedCustomerId]);
+
   // Fetch salesperson display names for InvoiceView
   useEffect(() => {
     if (!selectedSalespersonIds?.length) { setSalespersonNames([]); return; }
@@ -217,6 +254,45 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     () => computeBillTotals(items, selectedCodes, allDiscounts),
     [items, selectedCodes, allDiscounts]
   );
+
+  const handleApplyVoucher = async () => {
+    const code = voucherCode.trim();
+    if (!code) return;
+    setVoucherLoading(true);
+    setVoucherError("");
+    try {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const { data, error } = await supabase
+        .from('vouchers')
+        .select('voucher_id, customerid, expiry_date, value, redeemed')
+        .eq('voucher_id', code)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        setVoucherError("Voucher code not found or already redeemed.");
+        return;
+      }
+      if (data.redeemed) {
+        setVoucherError("Voucher code not found or already redeemed.");
+        return;
+      }
+      if (data.expiry_date && data.expiry_date < today) {
+        setVoucherError("This voucher has expired.");
+        return;
+      }
+      if (data.customerid != null && selectedCustomerId != null && data.customerid !== selectedCustomerId) {
+        setVoucherError("This voucher is assigned to a different customer.");
+        return;
+      }
+      // Valid
+      setAppliedVoucher({ voucher_id: data.voucher_id, value: Number(data.value ?? 0) });
+      setVoucherCode("");
+    } catch (e) {
+      setVoucherError(e?.message || "Could not apply voucher. Please try again.");
+    } finally {
+      setVoucherLoading(false);
+    }
+  };
 
   // BILL-01 + STOCK-01: New draft save | BILL-02 + STOCK-02: Draft update (Plan 03)
   const handleSaveDraft = async () => {
@@ -451,11 +527,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       toast.error("Payment required", { description: "Select a payment method and enter the amount received before finalizing." });
       return;
     }
-    if (Math.abs(paidAmt - computed.grandTotal) > 100) {
-      const diff = (paidAmt - computed.grandTotal).toFixed(2);
+    // Compute effective grand total (D-24 order: voucher before store credit, floor at 0)
+    const voucherAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
+    const postVoucher = Math.max(0, computed.grandTotal - voucherAmt);
+    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), postVoucher);
+    const effectiveGrandTotal = Math.max(0, postVoucher - storeCreditAmt);
+
+    if (Math.abs(paidAmt - effectiveGrandTotal) > 100) {
+      const diff = (paidAmt - effectiveGrandTotal).toFixed(2);
       const msg = diff > 0
-        ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${computed.grandTotal.toFixed(2)}).`
-        : `Amount received is ₹${Math.abs(diff)} short of the total (₹${computed.grandTotal.toFixed(2)}).`;
+        ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${effectiveGrandTotal.toFixed(2)}).`
+        : `Amount received is ₹${Math.abs(diff)} short of the total (₹${effectiveGrandTotal.toFixed(2)}).`;
       toast.error("Payment mismatch", { description: msg + " Must be within ₹100." });
       return;
     }
@@ -581,6 +663,42 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         }));
         const { error: duErr } = await supabase.from('discount_usage').insert(usageRows);
         if (duErr) throw duErr;
+      }
+
+      // D-23: Mark applied voucher redeemed
+      if (appliedVoucher?.voucher_id) {
+        const { error: vErr } = await supabase
+          .from('vouchers')
+          .update({
+            redeemed: true,
+            redeemed_at: new Date().toISOString(),
+            redeemed_billid: activeBillId,
+          })
+          .eq('voucher_id', appliedVoucher.voucher_id);
+        if (vErr) throw vErr;
+      }
+
+      // D-18 + D-26: Decrement customer store credit by the amount actually consumed
+      if (Number(appliedStoreCredit || 0) > 0) {
+        // Recompute effective consumption using the same clamping the Summary uses
+        const vAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
+        const postV = Math.max(0, computed.grandTotal - vAmt);
+        const consumed = Math.min(Number(appliedStoreCredit || 0), postV);
+        if (consumed > 0) {
+          const { data: custCredRow, error: credFetchErr } = await supabase
+            .from('customers')
+            .select('store_credit')
+            .eq('customerid', selectedCustomerId)
+            .single();
+          if (credFetchErr) throw credFetchErr;
+          const currentBalance = Number(custCredRow?.store_credit ?? 0);
+          const newBalance = Math.max(0, currentBalance - consumed);
+          const { error: credUpdErr } = await supabase
+            .from('customers')
+            .update({ store_credit: newBalance })
+            .eq('customerid', selectedCustomerId);
+          if (credUpdErr) throw credUpdErr;
+        }
       }
 
       // Steps 5-7: PDF generate + upload + pdf_url update
@@ -713,6 +831,45 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               />
             </section>
 
+            {/* Promotional Voucher */}
+            <section className="space-y-2">
+              <Label>Promotional Voucher</Label>
+              {appliedVoucher ? (
+                <div className="flex justify-between items-center bg-blue-50 border border-blue-200 text-blue-800 rounded px-3 py-1.5 text-sm">
+                  <span>Voucher #{appliedVoucher.voucher_id}: ₹{Number(appliedVoucher.value).toFixed(2)} applied</span>
+                  <button
+                    type="button"
+                    className="ml-2 text-blue-600 hover:text-blue-900"
+                    aria-label="Remove voucher"
+                    onClick={() => { setAppliedVoucher(null); setVoucherError(""); }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter voucher code"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value)}
+                      disabled={voucherLoading}
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={handleApplyVoucher}
+                      disabled={voucherLoading || !voucherCode.trim()}
+                    >
+                      {voucherLoading ? "Applying..." : "Apply Voucher"}
+                    </Button>
+                  </div>
+                  {voucherError && (
+                    <p className="text-xs text-destructive mt-1">{voucherError}</p>
+                  )}
+                </>
+              )}
+            </section>
+
             {/* Notes */}
             <Notes notes={notes} setNotes={setNotes} />
 
@@ -745,7 +902,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             </section>
 
             {/* Summary */}
-            <Summary computed={computed} />
+            <Summary
+              computed={computed}
+              appliedStoreCredit={appliedStoreCredit}
+              appliedVoucher={appliedVoucher}
+              onRemoveStoreCredit={() => setAppliedStoreCredit(0)}
+              onRemoveVoucher={() => setAppliedVoucher(null)}
+            />
 
             {/* Actions */}
             <div className="flex justify-end gap-2">
@@ -794,6 +957,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
           <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
           <div><span className="font-semibold">Grand Total:</span> ₹{computed.grandTotal.toFixed(2)}</div>
+          {Number(appliedVoucher?.value ?? 0) > 0 && (
+            <div><span className="font-semibold">Voucher Applied:</span> −₹{Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal).toFixed(2)}</div>
+          )}
+          {Number(appliedStoreCredit || 0) > 0 && (
+            <div><span className="font-semibold">Store Credit Applied:</span> −₹{Math.min(Number(appliedStoreCredit || 0), Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal))).toFixed(2)}</div>
+          )}
+          {(Number(appliedVoucher?.value ?? 0) > 0 || Number(appliedStoreCredit || 0) > 0) && (
+            <div><span className="font-semibold">Net Total:</span> ₹{Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal) - Math.min(Number(appliedStoreCredit || 0), Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal)))).toFixed(2)}</div>
+          )}
           <div><span className="font-semibold">Payment Method:</span> {paymentMethod}</div>
           <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>
         </div>
