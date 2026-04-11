@@ -116,11 +116,27 @@ export default function BillTable({ onEdit }) {
     }
   };
 
+  // WR-03: Reset voucher redemption if the bill used a promotional voucher
+  const unRedeemVoucherForBill = async (billId) => {
+    const { data: voucherRow } = await supabase
+      .from("vouchers")
+      .select("voucher_id")
+      .eq("redeemed_billid", billId)
+      .maybeSingle();
+    if (voucherRow) {
+      await supabase
+        .from("vouchers")
+        .update({ redeemed: false, redeemed_at: null, redeemed_billid: null })
+        .eq("voucher_id", voucherRow.voucher_id);
+    }
+  };
+
   const handleCancelFinalizedNoCustomer = async (bill) => {
     const { billid: billId } = bill;
     setCancelSaving(true);
     try {
       await restoreStockForBill(billId);
+      await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
       const { error } = await supabase
         .from("bills")
@@ -169,6 +185,7 @@ export default function BillTable({ onEdit }) {
           .update({ total_spend: newSpend, last_purchased_at: newLastPurchase })
           .eq("customerid", customerid);
       }
+      await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
       const { error } = await supabase
         .from("bills")
