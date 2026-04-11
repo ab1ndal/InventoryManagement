@@ -263,7 +263,7 @@ export default function BillTable({ onEdit }) {
       });
       try {
         if (receiptRef.current) {
-          const blob = await generateInvoicePdf(receiptRef.current);
+          const blob = await generateInvoicePdf(receiptRef.current, 'a5');
           const url = URL.createObjectURL(blob);
           window.open(url, "_blank");
         }

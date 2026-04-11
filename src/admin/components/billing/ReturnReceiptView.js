@@ -18,7 +18,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
     <div
       ref={ref}
       style={{
-        width: "400px",
+        width: "559px",
         backgroundColor: "#ffffff",
         padding: "16px",
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',

@@ -2,11 +2,12 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
 /**
- * Captures a DOM node and returns a PDF Blob sized to A4 portrait.
- * @param {HTMLElement} node - InvoiceView DOM node (ref.current)
+ * Captures a DOM node and returns a PDF Blob.
+ * @param {HTMLElement} node - DOM node to capture (ref.current)
+ * @param {'a4'|'a5'|string} [format='a4'] - jsPDF page format
  * @returns {Promise<Blob>} PDF blob
  */
-export async function generateInvoicePdf(node) {
+export async function generateInvoicePdf(node, format = 'a4') {
   if (!node) throw new Error("generateInvoicePdf: node is null");
 
   const canvas = await html2canvas(node, {
@@ -16,8 +17,7 @@ export async function generateInvoicePdf(node) {
     logging: false,
   });
 
-  // A4 portrait in points: 595 x 842 (jsPDF default)
-  const pdf = new jsPDF({ unit: "pt", format: "a4", orientation: "portrait" });
+  const pdf = new jsPDF({ unit: "pt", format, orientation: "portrait" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
 
