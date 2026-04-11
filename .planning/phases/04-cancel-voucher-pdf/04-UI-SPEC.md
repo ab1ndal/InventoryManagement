@@ -1,10 +1,11 @@
 ---
 phase: 4
 slug: cancel-voucher-pdf
-status: draft
+status: approved
 shadcn_initialized: true
 preset: default / slate / css-variables
 created: 2026-04-11
+reviewed_at: 2026-04-11
 ---
 
 # Phase 4 — UI Design Contract
@@ -135,7 +136,7 @@ New components required for this phase:
 - Label: `<Label>Promotional Voucher</Label>`
 - Input row: `<div className="flex gap-2">`
   - `<Input placeholder="Enter voucher code" value={voucherCode} />`
-  - `<Button variant="outline" onClick={handleApplyVoucher}>Apply</Button>`
+  - `<Button variant="outline" onClick={handleApplyVoucher}>Apply Voucher</Button>`
 - States:
   - Idle: input + Apply button as described
   - Loading: Apply button shows `<Loader2 className="h-4 w-4 animate-spin" />`, disabled
@@ -190,7 +191,7 @@ New components required for this phase:
 | Store credit badge remove aria-label | "Remove store credit" |
 | Voucher input label | "Promotional Voucher" |
 | Voucher input placeholder | "Enter voucher code" |
-| Voucher Apply button | "Apply" |
+| Voucher Apply button | "Apply Voucher" |
 | Voucher applied badge | "Voucher #{code}: ₹Y applied" |
 | Voucher error — not found | "Voucher code not found or already redeemed." |
 | Voucher error — expired | "This voucher has expired." |
@@ -247,6 +248,15 @@ No `window.confirm()` — all confirmations use Shadcn Dialog. Source: CONTEXT.m
 
 ---
 
+## Visual Focal Points
+
+Primary visual anchors per affected screen:
+
+- **BillingForm:** Grand Total row in the Summary panel — largest bold number, border-top separator, always in view during billing. New store credit (green) and voucher (blue) badge rows draw eye upward to the deduction chain.
+- **BillTable:** Status badge column + action column — the "Cancelled" destructive badge is the primary state indicator; the action column (Edit/PDF/Cancel/Delete icons) is the interaction target.
+
+---
+
 ## Deduction Order in Summary Display
 
 The Summary component must display deductions in this exact order:
@@ -276,11 +286,11 @@ No third-party registries declared for this phase. All components are either exi
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS (FLAG resolved — "Apply Voucher" updated)
+- [x] Dimension 2 Visuals: PASS (FLAG resolved — focal points declared)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved — 2026-04-11
