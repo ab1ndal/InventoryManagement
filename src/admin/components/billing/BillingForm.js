@@ -646,7 +646,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         .eq('customerid', selectedCustomerId)
         .single();
       if (custFetchErr) throw custFetchErr;
-      const newTotal = Number(custRow?.total_spend ?? 0) + Number(computed.grandTotal);
+      // Compute the net amount the customer actually paid (voucher then store credit, both clamped)
+      const vAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
+      const postV = Math.max(0, computed.grandTotal - vAmt);
+      const scConsumed = Math.min(Number(appliedStoreCredit || 0), postV);
+      const amountPaidByCustomer = Math.max(0, postV - scConsumed);
+      const newTotal = Number(custRow?.total_spend ?? 0) + amountPaidByCustomer;
       const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const { error: custUpdErr } = await supabase
         .from('customers')
