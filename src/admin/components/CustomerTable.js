@@ -35,16 +35,55 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
   }, [refreshSignal]);
 
   const fetchCustomers = async () => {
-    const { data, error } = await supabase
+    // 1. Fetch customers with referrer join
+    const { data: customersData, error: custErr } = await supabase
       .from("customers")
       .select("*, referred_by_data:referred_by(first_name, last_name)")
       .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error fetching customers:", error.message);
-    } else {
-      setCustomers(data || []);
+    if (custErr) {
+      console.error("Error fetching customers:", custErr.message);
+      return;
     }
+
+    // 2. Fetch aggregation data from bills: only finalized, not cancelled.
+    //    Aggregate in JS (small dataset, no RPC needed).
+    const { data: billsData, error: billsErr } = await supabase
+      .from("bills")
+      .select("customerid, net_amount, totalamount, orderdate, paymentstatus, finalized")
+      .eq("finalized", true)
+      .neq("paymentstatus", "cancelled");
+    if (billsErr) {
+      console.error("Error fetching bills for aggregation:", billsErr.message);
+      setCustomers(customersData || []);
+      return;
+    }
+
+    // 3. Aggregate per customer: sum(net_amount ?? totalamount), max(orderdate)
+    const aggByCustomer = {};
+    for (const b of billsData || []) {
+      if (b.customerid == null) continue;
+      const amt = Number(b.net_amount ?? b.totalamount ?? 0);
+      const prev = aggByCustomer[b.customerid] || { total_spend: 0, last_purchased_at: null };
+      prev.total_spend += amt;
+      if (b.orderdate && (!prev.last_purchased_at || b.orderdate > prev.last_purchased_at)) {
+        prev.last_purchased_at = b.orderdate;
+      }
+      aggByCustomer[b.customerid] = prev;
+    }
+
+    // 4. Merge: derived fields win over stored columns (which are now stale)
+    const merged = (customersData || []).map((c) => {
+      const agg = aggByCustomer[c.customerid] || { total_spend: 0, last_purchased_at: null };
+      return {
+        ...c,
+        total_spend: agg.total_spend,
+        last_purchased_at: agg.last_purchased_at
+          ? new Date(agg.last_purchased_at).toISOString().slice(0, 10)
+          : null,
+      };
+    });
+
+    setCustomers(merged);
   };
 
   const handleDelete = async (customer_ulid) => {
@@ -121,6 +160,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
               <th className="p-2 text-center w-[180px]">Referred By</th>
               <th className="p-2 text-center w-[200px]">Email</th>
               <th className="p-2 text-center w-[50px]">Loyalty</th>
+              <th className="p-2 text-center w-[80px]">Store Credit</th>
               <th className="p-2 text-center w-[50px]">Total Spend</th>
               <th className="p-2 text-center w-[50px]">Last Purchase</th>
               <th className="p-2 text-center w-[50px]">Actions</th>
@@ -133,6 +173,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                 "referred_by",
                 "email",
                 "loyalty_tier",
+                "",
                 "",
                 "",
                 "",
@@ -160,7 +201,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
             {filteredCustomers.length === 0 ? (
               <tr className="border-t">
                 <td
-                  colSpan={10}
+                  colSpan={11}
                   className="p-2 text-center w-[140px] py-4 text-gray-500"
                 >
                   No customers found
@@ -215,6 +256,9 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                         </TooltipContent>
                       )}
                     </Tooltip>
+                  </td>
+                  <td className="p-2 text-center w-[80px] tabular-nums">
+                    ₹{Number(customer.store_credit || 0).toFixed(2)}
                   </td>
                   <td className="p-2 text-left w-[50px]">
                     ₹{(customer.total_spend || 0).toFixed(2)}
