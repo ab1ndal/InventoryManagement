@@ -6,9 +6,17 @@
 <domain>
 ## Phase Boundary
 
-Cancelling a bill (Draft or Finalized) — restore inventory, optionally insert a voucher record if a customer is on the bill, generate a voucher PDF, upload it to Supabase Storage, and open it for printing.
+This phase has two connected scopes:
 
-This phase does NOT include: "Cancelled" watermark on existing invoice PDF (deferred), salesperson commission reports (future milestone), loyalty/spend portal (future milestone).
+**1. Bill Cancellation flow:** Cancel or Delete a bill (Draft or Finalized) — restore inventory, then for Finalized bills offer "Return payment" or "Issue store credit". Generate a return receipt PDF if store credit is issued.
+
+**2. Billing form — voucher & store credit application:** When billing a customer, auto-detect and apply any stored store credit. Also allow staff to apply 1 promotional voucher code per bill.
+
+**Key distinction (user-confirmed):**
+- **Store Credit** = balance tied to a customer's account (`customers.store_credit`). Generated when a finalized bill is cancelled with "Issue store credit". Auto-applies to next bill.
+- **Promotional Vouchers** = one-time codes stored in the `vouchers` table. Custom discounts issued to specific customers. Staff enters a code manually in BillingForm. Separate from store credit and from the existing `discounts` / `selectedCodes` system.
+
+This phase does NOT include: "Cancelled" watermark on invoice PDF (deferred), salesperson commission (future milestone), voucher management UI (future milestone).
 
 </domain>
 
@@ -16,63 +24,73 @@ This phase does NOT include: "Cancelled" watermark on existing invoice PDF (defe
 ## Implementation Decisions
 
 ### Cancel Entry Point
-- **D-01:** Cancel button lives in **BillTable** action column — new 4th action alongside Edit / PDF / Delete. Applies to both Draft and Finalized rows (per ROADMAP success criteria).
-- **D-02:** The existing "Cancel" button in BillingForm closes the modal (not the bill) — do NOT add a bill-cancel action inside BillingForm to avoid naming collision.
-- **D-03:** Keep the existing **Delete** button in BillTable. Delete = permanent removal (staff use case: accidental/test bills). Cancel = soft-cancel, keeps the record with `paymentstatus='cancelled'` for audit.
+- **D-01:** Cancel button lives in **BillTable** action column — new 4th action alongside Edit / PDF / Delete. Applies to both Draft and Finalized rows.
+- **D-02:** Keep the existing **Delete** button in BillTable (permanent removal for accidental/test bills). Cancel = soft-cancel: sets `paymentstatus='cancelled'`, preserves the record for audit.
+- **D-03:** The "Cancel" button in BillingForm closes the modal — do NOT add a bill-cancel action inside BillingForm to avoid naming collision.
 
-### Cancellation Flow
-- **D-04:** Cancel button in BillTable shows a **confirmation dialog** before proceeding. Dialog content:
-  - If customer present: "Cancel Bill #X? Stock will be restored. A voucher of ₹[grandTotal] will be issued to [Customer Name]."
-  - If no customer: "Cancel Bill #X? Stock will be restored. No voucher will be issued (no customer on this bill)."
-- **D-05:** Cancellation sequence (all in a single try/catch handler):
-  1. Restore stock: fetch `bill_items`, `UPDATE productsizecolors SET stock = stock + qty` for each row with a `variantid`
-  2. Update `bills`: `SET paymentstatus='cancelled'`
-  3. If finalized + customer: delete `discount_usage` rows for this billid; reverse `customers.total_spend` (subtract grandTotal); recalculate `customers.last_purchased_at` from remaining finalized bills
-  4. If customer present: insert voucher into `vouchers` table (see D-07), generate + upload voucher PDF (see D-08 / D-09)
-- **D-06:** `handleDelete` in BillTable.js already implements stock restore + customer reversal for the Delete flow. The Cancel handler mirrors that logic but sets `paymentstatus='cancelled'` instead of deleting the bill record. Reuse the same stock/customer patterns — do not DRY them into a shared helper unless it's clean.
+### Cancellation Flow — Draft Bills
+- **D-04:** For **Draft bills** (no payment received): Cancel/Delete restores stock and closes/deletes the bill **silently** — no "return payment or store credit" dialog. Toast: "Bill #X cancelled. Stock restored."
 
-### Voucher Record
-- **D-07:** Voucher insertion into `vouchers` table:
-  - `voucher_id`: generated via `crypto.randomUUID()` (no extra library needed)
-  - `customerid`: from the bill's `customerid`
-  - `issue_date`: today (Supabase default `CURRENT_DATE`)
-  - `expiry_date`: 1 year from today
-  - `value`: grandTotal of the bill
-  - `source`: `'exchange'`
-  - `note`: `'Cancellation of Bill #[billid]'`
+### Cancellation Flow — Finalized Bills
+- **D-05:** For **Finalized bills**, after confirming cancellation (confirmation dialog with bill details), show a second dialog: **"How would you like to resolve this?"**
+  - Option A: **"Return payment"** — stock restored, discount_usage deleted, `total_spend` and `last_purchased_at` reversed on customer, no store credit, no PDF.
+  - Option B: **"Issue store credit"** — stock restored, discount_usage deleted, `customers.store_credit += grandTotal` (do NOT reverse `total_spend` or `last_purchased_at`), generate return receipt PDF.
+- **D-06:** If the finalized bill has **no customer**: no "return payment vs store credit" dialog — just restore stock, delete discount_usage, set `paymentstatus='cancelled'`. Toast: "Bill #X cancelled. Stock restored. No customer on record."
 
-### Voucher PDF — Storage + Print
-- **D-08:** Voucher PDF uses the same **html2canvas + jsPDF** approach as `generateInvoicePdf.js`. Create a `VoucherView` React component (off-screen hidden div) rendered with the voucher data, captured via `generateInvoicePdf`-style function (can reuse `generateInvoicePdf.js` directly).
-- **D-09:** Upload the voucher PDF blob to Supabase Storage **`vouchers` bucket** (separate from `invoices`). File path: `voucher-{voucher_id}.pdf`. Store a **permanent public URL** in `vouchers.pdf_url` (requires schema migration — see D-10).
-- **D-10:** Schema migration needed: `ALTER TABLE vouchers ADD COLUMN pdf_url text;` — provide as `schema/migration_04_voucher_pdf_url.sql`.
-- **D-11:** After successful upload and `pdf_url` save, **open the voucher PDF in a new tab** (same as invoice behavior in Phase 3). Staff gets the voucher in front of them immediately.
+### Stock Restore (shared logic for all cancellations)
+- **D-07:** Stock restore: fetch `bill_items` for the bill, `UPDATE productsizecolors SET stock = stock + qty` for each row with a non-null `variantid`. Same pattern as `handleDelete` in BillTable.js.
 
-### VoucherView Component
-- **D-12:** `VoucherView` component content:
-  - Store name + branding (same STORE constants as InvoiceView — reuse)
-  - Voucher code (voucher_id)
-  - Value (₹X.XX)
-  - Issue date + Expiry date
+### Customer Stats — "Return Payment" Path
+- **D-08:** Reverse `customers.total_spend` (subtract grandTotal, floor at 0) and recalculate `customers.last_purchased_at` from the next-most-recent finalized bill for that customer. Mirrors existing `handleDelete` logic exactly.
+
+### Customer Stats — "Issue Store Credit" Path
+- **D-09:** `customers.total_spend` and `customers.last_purchased_at` are **NOT reversed**. The purchase happened — the store credit is a future benefit.
+- **D-10:** `customers.store_credit += grandTotal`. The `customers.store_credit` field already exists (double precision, default 0, check >= 0). No schema migration needed.
+
+### Return Receipt PDF
+- **D-11:** When "Issue store credit" is chosen: generate a **return receipt PDF** using html2canvas + jsPDF (same `generateInvoicePdf.js` pattern). Create a `ReturnReceiptView` component (not `VoucherView` — this is a receipt, not a promotional voucher).
+- **D-12:** `ReturnReceiptView` content:
+  - Store name + branding (same STORE constants as InvoiceView)
+  - "STORE CREDIT RECEIPT" header
+  - Bill #, original bill date
   - Customer name
-  - Source label: "Store Credit Voucher — Cancellation"
-  - Note text: "Cancellation of Bill #[billid]"
-- **D-13:** Voucher layout is a single compact card (not full A4 page). Keep it receipt-sized and printable. No GST breakdown needed — it's a store credit receipt, not a tax invoice.
+  - Items cancelled (itemized list from bill_items — name, qty, MRP)
+  - Store credit amount issued: ₹X
+  - Issue date
+  - Note: "Store credit has been added to your account and will be automatically applied on your next purchase."
+- **D-13:** Return receipt PDF is printed immediately (open in new tab). It does NOT need to be saved to Supabase Storage — it's a one-time receipt for the customer. No `pdf_url` column needed on any table.
+- **D-14:** `vouchers` table is **not used** for store credit. Store credit lives entirely in `customers.store_credit`.
+- **D-15:** No schema migration needed for Phase 4 cancellation flow — all required columns already exist.
 
-### Customer Spend Reversal on Cancel
-- **D-14:** When cancelling a **finalized** bill with a customer, **always reverse**:
-  - `customers.total_spend` -= grandTotal (floor at 0)
-  - `customers.last_purchased_at` = date of next-most-recent finalized bill for this customer (recalculated from remaining finalized bills), or `null` if no others
-- **D-15:** When cancelling a **draft** bill: no customer spend reversal needed (draft doesn't update customer stats).
+### BillingForm — Store Credit Auto-Apply
+- **D-16:** When a customer is selected in BillingForm: query `customers.store_credit` for that customer. If `store_credit > 0`, **automatically apply** it to the bill and show a badge: "₹X store credit applied". Staff can remove it via an ✕ button on the badge.
+- **D-17:** Store credit reduces `grandTotal` directly (after all other discounts). It is NOT a discount code — it comes off the final total. If store credit > grandTotal, apply only grandTotal (no cashback — credit balance reduces by grandTotal only).
+- **D-18:** Store credit application is tracked in local state (`appliedStoreCredit`). On **Finalize**: `UPDATE customers SET store_credit = store_credit - appliedStoreCredit`. Only deduct on finalize — not on save-as-draft.
+- **D-19:** `computeBillTotals` in `billUtils.js` does not need to change — store credit is a post-computation deduction applied to `grandTotal` in the BillingForm component.
 
-### No-Customer Cancellation
-- **D-16:** If the bill has no customer: stock is still restored, `paymentstatus='cancelled'`, no voucher issued. Confirmation dialog says "No voucher will be issued (no customer on this bill)." After success, show toast: "Bill #X cancelled. Stock restored. No voucher issued."
-- **D-17:** If the bill has a customer: after success, show toast: "Bill #X cancelled. Voucher ₹[value] issued to [Customer Name]."
+### BillingForm — Promotional Voucher Code
+- **D-20:** BillingForm allows entering **1 promotional voucher code** per bill. This is a separate input from the existing `selectedCodes` (discount codes from `discounts` table). A new `appliedVoucher` state slot.
+- **D-21:** Voucher lookup: staff enters a code → system queries `vouchers` table for a row where `voucher_id = code AND redeemed = false AND expiry_date >= today`. Optionally, if `customerid` is set on the voucher, validate it matches the selected customer.
+- **D-22:** If valid: show voucher details badge — "Voucher #ABC: ₹Y applied". The voucher `value` deducts from `grandTotal` (after discounts, alongside store credit). If voucher value > remaining total, apply only remaining total (no cashback).
+- **D-23:** On **Finalize**: `UPDATE vouchers SET redeemed=true, redeemed_at=now(), redeemed_billid=billid` for the applied voucher. Do NOT mark redeemed on Save Draft.
+- **D-24:** Order of deductions from grandTotal: item discounts → overall discount codes → promotional voucher → store credit. All floor at 0 (never negative).
+- **D-25:** At most 1 promotional voucher per bill. The input is a simple text field with a "Apply" button. No autocomplete needed — staff has the code.
+
+### Finalize Sequence Update
+- **D-26:** Updated finalize sequence in `handleFinalize` (BillingForm.js):
+  1. Existing: validate, open confirm dialog, on confirm → update bills, update customer total_spend + last_purchased_at, insert discount_usage, generate invoice PDF, upload, open
+  2. **New additions:**
+     - If `appliedVoucher`: `UPDATE vouchers SET redeemed=true, redeemed_at=now(), redeemed_billid=billid`
+     - If `appliedStoreCredit > 0`: `UPDATE customers SET store_credit = store_credit - appliedStoreCredit`
+  3. Both added after the existing customer update step.
 
 ### Claude's Discretion
-- Cancel confirmation dialog: use existing Shadcn `Dialog` component in BillTable.js (may need to import — check if currently used there, if not import from same path as BillingForm)
-- Error handling: if voucher PDF upload fails, show destructive toast but do NOT roll back the cancellation — bill is already cancelled, voucher record is inserted. PDF can be regenerated later if needed.
-- Voucher PDF file naming: `voucher-{voucher_id}.pdf` where voucher_id is the UUID
-- Supabase Storage bucket for vouchers: `vouchers` — may need to create this bucket in Supabase dashboard (note in migration file)
+- Confirmation dialog for Cancel: use Shadcn `Dialog` — may need to add Dialog import to BillTable.js
+- "Return payment vs store credit" dialog: second Dialog, opens after the first confirm is accepted
+- Error handling: if receipt PDF generation fails, show toast but do NOT rollback the cancellation
+- BillingForm store credit badge: render inline in the Summary/totals area below the existing discount codes section
+- Voucher input placement: below DiscountSelector, above the payment method fields
+- `appliedStoreCredit` and `appliedVoucher` states: reset when customer changes or bill reloads
 
 </decisions>
 
@@ -82,22 +100,24 @@ This phase does NOT include: "Cancelled" watermark on existing invoice PDF (defe
 **Downstream agents MUST read these before planning or implementing.**
 
 ### Core Implementation Files
-- `src/admin/components/BillTable.js` — Add Cancel button + handler here; existing `handleDelete` (line ~50) is the pattern to mirror for stock restore + customer reversal
-- `src/admin/components/billing/generateInvoicePdf.js` — Reuse for VoucherView PDF capture
-- `src/admin/components/billing/InvoiceView.js` — Pattern for VoucherView component (STORE constants, off-screen render approach)
-- `src/admin/components/billing/BillingForm.js` — Reference for Dialog usage pattern and toast patterns
+- `src/admin/components/BillTable.js` — Add Cancel button + handler; `handleDelete` (line ~50) has the stock restore + customer reversal pattern to mirror
+- `src/admin/components/billing/BillingForm.js` — Add `appliedStoreCredit` + `appliedVoucher` state; update `handleFinalize`; add store credit badge + voucher input UI
+- `src/admin/components/billing/billUtils.js` — `computeBillTotals()` returns grandTotal; store credit and voucher deductions applied on top in BillingForm component
+- `src/admin/components/billing/Summary.js` — Likely where store credit badge + voucher deduction display will be added (shows totals breakdown)
+- `src/admin/components/billing/generateInvoicePdf.js` — Reuse for return receipt PDF capture
+- `src/admin/components/billing/InvoiceView.js` — Pattern for `ReturnReceiptView` component (STORE constants, off-screen render)
 
 ### Schema
-- `schema/initial_schema.sql` — `vouchers` table (voucher_id, customerid, issue_date, expiry_date, value, redeemed, note, source); `bills` table (paymentstatus, finalized); `bill_items` (variantid, quantity); `productsizecolors` (stock); `customers` (total_spend, last_purchased_at)
+- `schema/initial_schema.sql` — `customers` table (store_credit double precision default 0, total_spend, last_purchased_at); `vouchers` table (voucher_id text PK, customerid, expiry_date, value, redeemed boolean, redeemed_at, redeemed_billid, source); `bills` (paymentstatus, finalized); `bill_items` (variantid, quantity); `productsizecolors` (stock); `discount_usage`
 
 ### Requirements
-- `.planning/REQUIREMENTS.md` — BILL-05, STOCK-03, VOUCH-01, VOUCH-02 acceptance criteria
+- `.planning/REQUIREMENTS.md` — BILL-05, STOCK-03, VOUCH-01, VOUCH-02 acceptance criteria (note: VOUCH-01/02 re-scoped to store credit via `customers.store_credit` + return receipt PDF, not `vouchers` table insert)
 
 ### Planning
 - `.planning/ROADMAP.md` — Phase 4 section: success criteria, key implementation notes
 
 ### Prior Phase Context
-- `.planning/phases/03-finalize-with-payment-pdf-invoice/03-CONTEXT.md` — D-01 through D-03: pdf generation approach, D-04: STORE constants
+- `.planning/phases/03-finalize-with-payment-pdf-invoice/03-CONTEXT.md` — D-01–D-03 (pdf approach), D-04 (STORE constants), handleFinalize sequence to extend
 
 </canonical_refs>
 
@@ -105,48 +125,53 @@ This phase does NOT include: "Cancelled" watermark on existing invoice PDF (defe
 ## Existing Code Insights
 
 ### Reusable Assets
-- `handleDelete` in BillTable.js — stock restore pattern (fetch bill_items → update productsizecolors stock) and customer reversal (recalc total_spend + last_purchased_at) — mirror this in handleCancel
-- `generateInvoicePdf(node)` in `generateInvoicePdf.js` — takes a DOM node, returns PDF Blob; reuse directly for VoucherView
-- STORE constants in InvoiceView.js — import or duplicate in VoucherView for store branding
-- Shadcn `Dialog` — already imported in BillingForm; may need to import in BillTable
+- `handleDelete` in BillTable.js — stock restore + customer spend reversal pattern. `handleCancel` mirrors this but sets `paymentstatus='cancelled'` instead of deleting, and branches on "return payment" vs "issue store credit" for customer stat handling.
+- `generateInvoicePdf(node)` in `generateInvoicePdf.js` — returns PDF Blob from a DOM node. Reuse for `ReturnReceiptView` PDF.
+- STORE constants in InvoiceView.js — copy into `ReturnReceiptView` or import.
+- `computeBillTotals(items, selectedCodes, allDiscounts)` — returns `grandTotal`. Store credit / voucher deductions are applied to `grandTotal` in BillingForm, not inside `computeBillTotals`.
+- `selectedCodes` / `allDiscounts` state in BillingForm — existing discount code system. New `appliedVoucher` and `appliedStoreCredit` are separate state slots, not folded into `selectedCodes`.
+- Shadcn `Dialog` — already imported in BillingForm. Need to import in BillTable.js.
 
 ### Established Patterns
-- Direct Supabase calls from component handlers (no API layer)
-- `setLoading(true)` / `finally { setLoading(false) }` pattern
-- Toast: `{ title, description, variant: "destructive" }` for errors, `{ title }` for success
-- `setBills(prev => prev.map(...))` to update row state locally after mutation
-- `crypto.randomUUID()` — available in modern browsers, no library needed
+- Direct Supabase calls from component handlers
+- Toast for errors + success
+- `setBills(prev => prev.map(...))` for local state updates after BillTable mutations
+- `setIsSaving(true)` / `finally { setIsSaving(false) }` loading state pattern
 
 ### Integration Points
-- BillTable → Supabase: `UPDATE bills SET paymentstatus='cancelled'` where billid matches
-- BillTable → Supabase: `UPDATE productsizecolors SET stock = stock + qty` per bill_item with variantid
-- BillTable → Supabase: `DELETE FROM discount_usage WHERE billid=X` (finalized bills only)
-- BillTable → Supabase: `UPDATE customers SET total_spend=..., last_purchased_at=...` (finalized + customer only)
-- BillTable → Supabase: `INSERT INTO vouchers (voucher_id, customerid, expiry_date, value, source, note)` (customer present)
-- BillTable → Supabase Storage `vouchers` bucket: upload PDF blob, get public URL, then `UPDATE vouchers SET pdf_url=...`
+- BillTable → cancel handler: `UPDATE bills SET paymentstatus='cancelled'`; stock restore; conditional customer stat reversal or store credit add
+- BillingForm → on customer select: `SELECT store_credit FROM customers WHERE customerid=X`
+- BillingForm → voucher lookup: `SELECT * FROM vouchers WHERE voucher_id=X AND redeemed=false AND expiry_date >= today`
+- BillingForm → finalize: `UPDATE vouchers SET redeemed=true, redeemed_at, redeemed_billid` (if voucher applied)
+- BillingForm → finalize: `UPDATE customers SET store_credit = store_credit - appliedStoreCredit` (if store credit applied)
 
 </code_context>
 
 <specifics>
 ## Specific Details
 
-- `crypto.randomUUID()` for voucher_id (no extra library)
-- Voucher expiry: 1 year from today → `new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)`
-- VoucherView branding: same STORE constants as InvoiceView (store name, tagline, address, phone, gstin)
-- Storage bucket: `vouchers` (separate from `invoices` bucket used for invoice PDFs)
-- Schema migration: `schema/migration_04_voucher_pdf_url.sql` — ADD COLUMN pdf_url text to vouchers; note to create `vouchers` storage bucket in Supabase dashboard
+- Store credit field: `customers.store_credit` (double precision, default 0, check >= 0) — already in schema, no migration needed
+- "Issue store credit" on cancel: `UPDATE customers SET store_credit = store_credit + grandTotal WHERE customerid=X`
+- Store credit deduction on finalize: `UPDATE customers SET store_credit = store_credit - appliedStoreCredit WHERE customerid=X` (never go below 0 — clamp in JS before update)
+- Promo voucher lookup: `SELECT * FROM vouchers WHERE voucher_id = $1 AND redeemed = false AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)`
+- Deduction order: item discounts → overall discount codes → promo voucher → store credit (all floor grandTotal at 0)
+- ReturnReceiptView: compact layout, not full A4. Store header + "STORE CREDIT RECEIPT" + bill details + credit amount + note.
 
 </specifics>
 
 <deferred>
 ## Deferred Ideas
 
-### Phase 4 noted but out of scope
-- **"Cancelled" watermark on existing invoice PDF:** When a bill is cancelled, stamp/overlay "CANCELLED" on the stored invoice PDF. Noted from Phase 2 context and Phase 3 deferred — not in VOUCH requirements, skip for now.
+### Out of scope for Phase 4
+- **"Cancelled" watermark on invoice PDF** (from Phase 2/3 context)
+- **Voucher management UI** — creating/issuing promo vouchers from an admin screen
+- **Store credit history** — audit log of store credit additions/deductions per customer
+- **Partial store credit** — applying only part of the store credit balance (Phase 4: apply full balance up to grandTotal)
 
 ### Future Milestone
-- **Send voucher via SMS/WhatsApp:** After cancellation, send the voucher PDF URL to the customer's phone. Same pattern as invoice delivery idea deferred from Phase 3.
-- **Voucher redemption tracking:** Wiring the `redeemed`, `redeemed_at`, `redeemed_billid` fields on `vouchers` to actual redemption UX (apply voucher during billing). Out of scope for this milestone.
+- **Send return receipt via SMS/WhatsApp**
+- **Loyalty tier recalculation** after store credit issuance
+- **Voucher expiry notifications**
 
 </deferred>
 
