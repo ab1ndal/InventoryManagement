@@ -214,18 +214,27 @@ export default function BillTable({ onEdit }) {
     setCancelSaving(true);
     try {
       await restoreStockForBill(billId);
+      // WR-04: Fetch net_amount (actual cash collected) so we credit only what the customer paid.
+      // Falls back to totalamount if the net_amount column has not been migrated yet.
+      const { data: billRow } = await supabase
+        .from("bills")
+        .select("net_amount")
+        .eq("billid", billId)
+        .single();
+      const refundAmount = Number(billRow?.net_amount ?? totalamount ?? 0);
       const { data: custRow } = await supabase
         .from("customers")
         .select("store_credit")
         .eq("customerid", customerid)
         .single();
       if (custRow) {
-        const newCredit = Number(custRow.store_credit ?? 0) + Number(totalamount ?? 0);
+        const newCredit = Number(custRow.store_credit ?? 0) + refundAmount;
         await supabase
           .from("customers")
           .update({ store_credit: newCredit })
           .eq("customerid", customerid);
       }
+      await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
       const { error } = await supabase
         .from("bills")
@@ -243,7 +252,7 @@ export default function BillTable({ onEdit }) {
           originalBillDate: orderdate,
           customerName,
           items: receiptItems || [],
-          creditAmount: Number(totalamount ?? 0),
+          creditAmount: refundAmount,
           issueDate: new Date().toISOString(),
         });
       });
@@ -262,7 +271,7 @@ export default function BillTable({ onEdit }) {
       }
 
       toast({
-        title: `Bill #${billId} cancelled. ₹${Number(totalamount ?? 0).toFixed(2)} store credit added to ${customerName || "customer"}'s account.`,
+        title: `Bill #${billId} cancelled. ₹${refundAmount.toFixed(2)} store credit added to ${customerName || "customer"}'s account.`,
       });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
