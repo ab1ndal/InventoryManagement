@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 04-cancel-voucher-pdf
 source: [04-01-SUMMARY.md, 04-02-SUMMARY.md]
 started: 2026-04-11T00:00:00Z
@@ -112,57 +112,97 @@ blocked: 0
   reason: "User reported: The total spend should actually be real payment by the customer not the bill total. Rest is ok."
   severity: major
   test: 5
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "handleResolveReturnPayment() uses totalamount (gross total from cached cancelBill state) to reverse total_spend. The sibling handler handleResolveIssueStoreCredit already correctly fetches net_amount from the bills table, but this pattern was not applied to the return-payment handler."
+  artifacts:
+    - path: "src/admin/components/BillTable.js"
+      issue: "Line 171: subtracts totalamount (gross) instead of net_amount (actual paid). handleResolveIssueStoreCredit already has the correct pattern at lines 219-224."
+  missing:
+    - "Before computing newSpend, fetch net_amount from bills table for billId (same pattern as lines 219-224)"
+    - "Use net_amount ?? totalamount as the reversal amount"
+  debug_session: ".planning/debug/return-payment-wrong-amount.md"
 
 - truth: "Customer Table displays store_credit balance; total_spend and last_purchase_date are derived from finalized non-cancelled bills"
   status: failed
   reason: "User reported: This works but I need to add this in the Customer Table display. Additionally, total spend and last purchase date should be derived from the bills (Finalized bills but not cancelled bills)"
   severity: major
   test: 16
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "CustomerTable.js has no store_credit column (field is fetched via * but never rendered). total_spend/last_purchased_at are stored mutable fields updated on each transaction — amount added on Finalize (net paid) differs from amount subtracted on Cancel (gross total), causing drift."
+  artifacts:
+    - path: "src/admin/components/CustomerTable.js"
+      issue: "Missing <th>Store Credit</th> header and matching <td> cell"
+    - path: "src/admin/components/billing/BillingForm.js"
+      issue: "Lines 650-668 mutate total_spend/last_purchased_at on Finalize — should be removed in favor of live derivation"
+    - path: "src/admin/components/BillTable.js"
+      issue: "Lines 159-195 and 330-360 mutate total_spend/last_purchased_at on Cancel — should also be removed"
+  missing:
+    - "Add Store Credit column to CustomerTable.js"
+    - "Replace stored total_spend/last_purchased_at with live derivation from bills (Supabase RPC or view filtering finalized non-cancelled bills)"
+  debug_session: ".planning/debug/customer-table-missing-store-credit.md"
 
 - truth: "After removing auto-applied store credit, user can re-apply it without re-selecting the customer"
   status: failed
   reason: "User reported: This is applied but If I cancel, there is no way to add it back."
   severity: minor
   test: 8
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "onRemoveStoreCredit sets appliedStoreCredit(0) but customerStoreCreditBalance remains intact. Balance is never passed to Summary as a prop and no re-apply UI exists. The auto-apply useEffect only fires on selectedCustomerId changes, not on manual removal."
+  artifacts:
+    - path: "src/admin/components/billing/BillingForm.js"
+      issue: "customerStoreCreditBalance not passed to Summary; no onApplyStoreCredit handler"
+    - path: "src/admin/components/billing/Summary.js"
+      issue: "Does not receive customerStoreCreditBalance; storeCreditApplied > 0 guard hides all credit UI after removal"
+  missing:
+    - "Pass customerStoreCreditBalance as prop to Summary"
+    - "Render 'Apply store credit (₹X)' button in Summary when storeCreditApplied === 0 && customerStoreCreditBalance > 0"
+    - "Add onApplyStoreCredit prop: () => setAppliedStoreCredit(customerStoreCreditBalance)"
+  debug_session: ".planning/debug/store-credit-no-reapply.md"
 
 - truth: "When cancelling a bill where store credit was applied, the store credit amount is refunded back to the customer's balance"
   status: failed
   reason: "User reported: The amount is restocked but I am not noting 'Store Credit' that is applied in the bill."
   severity: major
   test: 7
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "bills table has no store_credit_used column. BillingForm computes the consumed amount at finalize time but never persists it to the bill record. All cancel handlers in BillTable.js have no way to know how much store credit to restore."
+  artifacts:
+    - path: "src/admin/components/billing/BillingForm.js"
+      issue: "Lines 694-715: computes consumed store credit but does not write it to the bills row"
+    - path: "src/admin/components/BillTable.js"
+      issue: "All cancel handlers lack store_credit restoration logic"
+    - path: "schema/"
+      issue: "bills table missing store_credit_used column"
+  missing:
+    - "Add store_credit_used numeric(10,2) default 0 to bills table via new migration"
+    - "Write consumed amount to bills.store_credit_used on Finalize in BillingForm.js"
+    - "In each cancel handler: read bills.store_credit_used, add back to customers.store_credit if > 0"
+  debug_session: ".planning/debug/store-credit-not-refunded-on-cancel.md"
 
 - truth: "Store credit receipt PDF is formatted as a half A4 page document suitable for direct printing"
   status: failed
   reason: "User reported: I see this. Make this half A4 page document. that I can print directly"
   severity: minor
   test: 6
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "ReturnReceiptView.js root container is width:400px. generateInvoicePdf.js hardcodes format:'a4' with no override parameter. BillTable.js calls generateInvoicePdf(receiptRef.current) with no format argument."
+  artifacts:
+    - path: "src/admin/components/billing/ReturnReceiptView.js"
+      issue: "width: 400px — should be ~559px (A5 at 96dpi); no @page { size: A5 } style"
+    - path: "src/admin/components/billing/generateInvoicePdf.js"
+      issue: "format: 'a4' hardcoded; no optional format parameter"
+    - path: "src/admin/components/BillTable.js"
+      issue: "Line 261: calls generateInvoicePdf(receiptRef.current) with no format override"
+  missing:
+    - "Add optional format param to generateInvoicePdf (default 'a4' for backward compat)"
+    - "Call with format:'a5' from the store-credit path in BillTable.js"
+    - "Update ReturnReceiptView.js root container to width:559px"
+  debug_session: ".planning/debug/receipt-pdf-not-half-a4.md"
 
 - truth: "Step 2 resolution dialog is sized to fully contain its content without clipping or overflow"
   status: failed
   reason: "User reported: works but the second dialog is shorter than the messages been shown on the dialog"
   severity: cosmetic
   test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Dialog 2's DialogContent (BillTable.js line 571) has no max-height or overflow-y:auto. Content is tall (multi-line description + two h-auto py-3 buttons with two-line text + footer + gap-4 grid) and silently overflows the dialog box."
+  artifacts:
+    - path: "src/admin/components/BillTable.js"
+      issue: "Line 571: <DialogContent className='bg-white max-w-md'> missing max-h-[90vh] overflow-y-auto"
+  missing:
+    - "Add max-h-[90vh] overflow-y-auto to Dialog 2's DialogContent at line 571"
+  debug_session: ".planning/debug/resolve-dialog-too-short.md"
