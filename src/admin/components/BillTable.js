@@ -1,5 +1,6 @@
 // src/admin/components/BillTable.js
 import React, { useEffect, useState, useRef } from "react";
+import { flushSync } from "react-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
@@ -219,15 +220,16 @@ export default function BillTable({ onEdit }) {
         .from("bill_items")
         .select("product_name, quantity, mrp")
         .eq("billid", billId);
-      setReceiptBill({
-        billId,
-        originalBillDate: orderdate,
-        customerName,
-        items: receiptItems || [],
-        creditAmount: Number(totalamount ?? 0),
-        issueDate: new Date().toISOString(),
+      flushSync(() => {
+        setReceiptBill({
+          billId,
+          originalBillDate: orderdate,
+          customerName,
+          items: receiptItems || [],
+          creditAmount: Number(totalamount ?? 0),
+          issueDate: new Date().toISOString(),
+        });
       });
-      await new Promise((r) => setTimeout(r, 100));
       try {
         if (receiptRef.current) {
           const blob = await generateInvoicePdf(receiptRef.current);
