@@ -122,6 +122,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     const loadBill = async () => {
       try {
         // Fetch bill header (customerid + notes only — applied_codes fetched separately for resilience)
+        // TODO(WR-05): payment_method and payment_amount are included in this primary query without
+        // the same resilience guard used for applied_codes below. If either column is absent due to
+        // a missing migration the whole query will fail and the bill will not load. Consider moving
+        // payment_method/payment_amount to a separate defensive query like applied_codes.
         const { data: bill, error: billErr } = await supabase
           .from("bills")
           .select("customerid, notes, payment_method, payment_amount")
