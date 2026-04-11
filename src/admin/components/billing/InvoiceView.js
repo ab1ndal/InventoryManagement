@@ -1,4 +1,5 @@
 import React, { forwardRef } from "react";
+import logo from "../../../assets/LOGO-BindalsCreation.png";
 
 const STORE = {
   name: "BINDAL'S CREATION",
@@ -22,8 +23,13 @@ const InvoiceView = forwardRef(function InvoiceView(
     const qty = Number(item.qty || item.quantity) || 0;
     const gstRate = Number(item.gstRate) || 0;
     const disc = (mrp * qty) * ((Number(item.quickDiscountPct) || 0) / 100);
-    const lineGross = (mrp * qty) - disc; // GST-inclusive
-    const taxable = gstRate > 0 ? lineGross / (1 + gstRate / 100) : lineGross;
+    const alteration = Number(item.alteration_charge || item.stitching_charge || 0);
+    const afterDisc = (mrp * qty) - disc;
+    const withCharges = afterDisc + alteration; // taxable base (GST-exclusive)
+    const lineGross = gstRate > 0
+      ? withCharges * (1 + gstRate / 100) // GST-inclusive line total
+      : withCharges;
+    const taxable = withCharges;
     const cgst = taxable * (gstRate / 2) / 100;
     const sgst = taxable * (gstRate / 2) / 100;
     return { item, idx, mrp, qty, gstRate, disc, lineGross, taxable, cgst, sgst };
@@ -56,14 +62,17 @@ const InvoiceView = forwardRef(function InvoiceView(
       }}
     >
       {/* 1. Store Header */}
-      <div style={{ textAlign: "center", borderBottom: "1px solid #e5e7eb", paddingBottom: "12px", marginBottom: "12px" }}>
-        <div style={{ fontSize: "20px", fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>
-          {STORE.name}
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", borderBottom: "1px solid #e5e7eb", paddingBottom: "12px", marginBottom: "12px" }}>
+        <img src={logo} alt="Bindal's Creation" style={{ height: "120px", flexShrink: 0 }} />
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <div style={{ fontSize: "20px", fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>
+            {STORE.name}
+          </div>
+          <div style={{ fontSize: "11px", color: "#6b7280" }}>{STORE.tagline}</div>
+          <div>{STORE.address}</div>
+          <div>{STORE.phone}</div>
+          <div><span style={{ fontWeight: 600 }}>GSTIN:</span> {STORE.gstin}</div>
         </div>
-        <div style={{ fontSize: "11px", color: "#6b7280" }}>{STORE.tagline}</div>
-        <div>{STORE.address}</div>
-        <div>{STORE.phone}</div>
-        <div><span style={{ fontWeight: 600 }}>GSTIN:</span> {STORE.gstin}</div>
       </div>
 
       {/* 2. Bill Metadata */}
@@ -84,16 +93,14 @@ const InvoiceView = forwardRef(function InvoiceView(
           <tr style={{ backgroundColor: "#f4f4f5", fontWeight: 600 }}>
             <th style={thLeft}>S.No.</th>
             <th style={thLeft}>Particulars</th>
-            <th style={thLeft}>Size</th>
-            <th style={thLeft}>Color</th>
             <th style={thRight}>Qty</th>
-            <th style={thRight}>Rate</th>
-            <th style={thRight}>Disc</th>
+            <th style={thRight}>Rate (₹)</th>
+            <th style={thRight}>Disc (₹)</th>
             <th style={thRight}>GST%</th>
-            <th style={thRight}>Taxable</th>
-            <th style={thRight}>CGST</th>
-            <th style={thRight}>SGST</th>
-            <th style={thRight}>Amount</th>
+            <th style={thRight}>Taxable (₹)</th>
+            <th style={thRight}>CGST (₹)</th>
+            <th style={thRight}>SGST (₹)</th>
+            <th style={thRight}>Amount (₹)</th>
           </tr>
         </thead>
         <tbody>
@@ -102,17 +109,27 @@ const InvoiceView = forwardRef(function InvoiceView(
             return (
               <tr key={item._id || idx} style={{ backgroundColor: rowBg }}>
                 <td style={tdLeft}>{idx + 1}</td>
-                <td style={tdLeft}>{item.product_name || "—"}</td>
-                <td style={tdLeft}>{item.size || "—"}</td>
-                <td style={tdLeft}>{item.color || "—"}</td>
+                <td style={tdLeft}>
+                  <div>{item.product_name || "—"}</div>
+                  {item.productid && (
+                    <div style={{ color: "#6b7280", fontSize: "10px" }}>
+                      {item.productid}
+                    </div>
+                  )}
+                  {(item.category || item.size || item.color) && (
+                    <div style={{ color: "#6b7280", fontSize: "10px" }}>
+                      ({[item.category, item.size, item.color].filter(Boolean).join("|")})
+                    </div>
+                  )}
+                </td>
                 <td style={tdRight}>{qty}</td>
-                <td style={tdRight}>{mrp.toFixed(2)}</td>
-                <td style={tdRight}>{disc.toFixed(2)}</td>
+                <td style={tdRight}>₹{mrp.toFixed(2)}</td>
+                <td style={tdRight}>₹{disc.toFixed(2)}</td>
                 <td style={tdRight}>{gstRate}%</td>
-                <td style={tdRight}>{taxable.toFixed(2)}</td>
-                <td style={tdRight}>{cgst.toFixed(2)}</td>
-                <td style={tdRight}>{sgst.toFixed(2)}</td>
-                <td style={tdRight}>{lineGross.toFixed(2)}</td>
+                <td style={tdRight}>₹{taxable.toFixed(2)}</td>
+                <td style={tdRight}>₹{cgst.toFixed(2)}</td>
+                <td style={tdRight}>₹{sgst.toFixed(2)}</td>
+                <td style={tdRight}>₹{lineGross.toFixed(2)}</td>
               </tr>
             );
           })}

@@ -35,7 +35,8 @@ export default function SalespersonSelector({ selectedIds, setSelectedIds }) {
     };
 
     loadSalespersons();
-  }, [toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleMouseDown = (e) => {

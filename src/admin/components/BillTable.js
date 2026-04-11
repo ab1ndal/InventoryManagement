@@ -23,7 +23,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, paymentstatus",
+          "billid, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, paymentstatus, finalized, pdf_url",
           { count: "exact" }
         )
         .order("orderdate", { ascending: false })
@@ -49,6 +49,79 @@ export default function BillTable({ onEdit }) {
 
     loadBills();
   }, [page, filters, toast]);
+
+  const handleDelete = async (bill) => {
+    const { billid: billId, finalized, customerid, totalamount, pdf_url } = bill;
+    const confirmMsg = finalized
+      ? `Delete finalized Bill #${billId}? This will restore stock and reverse customer spend. This cannot be undone.`
+      : `Delete draft Bill #${billId}? This will restore stock.`;
+    if (!window.confirm(confirmMsg)) return;
+    try {
+      // Fetch bill_items to restore stock
+      const { data: billItems } = await supabase
+        .from("bill_items")
+        .select("variantid, quantity")
+        .eq("billid", billId)
+        .not("variantid", "is", null);
+
+      // Restore stock for each inventory item
+      for (const bi of billItems || []) {
+        const { data: variant } = await supabase
+          .from("productsizecolors")
+          .select("stock")
+          .eq("variantid", bi.variantid)
+          .single();
+        if (variant) {
+          await supabase
+            .from("productsizecolors")
+            .update({ stock: variant.stock + bi.quantity })
+            .eq("variantid", bi.variantid);
+        }
+      }
+
+      // For finalized bills: reverse customer spend + delete discount_usage + remove PDF
+      if (finalized && customerid) {
+        const { data: custRow } = await supabase
+          .from("customers")
+          .select("total_spend")
+          .eq("customerid", customerid)
+          .single();
+        if (custRow) {
+          const newSpend = Math.max(0, Number(custRow.total_spend ?? 0) - Number(totalamount ?? 0));
+          // Find new last_purchased_at from remaining finalized bills for this customer
+          const { data: remaining } = await supabase
+            .from("bills")
+            .select("orderdate")
+            .eq("customerid", customerid)
+            .eq("finalized", true)
+            .neq("billid", billId)
+            .order("orderdate", { ascending: false })
+            .limit(1);
+          const newLastPurchase = remaining?.[0]?.orderdate
+            ? new Date(remaining[0].orderdate).toISOString().slice(0, 10)
+            : null;
+          await supabase
+            .from("customers")
+            .update({ total_spend: newSpend, last_purchased_at: newLastPurchase })
+            .eq("customerid", customerid);
+        }
+        await supabase.from("discount_usage").delete().eq("billid", billId);
+        if (pdf_url) {
+          await supabase.storage.from("invoices").remove([`bill-${billId}.pdf`]);
+        }
+      }
+
+      await supabase.from("bill_items").delete().eq("billid", billId);
+      await supabase.from("bill_salespersons").delete().eq("billid", billId);
+      const { error } = await supabase.from("bills").delete().eq("billid", billId);
+      if (error) throw error;
+
+      toast({ title: `Bill #${billId} deleted` });
+      setBills((prev) => prev.filter((b) => b.billid !== billId));
+    } catch (e) {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    }
+  };
 
   const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE);
 
@@ -128,18 +201,18 @@ export default function BillTable({ onEdit }) {
                       <Button
                         size="icon"
                         variant="ghost"
-                        disabled
-                        className="opacity-40 cursor-not-allowed"
-                        title="Available after finalize"
+                        disabled={!b.pdf_url}
+                        className={!b.pdf_url ? "opacity-40 cursor-not-allowed" : ""}
+                        title={b.pdf_url ? "View invoice PDF" : "PDF available after finalize"}
+                        onClick={() => b.pdf_url && window.open(b.pdf_url, "_blank")}
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
                       <Button
                         size="icon"
                         variant="ghost"
-                        disabled
-                        className="opacity-40 cursor-not-allowed"
-                        title="Available in Phase 4"
+                        title={b.finalized ? "Delete finalized bill (restores stock)" : "Delete draft"}
+                        onClick={() => handleDelete(b)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

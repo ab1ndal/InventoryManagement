@@ -46,14 +46,10 @@ export default function AddItemDialog({
   const handleConfirm = (item) => {
     if (isEditing) {
       onUpdate({ ...item, _id: editItem._id });
-      setOpen(false);
-    } else if ((activeTab ?? defaultTab) === "manual") {
-      // Manual items: add to bill but keep dialog open so values are retained
-      onAdd(item);
     } else {
       onAdd(item);
-      setOpen(false);
     }
+    setOpen(false);
   };
 
   return (

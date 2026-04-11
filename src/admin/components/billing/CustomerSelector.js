@@ -7,10 +7,16 @@ import { supabase } from "../../../lib/supabaseClient";
 export default function CustomerSelector({
   selectedCustomerId,
   setSelectedCustomerId,
+  displayName,
 }) {
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerOptions, setCustomerOptions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // Pre-populate display text when loading an existing bill
+  useEffect(() => {
+    if (displayName) setCustomerQuery(displayName);
+  }, [displayName]);
 
   useEffect(() => {
     const run = async () => {

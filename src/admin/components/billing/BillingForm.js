@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { computeBillTotals } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { Button } from "../../../components/ui/button";
@@ -19,7 +20,7 @@ import {
 import { Label } from "../../../components/ui/label";
 //import { Textarea } from "../../../components/ui/textarea";
 import { supabase } from "../../../lib/supabaseClient";
-import { useToast } from "../../../components/hooks/use-toast";
+import { toast } from "sonner";
 
 import CustomerSelector from "./CustomerSelector";
 import ItemTable from "./ItemTable";
@@ -40,7 +41,6 @@ import {
 } from "../../../components/ui/dialog";
 
 export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
-  const { toast } = useToast();
   const [items, setItems] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [notes, setNotes] = useState("");
@@ -54,8 +54,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const invoiceRef = useRef(null);
   const [customerName, setCustomerName] = useState("");
+  const [customerDisplayText, setCustomerDisplayText] = useState("");
   const [salespersonNames, setSalespersonNames] = useState([]);
   const [billDate, setBillDate] = useState(null);
+  const [effectiveBillId, setEffectiveBillId] = useState(null);
 
   useEffect(() => {
     if (!open) {
@@ -69,6 +71,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setSelectedSalespersonIds([]);
       setPaymentMethod("");
       setPaymentAmount("");
+      setCustomerDisplayText("");
+      setEffectiveBillId(null);
       return;
     }
 
@@ -82,11 +86,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         .eq("active", true);
       if (error) {
         console.error("Error loading discounts:", error.message);
-        toast({
-          title: "Could not load discounts",
-          description: error.message,
-          variant: "destructive",
-        });
+        toast.error("Could not load discounts", { description: error.message });
         return;
       }
       const valid = (data || []).filter((d) => {
@@ -103,7 +103,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     };
 
     loadDiscounts();
-  }, [open, toast, billId]);
+  }, [open, billId]);
 
   useEffect(() => {
     if (!open || !billId) return;
@@ -112,7 +112,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         // Fetch bill header (customerid + notes only — applied_codes fetched separately for resilience)
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select("customerid, notes, payment_method, payment_amount, created_at")
+          .select("customerid, notes, payment_method, payment_amount")
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
@@ -143,11 +143,33 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         setNotes(bill.notes || "");
         setPaymentMethod(bill.payment_method || "");
         setPaymentAmount(bill.payment_amount ?? "");
-        setBillDate(bill.created_at ? new Date(bill.created_at) : new Date());
+        setBillDate(new Date());
 
         // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts
         const savedCodes = codesRow?.applied_codes;
         setSelectedCodes(savedCodes || []);
+
+        // Fetch size/color for inventory variants
+        const inventoryBillItems = (billItems || []).filter(bi => bi.variantid);
+        let variantMap = {};
+        if (inventoryBillItems.length > 0) {
+          const { data: variants } = await supabase
+            .from("productsizecolors")
+            .select("variantid, size, color")
+            .in("variantid", inventoryBillItems.map(bi => bi.variantid));
+          variantMap = Object.fromEntries((variants || []).map(v => [v.variantid, v]));
+        }
+
+        // Fetch size/color for manual items from manual_items table
+        const manualBillItems = (billItems || []).filter(bi => !bi.variantid && bi.product_code);
+        let manualMap = {};
+        if (manualBillItems.length > 0) {
+          const { data: manuals } = await supabase
+            .from("manual_items")
+            .select("manual_item_id, size, color")
+            .in("manual_item_id", manualBillItems.map(bi => bi.product_code));
+          manualMap = Object.fromEntries((manuals || []).map(m => [m.manual_item_id, m]));
+        }
 
         // Reconstruct items — product_code in DB stores the BC-format productid for inventory items
         setItems((billItems || []).map(bi => ({
@@ -162,19 +184,26 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           alteration_charge: bi.alteration_charge || 0,
           quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
           gstRate: bi.gst_rate ?? 18,
+          size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
+          color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
         })));
       } catch (e) {
-        toast({ title: "Error loading bill", description: e.message, variant: "destructive" });
+        toast.error("Error loading bill", { description: e.message });
       }
     };
     loadBill();
-  }, [open, billId, toast]);
+  }, [open, billId]);
 
-  // Fetch customer display name for InvoiceView
+  // Fetch customer display name for InvoiceView and CustomerSelector
   useEffect(() => {
-    if (!selectedCustomerId) { setCustomerName(""); return; }
-    supabase.from('customers').select('name').eq('customerid', selectedCustomerId).single()
-      .then(({ data }) => setCustomerName(data?.name ?? ""));
+    if (!selectedCustomerId) { setCustomerName(""); setCustomerDisplayText(""); return; }
+    supabase.from('customers').select('first_name, last_name, phone').eq('customerid', selectedCustomerId).single()
+      .then(({ data }) => {
+        const name = data ? `${data.first_name} ${data.last_name}` : "";
+        const displayText = data ? `${data.first_name} ${data.last_name} | ${data.phone}` : "";
+        setCustomerName(name);
+        setCustomerDisplayText(displayText);
+      });
   }, [selectedCustomerId]);
 
   // Fetch salesperson display names for InvoiceView
@@ -198,7 +227,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
 
         // Step A: Validate items exist
         if (items.length === 0) {
-          toast({ title: "Error", description: "Add at least one item", variant: "destructive" });
+          toast.error("Add at least one item");
           return;
         }
 
@@ -243,7 +272,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           }
         }
         if (stockErrors.length > 0) {
-          toast({ title: "Insufficient stock", description: stockErrors.join("\n"), variant: "destructive" });
+          toast.error("Insufficient stock", { description: stockErrors.join("\n") });
           return;
         }
 
@@ -283,6 +312,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         }
 
         // Step I: Apply stock deltas
+        const stockFailures = [];
         for (const [vid, delta] of Object.entries(deltaMap)) {
           if (delta === 0) continue;
           const currentStock = stockMap[vid]?.stock ?? 0;
@@ -292,11 +322,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             .eq("variantid", vid);
           if (stockUpdateErr) {
             console.error("Stock update failed for", vid, stockUpdateErr);
+            stockFailures.push(vid);
           }
         }
 
         // Step J: Success
-        toast({ title: `Draft saved — Bill #${billId}` });
+        toast.success(`Draft saved — Bill #${billId}`);
+        if (stockFailures.length > 0) {
+          toast.error("Stock sync warning", {
+            description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
+          });
+        }
         onOpenChange?.(false);
         onSubmit?.();
         return;
@@ -304,7 +340,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
 
       // New draft path
       if (items.length === 0) {
-        toast({ title: "Error", description: "Add at least one item", variant: "destructive" });
+        toast.error("Add at least one item");
         return;
       }
 
@@ -329,7 +365,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             const avail = stockMap[it.variantid]?.stock ?? 0;
             return `${it.product_name} (${stockMap[it.variantid]?.size || ''}/${stockMap[it.variantid]?.color || ''}): requested ${it.quantity}, available ${avail}`;
           }).join("\n");
-          toast({ title: "Insufficient stock", description: details, variant: "destructive" });
+          toast.error("Insufficient stock", { description: details });
           return;
         }
       }
@@ -374,6 +410,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       }
 
       // Step E - Decrement stock for inventory items
+      const newDraftStockFailures = [];
       for (const it of inventoryItems) {
         const currentStock = stockMap[it.variantid]?.stock ?? 0;
         const { error: stockUpdateErr } = await supabase
@@ -382,15 +419,21 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           .eq("variantid", it.variantid);
         if (stockUpdateErr) {
           console.error("Stock update failed for", it.variantid, stockUpdateErr);
+          newDraftStockFailures.push(it.variantid);
         }
       }
 
       // Step F - Success
-      toast({ title: `Draft saved — Bill #${bill.billid}` });
+      toast.success(`Draft saved — Bill #${bill.billid}`);
+      if (newDraftStockFailures.length > 0) {
+        toast.error("Stock sync warning", {
+          description: `Stock could not be updated for ${newDraftStockFailures.length} variant(s). Please recheck inventory.`,
+        });
+      }
       onOpenChange?.(false);
       onSubmit?.();
     } catch (e) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setIsSaving(false);
     }
@@ -399,13 +442,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const openFinalizeConfirm = () => {
     // D-06: Customer required to finalize
     if (!selectedCustomerId) {
-      toast({ title: "Customer required", description: "A customer must be selected before finalizing.", variant: "destructive" });
+      toast.error("Customer required", { description: "A customer must be selected before finalizing." });
       return;
     }
     // Validate payment fields
     const paidAmt = Number(paymentAmount);
     if (!paymentMethod || !paymentAmount) {
-      toast({ title: "Payment required", description: "Select a payment method and enter the amount received before finalizing.", variant: "destructive" });
+      toast.error("Payment required", { description: "Select a payment method and enter the amount received before finalizing." });
       return;
     }
     if (Math.abs(paidAmt - computed.grandTotal) > 100) {
@@ -413,32 +456,106 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       const msg = diff > 0
         ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${computed.grandTotal.toFixed(2)}).`
         : `Amount received is ₹${Math.abs(diff)} short of the total (₹${computed.grandTotal.toFixed(2)}).`;
-      toast({ title: "Payment mismatch", description: msg + " Must be within ₹100.", variant: "destructive" });
+      toast.error("Payment mismatch", { description: msg + " Must be within ₹100." });
       return;
     }
     setConfirmOpen(true);
   };
 
   const handleConfirmFinalize = async () => {
-    // Guard: bill must be saved as a draft first
-    if (!billId) {
-      toast({ title: "Error", description: "Cannot finalize a bill that has not been saved as a draft yet.", variant: "destructive" });
-      return;
-    }
-
     setIsSaving(true);
+    let activeBillId = billId;
     try {
-      // Step 1: Update bills row
-      const { error: billErr } = await supabase
-        .from('bills')
-        .update({
-          finalized: true,
-          paymentstatus: 'finalized',
-          payment_method: paymentMethod,
-          payment_amount: Number(paymentAmount),
-        })
-        .eq('billid', billId);
-      if (billErr) throw billErr;
+      if (!activeBillId) {
+        // New bill: validate, create, and finalize in one step
+        if (items.length === 0) {
+          toast.error("Add at least one item");
+          return;
+        }
+
+        // Stock validation
+        const inventoryItems = items.filter(it => it.variantid);
+        let stockMap = {};
+        if (inventoryItems.length > 0) {
+          const variantIds = inventoryItems.map(it => it.variantid);
+          const { data: stockData, error: stockErr } = await supabase
+            .from("productsizecolors")
+            .select("variantid, stock, size, color")
+            .in("variantid", variantIds);
+          if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+          stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
+          const outOfStock = inventoryItems.filter(it => (stockMap[it.variantid]?.stock ?? 0) < it.quantity);
+          if (outOfStock.length > 0) {
+            const details = outOfStock.map(it => {
+              const avail = stockMap[it.variantid]?.stock ?? 0;
+              return `${it.product_name} (${stockMap[it.variantid]?.size || ''}/${stockMap[it.variantid]?.color || ''}): requested ${it.quantity}, available ${avail}`;
+            }).join("\n");
+            toast.error("Insufficient stock", { description: details });
+            return;
+          }
+        }
+
+        // Create bill as finalized
+        const { data: bill, error: billError } = await supabase
+          .from("bills")
+          .insert({
+            customerid: selectedCustomerId || null,
+            notes: notes || null,
+            totalamount: computed.grandTotal,
+            gst_total: computed.gstTotal,
+            discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
+            taxable_total: computed.taxableTotal,
+            paymentstatus: "finalized",
+            finalized: true,
+            applied_codes: selectedCodes,
+            payment_method: paymentMethod || null,
+            payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
+          })
+          .select("billid")
+          .single();
+        if (billError) throw new Error("Failed to save bill: " + billError.message);
+        activeBillId = bill.billid;
+
+        // Insert bill_items
+        const billItemsPayload = buildBillItemsPayload(activeBillId, items);
+        const { error: itemsError } = await supabase.from("bill_items").insert(billItemsPayload);
+        if (itemsError) {
+          await supabase.from("bills").delete().eq("billid", activeBillId);
+          throw new Error("Failed to save bill items: " + itemsError.message);
+        }
+
+        // Save salesperson associations
+        if (selectedSalespersonIds.length > 0) {
+          const spPayload = selectedSalespersonIds.map(spId => ({ billid: activeBillId, salesperson_id: spId }));
+          const { error: spErr } = await supabase.from("bill_salespersons").insert(spPayload);
+          if (spErr) console.error("Failed to save salespersons:", spErr.message);
+        }
+
+        // Decrement stock
+        for (const it of inventoryItems) {
+          const currentStock = stockMap[it.variantid]?.stock ?? 0;
+          const { error: stockUpdateErr } = await supabase
+            .from("productsizecolors")
+            .update({ stock: currentStock - it.quantity })
+            .eq("variantid", it.variantid);
+          if (stockUpdateErr) console.error("Stock update failed for", it.variantid, stockUpdateErr);
+        }
+
+        // Force InvoiceView to render with new bill ID before PDF capture
+        flushSync(() => setEffectiveBillId(activeBillId));
+      } else {
+        // Existing draft: update to finalized
+        const { error: billErr } = await supabase
+          .from('bills')
+          .update({
+            finalized: true,
+            paymentstatus: 'finalized',
+            payment_method: paymentMethod,
+            payment_amount: Number(paymentAmount),
+          })
+          .eq('billid', activeBillId);
+        if (billErr) throw billErr;
+      }
 
       // Step 2: Update customer total_spend + last_purchased_at (D-07 — always runs per D-06 guarantee)
       const { data: custRow, error: custFetchErr } = await supabase
@@ -460,7 +577,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         const usageRows = selectedCodes.map(code => ({
           customerid: selectedCustomerId,
           code,
-          billid: billId,
+          billid: activeBillId,
         }));
         const { error: duErr } = await supabase.from('discount_usage').insert(usageRows);
         if (duErr) throw duErr;
@@ -471,10 +588,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       try {
         if (!invoiceRef.current) throw new Error("InvoiceView ref missing");
         const blob = await generateInvoicePdf(invoiceRef.current);
-        const path = `bill-${billId}.pdf`;
+        const path = `bill-${activeBillId}.pdf`;
+        // Delete before upload so Supabase CDN cache is invalidated (upsert alone doesn't bust cache)
+        await supabase.storage.from('invoices').remove([path]);
         const { error: upErr } = await supabase.storage
           .from('invoices')
-          .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
+          .upload(path, blob, { contentType: 'application/pdf' });
         if (upErr) throw upErr;
         const { data: urlData } = supabase.storage.from('invoices').getPublicUrl(path);
         pdfUrl = urlData?.publicUrl ?? null;
@@ -482,14 +601,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           const { error: urlErr } = await supabase
             .from('bills')
             .update({ pdf_url: pdfUrl })
-            .eq('billid', billId);
+            .eq('billid', activeBillId);
           if (urlErr) throw urlErr;
         }
       } catch (pdfErr) {
-        toast({
-          title: "PDF generation failed",
-          description: "Bill is finalized. You can reprint from the Bill List.",
-          variant: "destructive",
+        console.error("PDF generation failed:", pdfErr);
+        toast.error("PDF generation failed", {
+          description: pdfErr?.message || "Bill is finalized. You can reprint from the Bill List.",
         });
       }
 
@@ -499,18 +617,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       }
 
       // Steps 9-10: success toast + close
-      toast({ title: `Bill #${billId} finalized` });
+      toast.success(`Bill #${activeBillId} finalized`);
       setConfirmOpen(false);
       onOpenChange?.(false);
       onSubmit?.();
     } catch (e) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast.error(e.message);
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto bg-white">
         <DialogHeader>
@@ -535,6 +654,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               <CustomerSelector
                 selectedCustomerId={selectedCustomerId}
                 setSelectedCustomerId={setSelectedCustomerId}
+                displayName={customerDisplayText}
               />
             </section>
 
@@ -643,11 +763,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         </Card>
       </DialogContent>
 
-      {/* Off-screen InvoiceView for html2canvas PDF capture */}
+    </Dialog>
+
+    {/* Off-screen InvoiceView for html2canvas PDF capture */}
+    {open && (
       <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
         <InvoiceView
           ref={invoiceRef}
-          billId={billId}
+          billId={effectiveBillId ?? billId}
           billDate={billDate ?? new Date()}
           customerName={customerName}
           salespersonNames={salespersonNames}
@@ -658,27 +781,28 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           appliedCodes={selectedCodes}
         />
       </div>
+    )}
 
-      {/* Finalize Confirmation Dialog */}
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="bg-white max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirm Finalize</DialogTitle>
-            <DialogDescription>This action cannot be undone.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 text-sm">
-            <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
-            <div><span className="font-semibold">Customer:</span> {selectedCustomerId ?? "—"}</div>
-            <div><span className="font-semibold">Grand Total:</span> ₹{computed.grandTotal.toFixed(2)}</div>
-            <div><span className="font-semibold">Payment Method:</span> {paymentMethod}</div>
-            <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" disabled={isSaving} onClick={() => setConfirmOpen(false)}>Keep Editing</Button>
-            <Button disabled={isSaving} onClick={handleConfirmFinalize}>{isSaving ? "Saving..." : "Confirm & Finalize"}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+    {/* Finalize Confirmation Dialog */}
+    <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <DialogContent className="bg-white max-w-md">
+        <DialogHeader>
+          <DialogTitle>Confirm Finalize</DialogTitle>
+          <DialogDescription>This action cannot be undone.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 text-sm">
+          <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
+          <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
+          <div><span className="font-semibold">Grand Total:</span> ₹{computed.grandTotal.toFixed(2)}</div>
+          <div><span className="font-semibold">Payment Method:</span> {paymentMethod}</div>
+          <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>
+        </div>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button variant="ghost" disabled={isSaving} onClick={() => setConfirmOpen(false)}>Keep Editing</Button>
+          <Button disabled={isSaving} onClick={handleConfirmFinalize}>{isSaving ? "Saving..." : "Confirm & Finalize"}</Button>
+        </div>
+      </DialogContent>
     </Dialog>
+    </>
   );
 }
