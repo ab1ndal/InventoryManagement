@@ -1,6 +1,14 @@
 import { money, round2 } from "./billUtils";
 
-export default function Summary({ computed, appliedStoreCredit, appliedVoucher, onRemoveStoreCredit, onRemoveVoucher }) {
+export default function Summary({
+  computed,
+  appliedStoreCredit,
+  appliedVoucher,
+  customerStoreCreditBalance = 0,
+  onRemoveStoreCredit,
+  onApplyStoreCredit,
+  onRemoveVoucher,
+}) {
   const totalDiscount = round2(
     computed.itemLevelDiscountTotal + computed.overallDiscount
   );
@@ -72,6 +80,18 @@ export default function Summary({ computed, appliedStoreCredit, appliedVoucher, 
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {storeCreditApplied === 0 && Number(customerStoreCreditBalance || 0) > 0 && onApplyStoreCredit && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className="text-xs text-green-700 hover:text-green-900 underline"
+            onClick={onApplyStoreCredit}
+          >
+            Apply store credit (₹{Number(customerStoreCreditBalance).toFixed(2)})
+          </button>
         </div>
       )}
 
