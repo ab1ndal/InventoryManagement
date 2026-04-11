@@ -555,6 +555,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const handleConfirmFinalize = async () => {
     setIsSaving(true);
     let activeBillId = billId;
+    // Compute the consumed store credit (same clamping as Summary)
+    const vAmtForPersist = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
+    const postVForPersist = Math.max(0, computed.grandTotal - vAmtForPersist);
+    const storeCreditUsed = Math.min(Number(appliedStoreCredit || 0), postVForPersist);
     try {
       if (!activeBillId) {
         // New bill: validate, create, and finalize in one step
@@ -600,6 +604,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             applied_codes: selectedCodes,
             payment_method: paymentMethod || null,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
+            store_credit_used: storeCreditUsed,
           })
           .select("billid")
           .single();
@@ -642,30 +647,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             paymentstatus: 'finalized',
             payment_method: paymentMethod,
             payment_amount: Number(paymentAmount),
+            store_credit_used: storeCreditUsed,
           })
           .eq('billid', activeBillId);
         if (billErr) throw billErr;
       }
-
-      // Step 2: Update customer total_spend + last_purchased_at (D-07 — always runs per D-06 guarantee)
-      const { data: custRow, error: custFetchErr } = await supabase
-        .from('customers')
-        .select('total_spend')
-        .eq('customerid', selectedCustomerId)
-        .single();
-      if (custFetchErr) throw custFetchErr;
-      // Compute the net amount the customer actually paid (voucher then store credit, both clamped)
-      const vAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
-      const postV = Math.max(0, computed.grandTotal - vAmt);
-      const scConsumed = Math.min(Number(appliedStoreCredit || 0), postV);
-      const amountPaidByCustomer = Math.max(0, postV - scConsumed);
-      const newTotal = Number(custRow?.total_spend ?? 0) + amountPaidByCustomer;
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-      const { error: custUpdErr } = await supabase
-        .from('customers')
-        .update({ total_spend: newTotal, last_purchased_at: today })
-        .eq('customerid', selectedCustomerId);
-      if (custUpdErr) throw custUpdErr;
 
       // Step 3: Insert discount_usage rows for each applied code
       if (selectedCodes && selectedCodes.length > 0) {
@@ -919,7 +905,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               computed={computed}
               appliedStoreCredit={appliedStoreCredit}
               appliedVoucher={appliedVoucher}
+              customerStoreCreditBalance={customerStoreCreditBalance}
               onRemoveStoreCredit={() => setAppliedStoreCredit(0)}
+              onApplyStoreCredit={() => setAppliedStoreCredit(customerStoreCreditBalance)}
               onRemoveVoucher={() => setAppliedVoucher(null)}
             />
 
