@@ -93,11 +93,36 @@ export default function BillTable({ onEdit }) {
     }
   };
 
+  // Refund bills.store_credit_used back to customers.store_credit if > 0.
+  // No-op if the bill has no customer or the column is 0/null.
+  const refundStoreCreditForBill = async (billId, customerid) => {
+    if (!customerid) return;
+    const { data: billRow } = await supabase
+      .from("bills")
+      .select("store_credit_used")
+      .eq("billid", billId)
+      .single();
+    const refund = Number(billRow?.store_credit_used ?? 0);
+    if (!(refund > 0)) return;
+    const { data: custRow } = await supabase
+      .from("customers")
+      .select("store_credit")
+      .eq("customerid", customerid)
+      .single();
+    if (!custRow) return;
+    const newBalance = Number(custRow.store_credit ?? 0) + refund;
+    await supabase
+      .from("customers")
+      .update({ store_credit: newBalance })
+      .eq("customerid", customerid);
+  };
+
   const handleCancelDraft = async (bill) => {
-    const { billid: billId } = bill;
+    const { billid: billId, customerid } = bill;
     setCancelSaving(true);
     try {
       await restoreStockForBill(billId);
+      await refundStoreCreditForBill(billId, customerid);
       const { error } = await supabase
         .from("bills")
         .update({ paymentstatus: "cancelled" })
@@ -132,10 +157,11 @@ export default function BillTable({ onEdit }) {
   };
 
   const handleCancelFinalizedNoCustomer = async (bill) => {
-    const { billid: billId } = bill;
+    const { billid: billId, customerid } = bill;
     setCancelSaving(true);
     try {
       await restoreStockForBill(billId);
+      await refundStoreCreditForBill(billId, customerid);
       await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
       const { error } = await supabase
@@ -158,33 +184,11 @@ export default function BillTable({ onEdit }) {
 
   const handleResolveReturnPayment = async () => {
     if (!cancelBill) return;
-    const { billid: billId, customerid, totalamount } = cancelBill;
+    const { billid: billId, customerid } = cancelBill;
     setCancelSaving(true);
     try {
       await restoreStockForBill(billId);
-      const { data: custRow } = await supabase
-        .from("customers")
-        .select("total_spend")
-        .eq("customerid", customerid)
-        .single();
-      if (custRow) {
-        const newSpend = Math.max(0, Number(custRow.total_spend ?? 0) - Number(totalamount ?? 0));
-        const { data: remaining } = await supabase
-          .from("bills")
-          .select("orderdate")
-          .eq("customerid", customerid)
-          .eq("finalized", true)
-          .neq("billid", billId)
-          .order("orderdate", { ascending: false })
-          .limit(1);
-        const newLastPurchase = remaining?.[0]?.orderdate
-          ? new Date(remaining[0].orderdate).toISOString().slice(0, 10)
-          : null;
-        await supabase
-          .from("customers")
-          .update({ total_spend: newSpend, last_purchased_at: newLastPurchase })
-          .eq("customerid", customerid);
-      }
+      await refundStoreCreditForBill(billId, customerid);
       await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
       const { error } = await supabase
@@ -192,7 +196,7 @@ export default function BillTable({ onEdit }) {
         .update({ paymentstatus: "cancelled" })
         .eq("billid", billId);
       if (error) throw error;
-      toast({ title: `Bill #${billId} cancelled. Stock restored. Customer spend reversed.` });
+      toast({ title: `Bill #${billId} cancelled. Stock restored.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
       );
@@ -214,6 +218,7 @@ export default function BillTable({ onEdit }) {
     setCancelSaving(true);
     try {
       await restoreStockForBill(billId);
+      await refundStoreCreditForBill(billId, customerid);
       // WR-04: Fetch net_amount (actual cash collected) so we credit only what the customer paid.
       // Falls back to totalamount if the net_amount column has not been migrated yet.
       const { data: billRow } = await supabase
@@ -329,32 +334,9 @@ export default function BillTable({ onEdit }) {
         }
       }
 
-      // For finalized bills: reverse customer spend + delete discount_usage + remove PDF
+      // For finalized bills: refund store credit + delete discount_usage + remove PDF
       if (finalized && customerid) {
-        const { data: custRow } = await supabase
-          .from("customers")
-          .select("total_spend")
-          .eq("customerid", customerid)
-          .single();
-        if (custRow) {
-          const newSpend = Math.max(0, Number(custRow.total_spend ?? 0) - Number(totalamount ?? 0));
-          // Find new last_purchased_at from remaining finalized bills for this customer
-          const { data: remaining } = await supabase
-            .from("bills")
-            .select("orderdate")
-            .eq("customerid", customerid)
-            .eq("finalized", true)
-            .neq("billid", billId)
-            .order("orderdate", { ascending: false })
-            .limit(1);
-          const newLastPurchase = remaining?.[0]?.orderdate
-            ? new Date(remaining[0].orderdate).toISOString().slice(0, 10)
-            : null;
-          await supabase
-            .from("customers")
-            .update({ total_spend: newSpend, last_purchased_at: newLastPurchase })
-            .eq("customerid", customerid);
-        }
+        await refundStoreCreditForBill(billId, customerid);
         await supabase.from("discount_usage").delete().eq("billid", billId);
         if (pdf_url) {
           await supabase.storage.from("invoices").remove([`bill-${billId}.pdf`]);
@@ -568,7 +550,7 @@ export default function BillTable({ onEdit }) {
 
       {/* Dialog 2 — Step 2 resolution */}
       <Dialog open={resolveOpen} onOpenChange={(o) => { if (!o) { setResolveOpen(false); setCancelBill(null); } }}>
-        <DialogContent className="bg-white max-w-md">
+        <DialogContent className="bg-white max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>How would you like to resolve this?</DialogTitle>
             <DialogDescription>
