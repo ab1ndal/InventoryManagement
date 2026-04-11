@@ -1,11 +1,14 @@
 // src/admin/components/BillTable.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Pencil, FileText, Trash2 } from "lucide-react";
+import { Loader2, Pencil, FileText, Trash2, Ban } from "lucide-react";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
+import ReturnReceiptView from "./billing/ReturnReceiptView";
+import { generateInvoicePdf } from "./billing/generateInvoicePdf";
 
 const ROWS_PER_PAGE = 15;
 
@@ -16,6 +19,12 @@ export default function BillTable({ onEdit }) {
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "" });
+  const [cancelBill, setCancelBill] = useState(null);
+  const [resolveOpen, setResolveOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [receiptBill, setReceiptBill] = useState(null);
+  const receiptRef = useRef(null);
 
   useEffect(() => {
     const loadBills = async () => {
@@ -49,6 +58,212 @@ export default function BillTable({ onEdit }) {
 
     loadBills();
   }, [page, filters, toast]);
+
+  const openCancelFlow = (bill) => {
+    setCancelBill(bill);
+    setConfirmOpen(true);
+  };
+
+  const restoreStockForBill = async (billId) => {
+    const { data: billItems } = await supabase
+      .from("bill_items")
+      .select("variantid, quantity")
+      .eq("billid", billId)
+      .not("variantid", "is", null);
+    for (const bi of billItems || []) {
+      const { data: variant } = await supabase
+        .from("productsizecolors")
+        .select("stock")
+        .eq("variantid", bi.variantid)
+        .single();
+      if (variant) {
+        await supabase
+          .from("productsizecolors")
+          .update({ stock: variant.stock + bi.quantity })
+          .eq("variantid", bi.variantid);
+      }
+    }
+  };
+
+  const handleCancelDraft = async (bill) => {
+    const { billid: billId } = bill;
+    setCancelSaving(true);
+    try {
+      await restoreStockForBill(billId);
+      const { error } = await supabase
+        .from("bills")
+        .update({ paymentstatus: "cancelled" })
+        .eq("billid", billId);
+      if (error) throw error;
+      toast({ title: `Bill #${billId} cancelled. Stock restored.` });
+      setBills((prev) =>
+        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
+      );
+      setConfirmOpen(false);
+      setCancelBill(null);
+    } catch (e) {
+      toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
+    } finally {
+      setCancelSaving(false);
+    }
+  };
+
+  const handleCancelFinalizedNoCustomer = async (bill) => {
+    const { billid: billId } = bill;
+    setCancelSaving(true);
+    try {
+      await restoreStockForBill(billId);
+      await supabase.from("discount_usage").delete().eq("billid", billId);
+      const { error } = await supabase
+        .from("bills")
+        .update({ paymentstatus: "cancelled" })
+        .eq("billid", billId);
+      if (error) throw error;
+      toast({ title: `Bill #${billId} cancelled. Stock restored. No customer on record.` });
+      setBills((prev) =>
+        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
+      );
+      setConfirmOpen(false);
+      setCancelBill(null);
+    } catch (e) {
+      toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
+    } finally {
+      setCancelSaving(false);
+    }
+  };
+
+  const handleResolveReturnPayment = async () => {
+    if (!cancelBill) return;
+    const { billid: billId, customerid, totalamount } = cancelBill;
+    setCancelSaving(true);
+    try {
+      await restoreStockForBill(billId);
+      const { data: custRow } = await supabase
+        .from("customers")
+        .select("total_spend")
+        .eq("customerid", customerid)
+        .single();
+      if (custRow) {
+        const newSpend = Math.max(0, Number(custRow.total_spend ?? 0) - Number(totalamount ?? 0));
+        const { data: remaining } = await supabase
+          .from("bills")
+          .select("orderdate")
+          .eq("customerid", customerid)
+          .eq("finalized", true)
+          .neq("billid", billId)
+          .order("orderdate", { ascending: false })
+          .limit(1);
+        const newLastPurchase = remaining?.[0]?.orderdate
+          ? new Date(remaining[0].orderdate).toISOString().slice(0, 10)
+          : null;
+        await supabase
+          .from("customers")
+          .update({ total_spend: newSpend, last_purchased_at: newLastPurchase })
+          .eq("customerid", customerid);
+      }
+      await supabase.from("discount_usage").delete().eq("billid", billId);
+      const { error } = await supabase
+        .from("bills")
+        .update({ paymentstatus: "cancelled" })
+        .eq("billid", billId);
+      if (error) throw error;
+      toast({ title: `Bill #${billId} cancelled. Stock restored. Customer spend reversed.` });
+      setBills((prev) =>
+        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
+      );
+      setResolveOpen(false);
+      setCancelBill(null);
+    } catch (e) {
+      toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
+    } finally {
+      setCancelSaving(false);
+    }
+  };
+
+  const handleResolveIssueStoreCredit = async () => {
+    if (!cancelBill) return;
+    const { billid: billId, customerid, totalamount, orderdate } = cancelBill;
+    const customerName = cancelBill.customers
+      ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name}`
+      : "";
+    setCancelSaving(true);
+    try {
+      await restoreStockForBill(billId);
+      const { data: custRow } = await supabase
+        .from("customers")
+        .select("store_credit")
+        .eq("customerid", customerid)
+        .single();
+      if (custRow) {
+        const newCredit = Number(custRow.store_credit ?? 0) + Number(totalamount ?? 0);
+        await supabase
+          .from("customers")
+          .update({ store_credit: newCredit })
+          .eq("customerid", customerid);
+      }
+      await supabase.from("discount_usage").delete().eq("billid", billId);
+      const { error } = await supabase
+        .from("bills")
+        .update({ paymentstatus: "cancelled" })
+        .eq("billid", billId);
+      if (error) throw error;
+
+      const { data: receiptItems } = await supabase
+        .from("bill_items")
+        .select("product_name, quantity, mrp")
+        .eq("billid", billId);
+      setReceiptBill({
+        billId,
+        originalBillDate: orderdate,
+        customerName,
+        items: receiptItems || [],
+        creditAmount: Number(totalamount ?? 0),
+        issueDate: new Date().toISOString(),
+      });
+      await new Promise((r) => setTimeout(r, 100));
+      try {
+        if (receiptRef.current) {
+          const blob = await generateInvoicePdf(receiptRef.current);
+          const url = URL.createObjectURL(blob);
+          window.open(url, "_blank");
+        }
+      } catch (pdfErr) {
+        toast({
+          title: "Receipt PDF failed",
+          description: pdfErr?.message || "Bill is cancelled. Credit added.",
+          variant: "destructive",
+        });
+      }
+
+      toast({
+        title: `Bill #${billId} cancelled. ₹${Number(totalamount ?? 0).toFixed(2)} store credit added to ${customerName || "customer"}'s account.`,
+      });
+      setBills((prev) =>
+        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
+      );
+      setResolveOpen(false);
+      setCancelBill(null);
+      setReceiptBill(null);
+    } catch (e) {
+      toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
+    } finally {
+      setCancelSaving(false);
+    }
+  };
+
+  const handleStep1Continue = () => {
+    if (!cancelBill) return;
+    if (!cancelBill.finalized) {
+      handleCancelDraft(cancelBill);
+      return;
+    }
+    if (cancelBill.finalized && !cancelBill.customerid) {
+      handleCancelFinalizedNoCustomer(cancelBill);
+      return;
+    }
+    setConfirmOpen(false);
+    setResolveOpen(true);
+  };
 
   const handleDelete = async (bill) => {
     const { billid: billId, finalized, customerid, totalamount, pdf_url } = bill;
@@ -208,6 +423,18 @@ export default function BillTable({ onEdit }) {
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
+                      {b.paymentstatus !== "cancelled" && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="hover:text-destructive"
+                          title={b.finalized ? "Cancel finalized bill" : "Cancel bill"}
+                          aria-label="Cancel bill"
+                          onClick={() => openCancelFlow(b)}
+                        >
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"
@@ -259,6 +486,111 @@ export default function BillTable({ onEdit }) {
           </Button>
         </div>
       </div>
+
+      {/* Dialog 1 — Step 1 confirm */}
+      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!o) { setConfirmOpen(false); setCancelBill(null); } }}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {cancelBill?.finalized ? `Cancel Finalized Bill #${cancelBill?.billid}?` : `Cancel Draft Bill #${cancelBill?.billid}?`}
+            </DialogTitle>
+            <DialogDescription>
+              This will restore stock for all items. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {cancelBill && (
+            <div className="space-y-2 text-sm">
+              <div>
+                <span className="font-semibold">Customer:</span>{" "}
+                {cancelBill.customers ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name}` : "—"}
+              </div>
+              <div>
+                <span className="font-semibold">Date:</span>{" "}
+                {cancelBill.orderdate ? new Date(cancelBill.orderdate).toLocaleString() : "—"}
+              </div>
+              <div>
+                <span className="font-semibold">Grand Total:</span> ₹{Number(cancelBill.totalamount ?? 0).toFixed(2)}
+              </div>
+              <div>
+                <span className="font-semibold">Status:</span> {cancelBill.finalized ? "Finalized" : "Draft"}
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" disabled={cancelSaving} onClick={() => { setConfirmOpen(false); setCancelBill(null); }}>
+              Keep Bill
+            </Button>
+            <Button
+              variant={cancelBill?.finalized ? "default" : "destructive"}
+              disabled={cancelSaving}
+              onClick={handleStep1Continue}
+            >
+              {cancelSaving ? "Working..." : (cancelBill?.finalized ? "Continue" : "Cancel Draft")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog 2 — Step 2 resolution */}
+      <Dialog open={resolveOpen} onOpenChange={(o) => { if (!o) { setResolveOpen(false); setCancelBill(null); } }}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>How would you like to resolve this?</DialogTitle>
+            <DialogDescription>
+              {cancelBill && `Bill #${cancelBill.billid} (₹${Number(cancelBill.totalamount ?? 0).toFixed(2)}) was finalized. Choose a resolution for the customer.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 pt-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start h-auto py-3"
+              disabled={cancelSaving}
+              onClick={handleResolveReturnPayment}
+            >
+              <div className="text-left">
+                <div className="font-semibold">Return payment to customer</div>
+                <div className="text-xs text-muted-foreground">Reverses customer spend. No store credit issued.</div>
+              </div>
+            </Button>
+            <Button
+              className="w-full justify-start h-auto py-3"
+              disabled={cancelSaving}
+              onClick={handleResolveIssueStoreCredit}
+            >
+              <div className="text-left">
+                <div className="font-semibold">Issue store credit</div>
+                <div className="text-xs opacity-90">
+                  ₹{Number(cancelBill?.totalamount ?? 0).toFixed(2)} added to{" "}
+                  {cancelBill?.customers
+                    ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name}`
+                    : "customer"}
+                  's account. A return receipt will be printed.
+                </div>
+              </div>
+            </Button>
+          </div>
+          <div className="flex justify-end pt-4">
+            <Button variant="ghost" disabled={cancelSaving} onClick={() => { setResolveOpen(false); setCancelBill(null); }}>
+              Go Back
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Off-screen ReturnReceiptView for PDF capture */}
+      {receiptBill && (
+        <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
+          <ReturnReceiptView
+            ref={receiptRef}
+            billId={receiptBill.billId}
+            originalBillDate={receiptBill.originalBillDate}
+            customerName={receiptBill.customerName}
+            items={receiptBill.items}
+            creditAmount={receiptBill.creditAmount}
+            issueDate={receiptBill.issueDate}
+          />
+        </div>
+      )}
     </div>
   );
 }
