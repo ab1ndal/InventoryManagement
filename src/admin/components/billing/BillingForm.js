@@ -280,7 +280,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         setVoucherError("This voucher has expired.");
         return;
       }
-      if (data.customerid != null && selectedCustomerId != null && data.customerid !== selectedCustomerId) {
+      if (
+        data.customerid !== null && data.customerid !== undefined &&
+        selectedCustomerId !== null && selectedCustomerId !== undefined &&
+        String(data.customerid) !== String(selectedCustomerId)
+      ) {
         setVoucherError("This voucher is assigned to a different customer.");
         return;
       }
