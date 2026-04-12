@@ -110,29 +110,28 @@ Plans:
 
 ## Phase 4: Cancel & Voucher PDF
 
-**Goal:** Cancelling a bill restores inventory and issues a store credit voucher.
+**Goal:** Cancelling a bill restores inventory and handles customer refunds via return payment or store credit.
 
-**Requirements:** BILL-05, STOCK-03, VOUCH-01, VOUCH-02
+**Requirements:** BILL-05, STOCK-03, VOUCH-01, VOUCH-02, CUST-01
 
-**Plans:** 2 plans
+**Plans:** 3 plans (including gap closure)
 
 Plans:
-- [ ] 04-01-PLAN.md — Bill cancellation flow: Cancel button in BillTable, confirm + resolution dialogs, stock restore, store credit issuance, return receipt PDF (BILL-05, STOCK-03, VOUCH-01, VOUCH-02)
-- [ ] 04-02-PLAN.md — BillingForm store credit auto-apply + promotional voucher redemption, Summary deduction rows, finalize sequence updates (VOUCH-01, VOUCH-02)
+- [x] 04-01-PLAN.md — Bill cancellation flow: Cancel button in BillTable, confirm + resolution dialogs, stock restore, store credit issuance, return receipt PDF (BILL-05, STOCK-03, VOUCH-01, VOUCH-02)
+- [x] 04-02-PLAN.md — BillingForm store credit auto-apply + promotional voucher redemption, Summary deduction rows, finalize sequence updates (VOUCH-01, VOUCH-02)
+- [x] 04-03-PLAN.md — Gap closure: net_amount on return payment, store_credit_used refund on cancel, CustomerTable Store Credit column + live-derived totals, A5 receipt PDF, Summary re-apply button, Dialog 2 sizing
 
 **Success criteria:**
 1. Cancel button (on Draft or Finalized bills) shows confirmation dialog before proceeding
 2. Cancelled bill: `paymentstatus='cancelled'`, stock restored for all inventory items, BillTable shows "Cancelled" badge
-3. If customer is set on bill: a voucher is inserted into `vouchers` table (value = grandTotal, expiry = 1 year from today, source='exchange')
-4. Voucher PDF is generated and displayed for printing (voucher code, value, expiry, store name/branding)
-5. If no customer: stock is still restored, but no voucher is issued (inform staff)
+3. If customer is set on a finalized bill: staff chooses "Return payment" (marks cancelled, stock restored) or "Issue store credit" (adds net_amount to `customers.store_credit`, prints A5 receipt PDF) — design decision D-14 (store credit balance, not a voucher code row)
+4. Store credit receipt PDF generated at A5 size (half-A4) — shows credit amount, customer name, original bill ref
+5. If no customer: stock is still restored, no credit issued; staff informed
+6. `bills.store_credit_used` persisted on Finalize; refunded to `customers.store_credit` on every cancel path
+7. CustomerTable shows a Store Credit column; `total_spend` and `last_purchased_at` derived live from finalized non-cancelled bills
+8. Summary shows "Apply store credit" re-apply button when credit was removed but balance exists
 
-**Key implementation notes:**
-- Stock restore: fetch `bill_items` for the bill, `UPDATE productsizecolors SET stock = stock + qty WHERE variantid = X` for each item with a variantid
-- Voucher: generate a ULID or UUID for `voucher_id`, insert into `vouchers` with source='exchange'
-- Voucher PDF: same `window.print()` approach — render a `VoucherView` component and print
-- Cancelling a finalized bill should also reverse `discount_usage` entries (delete where billid=X)
-- Consider whether to reverse `customers.total_spend` on cancellation — recommended yes, subtract grandTotal
+**Note:** A full voucher-code system (`vouchers` table, `VoucherView` PDF with voucher_id/expiry) is a planned future milestone — not part of this phase.
 
 ---
 
