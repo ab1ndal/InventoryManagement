@@ -49,7 +49,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     //    Aggregate in JS (small dataset, no RPC needed).
     const { data: billsData, error: billsErr } = await supabase
       .from("bills")
-      .select("customerid, net_amount, totalamount, orderdate, paymentstatus, finalized")
+      .select("customerid, net_amount, totalamount, store_credit_used, orderdate, paymentstatus, finalized")
       .eq("finalized", true)
       .neq("paymentstatus", "cancelled");
     if (billsErr) {
@@ -58,13 +58,15 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
       return;
     }
 
-    // 3. Aggregate per customer: sum(net_amount ?? totalamount), max(orderdate)
+    // 3. Aggregate per customer: sum(net_amount + store_credit_used), max(orderdate)
+    //    total_spend = cash paid + store credit used (true value of goods received)
     const aggByCustomer = {};
     for (const b of billsData || []) {
       if (b.customerid == null) continue;
-      const amt = Number(b.net_amount ?? b.totalamount ?? 0);
+      const cash = Number(b.net_amount ?? b.totalamount ?? 0);
+      const creditUsed = Number(b.store_credit_used ?? 0);
       const prev = aggByCustomer[b.customerid] || { total_spend: 0, last_purchased_at: null };
-      prev.total_spend += amt;
+      prev.total_spend += cash + creditUsed;
       if (b.orderdate && (!prev.last_purchased_at || b.orderdate > prev.last_purchased_at)) {
         prev.last_purchased_at = b.orderdate;
       }

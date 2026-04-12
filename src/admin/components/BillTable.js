@@ -306,7 +306,7 @@ export default function BillTable({ onEdit }) {
   };
 
   const handleDelete = async (bill) => {
-    const { billid: billId, finalized, customerid, totalamount, pdf_url } = bill;
+    const { billid: billId, finalized, customerid, pdf_url } = bill;
     const confirmMsg = finalized
       ? `Delete finalized Bill #${billId}? This will restore stock and reverse customer spend. This cannot be undone.`
       : `Delete draft Bill #${billId}? This will restore stock.`;

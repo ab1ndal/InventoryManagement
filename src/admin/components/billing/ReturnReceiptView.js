@@ -1,6 +1,6 @@
 // src/admin/components/billing/ReturnReceiptView.js
 import React, { forwardRef } from "react";
-import logo from "../../../assets/LOGO-BindalsCreation.png";
+import logo from "../../../assets/LOGO-Bill.png";
 
 const STORE = {
   name: "BINDAL'S CREATION",

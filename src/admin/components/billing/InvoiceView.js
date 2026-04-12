@@ -1,5 +1,5 @@
 import React, { forwardRef } from "react";
-import logo from "../../../assets/LOGO-BindalsCreation.png";
+import logo from "../../../assets/LOGO-Bill.png";
 
 const STORE = {
   name: "BINDAL'S CREATION",
@@ -116,9 +116,9 @@ const InvoiceView = forwardRef(function InvoiceView(
                       {item.productid}
                     </div>
                   )}
-                  {(item.category || item.size || item.color) && (
+                  {(item.size || item.color) && (
                     <div style={{ color: "#6b7280", fontSize: "10px" }}>
-                      ({[item.category, item.size, item.color].filter(Boolean).join("|")})
+                      ({[item.size, item.color].filter(Boolean).join("|")})
                     </div>
                   )}
                 </td>
