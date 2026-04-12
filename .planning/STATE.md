@@ -30,6 +30,10 @@ The verification report (`04-VERIFICATION.md`) found that ROADMAP Phase 4 Succes
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 5 added: Support different discount types in billing: percentage discounts, flat amount discounts, and buy-X-get-Y type deals
+
 **Bill lifecycle (IMPORTANT):**
 
 - Draft → stock subtracted immediately (inventory reserved)
