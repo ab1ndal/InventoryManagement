@@ -470,22 +470,25 @@ Step 2.6: SKIPPED (no external dependencies — all changes are React component 
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Auto-apply re-evaluation on item changes**
+1. **Auto-apply re-evaluation on item changes** — RESOLVED
    - What we know: The fix for D-03 is clear for initial load. It's unclear whether auto-apply should re-evaluate as items are added/removed mid-session.
    - What's unclear: If a staff member adds the 3rd qualifying item for a buy_x_get_y deal mid-session, should the discount auto-activate?
    - Recommendation: For V1, evaluate only at form open (for new bills) and when customer loads. Document that staff can manually check/uncheck codes. This is the simplest correct implementation.
+   - Resolution: Plan 05-01 Task 1 implements eligibility check at discount load time only. Reactive re-evaluation on item changes is deferred per assumption A2. Staff can manually toggle discounts after adding items.
 
-2. **Multi-qty FREE label rendering in InvoiceView**
+2. **Multi-qty FREE label rendering in InvoiceView** — RESOLVED
    - What we know: getFreeItems returns per-unit entries; InvoiceView renders per-item-row.
    - What's unclear: Whether to show "FREE" on rows where only some units are free.
    - Recommendation: Label a row FREE only when all units of that row are free. Show no special label for partial rows. Total discount amount in Summary is still correct.
+   - Resolution: Plan 05-02 Task 2 labels a row "FREE" when ANY unit from that row is free (using itemIndex in freeItemIndices Set). The total discount amount in the summary line is always correct regardless of label granularity.
 
-3. **`custom` type removal from Zod**
+3. **`custom` type removal from Zod** — RESOLVED
    - What we know: It's in Zod but not in the DB constraint.
    - What's unclear: Was `custom` intentionally added for future use?
    - Recommendation: Remove from Zod schema during the DiscountForm audit (D-07). Low risk — it only affects form validation, not existing data.
+   - Resolution: Plan 05-02 Task 1 removes "custom" from the Zod enum to align with the DB CHECK constraint. No existing data uses this type.
 
 ---
 
