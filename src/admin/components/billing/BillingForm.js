@@ -1000,6 +1000,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           paymentMethod={paymentMethod}
           paymentAmount={paymentAmount}
           appliedCodes={selectedCodes}
+          allDiscounts={allDiscounts}
         />
       </div>
     )}

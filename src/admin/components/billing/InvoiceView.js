@@ -1,5 +1,6 @@
 import React, { forwardRef } from "react";
 import logo from "../../../assets/LOGO-Bill.png";
+import { getFreeItems } from './billUtils';
 
 const STORE = {
   name: "BINDAL'S CREATION",
@@ -14,7 +15,7 @@ function formatDate(d) {
 }
 
 const InvoiceView = forwardRef(function InvoiceView(
-  { billId, billDate, customerName, salespersonNames, items, computed, paymentMethod, paymentAmount, appliedCodes },
+  { billId, billDate, customerName, salespersonNames, items, computed, paymentMethod, paymentAmount, appliedCodes, allDiscounts },
   ref
 ) {
   // Compute per-line GST breakdown
@@ -34,6 +35,18 @@ const InvoiceView = forwardRef(function InvoiceView(
     const sgst = taxable * (gstRate / 2) / 100;
     return { item, idx, mrp, qty, gstRate, disc, lineGross, taxable, cgst, sgst };
   });
+
+  // Identify items that are free via buy_x_get_y discounts (D-10)
+  const freeItemIndices = new Set();
+  if (appliedCodes && allDiscounts) {
+    appliedCodes.forEach((code) => {
+      const d = allDiscounts.find((disc) => disc.code === code && disc.type === 'buy_x_get_y');
+      if (d) {
+        const freeItems = getFreeItems(d, items);
+        freeItems.forEach((f) => freeItemIndices.add(f.itemIndex));
+      }
+    });
+  }
 
   const totalCgst = lineItems.reduce((s, l) => s + l.cgst, 0);
   const totalSgst = lineItems.reduce((s, l) => s + l.sgst, 0);
@@ -110,7 +123,25 @@ const InvoiceView = forwardRef(function InvoiceView(
               <tr key={item._id || idx} style={{ backgroundColor: rowBg }}>
                 <td style={tdLeft}>{idx + 1}</td>
                 <td style={tdLeft}>
-                  <div>{item.product_name || "—"}</div>
+                  <div>
+                    {item.product_name || "—"}
+                    {freeItemIndices.has(idx) && (
+                      <span style={{
+                        display: 'inline-block',
+                        marginLeft: '6px',
+                        padding: '1px 6px',
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        color: '#16a34a',
+                        border: '1px solid #16a34a',
+                        borderRadius: '3px',
+                        verticalAlign: 'middle',
+                        letterSpacing: '0.5px',
+                      }}>
+                        FREE
+                      </span>
+                    )}
+                  </div>
                   {item.productid && (
                     <div style={{ color: "#6b7280", fontSize: "10px" }}>
                       {item.productid}

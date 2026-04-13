@@ -89,6 +89,33 @@ function applyOverallDiscounts(items, codes, allDiscounts) {
   return active.reduce((sum, d) => sum + valueOfDiscount(d, items), 0);
 }
 
+/**
+ * Identifies which item units are "free" in a buy_x_get_y discount.
+ * Returns array of { itemIndex, unitPrice } for the cheapest eligible units.
+ * Used by both valueOfDiscount (for amount) and InvoiceView (for FREE labels).
+ */
+export function getFreeItems(d, items) {
+  if (d.type !== 'buy_x_get_y') return [];
+  const r = d.rules || {};
+  const cat = r.category || null;
+  const buy = Number(r.buy_qty || 2);
+  const get = Number(r.get_qty || 1);
+  const eligible = [];
+  items.forEach((it, itemIndex) => {
+    if (!cat || (it.category || it.manual_category) === cat) {
+      const p = priceItem(it);
+      const unitPrice = p.withCharges / (it.quantity || 1);
+      for (let i = 0; i < (it.quantity || 1); i++) {
+        eligible.push({ itemIndex, unitPrice });
+      }
+    }
+  });
+  eligible.sort((a, b) => a.unitPrice - b.unitPrice);
+  if (eligible.length < buy + get) return [];
+  const group = Math.floor(eligible.length / (buy + get));
+  return eligible.slice(0, group * get);
+}
+
 function valueOfDiscount(d, items) {
   const total = items.reduce((s, it) => s + priceItem(it).withCharges, 0);
   switch (d.type) {
@@ -99,24 +126,10 @@ function valueOfDiscount(d, items) {
       return clampMax(round2((total * pct) / 100), d.max_discount);
     }
     case "buy_x_get_y": {
-      const r = d.rules || {};
-      const cat = r.category || null;
-      const buy = Number(r.buy_qty || 2);
-      const get = Number(r.get_qty || 1);
-      const eligible = [];
-      items.forEach((it) => {
-        if (!cat || (it.category || it.manual_category) === cat) {
-          const p = priceItem(it);
-          for (let i = 0; i < (it.quantity || 1); i++)
-            eligible.push(p.withCharges / (it.quantity || 1));
-        }
-      });
-      eligible.sort((a, b) => a - b);
-      if (eligible.length < buy + get) return 0;
-      const group = Math.floor(eligible.length / (buy + get));
-      const freeCount = group * get;
+      const freeItems = getFreeItems(d, items);
+      if (freeItems.length === 0) return 0;
       return clampMax(
-        round2(eligible.slice(0, freeCount).reduce((s, v) => s + v, 0)),
+        round2(freeItems.reduce((s, f) => s + f.unitPrice, 0)),
         d.max_discount
       );
     }
