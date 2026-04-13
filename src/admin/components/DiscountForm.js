@@ -34,7 +34,6 @@ const discountSchema = z
         "buy_x_get_y",
         "fixed_price",
         "conditional",
-        "custom",
       ],
       { required_error: "Type is required" },
     ),
@@ -271,7 +270,13 @@ export default function DiscountForm({ defaultValues, onSuccess, onCancel }) {
       {/* Value + Max Discount */}
       <div className="grid grid-cols-2 gap-4">
         <Field
-          label={type === "percentage" ? "Value (%)" : "Value (₹)"}
+          label={
+            type === "percentage"
+              ? "Value (%)"
+              : type === "conditional"
+                ? "Discount Amount (₹ off)"
+                : "Value (₹)"
+          }
           required
           error={errors.value}
         >
