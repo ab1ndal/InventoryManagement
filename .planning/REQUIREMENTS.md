@@ -50,6 +50,16 @@ Bills follow this lifecycle:
 - [ ] **VOUCH-01**: Cancelling a finalized or draft bill creates a voucher in the `vouchers` table (value = grandTotal, expiry = 1 year, source='exchange')
 - [ ] **VOUCH-02**: Cancellation generates a printable voucher PDF showing voucher code, value, expiry date, and store branding
 
+## DISC — Discount Audit & Fix
+
+- [ ] **DISC-01**: `auto_apply` discounts only pre-select in BillingForm when eligibility conditions are met (date range, min_total, buy_x_get_y item qty) — not blindly
+- [ ] **DISC-02**: Expired discounts (`end_date < today`) are filtered out of DiscountSelector — not shown even as disabled
+- [ ] **DISC-03**: Once-per-customer discounts already used by the selected customer are hidden from DiscountSelector; no filter when no customer selected
+- [ ] **DISC-04**: BillingForm discount query fetches the `rules` JSONB column so buy_x_get_y, fixed_price, and conditional types have their configuration data
+- [ ] **DISC-05**: DiscountForm conditional type label reads "Discount Amount (Rs off)" instead of generic "Value (Rs)"
+- [ ] **DISC-06**: DiscountForm Zod schema matches DB CHECK constraint (5 types only — no "custom")
+- [ ] **DISC-07**: InvoiceView shows "FREE" badge on cheapest qualifying line items when buy_x_get_y discount is applied; label appears in invoice PDF only (not in Summary panel)
+
 ---
 
 ## Future Requirements (Deferred)
@@ -60,6 +70,11 @@ Bills follow this lifecycle:
 - Payment reconciliation / cash register totals
 - Email invoice to customer
 - Partial payments / split payment methods
+- Voucher management UI — creating/issuing promotional voucher codes
+- Loyalty tier discounts — auto-discounts based on customer tier
+- Flat item-level discounts (Rs X per item) — confirmed not needed
+- Discount analytics — usage reports per code/period
+- Category-restricted percentage discounts ("20% off Kurtis only")
 
 ## Out of Scope
 
@@ -91,3 +106,10 @@ Bills follow this lifecycle:
 | STOCK-03 | Phase 4 |
 | VOUCH-01 | Phase 4 |
 | VOUCH-02 | Phase 4 |
+| DISC-01 | Phase 5 |
+| DISC-02 | Phase 5 |
+| DISC-03 | Phase 5 |
+| DISC-04 | Phase 5 |
+| DISC-05 | Phase 5 |
+| DISC-06 | Phase 5 |
+| DISC-07 | Phase 5 |

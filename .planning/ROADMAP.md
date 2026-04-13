@@ -1,6 +1,6 @@
 # Roadmap — v1.0 Update Billing
 
-**4 phases** | **20 requirements mapped** | All covered ��
+**5 phases** | **27 requirements mapped** | All covered
 
 | # | Phase | Goal | Requirements | Criteria |
 |---|-------|------|--------------|----------|
@@ -8,6 +8,7 @@
 | 2 | Form Polish | Fix UI issues, manual items, salesperson input, schema additions | UI-01, UI-02, UI-03, SCHEMA-01, SCHEMA-02 | 4 |
 | 3 | Finalize & PDF | Payment info, customer spend update, PDF invoice saved to storage | BILL-04, CUST-01, PRINT-01–04 | 5 |
 | 4 | Cancel & Voucher | Cancel bill, restore stock, issue & print voucher PDF | BILL-05, STOCK-03, VOUCH-01, VOUCH-02 | 4 |
+| 5 | Discount Audit | Audit and fix end-to-end discount workflow | DISC-01–07 | 7 |
 
 ---
 
@@ -55,7 +56,7 @@ Plans:
 
 **Success criteria:**
 1. All dropdowns/selects in BillingForm have solid, opaque backgrounds (no washed-out/transparent look)
-2. Manual item form has: name (required), product code (optional), category, size, color, qty, MRP, alteration charge, GST rate ��� identical UX to inventory-sourced items
+2. Manual item form has: name (required), product code (optional), category, size, color, qty, MRP, alteration charge, GST rate — identical UX to inventory-sourced items
 3. Bill form has a Salesperson(s) multi-select; selected names are saved to `bill_salespersons`
 4. `payment_method` and `payment_amount` columns exist on `bills` table (SQL migration script provided)
 5. `salespersons` and `bill_salespersons` tables exist (SQL migration script provided)
@@ -132,6 +133,32 @@ Plans:
 8. Summary shows "Apply store credit" re-apply button when credit was removed but balance exists
 
 **Note:** A full voucher-code system (`vouchers` table, `VoucherView` PDF with voucher_id/expiry) is a planned future milestone — not part of this phase.
+
+---
+
+## Phase 5: Discount Audit & Fix
+
+**Goal:** Audit, fix, and validate the end-to-end discount workflow so all five discount types (flat, percentage, buy_x_get_y, fixed_price, conditional) work correctly from creation through billing to invoice.
+
+**Requirements:** DISC-01, DISC-02, DISC-03, DISC-04, DISC-05, DISC-06, DISC-07
+
+**Depends on:** Phase 4
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — BillingForm discount filtering: auto-apply eligibility fix, rules JSONB fetch, once-per-customer filter (DISC-01, DISC-02, DISC-03, DISC-04)
+- [ ] 05-02-PLAN.md — DiscountForm label audit, getFreeItems() extraction, InvoiceView FREE labels (DISC-05, DISC-06, DISC-07)
+
+**Success criteria:**
+1. Auto-apply discounts only pre-select when their eligibility conditions are met (date range, min_total, buy_x_get_y item qty)
+2. Expired discounts do not appear in DiscountSelector
+3. Once-per-customer discounts already used by the selected customer are hidden from DiscountSelector
+4. When no customer is selected, all active non-expired discounts are visible
+5. DiscountForm conditional type shows "Discount Amount (Rs off)" label — no ambiguity
+6. DiscountForm Zod schema matches DB CHECK constraint (5 types, no "custom")
+7. Invoice PDF shows "FREE" badge on cheapest qualifying items when buy_x_get_y discount is applied
+8. The `rules` JSONB column is fetched in BillingForm, enabling correct computation for all discount types
 
 ---
 
