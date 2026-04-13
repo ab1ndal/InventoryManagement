@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 04 Complete — Milestone Execution Done
-stopped_at: Phase 04 all plans executed; ROADMAP SC-3/SC-4 alignment pending developer decision
-last_updated: "2026-04-11T23:45:00Z"
+status: Ready to execute
+stopped_at: Phase 04 re-verification complete — all 3 plans verified
+last_updated: "2026-04-13T00:41:55.569Z"
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
-  total_plans: 11
+  total_plans: 13
   completed_plans: 11
-  percent: 100
+  percent: 85
 ---
 
 # State
@@ -25,6 +25,7 @@ All 4 phases and 11 plans executed. Milestone v1.0 execution done.
 The verification report (`04-VERIFICATION.md`) found that ROADMAP Phase 4 Success Criteria 3 and 4 describe vouchers-table inserts and a voucher-code PDF — but the CONTEXT-phase design decision D-14 explicitly chose `customers.store_credit` instead (no voucher row, return receipt PDF). All functional work matches D-14 and the user approved the UAT checkpoint.
 
 **Decision required — choose one:**
+
 1. **Accept D-14:** Update ROADMAP.md Phase 4 SC-3 and SC-4 to match the implemented design. Verification status becomes `passed`.
 2. **Reinstate voucher insert:** Plan a follow-up task to insert into the `vouchers` table and add a VoucherView PDF.
 
