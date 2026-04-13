@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
-import { computeBillTotals } from "./billUtils";
+import { computeBillTotals, priceItem } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -39,6 +39,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
+
+function isAutoApplyEligible(d, items, today) {
+  // Date guards (defensive — loadDiscounts already filters, but belt-and-suspenders)
+  if (d.start_date && d.start_date > today) return false;
+  if (d.end_date && d.end_date < today) return false;
+  // min_total guard
+  const total = items.reduce((s, it) => s + priceItem(it).withCharges, 0);
+  if (Number(d.min_total || 0) > 0 && total < Number(d.min_total)) return false;
+  // buy_x_get_y: need enough qualifying items
+  if (d.type === 'buy_x_get_y') {
+    const r = d.rules || {};
+    const cat = r.category || d.category || null;
+    const buy = Number(r.buy_qty || 2);
+    const get = Number(r.get_qty || 1);
+    const qtyInCat = items.reduce((s, it) => {
+      if (!cat || (it.category || it.manual_category) === cat)
+        return s + Number(it.quantity || 1);
+      return s;
+    }, 0);
+    if (qtyInCat < buy + get) return false;
+  }
+  return true;
+}
 
 export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [items, setItems] = useState([]);
@@ -93,7 +116,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       const { data, error } = await supabase
         .from("discounts")
         .select(
-          "id, code, type, value, max_discount, category, once_per_customer, exclusive, auto_apply, min_total, start_date, end_date, active",
+          "id, code, type, value, max_discount, category, once_per_customer, exclusive, auto_apply, min_total, start_date, end_date, active, rules",
         )
         .eq("active", true);
       if (error) {
@@ -109,7 +132,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setAllDiscounts(valid);
       // Only auto-apply on new bills — edits load codes from saved applied_codes
       if (!billId) {
-        const autoCodes = valid.filter((d) => d.auto_apply).map((d) => d.code);
+        const autoCodes = valid
+          .filter((d) => d.auto_apply && isAutoApplyEligible(d, items, today))
+          .map((d) => d.code);
         setSelectedCodes(autoCodes);
       }
     };
