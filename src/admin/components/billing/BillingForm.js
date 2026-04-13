@@ -47,18 +47,19 @@ function isAutoApplyEligible(d, items, today) {
   // min_total guard
   const total = items.reduce((s, it) => s + priceItem(it).withCharges, 0);
   if (Number(d.min_total || 0) > 0 && total < Number(d.min_total)) return false;
-  // buy_x_get_y: need enough qualifying items
-  if (d.type === 'buy_x_get_y') {
+  // buy_x_get_y / bundled_pricing: need enough qualifying items
+  if (d.type === 'buy_x_get_y' || d.type === 'bundled_pricing') {
     const r = d.rules || {};
-    const cat = r.category || d.category || null;
-    const buy = Number(r.buy_qty || 2);
-    const get = Number(r.get_qty || 1);
+    // Support multi-category (rules.categories[]) and single-category fallback
+    const cats = r.categories && r.categories.length > 0 ? r.categories : null;
+    const singleCat = cats ? null : (r.category || d.category || null);
+    const buy = d.type === 'buy_x_get_y' ? Number(r.buy_qty || 2) + Number(r.get_qty || 1) : Number(r.bundle_qty || 1);
     const qtyInCat = items.reduce((s, it) => {
-      if (!cat || (it.category || it.manual_category) === cat)
-        return s + Number(it.quantity || 1);
-      return s;
+      const itemCat = it.category || it.manual_category || null;
+      const matches = cats ? cats.includes(itemCat) : (!singleCat || itemCat === singleCat);
+      return matches ? s + Number(it.quantity || 1) : s;
     }, 0);
-    if (qtyInCat < buy + get) return false;
+    if (qtyInCat < buy) return false;
   }
   return true;
 }

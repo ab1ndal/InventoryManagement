@@ -97,12 +97,11 @@ function applyOverallDiscounts(items, codes, allDiscounts) {
 export function getFreeItems(d, items) {
   if (d.type !== 'buy_x_get_y') return [];
   const r = d.rules || {};
-  const cat = r.category || null;
   const buy = Number(r.buy_qty || 2);
   const get = Number(r.get_qty || 1);
   const eligible = [];
   items.forEach((it, itemIndex) => {
-    if (!cat || (it.category || it.manual_category) === cat) {
+    if (matchesCategories(it, d)) {
       const p = priceItem(it);
       const unitPrice = p.withCharges / (it.quantity || 1);
       for (let i = 0; i < (it.quantity || 1); i++) {
@@ -114,6 +113,23 @@ export function getFreeItems(d, items) {
   if (eligible.length < buy + get) return [];
   const group = Math.floor(eligible.length / (buy + get));
   return eligible.slice(0, group * get);
+}
+
+/**
+ * Returns true if the item's category matches the discount's category filter.
+ * Checks rules.categories (array) first, then rules.category / d.category (single).
+ * If no category filter is set, all items match.
+ */
+function matchesCategories(it, d) {
+  const r = d.rules || {};
+  const cats = r.categories; // string[] from multi-select
+  const itemCat = it.category || it.manual_category || null;
+  if (cats && cats.length > 0) {
+    return cats.includes(itemCat);
+  }
+  const single = r.category || d.category || null;
+  if (single) return itemCat === single;
+  return true; // no filter → all items
 }
 
 function valueOfDiscount(d, items) {
@@ -134,15 +150,45 @@ function valueOfDiscount(d, items) {
       );
     }
     case "fixed_price": {
+      // Per-item fixed pricing: each qualifying item is repriced to rules.fixed_total.
+      // Qualifying = matches category filter AND MRP is within [min_price, max_price] bounds.
       const r = d.rules || {};
-      const cat = r.category || null;
-      const fixed = Number(r.fixed_total || 0);
-      const sumCat = items.reduce((s, it) => {
-        if (!cat || (it.category || it.manual_category) === cat)
-          return s + priceItem(it).withCharges;
-        return s;
-      }, 0);
-      return clampMax(round2(Math.max(0, sumCat - fixed)), d.max_discount);
+      const fixedPerItem = Number(r.fixed_total || 0);
+      const minPrice = r.min_price != null ? Number(r.min_price) : null;
+      const maxPrice = r.max_price != null ? Number(r.max_price) : null;
+      let totalDiscount = 0;
+      items.forEach((it) => {
+        if (!matchesCategories(it, d)) return;
+        const mrp = Number(it.mrp || 0);
+        if (minPrice !== null && mrp < minPrice) return;
+        if (maxPrice !== null && mrp > maxPrice) return;
+        const qty = Number(it.quantity || 1);
+        const p = priceItem(it);
+        const unitPrice = p.withCharges / qty;
+        const disc = Math.max(0, unitPrice - fixedPerItem) * qty;
+        totalDiscount += disc;
+      });
+      return clampMax(round2(totalDiscount), d.max_discount);
+    }
+    case "bundled_pricing": {
+      // Customer buys bundle_qty items from qualifying categories at a fixed bundle_price.
+      // Discount = sum of cheapest bundle_qty item units − bundle_price (if enough items exist).
+      const r = d.rules || {};
+      const bundleQty = Number(r.bundle_qty || 1);
+      const bundlePrice = Number(r.bundle_price || 0);
+      const eligible = [];
+      items.forEach((it) => {
+        if (!matchesCategories(it, d)) return;
+        const p = priceItem(it);
+        const unitPrice = p.withCharges / (it.quantity || 1);
+        for (let i = 0; i < (it.quantity || 1); i++) {
+          eligible.push(unitPrice);
+        }
+      });
+      if (eligible.length < bundleQty) return 0;
+      eligible.sort((a, b) => a - b);
+      const bundleTotal = eligible.slice(0, bundleQty).reduce((s, p) => s + p, 0);
+      return clampMax(round2(Math.max(0, bundleTotal - bundlePrice)), d.max_discount);
     }
     case "conditional": {
       const r = d.rules || {};
