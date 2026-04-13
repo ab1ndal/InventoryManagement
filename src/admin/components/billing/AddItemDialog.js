@@ -33,7 +33,6 @@ export default function AddItemDialog({
   onOpenChange: controlledOnOpenChange,
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(null);
   const isEditing = !!editItem;
 
   const open = controlledOpen !== undefined ? controlledOpen : uncontrolledOpen;
@@ -68,7 +67,7 @@ export default function AddItemDialog({
               : "Select a product from inventory or add a manual item"}
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue={defaultTab} onValueChange={setActiveTab}>
+        <Tabs defaultValue={defaultTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="inventory">From Inventory</TabsTrigger>
             <TabsTrigger value="manual">Manual Item</TabsTrigger>
