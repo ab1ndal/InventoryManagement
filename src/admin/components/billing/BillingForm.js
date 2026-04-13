@@ -69,6 +69,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [notes, setNotes] = useState("");
   const [allDiscounts, setAllDiscounts] = useState([]);
   const [selectedCodes, setSelectedCodes] = useState([]);
+  const [usedCodeSet, setUsedCodeSet] = useState(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [selectedSalespersonIds, setSelectedSalespersonIds] = useState([]);
@@ -272,6 +273,30 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       });
   }, [selectedCustomerId]);
 
+  // D-05: Query discount_usage when customer changes to hide once_per_customer discounts already used
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setUsedCodeSet(new Set());
+      return;
+    }
+    const fetchUsedCodes = async () => {
+      const { data } = await supabase
+        .from("discount_usage")
+        .select("code")
+        .eq("customerid", selectedCustomerId);
+      const codes = new Set((data || []).map((r) => r.code));
+      setUsedCodeSet(codes);
+      // Also deselect any currently selected codes that are once_per_customer and already used
+      setSelectedCodes((prev) =>
+        prev.filter((c) => {
+          const disc = allDiscounts.find((d) => d.code === c);
+          return !(disc && disc.once_per_customer && codes.has(c));
+        })
+      );
+    };
+    fetchUsedCodes();
+  }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch salesperson display names for InvoiceView
   useEffect(() => {
     if (!selectedSalespersonIds?.length) { setSalespersonNames([]); return; }
@@ -283,6 +308,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     () => computeBillTotals(items, selectedCodes, allDiscounts),
     [items, selectedCodes, allDiscounts]
   );
+
+  const visibleDiscounts = useMemo(() => {
+    if (!selectedCustomerId) return allDiscounts; // D-06: no filter without customer
+    return allDiscounts.filter(
+      (d) => !(d.once_per_customer && usedCodeSet.has(d.code))
+    );
+  }, [allDiscounts, usedCodeSet, selectedCustomerId]);
 
   const handleApplyVoucher = async () => {
     const code = voucherCode.trim();
@@ -843,7 +875,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             <section className="space-y-2">
               <Label>Overall Discounts</Label>
               <DiscountSelector
-                discounts={allDiscounts}
+                discounts={visibleDiscounts}
                 selectedCodes={selectedCodes}
                 onToggle={(code) =>
                   setSelectedCodes((prev) =>
