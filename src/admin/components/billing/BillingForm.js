@@ -142,7 +142,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     };
 
     loadDiscounts();
-  }, [open, billId]);
+  }, [open, billId, items]);
 
   useEffect(() => {
     if (!open || !billId) return;

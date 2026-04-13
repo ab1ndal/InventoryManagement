@@ -1,0 +1,4800 @@
+{
+  "nodes": [
+    {
+      "id": "g0",
+      "type": "group",
+      "label": "Billing Form & Computation",
+      "x": 0,
+      "y": 0,
+      "width": 1100,
+      "height": 820,
+      "color": "1"
+    },
+    {
+      "id": "n_billform_additemdialog",
+      "type": "file",
+      "file": "graphify/obsidian/AddItemDialog().md",
+      "x": 20,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_archive_billform_js",
+      "type": "file",
+      "file": "graphify/obsidian/BillForm.js.md",
+      "x": 220,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_billingform",
+      "type": "file",
+      "file": "graphify/obsidian/BillingForm().md",
+      "x": 420,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_createcustomerform",
+      "type": "file",
+      "file": "graphify/obsidian/CreateCustomerForm().md",
+      "x": 20,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_inventorypicker",
+      "type": "file",
+      "file": "graphify/obsidian/InventoryPicker().md",
+      "x": 220,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_itemrow",
+      "type": "file",
+      "file": "graphify/obsidian/ItemRow().md",
+      "x": 420,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_manualitemform",
+      "type": "file",
+      "file": "graphify/obsidian/ManualItemForm().md",
+      "x": 20,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_overalldiscountselector",
+      "type": "file",
+      "file": "graphify/obsidian/OverallDiscountSelector().md",
+      "x": 220,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_summary",
+      "type": "file",
+      "file": "graphify/obsidian/Summary().md",
+      "x": 420,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_applyoveralldiscounts",
+      "type": "file",
+      "file": "graphify/obsidian/applyOverallDiscounts().md",
+      "x": 20,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_clampmax",
+      "type": "file",
+      "file": "graphify/obsidian/clampMax().md",
+      "x": 220,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_computebilltotals",
+      "type": "file",
+      "file": "graphify/obsidian/computeBillTotals().md",
+      "x": 420,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_cryptorandomulid",
+      "type": "file",
+      "file": "graphify/obsidian/cryptoRandomUlid().md",
+      "x": 20,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_describediscount",
+      "type": "file",
+      "file": "graphify/obsidian/describeDiscount().md",
+      "x": 220,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_materializeitemfordb",
+      "type": "file",
+      "file": "graphify/obsidian/materializeItemForDb().md",
+      "x": 420,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_money",
+      "type": "file",
+      "file": "graphify/obsidian/money().md",
+      "x": 20,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_normalizeitem",
+      "type": "file",
+      "file": "graphify/obsidian/normalizeItem().md",
+      "x": 220,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_priceitem",
+      "type": "file",
+      "file": "graphify/obsidian/priceItem().md",
+      "x": 420,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_round2",
+      "type": "file",
+      "file": "graphify/obsidian/round2().md",
+      "x": 20,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_tomoney",
+      "type": "file",
+      "file": "graphify/obsidian/toMoney().md",
+      "x": 220,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billform_valueofdiscount",
+      "type": "file",
+      "file": "graphify/obsidian/valueOfDiscount().md",
+      "x": 420,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g1",
+      "type": "group",
+      "label": "App Architecture & Routing",
+      "x": 1180,
+      "y": 0,
+      "width": 1100,
+      "height": 820,
+      "color": "2"
+    },
+    {
+      "id": "n_claudemd_supabase_js",
+      "type": "file",
+      "file": "graphify/obsidian/@supabasesupabase-js Client Library.md",
+      "x": 1200,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_admin_layout",
+      "type": "file",
+      "file": "graphify/obsidian/AdminLayout Component.md",
+      "x": 1400,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_readme_create_react_app",
+      "type": "file",
+      "file": "graphify/obsidian/Create React App.md",
+      "x": 1600,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_table_profiles",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table profiles.md",
+      "x": 1200,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_env_vars",
+      "type": "file",
+      "file": "graphify/obsidian/Environment Variables (REACT_APP_SUPABASE_URL, REACT_APP_SUPABASE_ANON_KEY).md",
+      "x": 1400,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_state_management",
+      "type": "file",
+      "file": "graphify/obsidian/Local State Management (useStateuseEffect).md",
+      "x": 1600,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_product_id_format",
+      "type": "file",
+      "file": "graphify/obsidian/Product ID Format BC{YY}{}.md",
+      "x": 1200,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_rationale_no_global_store",
+      "type": "file",
+      "file": "graphify/obsidian/Rationale No Global Store \u2014 local state per component.md",
+      "x": 1400,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_rationale_no_server_side",
+      "type": "file",
+      "file": "graphify/obsidian/Rationale No Server-Side Code \u2014 all data access direct from client.md",
+      "x": 1600,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_react19_spa",
+      "type": "file",
+      "file": "graphify/obsidian/React 19 SPA.md",
+      "x": 1200,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_require_admin_auth",
+      "type": "file",
+      "file": "graphify/obsidian/RequireAdminAuth Component.md",
+      "x": 1400,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_supabase",
+      "type": "file",
+      "file": "graphify/obsidian/Supabase (PostgreSQL + Auth).md",
+      "x": 1600,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_rpc_get_max_product_suffix",
+      "type": "file",
+      "file": "graphify/obsidian/Supabase RPC get_max_product_suffix.md",
+      "x": 1200,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_readme_npm_build",
+      "type": "file",
+      "file": "graphify/obsidian/npm run build (Production Build).md",
+      "x": 1400,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_readme_npm_start",
+      "type": "file",
+      "file": "graphify/obsidian/npm start (Dev Server).md",
+      "x": 1600,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_refresh_flag_pattern",
+      "type": "file",
+      "file": "graphify/obsidian/refreshFlag Re-fetch Pattern.md",
+      "x": 1200,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_robots_sitemap",
+      "type": "file",
+      "file": "graphify/obsidian/robots.txt Sitemap (bindalscreations.com).md",
+      "x": 1400,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_app_js",
+      "type": "file",
+      "file": "graphify/obsidian/srcApp.js (Routing).md",
+      "x": 1600,
+      "y": 480,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_supabase_client_js",
+      "type": "file",
+      "file": "graphify/obsidian/srclibsupabaseClient.js.md",
+      "x": 1200,
+      "y": 560,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g2",
+      "type": "group",
+      "label": "Sample Invoice Document",
+      "x": 2360,
+      "y": 0,
+      "width": 880,
+      "height": 620,
+      "color": "3"
+    },
+    {
+      "id": "n_sample_bill_customer_akash_raghani",
+      "type": "file",
+      "file": "graphify/obsidian/Akash Raghani (Customer).md",
+      "x": 2380,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_policy_notes",
+      "type": "file",
+      "file": "graphify/obsidian/Bill Footer Policy Notes (no returns, guarantee terms).md",
+      "x": 2580,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_field_bill_number",
+      "type": "file",
+      "file": "graphify/obsidian/Bill Number Field (012).md",
+      "x": 2780,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_business_bindals_creation",
+      "type": "file",
+      "file": "graphify/obsidian/Bindal's Creation (Business).md",
+      "x": 2380,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_field_customer_name",
+      "type": "file",
+      "file": "graphify/obsidian/Customer Name Field.md",
+      "x": 2580,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_field_discount",
+      "type": "file",
+      "file": "graphify/obsidian/Discount  Adjustment Field (-836).md",
+      "x": 2780,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_layout_handwritten",
+      "type": "file",
+      "file": "graphify/obsidian/Handwritten Bill Layout (pre-printed template).md",
+      "x": 2380,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_line_item_1",
+      "type": "file",
+      "file": "graphify/obsidian/Line Item 1 - Product (Qty1, Rate595, Amt595).md",
+      "x": 2580,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_line_item_2",
+      "type": "file",
+      "file": "graphify/obsidian/Line Item 2 - Suit BS25316 (Qty1, Rate1026, Amt1026).md",
+      "x": 2780,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_field_net_amount",
+      "type": "file",
+      "file": "graphify/obsidian/Net Amount Field (1636).md",
+      "x": 2380,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_field_phone",
+      "type": "file",
+      "file": "graphify/obsidian/Phone Number Field (9662160069  6260971106).md",
+      "x": 2580,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_document",
+      "type": "file",
+      "file": "graphify/obsidian/Sample Bill - Bindal's Creation Invoice.md",
+      "x": 2780,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_product_suit",
+      "type": "file",
+      "file": "graphify/obsidian/Suit Product (BC-format product code BS25316).md",
+      "x": 2380,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_sample_bill_field_total_qty",
+      "type": "file",
+      "file": "graphify/obsidian/Total Quantity Field.md",
+      "x": 2580,
+      "y": 400,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g3",
+      "type": "group",
+      "label": "Brand Identity Assets",
+      "x": 3320,
+      "y": 0,
+      "width": 880,
+      "height": 520,
+      "color": "4"
+    },
+    {
+      "id": "n_brand_bindals_creation",
+      "type": "file",
+      "file": "graphify/obsidian/Bindal's Creation Brand.md",
+      "x": 3340,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_bindals_creation",
+      "type": "file",
+      "file": "graphify/obsidian/Bindal's Creation Logo.md",
+      "x": 3540,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_purpose_brand_identity",
+      "type": "file",
+      "file": "graphify/obsidian/Brand Identity  Logo Asset.md",
+      "x": 3740,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_design_element_butterfly_silhouette",
+      "type": "file",
+      "file": "graphify/obsidian/Butterfly Silhouette.md",
+      "x": 3340,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_design_element_floral_scrollwork",
+      "type": "file",
+      "file": "graphify/obsidian/Floral Scrollwork  Acanthus Flourishes.md",
+      "x": 3540,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_color_gold",
+      "type": "file",
+      "file": "graphify/obsidian/Gold  Amber Color Scheme.md",
+      "x": 3740,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_style_luxury_elegant",
+      "type": "file",
+      "file": "graphify/obsidian/Luxury  Elegant Design Style.md",
+      "x": 3340,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_design_element_monogram_b",
+      "type": "file",
+      "file": "graphify/obsidian/Monogram Letter B_1.md",
+      "x": 3540,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_design_element_ornamental_frame",
+      "type": "file",
+      "file": "graphify/obsidian/Ornamental Circular Frame_2.md",
+      "x": 3740,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_color_white",
+      "type": "file",
+      "file": "graphify/obsidian/White Background.md",
+      "x": 3340,
+      "y": 320,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g4",
+      "type": "group",
+      "label": "Bill Calculation Utilities",
+      "x": 4280,
+      "y": 0,
+      "width": 660,
+      "height": 420,
+      "color": "5"
+    },
+    {
+      "id": "n_billutils_applyoveralldiscounts",
+      "type": "file",
+      "file": "graphify/obsidian/applyOverallDiscounts()_1.md",
+      "x": 4300,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_billutils_js",
+      "type": "file",
+      "file": "graphify/obsidian/billUtils.js.md",
+      "x": 4500,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billutils_clampmax",
+      "type": "file",
+      "file": "graphify/obsidian/clampMax()_1.md",
+      "x": 4700,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billutils_computebilltotals",
+      "type": "file",
+      "file": "graphify/obsidian/computeBillTotals()_1.md",
+      "x": 4300,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billutils_money",
+      "type": "file",
+      "file": "graphify/obsidian/money()_1.md",
+      "x": 4500,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billutils_normalizeitem",
+      "type": "file",
+      "file": "graphify/obsidian/normalizeItem()_1.md",
+      "x": 4700,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billutils_priceitem",
+      "type": "file",
+      "file": "graphify/obsidian/priceItem()_1.md",
+      "x": 4300,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billutils_round2",
+      "type": "file",
+      "file": "graphify/obsidian/round2()_1.md",
+      "x": 4500,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_billutils_valueofdiscount",
+      "type": "file",
+      "file": "graphify/obsidian/valueOfDiscount()_1.md",
+      "x": 4700,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g5",
+      "type": "group",
+      "label": "Toast Notification System",
+      "x": 5020,
+      "y": 0,
+      "width": 660,
+      "height": 420,
+      "color": "6"
+    },
+    {
+      "id": "n_use_toast_addtoremovequeue",
+      "type": "file",
+      "file": "graphify/obsidian/addToRemoveQueue().md",
+      "x": 5040,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_use_toast_dispatch",
+      "type": "file",
+      "file": "graphify/obsidian/dispatch().md",
+      "x": 5240,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_use_toast_genid",
+      "type": "file",
+      "file": "graphify/obsidian/genId().md",
+      "x": 5440,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_use_toast_reducer",
+      "type": "file",
+      "file": "graphify/obsidian/reducer().md",
+      "x": 5040,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_use_toast_toast",
+      "type": "file",
+      "file": "graphify/obsidian/toast().md",
+      "x": 5240,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_components_hooks_use_toast_ts",
+      "type": "file",
+      "file": "graphify/obsidian/use-toast.ts.md",
+      "x": 5440,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_use_toast_usetoast",
+      "type": "file",
+      "file": "graphify/obsidian/useToast().md",
+      "x": 5040,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g6",
+      "type": "group",
+      "label": "Bindals Creation Logo",
+      "x": 5760,
+      "y": 0,
+      "width": 660,
+      "height": 420,
+      "color": "1"
+    },
+    {
+      "id": "n_brand_bindalscreation",
+      "type": "file",
+      "file": "graphify/obsidian/Bindals Creation.md",
+      "x": 5780,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_bindalscreation",
+      "type": "file",
+      "file": "graphify/obsidian/Bindals Creation Logo.md",
+      "x": 5980,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_visual_floral_scrollwork",
+      "type": "file",
+      "file": "graphify/obsidian/Floral Scrollwork  Filigree.md",
+      "x": 6180,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_color_gold_white",
+      "type": "file",
+      "file": "graphify/obsidian/Gold and White Color Scheme.md",
+      "x": 5780,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_design_style_luxury",
+      "type": "file",
+      "file": "graphify/obsidian/Luxury  Ornate Design Style.md",
+      "x": 5980,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_visual_monogram_b",
+      "type": "file",
+      "file": "graphify/obsidian/Monogram Letter B.md",
+      "x": 6180,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_visual_ornamental_frame",
+      "type": "file",
+      "file": "graphify/obsidian/Ornamental Circular Frame.md",
+      "x": 5780,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g7",
+      "type": "group",
+      "label": "Bill Header Branding",
+      "x": 6500,
+      "y": 0,
+      "width": 660,
+      "height": 420,
+      "color": "2"
+    },
+    {
+      "id": "n_LOGOBill_billing_purpose",
+      "type": "file",
+      "file": "graphify/obsidian/Billing Document Branding Purpose.md",
+      "x": 6520,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_LOGOBill_bindals_creation_logo",
+      "type": "file",
+      "file": "graphify/obsidian/Bindal's Creation Bill Logo.md",
+      "x": 6720,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_LOGOBill_scrollwork",
+      "type": "file",
+      "file": "graphify/obsidian/Decorative Scrollwork Base.md",
+      "x": 6920,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_LOGOBill_gold_color_scheme",
+      "type": "file",
+      "file": "graphify/obsidian/Gold Color Scheme.md",
+      "x": 6520,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_LOGOBill_ornamental_frame",
+      "type": "file",
+      "file": "graphify/obsidian/Ornamental Circular Frame_1.md",
+      "x": 6720,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_LOGOBill_retail_brand",
+      "type": "file",
+      "file": "graphify/obsidian/Retail Brand Identity.md",
+      "x": 6920,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_LOGOBill_letter_b",
+      "type": "file",
+      "file": "graphify/obsidian/Stylized Letter B.md",
+      "x": 6520,
+      "y": 240,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g8",
+      "type": "group",
+      "label": "Manual Item & Price Encoding",
+      "x": 7240,
+      "y": 0,
+      "width": 660,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_manualitemform_manualitemform",
+      "type": "file",
+      "file": "graphify/obsidian/ManualItemForm()_1.md",
+      "x": 7260,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_manualitemform_js",
+      "type": "file",
+      "file": "graphify/obsidian/ManualItemForm.js.md",
+      "x": 7460,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_manualitemform_decodezcode",
+      "type": "file",
+      "file": "graphify/obsidian/decodeZCode().md",
+      "x": 7660,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_manualitemform_encodepricetozcode",
+      "type": "file",
+      "file": "graphify/obsidian/encodePriceToZCode().md",
+      "x": 7260,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_manualitemform_getbcxprefix",
+      "type": "file",
+      "file": "graphify/obsidian/getBCXPrefix().md",
+      "x": 7460,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_manualitemform_getnextmanualitemid",
+      "type": "file",
+      "file": "graphify/obsidian/getNextManualItemId().md",
+      "x": 7660,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g9",
+      "type": "group",
+      "label": "React Default Assets",
+      "x": 7980,
+      "y": 0,
+      "width": 660,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_app_js",
+      "type": "file",
+      "file": "graphify/obsidian/App.js_1.md",
+      "x": 8000,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_central_circle",
+      "type": "file",
+      "file": "graphify/obsidian/Central Nucleus Circle.md",
+      "x": 8200,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_orbital_paths",
+      "type": "file",
+      "file": "graphify/obsidian/Elliptical Orbital Paths.md",
+      "x": 8400,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_react_atom_symbol",
+      "type": "file",
+      "file": "graphify/obsidian/React Atom Symbol.md",
+      "x": 8000,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_color_61dafb",
+      "type": "file",
+      "file": "graphify/obsidian/React Blue Color (61DAFB).md",
+      "x": 8200,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_svg",
+      "type": "file",
+      "file": "graphify/obsidian/React Logo SVG.md",
+      "x": 8400,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g10",
+      "type": "group",
+      "label": "Bills Table & Logo",
+      "x": 8720,
+      "y": 0,
+      "width": 660,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_bills_table",
+      "type": "file",
+      "file": "graphify/obsidian/Bills Table.md",
+      "x": 8740,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_bill_brand_logo",
+      "type": "file",
+      "file": "graphify/obsidian/Bindal's Creation Bill Logo_1.md",
+      "x": 8940,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_bill_color_scheme",
+      "type": "file",
+      "file": "graphify/obsidian/Gold on White Color Scheme.md",
+      "x": 9140,
+      "y": 80,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_bill_purpose",
+      "type": "file",
+      "file": "graphify/obsidian/InvoiceBill Header Branding.md",
+      "x": 8740,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_bill_design_style",
+      "type": "file",
+      "file": "graphify/obsidian/Ornate Gold Scrollwork Design.md",
+      "x": 8940,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_logo_bill_letter_b",
+      "type": "file",
+      "file": "graphify/obsidian/Stylized Letter B_1.md",
+      "x": 9140,
+      "y": 160,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g11",
+      "type": "group",
+      "label": "Discount Form",
+      "x": 0,
+      "y": 900,
+      "width": 660,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_discountform_discountform",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountForm().md",
+      "x": 20,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_discountform_js",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountForm.js.md",
+      "x": 220,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_discountform_field",
+      "type": "file",
+      "file": "graphify/obsidian/Field().md",
+      "x": 420,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_discountform_fielderror",
+      "type": "file",
+      "file": "graphify/obsidian/FieldError().md",
+      "x": 20,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_discountform_toformvalues",
+      "type": "file",
+      "file": "graphify/obsidian/toFormValues().md",
+      "x": 220,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g12",
+      "type": "group",
+      "label": "Action Buttons",
+      "x": 1180,
+      "y": 900,
+      "width": 660,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_components_actionbuttons_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/ActionButtons.jsx.md",
+      "x": 1200,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_actionbuttons_deletebutton",
+      "type": "file",
+      "file": "graphify/obsidian/DeleteButton().md",
+      "x": 1400,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_actionbuttons_editbutton",
+      "type": "file",
+      "file": "graphify/obsidian/EditButton().md",
+      "x": 1600,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_actionbuttons_printbutton",
+      "type": "file",
+      "file": "graphify/obsidian/PrintButton().md",
+      "x": 1200,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_actionbuttons_safeclick",
+      "type": "file",
+      "file": "graphify/obsidian/safeClick().md",
+      "x": 1400,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g13",
+      "type": "group",
+      "label": "Admin Pages & Charts",
+      "x": 2360,
+      "y": 900,
+      "width": 660,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_claudemd_admin_components_dir",
+      "type": "file",
+      "file": "graphify/obsidian/Admin Components Directory (srcadmincomponents).md",
+      "x": 2380,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_admin_pages_dir",
+      "type": "file",
+      "file": "graphify/obsidian/Admin Pages Directory (srcadminpages).md",
+      "x": 2580,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_mockup_graphs_page",
+      "type": "file",
+      "file": "graphify/obsidian/MockupGraphsPage.md",
+      "x": 2780,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_plotly_js",
+      "type": "file",
+      "file": "graphify/obsidian/Plotly.js (react-plotly.js).md",
+      "x": 2380,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_total_value_page",
+      "type": "file",
+      "file": "graphify/obsidian/TotalValuePage.md",
+      "x": 2580,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g14",
+      "type": "group",
+      "label": "Mockup Row",
+      "x": 3320,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_mockuprow_mockuprow",
+      "type": "file",
+      "file": "graphify/obsidian/MockupRow().md",
+      "x": 3340,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_mockuprow_js",
+      "type": "file",
+      "file": "graphify/obsidian/MockupRow.js.md",
+      "x": 3540,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_mockuprow_encodedpricetocode",
+      "type": "file",
+      "file": "graphify/obsidian/encodedPriceToCode().md",
+      "x": 3740,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_mockuprow_formatdate",
+      "type": "file",
+      "file": "graphify/obsidian/formatDate().md",
+      "x": 3340,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g15",
+      "type": "group",
+      "label": "Stock & Billing Helpers",
+      "x": 4280,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_stockhelpers_backcalcdiscountpct",
+      "type": "file",
+      "file": "graphify/obsidian/backCalcDiscountPct().md",
+      "x": 4300,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_stockhelpers_buildbillitemspayload",
+      "type": "file",
+      "file": "graphify/obsidian/buildBillItemsPayload().md",
+      "x": 4500,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_stockhelpers_computestockdelta",
+      "type": "file",
+      "file": "graphify/obsidian/computeStockDelta().md",
+      "x": 4700,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_stockhelpers_js",
+      "type": "file",
+      "file": "graphify/obsidian/stockHelpers.js.md",
+      "x": 4300,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g16",
+      "type": "group",
+      "label": "Discount Selector",
+      "x": 5020,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_discountselector_discountrow",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountRow().md",
+      "x": 5040,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_discountselector_discountselector",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountSelector().md",
+      "x": 5240,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_discountselector_js",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountSelector.js.md",
+      "x": 5440,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_discountselector_discountlabel",
+      "type": "file",
+      "file": "graphify/obsidian/discountLabel().md",
+      "x": 5040,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g17",
+      "type": "group",
+      "label": "Label Printing",
+      "x": 5760,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_printlabel_encodepricetocode",
+      "type": "file",
+      "file": "graphify/obsidian/encodePriceToCode().md",
+      "x": 5780,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_printlabel_generatetspllabel",
+      "type": "file",
+      "file": "graphify/obsidian/generateTSPLLabel().md",
+      "x": 5980,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_printlabel_printlabel",
+      "type": "file",
+      "file": "graphify/obsidian/printLabel().md",
+      "x": 6180,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_components_printlabel_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/printLabel.jsx.md",
+      "x": 5780,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g18",
+      "type": "group",
+      "label": "QZ Tray & Core Tables",
+      "x": 6500,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_claudemd_table_bills",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table bills.md",
+      "x": 6520,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_table_customers",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table customers.md",
+      "x": 6720,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_table_discounts",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table discounts.md",
+      "x": 6920,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_qz_tray",
+      "type": "file",
+      "file": "graphify/obsidian/QZ Tray (LabelInvoice Printing).md",
+      "x": 6520,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g19",
+      "type": "group",
+      "label": "Shadcn / Tailwind UI Stack",
+      "x": 7240,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_claudemd_radix_ui",
+      "type": "file",
+      "file": "graphify/obsidian/Radix UI Primitives.md",
+      "x": 7260,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_shadcn_ui",
+      "type": "file",
+      "file": "graphify/obsidian/Shadcnui Components.md",
+      "x": 7460,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_tailwind_css",
+      "type": "file",
+      "file": "graphify/obsidian/Tailwind CSS.md",
+      "x": 7660,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_tailwind_config",
+      "type": "file",
+      "file": "graphify/obsidian/tailwind.config.js_1.md",
+      "x": 7260,
+      "y": 1060,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g20",
+      "type": "group",
+      "label": "Google Drive Folders",
+      "x": 7980,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_admin_components_createfolder_js",
+      "type": "file",
+      "file": "graphify/obsidian/createFolder.js.md",
+      "x": 8000,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_createfolder_createproductfolder",
+      "type": "file",
+      "file": "graphify/obsidian/createProductFolder().md",
+      "x": 8200,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_createfolder_findorcreatefolder",
+      "type": "file",
+      "file": "graphify/obsidian/findOrCreateFolder().md",
+      "x": 8400,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g21",
+      "type": "group",
+      "label": "Variant Display",
+      "x": 8720,
+      "y": 900,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_variantrow_variantrow",
+      "type": "file",
+      "file": "graphify/obsidian/VariantRow().md",
+      "x": 8740,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_variantrow_js",
+      "type": "file",
+      "file": "graphify/obsidian/VariantRow.js.md",
+      "x": 8940,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_variantrow_formatstock",
+      "type": "file",
+      "file": "graphify/obsidian/formatStock().md",
+      "x": 9140,
+      "y": 980,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g22",
+      "type": "group",
+      "label": "Utility Functions",
+      "x": 0,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_claudemd_utility_dir",
+      "type": "file",
+      "file": "graphify/obsidian/Utility Functions Directory (srcutility).md",
+      "x": 20,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_date_format_js",
+      "type": "file",
+      "file": "graphify/obsidian/dateFormat.js_1.md",
+      "x": 220,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_format_phone_js",
+      "type": "file",
+      "file": "graphify/obsidian/formatPhone.js_1.md",
+      "x": 420,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g23",
+      "type": "group",
+      "label": "Module 23",
+      "x": 1180,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_reportwebvitals_reportwebvitals",
+      "type": "file",
+      "file": "graphify/obsidian/reportWebVitals().md",
+      "x": 1200,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_reportwebvitals_js",
+      "type": "file",
+      "file": "graphify/obsidian/reportWebVitals.js.md",
+      "x": 1400,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g24",
+      "type": "group",
+      "label": "Module 24",
+      "x": 2360,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_app_app",
+      "type": "file",
+      "file": "graphify/obsidian/App().md",
+      "x": 2380,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_app_js",
+      "type": "file",
+      "file": "graphify/obsidian/App.js.md",
+      "x": 2580,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g25",
+      "type": "group",
+      "label": "Module 25",
+      "x": 3320,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_adminlayout_adminlayout",
+      "type": "file",
+      "file": "graphify/obsidian/AdminLayout().md",
+      "x": 3340,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_adminlayout_js",
+      "type": "file",
+      "file": "graphify/obsidian/AdminLayout.js.md",
+      "x": 3540,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g26",
+      "type": "group",
+      "label": "Module 26",
+      "x": 4280,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_navbar_navbar",
+      "type": "file",
+      "file": "graphify/obsidian/Navbar().md",
+      "x": 4300,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_navbar_js",
+      "type": "file",
+      "file": "graphify/obsidian/Navbar.js.md",
+      "x": 4500,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g27",
+      "type": "group",
+      "label": "Module 27",
+      "x": 5020,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_customerform_customerform",
+      "type": "file",
+      "file": "graphify/obsidian/CustomerForm().md",
+      "x": 5040,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_customerform_js",
+      "type": "file",
+      "file": "graphify/obsidian/CustomerForm.js.md",
+      "x": 5240,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g28",
+      "type": "group",
+      "label": "Module 28",
+      "x": 5760,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_chevronicon_chevronicon",
+      "type": "file",
+      "file": "graphify/obsidian/ChevronIcon().md",
+      "x": 5780,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_chevronicon_js",
+      "type": "file",
+      "file": "graphify/obsidian/ChevronIcon.js.md",
+      "x": 5980,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g29",
+      "type": "group",
+      "label": "Module 29",
+      "x": 6500,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_productrow_productrow",
+      "type": "file",
+      "file": "graphify/obsidian/ProductRow().md",
+      "x": 6520,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_productrow_js",
+      "type": "file",
+      "file": "graphify/obsidian/ProductRow.js.md",
+      "x": 6720,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g30",
+      "type": "group",
+      "label": "Module 30",
+      "x": 7240,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_requireadminauth_requireadminauth",
+      "type": "file",
+      "file": "graphify/obsidian/RequireAdminAuth().md",
+      "x": 7260,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_requireadminauth_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/RequireAdminAuth.jsx.md",
+      "x": 7460,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g31",
+      "type": "group",
+      "label": "Module 31",
+      "x": 7980,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_customertable_customertable",
+      "type": "file",
+      "file": "graphify/obsidian/CustomerTable().md",
+      "x": 8000,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_customertable_js",
+      "type": "file",
+      "file": "graphify/obsidian/CustomerTable.js.md",
+      "x": 8200,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g32",
+      "type": "group",
+      "label": "Module 32",
+      "x": 8720,
+      "y": 1380,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_mockuptable_mockuptable",
+      "type": "file",
+      "file": "graphify/obsidian/MockupTable().md",
+      "x": 8740,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_mockuptable_js",
+      "type": "file",
+      "file": "graphify/obsidian/MockupTable.js.md",
+      "x": 8940,
+      "y": 1460,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g33",
+      "type": "group",
+      "label": "Module 33",
+      "x": 0,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_discounttable_discounttable",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountTable().md",
+      "x": 20,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_discounttable_js",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountTable.js.md",
+      "x": 220,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g34",
+      "type": "group",
+      "label": "Module 34",
+      "x": 1180,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_billtable_billtable",
+      "type": "file",
+      "file": "graphify/obsidian/BillTable().md",
+      "x": 1200,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billtable_js",
+      "type": "file",
+      "file": "graphify/obsidian/BillTable.js.md",
+      "x": 1400,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g35",
+      "type": "group",
+      "label": "Module 35",
+      "x": 2360,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_producteditdialog_producteditdialog",
+      "type": "file",
+      "file": "graphify/obsidian/ProductEditDialog().md",
+      "x": 2380,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_producteditdialog_js",
+      "type": "file",
+      "file": "graphify/obsidian/ProductEditDialog.js.md",
+      "x": 2580,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g36",
+      "type": "group",
+      "label": "Module 36",
+      "x": 3320,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_userregistration_userregistration",
+      "type": "file",
+      "file": "graphify/obsidian/UserRegistration().md",
+      "x": 3340,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_userregistration_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/UserRegistration.jsx.md",
+      "x": 3540,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g37",
+      "type": "group",
+      "label": "Module 37",
+      "x": 4280,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_notes_notes",
+      "type": "file",
+      "file": "graphify/obsidian/Notes().md",
+      "x": 4300,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_notes_js",
+      "type": "file",
+      "file": "graphify/obsidian/Notes.js.md",
+      "x": 4500,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g38",
+      "type": "group",
+      "label": "Module 38",
+      "x": 5020,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_inventorypicker_inventorypicker",
+      "type": "file",
+      "file": "graphify/obsidian/InventoryPicker()_1.md",
+      "x": 5040,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_inventorypicker_js",
+      "type": "file",
+      "file": "graphify/obsidian/InventoryPicker.js.md",
+      "x": 5240,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g39",
+      "type": "group",
+      "label": "Module 39",
+      "x": 5760,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_billingform_billingform",
+      "type": "file",
+      "file": "graphify/obsidian/BillingForm()_1.md",
+      "x": 5780,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_billingform_js",
+      "type": "file",
+      "file": "graphify/obsidian/BillingForm.js.md",
+      "x": 5980,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g40",
+      "type": "group",
+      "label": "Module 40",
+      "x": 6500,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_itemtable_itemtable",
+      "type": "file",
+      "file": "graphify/obsidian/ItemTable().md",
+      "x": 6520,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_itemtable_js",
+      "type": "file",
+      "file": "graphify/obsidian/ItemTable.js.md",
+      "x": 6720,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g41",
+      "type": "group",
+      "label": "Module 41",
+      "x": 7240,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_additemdialog_additemdialog",
+      "type": "file",
+      "file": "graphify/obsidian/AddItemDialog()_1.md",
+      "x": 7260,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_additemdialog_js",
+      "type": "file",
+      "file": "graphify/obsidian/AddItemDialog.js.md",
+      "x": 7460,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g42",
+      "type": "group",
+      "label": "Module 42",
+      "x": 7980,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_admin_components_billing_invoiceview_js",
+      "type": "file",
+      "file": "graphify/obsidian/InvoiceView.js.md",
+      "x": 8000,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_invoiceview_formatdate",
+      "type": "file",
+      "file": "graphify/obsidian/formatDate()_1.md",
+      "x": 8200,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g43",
+      "type": "group",
+      "label": "Module 43",
+      "x": 8720,
+      "y": 1860,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_customerselector_customerselector",
+      "type": "file",
+      "file": "graphify/obsidian/CustomerSelector().md",
+      "x": 8740,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_customerselector_js",
+      "type": "file",
+      "file": "graphify/obsidian/CustomerSelector.js.md",
+      "x": 8940,
+      "y": 1940,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g44",
+      "type": "group",
+      "label": "Module 44",
+      "x": 0,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_salespersonselector_salespersonselector",
+      "type": "file",
+      "file": "graphify/obsidian/SalespersonSelector().md",
+      "x": 20,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_salespersonselector_js",
+      "type": "file",
+      "file": "graphify/obsidian/SalespersonSelector.js.md",
+      "x": 220,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g45",
+      "type": "group",
+      "label": "Module 45",
+      "x": 1180,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_itemrow_itemrow",
+      "type": "file",
+      "file": "graphify/obsidian/ItemRow()_1.md",
+      "x": 1200,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_itemrow_js",
+      "type": "file",
+      "file": "graphify/obsidian/ItemRow.js.md",
+      "x": 1400,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g46",
+      "type": "group",
+      "label": "Module 46",
+      "x": 2360,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_summary_summary",
+      "type": "file",
+      "file": "graphify/obsidian/Summary()_1.md",
+      "x": 2380,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_summary_js",
+      "type": "file",
+      "file": "graphify/obsidian/Summary.js.md",
+      "x": 2580,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g47",
+      "type": "group",
+      "label": "Module 47",
+      "x": 3320,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_generateinvoicepdf_generateinvoicepdf",
+      "type": "file",
+      "file": "graphify/obsidian/generateInvoicePdf().md",
+      "x": 3340,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_components_billing_generateinvoicepdf_js",
+      "type": "file",
+      "file": "graphify/obsidian/generateInvoicePdf.js.md",
+      "x": 3540,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g48",
+      "type": "group",
+      "label": "Module 48",
+      "x": 4280,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_supplierspage_supplierspage",
+      "type": "file",
+      "file": "graphify/obsidian/SuppliersPage().md",
+      "x": 4300,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_supplierspage_js",
+      "type": "file",
+      "file": "graphify/obsidian/SuppliersPage.js.md",
+      "x": 4500,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g49",
+      "type": "group",
+      "label": "Module 49",
+      "x": 5020,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_inventorypage_inventorypage",
+      "type": "file",
+      "file": "graphify/obsidian/InventoryPage().md",
+      "x": 5040,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_inventorypage_js",
+      "type": "file",
+      "file": "graphify/obsidian/InventoryPage.js.md",
+      "x": 5240,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g50",
+      "type": "group",
+      "label": "Module 50",
+      "x": 5760,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_admin_pages_mockupgraphspage_js",
+      "type": "file",
+      "file": "graphify/obsidian/MockupGraphsPage.js.md",
+      "x": 5780,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_mockupgraphspage_mockupoverlaypercentbars",
+      "type": "file",
+      "file": "graphify/obsidian/MockupOverlayPercentBars().md",
+      "x": 5980,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g51",
+      "type": "group",
+      "label": "Module 51",
+      "x": 6500,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_signuppage_signuppage",
+      "type": "file",
+      "file": "graphify/obsidian/SignupPage().md",
+      "x": 6520,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_signuppage_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/SignupPage.jsx.md",
+      "x": 6720,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g52",
+      "type": "group",
+      "label": "Module 52",
+      "x": 7240,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_voucherpage_voucherpage",
+      "type": "file",
+      "file": "graphify/obsidian/VoucherPage().md",
+      "x": 7260,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_voucherpage_js",
+      "type": "file",
+      "file": "graphify/obsidian/VoucherPage.js.md",
+      "x": 7460,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g53",
+      "type": "group",
+      "label": "Module 53",
+      "x": 7980,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_billingpage_billingpage",
+      "type": "file",
+      "file": "graphify/obsidian/BillingPage().md",
+      "x": 8000,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_billingpage_js",
+      "type": "file",
+      "file": "graphify/obsidian/BillingPage.js.md",
+      "x": 8200,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g54",
+      "type": "group",
+      "label": "Module 54",
+      "x": 8720,
+      "y": 2340,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_discountpage_discountpage",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountPage().md",
+      "x": 8740,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_discountpage_js",
+      "type": "file",
+      "file": "graphify/obsidian/DiscountPage.js.md",
+      "x": 8940,
+      "y": 2420,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g55",
+      "type": "group",
+      "label": "Module 55",
+      "x": 0,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_exchangepage_exchangepage",
+      "type": "file",
+      "file": "graphify/obsidian/ExchangePage().md",
+      "x": 20,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_exchangepage_js",
+      "type": "file",
+      "file": "graphify/obsidian/ExchangePage.js.md",
+      "x": 220,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g56",
+      "type": "group",
+      "label": "Module 56",
+      "x": 1180,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_customerspage_customerspage",
+      "type": "file",
+      "file": "graphify/obsidian/CustomersPage().md",
+      "x": 1200,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_customerspage_js",
+      "type": "file",
+      "file": "graphify/obsidian/CustomersPage.js.md",
+      "x": 1400,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g57",
+      "type": "group",
+      "label": "Module 57",
+      "x": 2360,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_loginpage_loginpage",
+      "type": "file",
+      "file": "graphify/obsidian/LoginPage().md",
+      "x": 2380,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_loginpage_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/LoginPage.jsx.md",
+      "x": 2580,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g58",
+      "type": "group",
+      "label": "Module 58",
+      "x": 3320,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_totalvaluepage_totalvaluepage",
+      "type": "file",
+      "file": "graphify/obsidian/TotalValuePage().md",
+      "x": 3340,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_totalvaluepage_js",
+      "type": "file",
+      "file": "graphify/obsidian/TotalValuePage.js.md",
+      "x": 3540,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g59",
+      "type": "group",
+      "label": "Module 59",
+      "x": 4280,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_mockuppage_mockuppage",
+      "type": "file",
+      "file": "graphify/obsidian/MockupPage().md",
+      "x": 4300,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_mockuppage_js",
+      "type": "file",
+      "file": "graphify/obsidian/MockupPage.js.md",
+      "x": 4500,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g60",
+      "type": "group",
+      "label": "Module 60",
+      "x": 5020,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_usermanagement_usermanagement",
+      "type": "file",
+      "file": "graphify/obsidian/UserManagement().md",
+      "x": 5040,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_admin_pages_usermanagement_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/UserManagement.jsx.md",
+      "x": 5240,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g61",
+      "type": "group",
+      "label": "Module 61",
+      "x": 5760,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_customdropdown_customdropdown",
+      "type": "file",
+      "file": "graphify/obsidian/CustomDropdown().md",
+      "x": 5780,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_components_customdropdown_js",
+      "type": "file",
+      "file": "graphify/obsidian/CustomDropdown.js.md",
+      "x": 5980,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g62",
+      "type": "group",
+      "label": "Module 62",
+      "x": 6500,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_badge_badge",
+      "type": "file",
+      "file": "graphify/obsidian/Badge().md",
+      "x": 6520,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_components_ui_badge_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/badge.tsx.md",
+      "x": 6720,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g63",
+      "type": "group",
+      "label": "Module 63",
+      "x": 7240,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_src_components_ui_button_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/button.tsx.md",
+      "x": 7260,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_button_cn",
+      "type": "file",
+      "file": "graphify/obsidian/cn().md",
+      "x": 7460,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g64",
+      "type": "group",
+      "label": "Module 64",
+      "x": 7980,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_utils_cn",
+      "type": "file",
+      "file": "graphify/obsidian/cn()_1.md",
+      "x": 8000,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_lib_utils_ts",
+      "type": "file",
+      "file": "graphify/obsidian/utils.ts.md",
+      "x": 8200,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g65",
+      "type": "group",
+      "label": "Module 65",
+      "x": 8720,
+      "y": 2820,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_unauthorizedpage_unauthorizedpage",
+      "type": "file",
+      "file": "graphify/obsidian/UnauthorizedPage().md",
+      "x": 8740,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_pages_unauthorizedpage_jsx",
+      "type": "file",
+      "file": "graphify/obsidian/UnauthorizedPage.jsx.md",
+      "x": 8940,
+      "y": 2900,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g66",
+      "type": "group",
+      "label": "Module 66",
+      "x": 0,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_utility_dateformat_js",
+      "type": "file",
+      "file": "graphify/obsidian/dateFormat.js.md",
+      "x": 20,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_dateformat_formatdate",
+      "type": "file",
+      "file": "graphify/obsidian/formatDate()_2.md",
+      "x": 220,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g67",
+      "type": "group",
+      "label": "Module 67",
+      "x": 1180,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_formatphone_formatlivephoneinput",
+      "type": "file",
+      "file": "graphify/obsidian/formatLivePhoneInput().md",
+      "x": 1200,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_src_utility_formatphone_js",
+      "type": "file",
+      "file": "graphify/obsidian/formatPhone.js.md",
+      "x": 1400,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g68",
+      "type": "group",
+      "label": "Module 68",
+      "x": 2360,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_claudemd_table_products",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table products.md",
+      "x": 2380,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_table_productsizecolors",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table productsizecolors.md",
+      "x": 2580,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g69",
+      "type": "group",
+      "label": "Module 69",
+      "x": 3320,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_claudemd_react_hook_form",
+      "type": "file",
+      "file": "graphify/obsidian/React Hook Form.md",
+      "x": 3340,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "n_claudemd_zod",
+      "type": "file",
+      "file": "graphify/obsidian/Zod (Form Validation).md",
+      "x": 3540,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g70",
+      "type": "group",
+      "label": "Module 70",
+      "x": 4280,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_tailwind_config_js",
+      "type": "file",
+      "file": "graphify/obsidian/tailwind.config.js.md",
+      "x": 4300,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g71",
+      "type": "group",
+      "label": "Module 71",
+      "x": 5020,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_postcss_config_js",
+      "type": "file",
+      "file": "graphify/obsidian/postcss.config.js.md",
+      "x": 5040,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g72",
+      "type": "group",
+      "label": "Module 72",
+      "x": 5760,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_index_js",
+      "type": "file",
+      "file": "graphify/obsidian/index.js.md",
+      "x": 5780,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g73",
+      "type": "group",
+      "label": "Module 73",
+      "x": 6500,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_src_app_test_js",
+      "type": "file",
+      "file": "graphify/obsidian/App.test.js.md",
+      "x": 6520,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g74",
+      "type": "group",
+      "label": "Module 74",
+      "x": 7240,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_setuptests_js",
+      "type": "file",
+      "file": "graphify/obsidian/setupTests.js.md",
+      "x": 7260,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g75",
+      "type": "group",
+      "label": "Module 75",
+      "x": 7980,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_src_admin_components_producttable_js",
+      "type": "file",
+      "file": "graphify/obsidian/ProductTable.js.md",
+      "x": 8000,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g76",
+      "type": "group",
+      "label": "Module 76",
+      "x": 8720,
+      "y": 3300,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_src_admin_components_billing_returnreceiptview_js",
+      "type": "file",
+      "file": "graphify/obsidian/ReturnReceiptView.js.md",
+      "x": 8740,
+      "y": 3380,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g77",
+      "type": "group",
+      "label": "Module 77",
+      "x": 0,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_src_admin_components_billing_tests_stockdelta_test_js",
+      "type": "file",
+      "file": "graphify/obsidian/stockDelta.test.js.md",
+      "x": 20,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g78",
+      "type": "group",
+      "label": "Module 78",
+      "x": 1180,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_admin_components_billing_tests_billutils_test_js",
+      "type": "file",
+      "file": "graphify/obsidian/billUtils.test.js.md",
+      "x": 1200,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g79",
+      "type": "group",
+      "label": "Module 79",
+      "x": 2360,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_src_components_ui_tabs_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/tabs.tsx.md",
+      "x": 2380,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g80",
+      "type": "group",
+      "label": "Module 80",
+      "x": 3320,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_components_ui_card_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/card.tsx.md",
+      "x": 3340,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g81",
+      "type": "group",
+      "label": "Module 81",
+      "x": 4280,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_src_components_ui_toaster_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/toaster.tsx.md",
+      "x": 4300,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g82",
+      "type": "group",
+      "label": "Module 82",
+      "x": 5020,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_src_components_ui_scroll_area_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/scroll-area.tsx.md",
+      "x": 5040,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g83",
+      "type": "group",
+      "label": "Module 83",
+      "x": 5760,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_src_components_ui_label_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/label.tsx.md",
+      "x": 5780,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g84",
+      "type": "group",
+      "label": "Module 84",
+      "x": 6500,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_components_ui_tooltip_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/tooltip.tsx.md",
+      "x": 6520,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g85",
+      "type": "group",
+      "label": "Module 85",
+      "x": 7240,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_src_components_ui_dialog_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/dialog.tsx.md",
+      "x": 7260,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g86",
+      "type": "group",
+      "label": "Module 86",
+      "x": 7980,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_components_ui_table_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/table.tsx.md",
+      "x": 8000,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g87",
+      "type": "group",
+      "label": "Module 87",
+      "x": 8720,
+      "y": 3780,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_src_components_ui_toast_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/toast.tsx.md",
+      "x": 8740,
+      "y": 3860,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g88",
+      "type": "group",
+      "label": "Module 88",
+      "x": 0,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_src_components_ui_checkbox_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/checkbox.tsx.md",
+      "x": 20,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g89",
+      "type": "group",
+      "label": "Module 89",
+      "x": 1180,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_src_components_ui_select_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/select.tsx.md",
+      "x": 1200,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g90",
+      "type": "group",
+      "label": "Module 90",
+      "x": 2360,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_src_components_ui_textarea_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/textarea.tsx.md",
+      "x": 2380,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g91",
+      "type": "group",
+      "label": "Module 91",
+      "x": 3320,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_src_components_ui_input_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/input.tsx.md",
+      "x": 3340,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g92",
+      "type": "group",
+      "label": "Module 92",
+      "x": 4280,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_src_components_ui_form_tsx",
+      "type": "file",
+      "file": "graphify/obsidian/form.tsx.md",
+      "x": 4300,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g93",
+      "type": "group",
+      "label": "Module 93",
+      "x": 5020,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_src_lib_supabaseclient_js",
+      "type": "file",
+      "file": "graphify/obsidian/supabaseClient.js.md",
+      "x": 5040,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g94",
+      "type": "group",
+      "label": "Module 94",
+      "x": 5760,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_readme_npm_test",
+      "type": "file",
+      "file": "graphify/obsidian/npm test (Test Runner).md",
+      "x": 5780,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g95",
+      "type": "group",
+      "label": "Module 95",
+      "x": 6500,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_readme_npm_eject",
+      "type": "file",
+      "file": "graphify/obsidian/npm run eject.md",
+      "x": 6520,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g96",
+      "type": "group",
+      "label": "Module 96",
+      "x": 7240,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "1"
+    },
+    {
+      "id": "n_claudemd_table_categories",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table categories.md",
+      "x": 7260,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g97",
+      "type": "group",
+      "label": "Module 97",
+      "x": 7980,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "2"
+    },
+    {
+      "id": "n_claudemd_table_suppliers",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table suppliers.md",
+      "x": 8000,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g98",
+      "type": "group",
+      "label": "Module 98",
+      "x": 8720,
+      "y": 4260,
+      "width": 600,
+      "height": 400,
+      "color": "3"
+    },
+    {
+      "id": "n_claudemd_table_mockups",
+      "type": "file",
+      "file": "graphify/obsidian/DB Table mockups.md",
+      "x": 8740,
+      "y": 4340,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g99",
+      "type": "group",
+      "label": "Module 99",
+      "x": 0,
+      "y": 4740,
+      "width": 600,
+      "height": 400,
+      "color": "4"
+    },
+    {
+      "id": "n_claudemd_sonner",
+      "type": "file",
+      "file": "graphify/obsidian/Sonner (Toast Notifications).md",
+      "x": 20,
+      "y": 4820,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g100",
+      "type": "group",
+      "label": "Module 100",
+      "x": 1180,
+      "y": 4740,
+      "width": 600,
+      "height": 400,
+      "color": "5"
+    },
+    {
+      "id": "n_claudemd_path_alias",
+      "type": "file",
+      "file": "graphify/obsidian/Path Alias @ \u2192 src.md",
+      "x": 1200,
+      "y": 4820,
+      "width": 180,
+      "height": 60
+    },
+    {
+      "id": "g101",
+      "type": "group",
+      "label": "Module 101",
+      "x": 2360,
+      "y": 4740,
+      "width": 600,
+      "height": 400,
+      "color": "6"
+    },
+    {
+      "id": "n_robots_allow_all",
+      "type": "file",
+      "file": "graphify/obsidian/robots.txt Allow All Crawlers.md",
+      "x": 2380,
+      "y": 4820,
+      "width": 180,
+      "height": 60
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_src_reportwebvitals_js_reportwebvitals_reportwebvitals",
+      "fromNode": "n_src_reportwebvitals_js",
+      "toNode": "n_reportwebvitals_reportwebvitals",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_app_js_app_app",
+      "fromNode": "n_src_app_js",
+      "toNode": "n_app_app",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_adminlayout_js_adminlayout_adminlayout",
+      "fromNode": "n_src_admin_components_adminlayout_js",
+      "toNode": "n_adminlayout_adminlayout",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_createfolder_js_createfolder_findorcreatefolder",
+      "fromNode": "n_src_admin_components_createfolder_js",
+      "toNode": "n_createfolder_findorcreatefolder",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_createfolder_js_createfolder_createproductfolder",
+      "fromNode": "n_src_admin_components_createfolder_js",
+      "toNode": "n_createfolder_createproductfolder",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_createfolder_findorcreatefolder_createfolder_createproductfolder",
+      "fromNode": "n_createfolder_findorcreatefolder",
+      "toNode": "n_createfolder_createproductfolder",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_variantrow_js_variantrow_formatstock",
+      "fromNode": "n_src_admin_components_variantrow_js",
+      "toNode": "n_variantrow_formatstock",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_variantrow_js_variantrow_variantrow",
+      "fromNode": "n_src_admin_components_variantrow_js",
+      "toNode": "n_variantrow_variantrow",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_variantrow_formatstock_variantrow_variantrow",
+      "fromNode": "n_variantrow_formatstock",
+      "toNode": "n_variantrow_variantrow",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_navbar_js_navbar_navbar",
+      "fromNode": "n_src_admin_components_navbar_js",
+      "toNode": "n_navbar_navbar",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_customerform_js_customerform_customerform",
+      "fromNode": "n_src_admin_components_customerform_js",
+      "toNode": "n_customerform_customerform",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_mockuprow_js_mockuprow_encodedpricetocode",
+      "fromNode": "n_src_admin_components_mockuprow_js",
+      "toNode": "n_mockuprow_encodedpricetocode",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_mockuprow_js_mockuprow_formatdate",
+      "fromNode": "n_src_admin_components_mockuprow_js",
+      "toNode": "n_mockuprow_formatdate",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_mockuprow_js_mockuprow_mockuprow",
+      "fromNode": "n_src_admin_components_mockuprow_js",
+      "toNode": "n_mockuprow_mockuprow",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_mockuprow_formatdate_mockuprow_mockuprow",
+      "fromNode": "n_mockuprow_formatdate",
+      "toNode": "n_mockuprow_mockuprow",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_chevronicon_js_chevronicon_chevronicon",
+      "fromNode": "n_src_admin_components_chevronicon_js",
+      "toNode": "n_chevronicon_chevronicon",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_productrow_js_productrow_productrow",
+      "fromNode": "n_src_admin_components_productrow_js",
+      "toNode": "n_productrow_productrow",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_discountform_js_discountform_fielderror",
+      "fromNode": "n_src_admin_components_discountform_js",
+      "toNode": "n_discountform_fielderror",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_discountform_js_discountform_field",
+      "fromNode": "n_src_admin_components_discountform_js",
+      "toNode": "n_discountform_field",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_discountform_js_discountform_toformvalues",
+      "fromNode": "n_src_admin_components_discountform_js",
+      "toNode": "n_discountform_toformvalues",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_discountform_js_discountform_discountform",
+      "fromNode": "n_src_admin_components_discountform_js",
+      "toNode": "n_discountform_discountform",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_discountform_toformvalues_discountform_discountform",
+      "fromNode": "n_discountform_toformvalues",
+      "toNode": "n_discountform_discountform",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_requireadminauth_jsx_requireadminauth_requireadminauth",
+      "fromNode": "n_src_admin_components_requireadminauth_jsx",
+      "toNode": "n_requireadminauth_requireadminauth",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_customertable_js_customertable_customertable",
+      "fromNode": "n_src_admin_components_customertable_js",
+      "toNode": "n_customertable_customertable",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_mockuptable_js_mockuptable_mockuptable",
+      "fromNode": "n_src_admin_components_mockuptable_js",
+      "toNode": "n_mockuptable_mockuptable",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_discounttable_js_discounttable_discounttable",
+      "fromNode": "n_src_admin_components_discounttable_js",
+      "toNode": "n_discounttable_discounttable",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billtable_js_billtable_billtable",
+      "fromNode": "n_src_admin_components_billtable_js",
+      "toNode": "n_billtable_billtable",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_producteditdialog_js_producteditdialog_producteditdialog",
+      "fromNode": "n_src_admin_components_producteditdialog_js",
+      "toNode": "n_producteditdialog_producteditdialog",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_userregistration_jsx_userregistration_userregistration",
+      "fromNode": "n_src_admin_components_userregistration_jsx",
+      "toNode": "n_userregistration_userregistration",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_billingform",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_billingform",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_itemrow",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_itemrow",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_additemdialog",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_additemdialog",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_inventorypicker",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_inventorypicker",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_manualitemform",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_manualitemform",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_overalldiscountselector",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_overalldiscountselector",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_summary",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_summary",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_createcustomerform",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_createcustomerform",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_normalizeitem",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_normalizeitem",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_priceitem",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_priceitem",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_computebilltotals",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_computebilltotals",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_applyoveralldiscounts",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_applyoveralldiscounts",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_valueofdiscount",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_valueofdiscount",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_materializeitemfordb",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_materializeitemfordb",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_money",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_money",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_tomoney",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_tomoney",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_round2",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_round2",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_clampmax",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_clampmax",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_describediscount",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_describediscount",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_archive_billform_js_billform_cryptorandomulid",
+      "fromNode": "n_src_admin_components_archive_billform_js",
+      "toNode": "n_billform_cryptorandomulid",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_itemrow_billform_normalizeitem",
+      "fromNode": "n_billform_itemrow",
+      "toNode": "n_billform_normalizeitem",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_itemrow_billform_priceitem",
+      "fromNode": "n_billform_itemrow",
+      "toNode": "n_billform_priceitem",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_itemrow_billform_money",
+      "fromNode": "n_billform_itemrow",
+      "toNode": "n_billform_money",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_summary_billform_money",
+      "fromNode": "n_billform_summary",
+      "toNode": "n_billform_money",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_normalizeitem_billform_priceitem",
+      "fromNode": "n_billform_normalizeitem",
+      "toNode": "n_billform_priceitem",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_priceitem_billform_round2",
+      "fromNode": "n_billform_priceitem",
+      "toNode": "n_billform_round2",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_priceitem_billform_materializeitemfordb",
+      "fromNode": "n_billform_priceitem",
+      "toNode": "n_billform_materializeitemfordb",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_computebilltotals_billform_round2",
+      "fromNode": "n_billform_computebilltotals",
+      "toNode": "n_billform_round2",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_computebilltotals_billform_applyoveralldiscounts",
+      "fromNode": "n_billform_computebilltotals",
+      "toNode": "n_billform_applyoveralldiscounts",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_valueofdiscount_billform_clampmax",
+      "fromNode": "n_billform_valueofdiscount",
+      "toNode": "n_billform_clampmax",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_valueofdiscount_billform_round2",
+      "fromNode": "n_billform_valueofdiscount",
+      "toNode": "n_billform_round2",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billform_materializeitemfordb_billform_tomoney",
+      "fromNode": "n_billform_materializeitemfordb",
+      "toNode": "n_billform_tomoney",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_notes_js_notes_notes",
+      "fromNode": "n_src_admin_components_billing_notes_js",
+      "toNode": "n_notes_notes",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_manualitemform_js_manualitemform_encodepricetozcode",
+      "fromNode": "n_src_admin_components_billing_manualitemform_js",
+      "toNode": "n_manualitemform_encodepricetozcode",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_manualitemform_js_manualitemform_decodezcode",
+      "fromNode": "n_src_admin_components_billing_manualitemform_js",
+      "toNode": "n_manualitemform_decodezcode",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_manualitemform_js_manualitemform_getbcxprefix",
+      "fromNode": "n_src_admin_components_billing_manualitemform_js",
+      "toNode": "n_manualitemform_getbcxprefix",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_manualitemform_js_manualitemform_getnextmanualitemid",
+      "fromNode": "n_src_admin_components_billing_manualitemform_js",
+      "toNode": "n_manualitemform_getnextmanualitemid",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_manualitemform_js_manualitemform_manualitemform",
+      "fromNode": "n_src_admin_components_billing_manualitemform_js",
+      "toNode": "n_manualitemform_manualitemform",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_manualitemform_encodepricetozcode_manualitemform_manualitemform",
+      "fromNode": "n_manualitemform_encodepricetozcode",
+      "toNode": "n_manualitemform_manualitemform",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_manualitemform_getbcxprefix_manualitemform_getnextmanualitemid",
+      "fromNode": "n_manualitemform_getbcxprefix",
+      "toNode": "n_manualitemform_getnextmanualitemid",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_inventorypicker_js_inventorypicker_inventorypicker",
+      "fromNode": "n_src_admin_components_billing_inventorypicker_js",
+      "toNode": "n_inventorypicker_inventorypicker",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billingform_js_billingform_billingform",
+      "fromNode": "n_src_admin_components_billing_billingform_js",
+      "toNode": "n_billingform_billingform",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_stockhelpers_js_stockhelpers_computestockdelta",
+      "fromNode": "n_src_admin_components_billing_stockhelpers_js",
+      "toNode": "n_stockhelpers_computestockdelta",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_stockhelpers_js_stockhelpers_buildbillitemspayload",
+      "fromNode": "n_src_admin_components_billing_stockhelpers_js",
+      "toNode": "n_stockhelpers_buildbillitemspayload",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_stockhelpers_js_stockhelpers_backcalcdiscountpct",
+      "fromNode": "n_src_admin_components_billing_stockhelpers_js",
+      "toNode": "n_stockhelpers_backcalcdiscountpct",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_itemtable_js_itemtable_itemtable",
+      "fromNode": "n_src_admin_components_billing_itemtable_js",
+      "toNode": "n_itemtable_itemtable",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_additemdialog_js_additemdialog_additemdialog",
+      "fromNode": "n_src_admin_components_billing_additemdialog_js",
+      "toNode": "n_additemdialog_additemdialog",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_invoiceview_js_invoiceview_formatdate",
+      "fromNode": "n_src_admin_components_billing_invoiceview_js",
+      "toNode": "n_invoiceview_formatdate",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_round2",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_round2",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_money",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_money",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_normalizeitem",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_normalizeitem",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_priceitem",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_priceitem",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_computebilltotals",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_computebilltotals",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_applyoveralldiscounts",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_applyoveralldiscounts",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_valueofdiscount",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_valueofdiscount",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_billutils_js_billutils_clampmax",
+      "fromNode": "n_src_admin_components_billing_billutils_js",
+      "toNode": "n_billutils_clampmax",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_billutils_round2_billutils_priceitem",
+      "fromNode": "n_billutils_round2",
+      "toNode": "n_billutils_priceitem",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billutils_round2_billutils_computebilltotals",
+      "fromNode": "n_billutils_round2",
+      "toNode": "n_billutils_computebilltotals",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billutils_round2_billutils_valueofdiscount",
+      "fromNode": "n_billutils_round2",
+      "toNode": "n_billutils_valueofdiscount",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billutils_normalizeitem_billutils_priceitem",
+      "fromNode": "n_billutils_normalizeitem",
+      "toNode": "n_billutils_priceitem",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billutils_computebilltotals_billutils_applyoveralldiscounts",
+      "fromNode": "n_billutils_computebilltotals",
+      "toNode": "n_billutils_applyoveralldiscounts",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_billutils_valueofdiscount_billutils_clampmax",
+      "fromNode": "n_billutils_valueofdiscount",
+      "toNode": "n_billutils_clampmax",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_customerselector_js_customerselector_customerselector",
+      "fromNode": "n_src_admin_components_billing_customerselector_js",
+      "toNode": "n_customerselector_customerselector",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_salespersonselector_js_salespersonselector_salespersonselector",
+      "fromNode": "n_src_admin_components_billing_salespersonselector_js",
+      "toNode": "n_salespersonselector_salespersonselector",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_itemrow_js_itemrow_itemrow",
+      "fromNode": "n_src_admin_components_billing_itemrow_js",
+      "toNode": "n_itemrow_itemrow",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_discountselector_js_discountselector_discountlabel",
+      "fromNode": "n_src_admin_components_billing_discountselector_js",
+      "toNode": "n_discountselector_discountlabel",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_discountselector_js_discountselector_discountrow",
+      "fromNode": "n_src_admin_components_billing_discountselector_js",
+      "toNode": "n_discountselector_discountrow",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_discountselector_js_discountselector_discountselector",
+      "fromNode": "n_src_admin_components_billing_discountselector_js",
+      "toNode": "n_discountselector_discountselector",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_discountselector_discountlabel_discountselector_discountrow",
+      "fromNode": "n_discountselector_discountlabel",
+      "toNode": "n_discountselector_discountrow",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_summary_js_summary_summary",
+      "fromNode": "n_src_admin_components_billing_summary_js",
+      "toNode": "n_summary_summary",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_components_billing_generateinvoicepdf_js_generateinvoicepdf_generateinvoicepdf",
+      "fromNode": "n_src_admin_components_billing_generateinvoicepdf_js",
+      "toNode": "n_generateinvoicepdf_generateinvoicepdf",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_supplierspage_js_supplierspage_supplierspage",
+      "fromNode": "n_src_admin_pages_supplierspage_js",
+      "toNode": "n_supplierspage_supplierspage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_inventorypage_js_inventorypage_inventorypage",
+      "fromNode": "n_src_admin_pages_inventorypage_js",
+      "toNode": "n_inventorypage_inventorypage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_mockupgraphspage_js_mockupgraphspage_mockupoverlaypercentbars",
+      "fromNode": "n_src_admin_pages_mockupgraphspage_js",
+      "toNode": "n_mockupgraphspage_mockupoverlaypercentbars",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_signuppage_jsx_signuppage_signuppage",
+      "fromNode": "n_src_admin_pages_signuppage_jsx",
+      "toNode": "n_signuppage_signuppage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_voucherpage_js_voucherpage_voucherpage",
+      "fromNode": "n_src_admin_pages_voucherpage_js",
+      "toNode": "n_voucherpage_voucherpage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_billingpage_js_billingpage_billingpage",
+      "fromNode": "n_src_admin_pages_billingpage_js",
+      "toNode": "n_billingpage_billingpage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_discountpage_js_discountpage_discountpage",
+      "fromNode": "n_src_admin_pages_discountpage_js",
+      "toNode": "n_discountpage_discountpage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_exchangepage_js_exchangepage_exchangepage",
+      "fromNode": "n_src_admin_pages_exchangepage_js",
+      "toNode": "n_exchangepage_exchangepage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_customerspage_js_customerspage_customerspage",
+      "fromNode": "n_src_admin_pages_customerspage_js",
+      "toNode": "n_customerspage_customerspage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_loginpage_jsx_loginpage_loginpage",
+      "fromNode": "n_src_admin_pages_loginpage_jsx",
+      "toNode": "n_loginpage_loginpage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_totalvaluepage_js_totalvaluepage_totalvaluepage",
+      "fromNode": "n_src_admin_pages_totalvaluepage_js",
+      "toNode": "n_totalvaluepage_totalvaluepage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_mockuppage_js_mockuppage_mockuppage",
+      "fromNode": "n_src_admin_pages_mockuppage_js",
+      "toNode": "n_mockuppage_mockuppage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_admin_pages_usermanagement_jsx_usermanagement_usermanagement",
+      "fromNode": "n_src_admin_pages_usermanagement_jsx",
+      "toNode": "n_usermanagement_usermanagement",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_printlabel_jsx_printlabel_encodepricetocode",
+      "fromNode": "n_src_components_printlabel_jsx",
+      "toNode": "n_printlabel_encodepricetocode",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_printlabel_jsx_printlabel_generatetspllabel",
+      "fromNode": "n_src_components_printlabel_jsx",
+      "toNode": "n_printlabel_generatetspllabel",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_printlabel_jsx_printlabel_printlabel",
+      "fromNode": "n_src_components_printlabel_jsx",
+      "toNode": "n_printlabel_printlabel",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_printlabel_encodepricetocode_printlabel_generatetspllabel",
+      "fromNode": "n_printlabel_encodepricetocode",
+      "toNode": "n_printlabel_generatetspllabel",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_printlabel_generatetspllabel_printlabel_printlabel",
+      "fromNode": "n_printlabel_generatetspllabel",
+      "toNode": "n_printlabel_printlabel",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_customdropdown_js_customdropdown_customdropdown",
+      "fromNode": "n_src_components_customdropdown_js",
+      "toNode": "n_customdropdown_customdropdown",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_actionbuttons_jsx_actionbuttons_safeclick",
+      "fromNode": "n_src_components_actionbuttons_jsx",
+      "toNode": "n_actionbuttons_safeclick",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_actionbuttons_jsx_actionbuttons_editbutton",
+      "fromNode": "n_src_components_actionbuttons_jsx",
+      "toNode": "n_actionbuttons_editbutton",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_actionbuttons_jsx_actionbuttons_printbutton",
+      "fromNode": "n_src_components_actionbuttons_jsx",
+      "toNode": "n_actionbuttons_printbutton",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_actionbuttons_jsx_actionbuttons_deletebutton",
+      "fromNode": "n_src_components_actionbuttons_jsx",
+      "toNode": "n_actionbuttons_deletebutton",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_ui_badge_tsx_badge_badge",
+      "fromNode": "n_src_components_ui_badge_tsx",
+      "toNode": "n_badge_badge",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_ui_button_tsx_button_cn",
+      "fromNode": "n_src_components_ui_button_tsx",
+      "toNode": "n_button_cn",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_hooks_use_toast_ts_use_toast_genid",
+      "fromNode": "n_src_components_hooks_use_toast_ts",
+      "toNode": "n_use_toast_genid",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_hooks_use_toast_ts_use_toast_addtoremovequeue",
+      "fromNode": "n_src_components_hooks_use_toast_ts",
+      "toNode": "n_use_toast_addtoremovequeue",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_hooks_use_toast_ts_use_toast_reducer",
+      "fromNode": "n_src_components_hooks_use_toast_ts",
+      "toNode": "n_use_toast_reducer",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_hooks_use_toast_ts_use_toast_dispatch",
+      "fromNode": "n_src_components_hooks_use_toast_ts",
+      "toNode": "n_use_toast_dispatch",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_hooks_use_toast_ts_use_toast_toast",
+      "fromNode": "n_src_components_hooks_use_toast_ts",
+      "toNode": "n_use_toast_toast",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_components_hooks_use_toast_ts_use_toast_usetoast",
+      "fromNode": "n_src_components_hooks_use_toast_ts",
+      "toNode": "n_use_toast_usetoast",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_use_toast_genid_use_toast_toast",
+      "fromNode": "n_use_toast_genid",
+      "toNode": "n_use_toast_toast",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_use_toast_addtoremovequeue_use_toast_reducer",
+      "fromNode": "n_use_toast_addtoremovequeue",
+      "toNode": "n_use_toast_reducer",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_use_toast_reducer_use_toast_dispatch",
+      "fromNode": "n_use_toast_reducer",
+      "toNode": "n_use_toast_dispatch",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_use_toast_dispatch_use_toast_toast",
+      "fromNode": "n_use_toast_dispatch",
+      "toNode": "n_use_toast_toast",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_src_lib_utils_ts_utils_cn",
+      "fromNode": "n_src_lib_utils_ts",
+      "toNode": "n_utils_cn",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_pages_unauthorizedpage_jsx_unauthorizedpage_unauthorizedpage",
+      "fromNode": "n_src_pages_unauthorizedpage_jsx",
+      "toNode": "n_unauthorizedpage_unauthorizedpage",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_utility_dateformat_js_dateformat_formatdate",
+      "fromNode": "n_src_utility_dateformat_js",
+      "toNode": "n_dateformat_formatdate",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_src_utility_formatphone_js_formatphone_formatlivephoneinput",
+      "fromNode": "n_src_utility_formatphone_js",
+      "toNode": "n_formatphone_formatlivephoneinput",
+      "label": "contains [EXTRACTED]"
+    },
+    {
+      "id": "e_readme_create_react_app_claudemd_react19_spa",
+      "fromNode": "n_readme_create_react_app",
+      "toNode": "n_claudemd_react19_spa",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_readme_npm_start_claudemd_react19_spa",
+      "fromNode": "n_readme_npm_start",
+      "toNode": "n_claudemd_react19_spa",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_readme_npm_build_claudemd_react19_spa",
+      "fromNode": "n_readme_npm_build",
+      "toNode": "n_claudemd_react19_spa",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_react19_spa_claudemd_supabase",
+      "fromNode": "n_claudemd_react19_spa",
+      "toNode": "n_claudemd_supabase",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_react19_spa_claudemd_supabase_js",
+      "fromNode": "n_claudemd_react19_spa",
+      "toNode": "n_claudemd_supabase_js",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_supabase_claudemd_rpc_get_max_product_suffix",
+      "fromNode": "n_claudemd_supabase",
+      "toNode": "n_claudemd_rpc_get_max_product_suffix",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_supabase_js_claudemd_supabase_client_js",
+      "fromNode": "n_claudemd_supabase_js",
+      "toNode": "n_claudemd_supabase_client_js",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_supabase_js_claudemd_rationale_no_server_side",
+      "fromNode": "n_claudemd_supabase_js",
+      "toNode": "n_claudemd_rationale_no_server_side",
+      "label": "rationale_for [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_app_js_claudemd_require_admin_auth",
+      "fromNode": "n_claudemd_app_js",
+      "toNode": "n_claudemd_require_admin_auth",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_app_js_claudemd_admin_layout",
+      "fromNode": "n_claudemd_app_js",
+      "toNode": "n_claudemd_admin_layout",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_require_admin_auth_claudemd_supabase_client_js",
+      "fromNode": "n_claudemd_require_admin_auth",
+      "toNode": "n_claudemd_supabase_client_js",
+      "label": "calls [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_require_admin_auth_claudemd_table_profiles",
+      "fromNode": "n_claudemd_require_admin_auth",
+      "toNode": "n_claudemd_table_profiles",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_supabase_client_js_claudemd_env_vars",
+      "fromNode": "n_claudemd_supabase_client_js",
+      "toNode": "n_claudemd_env_vars",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_product_id_format_claudemd_rpc_get_max_product_suffix",
+      "fromNode": "n_claudemd_product_id_format",
+      "toNode": "n_claudemd_rpc_get_max_product_suffix",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_shadcn_ui_claudemd_radix_ui",
+      "fromNode": "n_claudemd_shadcn_ui",
+      "toNode": "n_claudemd_radix_ui",
+      "label": "implements [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_shadcn_ui_claudemd_tailwind_css",
+      "fromNode": "n_claudemd_shadcn_ui",
+      "toNode": "n_claudemd_tailwind_css",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_tailwind_css_claudemd_tailwind_config",
+      "fromNode": "n_claudemd_tailwind_css",
+      "toNode": "n_claudemd_tailwind_config",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_react_hook_form_claudemd_zod",
+      "fromNode": "n_claudemd_react_hook_form",
+      "toNode": "n_claudemd_zod",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_plotly_js_claudemd_mockup_graphs_page",
+      "fromNode": "n_claudemd_plotly_js",
+      "toNode": "n_claudemd_mockup_graphs_page",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_plotly_js_claudemd_total_value_page",
+      "fromNode": "n_claudemd_plotly_js",
+      "toNode": "n_claudemd_total_value_page",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_state_management_claudemd_rationale_no_global_store",
+      "fromNode": "n_claudemd_state_management",
+      "toNode": "n_claudemd_rationale_no_global_store",
+      "label": "rationale_for [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_state_management_claudemd_refresh_flag_pattern",
+      "fromNode": "n_claudemd_state_management",
+      "toNode": "n_claudemd_refresh_flag_pattern",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_utility_dir_claudemd_date_format_js",
+      "fromNode": "n_claudemd_utility_dir",
+      "toNode": "n_claudemd_date_format_js",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_claudemd_utility_dir_claudemd_format_phone_js",
+      "fromNode": "n_claudemd_utility_dir",
+      "toNode": "n_claudemd_format_phone_js",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindalscreation_brand_bindalscreation",
+      "fromNode": "n_logo_bindalscreation",
+      "toNode": "n_brand_bindalscreation",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindalscreation_visual_monogram_b",
+      "fromNode": "n_logo_bindalscreation",
+      "toNode": "n_visual_monogram_b",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindalscreation_visual_ornamental_frame",
+      "fromNode": "n_logo_bindalscreation",
+      "toNode": "n_visual_ornamental_frame",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindalscreation_visual_floral_scrollwork",
+      "fromNode": "n_logo_bindalscreation",
+      "toNode": "n_visual_floral_scrollwork",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindalscreation_color_gold_white",
+      "fromNode": "n_logo_bindalscreation",
+      "toNode": "n_color_gold_white",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_visual_monogram_b_visual_ornamental_frame",
+      "fromNode": "n_visual_monogram_b",
+      "toNode": "n_visual_ornamental_frame",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_LOGOBill_bindals_creation_logo_LOGOBill_letter_b",
+      "fromNode": "n_LOGOBill_bindals_creation_logo",
+      "toNode": "n_LOGOBill_letter_b",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_LOGOBill_bindals_creation_logo_LOGOBill_ornamental_frame",
+      "fromNode": "n_LOGOBill_bindals_creation_logo",
+      "toNode": "n_LOGOBill_ornamental_frame",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_LOGOBill_bindals_creation_logo_LOGOBill_scrollwork",
+      "fromNode": "n_LOGOBill_bindals_creation_logo",
+      "toNode": "n_LOGOBill_scrollwork",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_LOGOBill_bindals_creation_logo_LOGOBill_gold_color_scheme",
+      "fromNode": "n_LOGOBill_bindals_creation_logo",
+      "toNode": "n_LOGOBill_gold_color_scheme",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_LOGOBill_letter_b_LOGOBill_ornamental_frame",
+      "fromNode": "n_LOGOBill_letter_b",
+      "toNode": "n_LOGOBill_ornamental_frame",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_svg_logo_react_atom_symbol",
+      "fromNode": "n_logo_svg",
+      "toNode": "n_logo_react_atom_symbol",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_svg_logo_color_61dafb",
+      "fromNode": "n_logo_svg",
+      "toNode": "n_logo_color_61dafb",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_svg_logo_central_circle",
+      "fromNode": "n_logo_svg",
+      "toNode": "n_logo_central_circle",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_svg_logo_orbital_paths",
+      "fromNode": "n_logo_svg",
+      "toNode": "n_logo_orbital_paths",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_react_atom_symbol_logo_central_circle",
+      "fromNode": "n_logo_react_atom_symbol",
+      "toNode": "n_logo_central_circle",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_react_atom_symbol_logo_orbital_paths",
+      "fromNode": "n_logo_react_atom_symbol",
+      "toNode": "n_logo_orbital_paths",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindals_creation_brand_bindals_creation",
+      "fromNode": "n_logo_bindals_creation",
+      "toNode": "n_brand_bindals_creation",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindals_creation_design_element_monogram_b",
+      "fromNode": "n_logo_bindals_creation",
+      "toNode": "n_design_element_monogram_b",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindals_creation_design_element_ornamental_frame",
+      "fromNode": "n_logo_bindals_creation",
+      "toNode": "n_design_element_ornamental_frame",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindals_creation_design_element_floral_scrollwork",
+      "fromNode": "n_logo_bindals_creation",
+      "toNode": "n_design_element_floral_scrollwork",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindals_creation_color_gold",
+      "fromNode": "n_logo_bindals_creation",
+      "toNode": "n_color_gold",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bindals_creation_color_white",
+      "fromNode": "n_logo_bindals_creation",
+      "toNode": "n_color_white",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_design_element_monogram_b_design_element_ornamental_frame",
+      "fromNode": "n_design_element_monogram_b",
+      "toNode": "n_design_element_ornamental_frame",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bill_brand_logo_logo_bill_letter_b",
+      "fromNode": "n_logo_bill_brand_logo",
+      "toNode": "n_logo_bill_letter_b",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bill_brand_logo_logo_bill_design_style",
+      "fromNode": "n_logo_bill_brand_logo",
+      "toNode": "n_logo_bill_design_style",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_logo_bill_brand_logo_logo_bill_color_scheme",
+      "fromNode": "n_logo_bill_brand_logo",
+      "toNode": "n_logo_bill_color_scheme",
+      "label": "conceptually_related_to [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_business_bindals_creation",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_business_bindals_creation",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_customer_akash_raghani",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_customer_akash_raghani",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_field_bill_number",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_field_bill_number",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_field_customer_name",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_field_customer_name",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_field_phone",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_field_phone",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_line_item_1",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_line_item_1",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_line_item_2",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_line_item_2",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_field_total_qty",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_field_total_qty",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_field_net_amount",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_field_net_amount",
+      "label": "references [EXTRACTED]"
+    },
+    {
+      "id": "e_sample_bill_document_sample_bill_policy_notes",
+      "fromNode": "n_sample_bill_document",
+      "toNode": "n_sample_bill_policy_notes",
+      "label": "references [EXTRACTED]"
+    }
+  ]
+}

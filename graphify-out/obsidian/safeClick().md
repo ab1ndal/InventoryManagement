@@ -1,0 +1,17 @@
+---
+source_file: "src/components/ActionButtons.jsx"
+type: "code"
+community: "Action Buttons"
+location: "L11"
+tags:
+  - graphify/code
+  - graphify/EXTRACTED
+  - community/Action_Buttons
+---
+
+# safeClick()
+
+## Connections
+- [[ActionButtons.jsx]] - `contains` [EXTRACTED]
+
+#graphify/code #graphify/EXTRACTED #community/Action_Buttons
