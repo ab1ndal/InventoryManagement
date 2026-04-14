@@ -90,6 +90,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [voucherError, setVoucherError] = useState("");
   const [voucherLoading, setVoucherLoading] = useState(false);
 
+  // Reset all form state when the dialog closes. Must NOT include `items` in
+  // its dependency array — doing so would cause setItems([]) to create a new
+  // array reference on every render, triggering the effect again infinitely.
   useEffect(() => {
     if (!open) {
       setItems([]);
@@ -110,8 +113,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setAppliedVoucher(null);
       setVoucherError("");
       setVoucherLoading(false);
-      return;
     }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load discounts (and re-evaluate auto-apply eligibility) whenever the
+  // dialog is open or the item list changes.
+  useEffect(() => {
+    if (!open) return;
 
     const loadDiscounts = async () => {
       const today = new Date().toISOString().split("T")[0];
@@ -142,7 +150,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     };
 
     loadDiscounts();
-  }, [open, billId, items]);
+  }, [open, billId, items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open || !billId) return;

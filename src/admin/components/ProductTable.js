@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "react";
 import ProductRow from "./ProductRow";
 import { supabase } from "../../lib/supabaseClient";
@@ -25,7 +26,6 @@ const ProductTable = forwardRef(
     },
     ref
   ) => {
-    console.log("Filters: ", filters);
     const { toast } = useToast();
 
     const [currentPage, setCurrentPage] = useState(0);
@@ -36,6 +36,13 @@ const ProductTable = forwardRef(
     const [filteredProductIds, setFilteredProductIds] = useState([]);
     const [loading, setLoading] = useState(false);
     const keyCache = useRef(new Map());
+
+    // Debounce filters so keystrokes don't trigger a fetch on every character
+    const [debouncedFilters, setDebouncedFilters] = useState(filters);
+    useEffect(() => {
+      const timer = setTimeout(() => setDebouncedFilters(filters), 300);
+      return () => clearTimeout(timer);
+    }, [filters]);
 
     useImperativeHandle(ref, () => ({
       addProductToTable,
@@ -53,153 +60,116 @@ const ProductTable = forwardRef(
     }, []);
 
     const fetchMatchingProductIds = useCallback(async () => {
+      // Build a reusable filtered query builder — filters are pushed to the DB,
+      // but we still batch with .range() to respect PostgREST's max_rows cap.
+      const buildProductQuery = () => {
+        let q = supabase.from("products").select("productid").order("productid");
+        if (debouncedFilters.productid)
+          q = q.ilike("productid", `%${debouncedFilters.productid}%`);
+        if (debouncedFilters.fabric)
+          q = q.ilike("fabric", `%${debouncedFilters.fabric}%`);
+        if (debouncedFilters.description)
+          q = q.ilike("description", `%${debouncedFilters.description}%`);
+        if (debouncedFilters.purchaseMin !== "")
+          q = q.gte("purchaseprice", Number(debouncedFilters.purchaseMin));
+        if (debouncedFilters.purchaseMax !== "")
+          q = q.lte("purchaseprice", Number(debouncedFilters.purchaseMax));
+        if (debouncedFilters.retailMin !== "")
+          q = q.gte("retailprice", Number(debouncedFilters.retailMin));
+        if (debouncedFilters.retailMax !== "")
+          q = q.lte("retailprice", Number(debouncedFilters.retailMax));
+        // Discount price = purchaseprice * 1.3 — convert bounds back to purchaseprice
+        if (debouncedFilters.discountPriceMin !== "")
+          q = q.gte("purchaseprice", Number(debouncedFilters.discountPriceMin) / 1.3);
+        if (debouncedFilters.discountPriceMax !== "")
+          q = q.lte("purchaseprice", Number(debouncedFilters.discountPriceMax) / 1.3);
+        if (debouncedFilters.category) {
+          const matchingCatIds = categories
+            .filter((cat) =>
+              cat.name.toLowerCase().includes(debouncedFilters.category.toLowerCase())
+            )
+            .map((cat) => cat.categoryid);
+          if (matchingCatIds.length === 0) return null; // signal: no matches possible
+          q = q.in("categoryid", matchingCatIds);
+        }
+        return q;
+      };
+
+      const baseQuery = buildProductQuery();
+      if (baseQuery === null) return [];
+
+      // Batch through all matching products to stay under PostgREST's max_rows cap
       const batchSize = 1000;
       const allIds = new Set();
       let from = 0;
       let done = false;
-
       while (!done) {
-        const { data, error } = await supabase
-          .from("products")
-          .select(
-            "productid, categoryid, fabric, description, purchaseprice, retailprice"
-          )
-          .range(from, from + batchSize - 1);
-
+        const { data, error } = await baseQuery.range(from, from + batchSize - 1);
         if (error || !data) break;
-
-        for (const p of data) {
-          const matchesProductId = filters.productid
-            ? p.productid
-                .toLowerCase()
-                .includes(filters.productid.toLowerCase())
-            : true;
-
-          const matchesFabric = filters.fabric
-            ? (p.fabric || "")
-                .toLowerCase()
-                .includes(filters.fabric.toLowerCase())
-            : true;
-
-          const matchesDesc = filters.description
-            ? (p.description || "")
-                .toLowerCase()
-                .includes(filters.description.toLowerCase())
-            : true;
-
-          const categoryName =
-            categories.find((cat) => cat.categoryid === p.categoryid)?.name ||
-            "";
-
-          const matchesCategory = filters.category
-            ? categoryName
-                .toLowerCase()
-                .includes(filters.category.toLowerCase())
-            : true;
-
-          const matchesPurchase =
-            (filters.purchaseMin === "" ||
-              p.purchaseprice >= Number(filters.purchaseMin)) &&
-            (filters.purchaseMax === "" ||
-              p.purchaseprice <= Number(filters.purchaseMax));
-
-          const matchesRetail =
-            (filters.retailMin === "" ||
-              p.retailprice >= Number(filters.retailMin)) &&
-            (filters.retailMax === "" ||
-              p.retailprice <= Number(filters.retailMax));
-
-          const discountPrice = p.purchaseprice * 1.3;
-          const matchesDiscountPrice =
-            (filters.discountPriceMin === "" ||
-              discountPrice >= Number(filters.discountPriceMin)) &&
-            (filters.discountPriceMax === "" ||
-              discountPrice <= Number(filters.discountPriceMax));
-
-          if (
-            matchesProductId &&
-            matchesFabric &&
-            matchesDesc &&
-            matchesCategory &&
-            matchesPurchase &&
-            matchesRetail &&
-            matchesDiscountPrice
-          ) {
-            allIds.add(p.productid);
-          }
-        }
-
+        for (const p of data) allIds.add(p.productid);
         if (data.length < batchSize) done = true;
         else from += batchSize;
       }
+
+      // Variant-level filters (size, color, stock) — also batched
       const hasText = (s) => typeof s === "string" && s.trim() !== "";
       const isNumberSet = (v) => v !== "" && v != null;
 
       if (
-        hasText(filters.size) ||
-        hasText(filters.color) ||
-        isNumberSet(filters.stockMin) ||
-        isNumberSet(filters.stockMax)
+        hasText(debouncedFilters.size) ||
+        hasText(debouncedFilters.color) ||
+        isNumberSet(debouncedFilters.stockMin) ||
+        isNumberSet(debouncedFilters.stockMax)
       ) {
         const toNumberOrNull = (val) =>
           val !== "" && val != null && !Number.isNaN(Number(val))
             ? Number(val)
             : null;
-        const stockMinNumber = toNumberOrNull(filters.stockMin);
-        const stockMaxNumber = toNumberOrNull(filters.stockMax);
+        const stockMinNumber = toNumberOrNull(debouncedFilters.stockMin);
+        const stockMaxNumber = toNumberOrNull(debouncedFilters.stockMax);
 
-        let query = supabase.from("productsizecolors").select("productid");
-
-        console.log("Filters: ", filters);
-
-        if (filters.size) query = query.ilike("size", `%${filters.size}%`);
-        if (filters.color) {
-          const colorFilters = filters.color
-            .split(",")
-            .map((c) => c.trim())
-            .filter((c) => c.length > 0);
-
-          if (colorFilters.length > 1) {
-            // OR across multiple colors
-            const orConditions = colorFilters
-              .map((c) => `color.ilike.%${c}%`)
-              .join(",");
-            query = query.or(orConditions);
-          } else {
-            query = query.ilike("color", `%${colorFilters[0]}%`);
-          }
-        }
-
-        // Stock range filters
-        if (stockMinNumber !== null) {
-          query = query.gte("stock", stockMinNumber);
-        }
-        if (stockMaxNumber !== null) {
-          query = query.lte("stock", stockMaxNumber);
-        }
-
-        console.log("Query: ", query);
-        const { data: variantMatches, error } = await query;
-
-        if (error) {
-          console.log("ProductSizeColors Error: ", error);
-        }
-
-        if (variantMatches) {
-          const matchingFromVariants = new Set(
-            variantMatches.map((v) => v.productid)
-          );
-          // Intersect variant matches with product-level matches
-          for (const id of Array.from(allIds)) {
-            if (!matchingFromVariants.has(id)) {
-              allIds.delete(id);
+        const buildVarQuery = () => {
+          let q = supabase.from("productsizecolors").select("productid").order("productid");
+          if (debouncedFilters.size)
+            q = q.ilike("size", `%${debouncedFilters.size}%`);
+          if (debouncedFilters.color) {
+            const colorFilters = debouncedFilters.color
+              .split(",")
+              .map((c) => c.trim())
+              .filter((c) => c.length > 0);
+            if (colorFilters.length > 1) {
+              q = q.or(colorFilters.map((c) => `color.ilike.%${c}%`).join(","));
+            } else {
+              q = q.ilike("color", `%${colorFilters[0]}%`);
             }
           }
+          if (stockMinNumber !== null) q = q.gte("stock", stockMinNumber);
+          if (stockMaxNumber !== null) q = q.lte("stock", stockMaxNumber);
+          return q;
+        };
+
+        const varQuery = buildVarQuery();
+        const matchingFromVariants = new Set();
+        let vFrom = 0;
+        let vDone = false;
+        while (!vDone) {
+          const { data: variantMatches, error: varError } = await varQuery.range(
+            vFrom,
+            vFrom + batchSize - 1
+          );
+          if (varError || !variantMatches) break;
+          for (const v of variantMatches) matchingFromVariants.add(v.productid);
+          if (variantMatches.length < batchSize) vDone = true;
+          else vFrom += batchSize;
+        }
+
+        for (const id of Array.from(allIds)) {
+          if (!matchingFromVariants.has(id)) allIds.delete(id);
         }
       }
 
       return Array.from(allIds);
-    }, [filters, categories]);
+    }, [debouncedFilters, categories]);
 
     const fetchPaginatedProducts = useCallback(
       async (productIds, page = 0) => {
@@ -217,15 +187,10 @@ const ProductTable = forwardRef(
         );
         if (idsForPage.length === 0) return { products: [], variants: [] };
 
-        const { data: prods } = await supabase
-          .from("products")
-          .select("*")
-          .in("productid", idsForPage);
-
-        const { data: vars } = await supabase
-          .from("productsizecolors")
-          .select("*")
-          .in("productid", idsForPage);
+        const [{ data: prods }, { data: vars }] = await Promise.all([
+          supabase.from("products").select("*").in("productid", idsForPage),
+          supabase.from("productsizecolors").select("*").in("productid", idsForPage),
+        ]);
 
         const pos = new Map(idsForPage.map((id, i) => [id, i]));
         const byPageOrder = (a, b) =>
@@ -252,7 +217,7 @@ const ProductTable = forwardRef(
         setLoading(false);
       };
       loadFilteredPaginated();
-    }, [filters, refreshFlag, fetchMatchingProductIds, fetchPaginatedProducts]);
+    }, [debouncedFilters, refreshFlag, fetchMatchingProductIds, fetchPaginatedProducts]);
 
     useEffect(() => {
       const loadPage = async () => {
@@ -379,6 +344,16 @@ const ProductTable = forwardRef(
         return [...remaining, ...updatedVariants];
       });
     };
+
+    // Pre-compute per-product variant lists so each ProductRow gets O(1) lookup
+    const variantsByProduct = useMemo(() => {
+      const map = new Map();
+      for (const v of variants) {
+        if (!map.has(v.productid)) map.set(v.productid, []);
+        map.get(v.productid).push(v);
+      }
+      return map;
+    }, [variants]);
 
     return (
       <div className="overflow-x-auto">
@@ -590,7 +565,7 @@ const ProductTable = forwardRef(
                   key={product.productid}
                   product={product}
                   categories={categories}
-                  variants={variants}
+                  variants={variantsByProduct.get(product.productid) || []}
                   onEdit={handleProductSave}
                 />
               ))

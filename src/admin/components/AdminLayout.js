@@ -55,7 +55,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Top Navigation Bar */}
-      <nav className="bg-white border-b shadow px-6 py-4 flex items-center justify-between">
+      <nav className="sticky top-0 z-[60] bg-white border-b shadow px-6 py-4 flex items-center justify-between">
         <div className="flex space-x-6">
           {navItems.map((item) => (
             <NavLink

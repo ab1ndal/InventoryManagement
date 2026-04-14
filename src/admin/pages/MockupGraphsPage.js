@@ -1,7 +1,10 @@
 // src/admin/pages/MockupOverlayPercentBars.js
 import React, { useEffect, useState } from "react";
-import Plot from "react-plotly.js";
+import createPlotlyComponent from "react-plotly.js/factory";
+import Plotly from "plotly.js-basic-dist-min";
 import { supabase } from "../../lib/supabaseClient";
+
+const Plot = createPlotlyComponent(Plotly);
 
 export default function MockupOverlayPercentBars() {
   const [statsByCat, setStatsByCat] = useState([]);
