@@ -74,7 +74,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [isSaving, setIsSaving] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [selectedSalespersonIds, setSelectedSalespersonIds] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const invoiceRef = useRef(null);
@@ -83,12 +82,18 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [salespersonNames, setSalespersonNames] = useState([]);
   const [billDate, setBillDate] = useState(null);
   const [effectiveBillId, setEffectiveBillId] = useState(null);
+  const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
+  const [isBackdated, setIsBackdated] = useState(false);
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
   const [customerStoreCreditBalance, setCustomerStoreCreditBalance] = useState(0);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null); // { voucher_id, value }
   const [voucherError, setVoucherError] = useState("");
   const [voucherLoading, setVoucherLoading] = useState(false);
+  const [salesLocations, setSalesLocations] = useState([]);
+  const [salesMethods, setSalesMethods] = useState([]);
+  const [salesLocationId, setSalesLocationId] = useState(null);
+  const [salesMethodId, setSalesMethodId] = useState(null);
 
   // Reset all form state when the dialog closes. Must NOT include `items` in
   // its dependency array — doing so would cause setItems([]) to create a new
@@ -103,7 +108,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setIsSaving(false);
       setEditingItem(null);
       setSelectedSalespersonIds([]);
-      setPaymentMethod("");
       setPaymentAmount("");
       setCustomerDisplayText("");
       setEffectiveBillId(null);
@@ -113,6 +117,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setAppliedVoucher(null);
       setVoucherError("");
       setVoucherLoading(false);
+      setSalesLocationId(null);
+      setSalesMethodId(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -153,17 +159,25 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   }, [open, billId, items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!open) return;
+    const loadLookups = async () => {
+      const [{ data: locs }, { data: methods }] = await Promise.all([
+        supabase.from("saleslocations").select("saleslocationid, locationname").order("saleslocationid"),
+        supabase.from("salesmethods").select("salesmethodid, methodname").order("salesmethodid"),
+      ]);
+      if (locs) setSalesLocations(locs);
+      if (methods) setSalesMethods(methods);
+    };
+    loadLookups();
+  }, [open]);
+
+  useEffect(() => {
     if (!open || !billId) return;
     const loadBill = async () => {
       try {
-        // Fetch bill header (customerid + notes only — applied_codes fetched separately for resilience)
-        // TODO(WR-05): payment_method and payment_amount are included in this primary query without
-        // the same resilience guard used for applied_codes below. If either column is absent due to
-        // a missing migration the whole query will fail and the bill will not load. Consider moving
-        // payment_method/payment_amount to a separate defensive query like applied_codes.
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select("customerid, notes, payment_method, payment_amount")
+          .select("customerid, notes, payment_amount, saleslocationid, salesmethodid")
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
@@ -192,7 +206,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         // Set form state from bill
         setSelectedCustomerId(bill.customerid || null);
         setNotes(bill.notes || "");
-        setPaymentMethod(bill.payment_method || "");
+        setSalesLocationId(bill.saleslocationid || null);
+        setSalesMethodId(bill.salesmethodid || null);
         setPaymentAmount(bill.payment_amount ?? "");
         setBillDate(new Date());
 
@@ -446,8 +461,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
             taxable_total: computed.taxableTotal,
             applied_codes: selectedCodes,
-            payment_method: paymentMethod || null,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
+            saleslocationid: salesLocationId || null,
+            salesmethodid: salesMethodId || null,
           })
           .eq("billid", billId);
         if (updErr) throw new Error("Failed to update bill: " + updErr.message);
@@ -533,10 +549,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           paymentstatus: "draft",
           finalized: false,
           applied_codes: selectedCodes,
-          payment_method: paymentMethod || null,
           payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
+          saleslocationid: salesLocationId || null,
+          salesmethodid: salesMethodId || null,
         })
-        .select("billid")
+        .select("billid, bill_number")
         .single();
       if (billError) throw new Error("Failed to save bill: " + billError.message);
 
@@ -559,22 +576,24 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         if (spErr) console.error("Failed to save salespersons:", spErr.message);
       }
 
-      // Step E - Decrement stock for inventory items
+      // Step E - Decrement stock for inventory items (skipped for backdated bills)
       const newDraftStockFailures = [];
-      for (const it of inventoryItems) {
-        const currentStock = stockMap[it.variantid]?.stock ?? 0;
-        const { error: stockUpdateErr } = await supabase
-          .from("productsizecolors")
-          .update({ stock: currentStock - it.quantity })
-          .eq("variantid", it.variantid);
-        if (stockUpdateErr) {
-          console.error("Stock update failed for", it.variantid, stockUpdateErr);
-          newDraftStockFailures.push(it.variantid);
+      if (!isBackdated) {
+        for (const it of inventoryItems) {
+          const currentStock = stockMap[it.variantid]?.stock ?? 0;
+          const { error: stockUpdateErr } = await supabase
+            .from("productsizecolors")
+            .update({ stock: currentStock - it.quantity })
+            .eq("variantid", it.variantid);
+          if (stockUpdateErr) {
+            console.error("Stock update failed for", it.variantid, stockUpdateErr);
+            newDraftStockFailures.push(it.variantid);
+          }
         }
       }
 
       // Step F - Success
-      toast.success(`Draft saved — Bill #${bill.billid}`);
+      toast.success(`Draft saved — Bill #${bill.bill_number || bill.billid}`);
       if (newDraftStockFailures.length > 0) {
         toast.error("Stock sync warning", {
           description: `Stock could not be updated for ${newDraftStockFailures.length} variant(s). Please recheck inventory.`,
@@ -597,7 +616,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     }
     // Validate payment fields
     const paidAmt = Number(paymentAmount);
-    if (!paymentMethod || !paymentAmount) {
+    if (!salesMethodId || !paymentAmount) {
       toast.error("Payment required", { description: "Select a payment method and enter the amount received before finalizing." });
       return;
     }
@@ -607,7 +626,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), postVoucher);
     const effectiveGrandTotal = Math.max(0, postVoucher - storeCreditAmt);
 
-    if (Math.abs(paidAmt - effectiveGrandTotal) > 100) {
+    if (!isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
       const diff = (paidAmt - effectiveGrandTotal).toFixed(2);
       const msg = diff > 0
         ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${effectiveGrandTotal.toFixed(2)}).`
@@ -668,14 +687,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             paymentstatus: "finalized",
             finalized: true,
             applied_codes: selectedCodes,
-            payment_method: paymentMethod || null,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
             store_credit_used: storeCreditUsed,
+            saleslocationid: salesLocationId || null,
+            salesmethodid: salesMethodId || null,
           })
           .select("billid")
           .single();
         if (billError) throw new Error("Failed to save bill: " + billError.message);
         activeBillId = bill.billid;
+        setEffectiveBillNumber(bill.bill_number || null);
 
         // Insert bill_items
         const billItemsPayload = buildBillItemsPayload(activeBillId, items);
@@ -692,14 +713,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           if (spErr) console.error("Failed to save salespersons:", spErr.message);
         }
 
-        // Decrement stock
-        for (const it of inventoryItems) {
-          const currentStock = stockMap[it.variantid]?.stock ?? 0;
-          const { error: stockUpdateErr } = await supabase
-            .from("productsizecolors")
-            .update({ stock: currentStock - it.quantity })
-            .eq("variantid", it.variantid);
-          if (stockUpdateErr) console.error("Stock update failed for", it.variantid, stockUpdateErr);
+        // Decrement stock (skipped for backdated bills)
+        if (!isBackdated) {
+          for (const it of inventoryItems) {
+            const currentStock = stockMap[it.variantid]?.stock ?? 0;
+            const { error: stockUpdateErr } = await supabase
+              .from("productsizecolors")
+              .update({ stock: currentStock - it.quantity })
+              .eq("variantid", it.variantid);
+            if (stockUpdateErr) console.error("Stock update failed for", it.variantid, stockUpdateErr);
+          }
         }
 
         // Force InvoiceView to render with new bill ID before PDF capture
@@ -711,7 +734,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           .update({
             finalized: true,
             paymentstatus: 'finalized',
-            payment_method: paymentMethod,
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,
           })
@@ -935,25 +957,58 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               )}
             </section>
 
-            {/* Notes */}
-            <Notes notes={notes} setNotes={setNotes} />
-
-            {/* Payment */}
+            {/* Sale Context */}
             <section className="space-y-2">
-              <Label>Payment</Label>
+              <Label>Sale Details</Label>
               <div className="grid grid-cols-2 gap-2">
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <Select value={salesLocationId ? String(salesLocationId) : ""} onValueChange={(v) => setSalesLocationId(Number(v))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salesLocations.map((l) => (
+                      <SelectItem key={l.saleslocationid} value={String(l.saleslocationid)}>
+                        {l.locationname}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={salesMethodId ? String(salesMethodId) : ""} onValueChange={(v) => setSalesMethodId(Number(v))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Payment method" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="upi">UPI</SelectItem>
-                    <SelectItem value="mixed">Mixed</SelectItem>
+                    {salesMethods.map((m) => (
+                      <SelectItem key={m.salesmethodid} value={String(m.salesmethodid)}>
+                        {m.methodname}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                <div className="relative">
+              </div>
+            </section>
+
+            {/* Notes */}
+            <Notes notes={notes} setNotes={setNotes} />
+
+            {/* Backdated bill */}
+            <section className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="backdated-bill"
+                checked={isBackdated}
+                onChange={(e) => setIsBackdated(e.target.checked)}
+                className="h-4 w-4 cursor-pointer"
+              />
+              <Label htmlFor="backdated-bill" className="cursor-pointer text-sm font-normal">
+                Backdated bill (skip stock decrement)
+              </Label>
+            </section>
+
+            {/* Payment */}
+            <section className="space-y-2">
+              <Label>Payment Amount</Label>
+              <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">₹</span>
                   <Input
                     type="number"
@@ -963,7 +1018,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
                     onChange={(e) => setPaymentAmount(e.target.value)}
                   />
                 </div>
-              </div>
             </section>
 
             {/* Summary */}
@@ -1001,15 +1055,18 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         <InvoiceView
           ref={invoiceRef}
           billId={effectiveBillId ?? billId}
+          billNumber={effectiveBillNumber}
           billDate={billDate ?? new Date()}
           customerName={customerName}
           salespersonNames={salespersonNames}
           items={items}
           computed={computed}
-          paymentMethod={paymentMethod}
+          paymentMethod={salesMethods.find(m => m.salesmethodid === salesMethodId)?.methodname || ""}
           paymentAmount={paymentAmount}
           appliedCodes={selectedCodes}
           allDiscounts={allDiscounts}
+          appliedVoucher={appliedVoucher}
+          appliedStoreCredit={appliedStoreCredit}
         />
       </div>
     )}
@@ -1034,7 +1091,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           {(Number(appliedVoucher?.value ?? 0) > 0 || Number(appliedStoreCredit || 0) > 0) && (
             <div><span className="font-semibold">Net Total:</span> ₹{Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal) - Math.min(Number(appliedStoreCredit || 0), Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal)))).toFixed(2)}</div>
           )}
-          <div><span className="font-semibold">Payment Method:</span> {paymentMethod}</div>
+          <div><span className="font-semibold">Payment Method:</span> {salesMethods.find(m => m.salesmethodid === salesMethodId)?.methodname || ""}</div>
           <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>
         </div>
         <div className="flex justify-end gap-2 pt-4">

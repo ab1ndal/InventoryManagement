@@ -51,14 +51,18 @@ export function computeBillTotals(items, selectedCodes, allDiscounts) {
     priced.reduce((s, p) => s + p.withCharges, 0)
   );
 
-  const overallDiscount = round2(
-    applyOverallDiscounts(items, selectedCodes, allDiscounts)
-  );
-  const taxableTotal = Math.max(0, round2(preOverallTaxable - overallDiscount));
+  // Separate gst_off codes — handled post-GST-computation to truly zero out GST
+  const codes = selectedCodes || [];
+  const discounts = allDiscounts || [];
+  const gstOffCodes = codes.filter(c => discounts.find(d => d.code === c && d.type === 'gst_off'));
+  const nonGstOffCodes = codes.filter(c => !gstOffCodes.includes(c));
+
+  const nonGstOffDiscount = round2(applyOverallDiscounts(items, nonGstOffCodes, discounts));
+  const taxableTotal = Math.max(0, round2(preOverallTaxable - nonGstOffDiscount));
 
   const itemTaxables = items.map((it) => priceItem(it).withCharges);
   const totalTaxableBefore = preOverallTaxable || 1;
-  const gstTotal = round2(
+  const rawGst = round2(
     items.reduce((sum, it, idx) => {
       const share = itemTaxables[idx] / totalTaxableBefore;
       const reducedTaxable = taxableTotal * share;
@@ -67,14 +71,20 @@ export function computeBillTotals(items, selectedCodes, allDiscounts) {
     }, 0)
   );
 
+  const hasGstOff = gstOffCodes.length > 0;
+  const gstTotal = hasGstOff ? 0 : rawGst;
+  const overallDiscount = round2(nonGstOffDiscount + (hasGstOff ? rawGst : 0));
   const grandTotal = round2(taxableTotal + gstTotal);
+
   return {
     itemsSubtotal,
     itemLevelDiscountTotal,
+    preOverallTaxable,
     overallDiscount,
     taxableTotal,
     gstTotal,
     grandTotal,
+    gstOffSavings: hasGstOff ? rawGst : 0,
   };
 }
 
@@ -132,8 +142,9 @@ function matchesCategories(it, d) {
   return true; // no filter → all items
 }
 
-function valueOfDiscount(d, items) {
+export function valueOfDiscount(d, items) {
   const total = items.reduce((s, it) => s + priceItem(it).withCharges, 0);
+  if (Number(d.min_total || 0) > 0 && total < Number(d.min_total)) return 0;
   switch (d.type) {
     case "flat":
       return clampMax(Number(d.value || 0), d.max_discount);
@@ -150,8 +161,6 @@ function valueOfDiscount(d, items) {
       );
     }
     case "fixed_price": {
-      // Per-item fixed pricing: each qualifying item is repriced to rules.fixed_total.
-      // Qualifying = matches category filter AND MRP is within [min_price, max_price] bounds.
       const r = d.rules || {};
       const fixedPerItem = Number(r.fixed_total || 0);
       const minPrice = r.min_price != null ? Number(r.min_price) : null;
@@ -171,8 +180,6 @@ function valueOfDiscount(d, items) {
       return clampMax(round2(totalDiscount), d.max_discount);
     }
     case "bundled_pricing": {
-      // Customer buys bundle_qty items from qualifying categories at a fixed bundle_price.
-      // Discount = sum of cheapest bundle_qty item units − bundle_price (if enough items exist).
       const r = d.rules || {};
       const bundleQty = Number(r.bundle_qty || 1);
       const bundlePrice = Number(r.bundle_price || 0);
@@ -196,6 +203,9 @@ function valueOfDiscount(d, items) {
       const val = Number(r.value || d.value || 0);
       return total >= minTotal ? clampMax(val, d.max_discount) : 0;
     }
+    case "gst_off":
+      // Handled specially in computeBillTotals — valueOfDiscount returns 0 to avoid double-counting
+      return 0;
     default:
       return 0;
   }

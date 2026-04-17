@@ -4,12 +4,15 @@ import { flushSync } from "react-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Pencil, FileText, Trash2, Ban } from "lucide-react";
+import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw } from "lucide-react";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import ReturnReceiptView from "./billing/ReturnReceiptView";
+import InvoiceView from "./billing/InvoiceView";
 import { generateInvoicePdf } from "./billing/generateInvoicePdf";
+import { computeBillTotals } from "./billing/billUtils";
+import { backCalcDiscountPct } from "./billing/stockHelpers";
 
 const ROWS_PER_PAGE = 15;
 
@@ -26,6 +29,150 @@ export default function BillTable({ onEdit }) {
   const [cancelSaving, setCancelSaving] = useState(false);
   const [receiptBill, setReceiptBill] = useState(null);
   const receiptRef = useRef(null);
+  const [regenBillData, setRegenBillData] = useState(null);
+  const regenRef = useRef(null);
+  const [regeningBills, setRegeningBills] = useState(new Set());
+
+  const handleRegenPdf = async (bill) => {
+    const { billid: billId } = bill;
+    setRegeningBills((prev) => new Set(prev).add(billId));
+    try {
+      // Fetch bill core data
+      const { data: billRow, error: billErr } = await supabase
+        .from("bills")
+        .select("applied_codes, payment_amount, saleslocationid, salesmethodid, store_credit_used, orderdate, customerid, bill_number")
+        .eq("billid", billId)
+        .single();
+      if (billErr) throw billErr;
+
+      // Fetch bill items
+      const { data: billItems } = await supabase.from("bill_items").select("*").eq("billid", billId);
+
+      // Fetch variants
+      const inventoryItems = (billItems || []).filter(bi => bi.variantid);
+      let variantMap = {};
+      if (inventoryItems.length > 0) {
+        const { data: variants } = await supabase
+          .from("productsizecolors").select("variantid, size, color")
+          .in("variantid", inventoryItems.map(bi => bi.variantid));
+        variantMap = Object.fromEntries((variants || []).map(v => [v.variantid, v]));
+      }
+
+      // Fetch manual items
+      const manualItems = (billItems || []).filter(bi => !bi.variantid && bi.product_code);
+      let manualMap = {};
+      if (manualItems.length > 0) {
+        const { data: manuals } = await supabase
+          .from("manual_items").select("manual_item_id, size, color")
+          .in("manual_item_id", manualItems.map(bi => bi.product_code));
+        manualMap = Object.fromEntries((manuals || []).map(m => [m.manual_item_id, m]));
+      }
+
+      const items = (billItems || []).map(bi => ({
+        _id: String(bi.bill_item_id),
+        source: bi.variantid ? "inventory" : "manual",
+        variantid: bi.variantid || null,
+        productid: bi.product_code || null,
+        product_name: bi.product_name || "",
+        category: bi.category || null,
+        quantity: bi.quantity,
+        mrp: bi.mrp,
+        alteration_charge: bi.alteration_charge || 0,
+        quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
+        gstRate: bi.gst_rate ?? 18,
+        size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
+        color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
+      }));
+
+      // Fetch discounts matching applied codes
+      const appliedCodes = billRow.applied_codes || [];
+      let allDiscounts = [];
+      if (appliedCodes.length > 0) {
+        const { data: discData } = await supabase
+          .from("discounts").select("id, code, type, value, max_discount, category, exclusive, auto_apply, min_total, start_date, end_date, active, rules")
+          .in("code", appliedCodes);
+        allDiscounts = discData || [];
+      }
+
+      // Customer name
+      let customerName = "";
+      if (billRow.customerid) {
+        const { data: cust } = await supabase
+          .from("customers").select("first_name, last_name").eq("customerid", billRow.customerid).single();
+        if (cust) customerName = `${cust.first_name} ${cust.last_name}`;
+      }
+
+      // Salesperson names
+      const { data: spData } = await supabase
+        .from("bill_salespersons").select("salesperson_id").eq("billid", billId);
+      let salespersonNames = [];
+      if (spData?.length) {
+        const { data: spNames } = await supabase
+          .from("salespersons").select("name").in("salesperson_id", spData.map(r => r.salesperson_id));
+        salespersonNames = (spNames || []).map(r => r.name);
+      }
+
+      // Payment method name
+      let paymentMethod = "";
+      if (billRow.salesmethodid) {
+        const { data: meth } = await supabase
+          .from("salesmethods").select("methodname").eq("salesmethodid", billRow.salesmethodid).single();
+        paymentMethod = meth?.methodname || "";
+      }
+
+      // Voucher (if any)
+      let appliedVoucher = null;
+      const { data: voucherRow } = await supabase
+        .from("vouchers").select("voucher_id, value").eq("redeemed_billid", billId).maybeSingle();
+      if (voucherRow) appliedVoucher = { voucher_id: voucherRow.voucher_id, value: Number(voucherRow.value ?? 0) };
+
+      const computed = computeBillTotals(items, appliedCodes, allDiscounts);
+
+      flushSync(() => setRegenBillData({
+        billId,
+        billNumber: billRow.bill_number || null,
+        billDate: new Date(billRow.orderdate),
+        customerName,
+        salespersonNames,
+        items,
+        computed,
+        paymentMethod,
+        paymentAmount: billRow.payment_amount ?? 0,
+        appliedCodes,
+        allDiscounts,
+        appliedVoucher,
+        appliedStoreCredit: Number(billRow.store_credit_used ?? 0),
+      }));
+
+      if (!regenRef.current) throw new Error("Invoice ref missing");
+      const blob = await generateInvoicePdf(regenRef.current);
+      // Use versioned filename so each regen gets a guaranteed-fresh URL (no CDN/browser cache)
+      const newPath = `bill-${billId}-v${Date.now()}.pdf`;
+      // Delete legacy path and any previous versioned file stored in pdf_url
+      const oldPaths = [`bill-${billId}.pdf`];
+      if (bill.pdf_url) {
+        const stored = decodeURIComponent(bill.pdf_url.split('/invoices/')[1]?.split('?')[0] || '');
+        if (stored && stored !== `bill-${billId}.pdf`) oldPaths.push(stored);
+      }
+      await supabase.storage.from("invoices").remove(oldPaths);
+      const { error: upErr } = await supabase.storage
+        .from("invoices").upload(newPath, blob, { contentType: "application/pdf" });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("invoices").getPublicUrl(newPath);
+      const pdfUrl = urlData?.publicUrl ?? null;
+      if (pdfUrl) {
+        await supabase.from("bills").update({ pdf_url: pdfUrl }).eq("billid", billId);
+        setBills((prev) => prev.map((b) => b.billid === billId ? { ...b, pdf_url: pdfUrl } : b));
+        window.open(pdfUrl, "_blank");
+      }
+      toast({ title: `PDF regenerated for Bill #${billId}` });
+    } catch (e) {
+      toast({ title: "PDF generation failed", description: e.message, variant: "destructive" });
+    } finally {
+      setRegenBillData(null);
+      setRegeningBills((prev) => { const s = new Set(prev); s.delete(billId); return s; });
+    }
+  };
 
   useEffect(() => {
     const loadBills = async () => {
@@ -400,7 +547,7 @@ export default function BillTable({ onEdit }) {
                     {b.customers ? `${b.customers.first_name} ${b.customers.last_name}` : "—"}
                   </td>
                   <td className="p-2">
-                    {b.orderdate ? new Date(b.orderdate).toLocaleString() : "—"}
+                    {b.orderdate ? new Date(b.orderdate).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
                   </td>
                   <td className="p-2 text-right">
                     ₹{(b.totalamount || 0).toFixed(2)}
@@ -440,6 +587,19 @@ export default function BillTable({ onEdit }) {
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
+                      {b.finalized && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={regeningBills.has(b.billid)}
+                          title="Regenerate PDF"
+                          onClick={() => handleRegenPdf(b)}
+                        >
+                          {regeningBills.has(b.billid)
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <RefreshCw className="h-4 w-4" />}
+                        </Button>
+                      )}
                       {b.paymentstatus !== "cancelled" && (
                         <Button
                           size="icon"
@@ -523,7 +683,7 @@ export default function BillTable({ onEdit }) {
               </div>
               <div>
                 <span className="font-semibold">Date:</span>{" "}
-                {cancelBill.orderdate ? new Date(cancelBill.orderdate).toLocaleString() : "—"}
+                {cancelBill.orderdate ? new Date(cancelBill.orderdate).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
               </div>
               <div>
                 <span className="font-semibold">Grand Total:</span> ₹{Number(cancelBill.totalamount ?? 0).toFixed(2)}
@@ -593,6 +753,28 @@ export default function BillTable({ onEdit }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Off-screen InvoiceView for PDF regen */}
+      {regenBillData && (
+        <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
+          <InvoiceView
+            ref={regenRef}
+            billId={regenBillData.billId}
+            billNumber={regenBillData.billNumber}
+            billDate={regenBillData.billDate}
+            customerName={regenBillData.customerName}
+            salespersonNames={regenBillData.salespersonNames}
+            items={regenBillData.items}
+            computed={regenBillData.computed}
+            paymentMethod={regenBillData.paymentMethod}
+            paymentAmount={regenBillData.paymentAmount}
+            appliedCodes={regenBillData.appliedCodes}
+            allDiscounts={regenBillData.allDiscounts}
+            appliedVoucher={regenBillData.appliedVoucher}
+            appliedStoreCredit={regenBillData.appliedStoreCredit}
+          />
+        </div>
+      )}
 
       {/* Off-screen ReturnReceiptView for PDF capture */}
       {receiptBill && (
