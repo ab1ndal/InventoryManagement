@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
-import { computeBillTotals, priceItem } from "./billUtils";
+import { computeBillTotals, computePreTaxBalanceDiscount, priceItem } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -80,10 +80,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [customerName, setCustomerName] = useState("");
   const [customerDisplayText, setCustomerDisplayText] = useState("");
   const [salespersonNames, setSalespersonNames] = useState([]);
-  const [billDate, setBillDate] = useState(null);
   const [effectiveBillId, setEffectiveBillId] = useState(null);
   const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
   const [isBackdated, setIsBackdated] = useState(false);
+  const [backdatedDate, setBackdatedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
   const [customerStoreCreditBalance, setCustomerStoreCreditBalance] = useState(0);
   const [voucherCode, setVoucherCode] = useState("");
@@ -119,6 +119,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setVoucherLoading(false);
       setSalesLocationId(null);
       setSalesMethodId(null);
+      setBackdatedDate(new Date().toISOString().split("T")[0]);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -209,7 +210,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         setSalesLocationId(bill.saleslocationid || null);
         setSalesMethodId(bill.salesmethodid || null);
         setPaymentAmount(bill.payment_amount ?? "");
-        setBillDate(new Date());
+        // Restore the saved bill date (from DB orderdate) into the date picker
+        const { data: dateRow } = await supabase
+          .from("bills")
+          .select("orderdate")
+          .eq("billid", billId)
+          .single();
+        if (dateRow?.orderdate) {
+          setBackdatedDate(new Date(dateRow.orderdate).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
+        }
 
         // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts
         const savedCodes = codesRow?.applied_codes;
@@ -332,6 +341,22 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     () => computeBillTotals(items, selectedCodes, allDiscounts),
     [items, selectedCodes, allDiscounts]
   );
+
+  // When payment is less than the effective total, compute a pre-tax balance discount
+  // so the final bill total exactly matches what the customer paid.
+  const balanceAdjustedComputed = useMemo(() => {
+    const paidAmt = Number(paymentAmount);
+    if (!paidAmt || paidAmt <= 0 || computed.grandTotal <= 0) return computed;
+    const voucherAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
+    const postVoucher = Math.max(0, computed.grandTotal - voucherAmt);
+    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), postVoucher);
+    const effectiveGrandTotal = Math.max(0, postVoucher - storeCreditAmt);
+    if (paidAmt >= effectiveGrandTotal) return computed;
+    const shortfall = effectiveGrandTotal - paidAmt;
+    const preDisc = computePreTaxBalanceDiscount(computed, computed.grandTotal - shortfall);
+    if (preDisc <= 0) return computed;
+    return computeBillTotals(items, selectedCodes, allDiscounts, preDisc);
+  }, [computed, paymentAmount, appliedVoucher, appliedStoreCredit, items, selectedCodes, allDiscounts]);
 
   const visibleDiscounts = useMemo(() => {
     if (!selectedCustomerId) return allDiscounts; // D-06: no filter without customer
@@ -552,6 +577,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
           saleslocationid: salesLocationId || null,
           salesmethodid: salesMethodId || null,
+          orderdate: backdatedDate + "T00:00:00+05:30",
         })
         .select("billid, bill_number")
         .single();
@@ -621,8 +647,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       return;
     }
     // Compute effective grand total (D-24 order: voucher before store credit, floor at 0)
-    const voucherAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
-    const postVoucher = Math.max(0, computed.grandTotal - voucherAmt);
+    const voucherAmt = Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal);
+    const postVoucher = Math.max(0, balanceAdjustedComputed.grandTotal - voucherAmt);
     const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), postVoucher);
     const effectiveGrandTotal = Math.max(0, postVoucher - storeCreditAmt);
 
@@ -641,8 +667,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     setIsSaving(true);
     let activeBillId = billId;
     // Compute the consumed store credit (same clamping as Summary)
-    const vAmtForPersist = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
-    const postVForPersist = Math.max(0, computed.grandTotal - vAmtForPersist);
+    const vAmtForPersist = Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal);
+    const postVForPersist = Math.max(0, balanceAdjustedComputed.grandTotal - vAmtForPersist);
     const storeCreditUsed = Math.min(Number(appliedStoreCredit || 0), postVForPersist);
     try {
       if (!activeBillId) {
@@ -663,14 +689,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             .in("variantid", variantIds);
           if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
           stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
-          const outOfStock = inventoryItems.filter(it => (stockMap[it.variantid]?.stock ?? 0) < it.quantity);
-          if (outOfStock.length > 0) {
-            const details = outOfStock.map(it => {
-              const avail = stockMap[it.variantid]?.stock ?? 0;
-              return `${it.product_name} (${stockMap[it.variantid]?.size || ''}/${stockMap[it.variantid]?.color || ''}): requested ${it.quantity}, available ${avail}`;
-            }).join("\n");
-            toast.error("Insufficient stock", { description: details });
-            return;
+          if (!isBackdated) {
+            const outOfStock = inventoryItems.filter(it => (stockMap[it.variantid]?.stock ?? 0) < it.quantity);
+            if (outOfStock.length > 0) {
+              const details = outOfStock.map(it => {
+                const avail = stockMap[it.variantid]?.stock ?? 0;
+                return `${it.product_name} (${stockMap[it.variantid]?.size || ''}/${stockMap[it.variantid]?.color || ''}): requested ${it.quantity}, available ${avail}`;
+              }).join("\n");
+              toast.error("Insufficient stock", { description: details });
+              return;
+            }
           }
         }
 
@@ -680,10 +708,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           .insert({
             customerid: selectedCustomerId || null,
             notes: notes || null,
-            totalamount: computed.grandTotal,
-            gst_total: computed.gstTotal,
-            discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
-            taxable_total: computed.taxableTotal,
+            totalamount: balanceAdjustedComputed.grandTotal,
+            gst_total: balanceAdjustedComputed.gstTotal,
+            discount_total: balanceAdjustedComputed.itemLevelDiscountTotal + balanceAdjustedComputed.overallDiscount + balanceAdjustedComputed.balanceDiscount,
+            taxable_total: balanceAdjustedComputed.taxableTotal,
             paymentstatus: "finalized",
             finalized: true,
             applied_codes: selectedCodes,
@@ -691,15 +719,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             store_credit_used: storeCreditUsed,
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
+            orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .select("billid")
+          .select("billid, bill_number")
           .single();
         if (billError) throw new Error("Failed to save bill: " + billError.message);
         activeBillId = bill.billid;
         setEffectiveBillNumber(bill.bill_number || null);
 
-        // Insert bill_items
-        const billItemsPayload = buildBillItemsPayload(activeBillId, items);
+        // Insert bill_items with balance discount distributed proportionally
+        const billItemsPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount || 0);
         const { error: itemsError } = await supabase.from("bill_items").insert(billItemsPayload);
         if (itemsError) {
           await supabase.from("bills").delete().eq("billid", activeBillId);
@@ -728,7 +757,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         // Force InvoiceView to render with new bill ID before PDF capture
         flushSync(() => setEffectiveBillId(activeBillId));
       } else {
-        // Existing draft: update to finalized
+        // Existing draft: update to finalized with adjusted totals
         const { error: billErr } = await supabase
           .from('bills')
           .update({
@@ -736,9 +765,22 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             paymentstatus: 'finalized',
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,
+            totalamount: balanceAdjustedComputed.grandTotal,
+            gst_total: balanceAdjustedComputed.gstTotal,
+            discount_total: balanceAdjustedComputed.itemLevelDiscountTotal + balanceAdjustedComputed.overallDiscount + balanceAdjustedComputed.balanceDiscount,
+            taxable_total: balanceAdjustedComputed.taxableTotal,
           })
           .eq('billid', activeBillId);
         if (billErr) throw billErr;
+
+        // Redistribute balance discount proportionally across bill_items
+        if ((balanceAdjustedComputed.balanceDiscount || 0) > 0) {
+          const { error: delErr } = await supabase.from("bill_items").delete().eq("billid", activeBillId);
+          if (!delErr) {
+            const updatedPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount);
+            await supabase.from("bill_items").insert(updatedPayload);
+          }
+        }
       }
 
       // Step 3: Insert discount_usage rows for each applied code
@@ -871,11 +913,38 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               />
             </section>
 
+            {/* Bill date + stock control */}
+            <section className="space-y-2">
+              <div className="grid gap-1">
+                <Label>Bill Date</Label>
+                <Input
+                  type="date"
+                  value={backdatedDate}
+                  max={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setBackdatedDate(e.target.value)}
+                  className="w-48"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="backdated-bill"
+                  checked={isBackdated}
+                  onChange={(e) => setIsBackdated(e.target.checked)}
+                  className="h-4 w-4 cursor-pointer"
+                />
+                <Label htmlFor="backdated-bill" className="cursor-pointer text-sm font-normal text-muted-foreground">
+                  Skip stock decrement (backdated entry)
+                </Label>
+              </div>
+            </section>
+
             {/* Items */}
             <section className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Items</Label>
                 <AddItemDialog
+                  isBackdated={isBackdated}
                   onAdd={(item) => setItems((prev) => [...prev, item])}
                 />
               </div>
@@ -892,6 +961,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
                 key={editingItem._id}
                 open={!!editingItem}
                 onOpenChange={(o) => { if (!o) setEditingItem(null); }}
+                isBackdated={isBackdated}
                 editItem={editingItem}
                 onUpdate={(updated) => {
                   setItems((prev) =>
@@ -991,20 +1061,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
             {/* Notes */}
             <Notes notes={notes} setNotes={setNotes} />
 
-            {/* Backdated bill */}
-            <section className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="backdated-bill"
-                checked={isBackdated}
-                onChange={(e) => setIsBackdated(e.target.checked)}
-                className="h-4 w-4 cursor-pointer"
-              />
-              <Label htmlFor="backdated-bill" className="cursor-pointer text-sm font-normal">
-                Backdated bill (skip stock decrement)
-              </Label>
-            </section>
-
             {/* Payment */}
             <section className="space-y-2">
               <Label>Payment Amount</Label>
@@ -1022,7 +1078,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
 
             {/* Summary */}
             <Summary
-              computed={computed}
+              computed={balanceAdjustedComputed}
               appliedStoreCredit={appliedStoreCredit}
               appliedVoucher={appliedVoucher}
               customerStoreCreditBalance={customerStoreCreditBalance}
@@ -1056,11 +1112,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           ref={invoiceRef}
           billId={effectiveBillId ?? billId}
           billNumber={effectiveBillNumber}
-          billDate={billDate ?? new Date()}
+          billDate={new Date(backdatedDate)}
           customerName={customerName}
           salespersonNames={salespersonNames}
           items={items}
-          computed={computed}
+          computed={balanceAdjustedComputed}
           paymentMethod={salesMethods.find(m => m.salesmethodid === salesMethodId)?.methodname || ""}
           paymentAmount={paymentAmount}
           appliedCodes={selectedCodes}
@@ -1081,15 +1137,18 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         <div className="space-y-2 text-sm">
           <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
           <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
-          <div><span className="font-semibold">Grand Total:</span> ₹{computed.grandTotal.toFixed(2)}</div>
+          <div><span className="font-semibold">Grand Total:</span> ₹{balanceAdjustedComputed.grandTotal.toFixed(2)}</div>
+          {balanceAdjustedComputed.balanceDiscount > 0 && (
+            <div><span className="font-semibold">Balance Discount (pre-tax):</span> −₹{balanceAdjustedComputed.balanceDiscount.toFixed(2)}</div>
+          )}
           {Number(appliedVoucher?.value ?? 0) > 0 && (
-            <div><span className="font-semibold">Voucher Applied:</span> −₹{Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal).toFixed(2)}</div>
+            <div><span className="font-semibold">Voucher Applied:</span> −₹{Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal).toFixed(2)}</div>
           )}
           {Number(appliedStoreCredit || 0) > 0 && (
-            <div><span className="font-semibold">Store Credit Applied:</span> −₹{Math.min(Number(appliedStoreCredit || 0), Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal))).toFixed(2)}</div>
+            <div><span className="font-semibold">Store Credit Applied:</span> −₹{Math.min(Number(appliedStoreCredit || 0), Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal))).toFixed(2)}</div>
           )}
           {(Number(appliedVoucher?.value ?? 0) > 0 || Number(appliedStoreCredit || 0) > 0) && (
-            <div><span className="font-semibold">Net Total:</span> ₹{Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal) - Math.min(Number(appliedStoreCredit || 0), Math.max(0, computed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal)))).toFixed(2)}</div>
+            <div><span className="font-semibold">Net Total:</span> ₹{Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal) - Math.min(Number(appliedStoreCredit || 0), Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal)))).toFixed(2)}</div>
           )}
           <div><span className="font-semibold">Payment Method:</span> {salesMethods.find(m => m.salesmethodid === salesMethodId)?.methodname || ""}</div>
           <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>

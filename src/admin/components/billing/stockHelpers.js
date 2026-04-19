@@ -1,6 +1,6 @@
 // Pure helper functions for stock delta computation and bill item payload building
 
-import { priceItem } from "./billUtils";
+import { priceItem, round2 } from "./billUtils";
 
 /**
  * Compute a stock delta map between existing bill items and new inventory items.
@@ -40,9 +40,15 @@ export function computeStockDelta(existingBillItems, newInventoryItems) {
  * @param {Array} items - BillingForm item objects
  * @returns {Array} Array of bill_items insert objects ready for Supabase insert
  */
-export function buildBillItemsPayload(billid, items) {
+export function buildBillItemsPayload(billid, items, balanceDiscount = 0) {
+  const totalWithCharges = items.reduce((s, it) => s + priceItem(it).withCharges, 0);
   return items.map((it) => {
     const priced = priceItem(it);
+    const proportion = totalWithCharges > 0 ? priced.withCharges / totalWithCharges : 1 / Math.max(items.length, 1);
+    const itemBalanceDisc = balanceDiscount > 0 ? round2(balanceDiscount * proportion) : 0;
+    const adjustedSubtotal = round2(priced.withCharges - itemBalanceDisc);
+    const gstRate = Number(it.gstRate ?? 18);
+    const adjustedGst = round2((adjustedSubtotal * gstRate) / 100);
     return {
       billid,
       quantity: it.quantity,
@@ -52,11 +58,11 @@ export function buildBillItemsPayload(billid, items) {
       product_code: it.productid || it.product_code || null,
       category: it.category || null,
       alteration_charge: it.alteration_charge || 0,
-      discount_total: priced.itemDisc,
-      subtotal: priced.subtotal,
-      gst_rate: it.gstRate ?? 18,
-      gst_amount: priced.gst_amount,
-      total: priced.total,
+      discount_total: round2(priced.itemDisc + itemBalanceDisc),
+      subtotal: adjustedSubtotal,
+      gst_rate: gstRate,
+      gst_amount: adjustedGst,
+      total: round2(adjustedSubtotal + adjustedGst),
     };
   });
 }

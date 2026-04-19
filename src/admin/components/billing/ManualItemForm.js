@@ -225,10 +225,13 @@ export default function ManualItemForm({ onAdd, initialVal }) {
             <Input
               type="number"
               min={0}
-              max={100}
+              max={30}
               placeholder="0"
               value={discountPct}
-              onChange={(e) => setDiscountPct(e.target.value)}
+              onChange={(e) => {
+                const v = Math.min(30, Math.max(0, Number(e.target.value) || 0));
+                setDiscountPct(v);
+              }}
             />
           </div>
           <div className="grid gap-1">

@@ -12,6 +12,10 @@ export default function Summary({
   const totalDiscount = round2(
     computed.itemLevelDiscountTotal + computed.overallDiscount
   );
+  const totalPreTaxDiscount = round2(totalDiscount + (computed.balanceDiscount || 0));
+  const discountPct = computed.itemsSubtotal > 0
+    ? round2((totalPreTaxDiscount / computed.itemsSubtotal) * 100)
+    : 0;
 
   // D-24 deduction order: voucher before store credit; both floor at 0
   const voucherAmount = Number(appliedVoucher?.value ?? 0);
@@ -22,7 +26,7 @@ export default function Summary({
   const storeCreditApplied = Math.min(Number(appliedStoreCredit || 0), postVoucherTotal);
   const effectiveGrandTotal = Math.max(0, postVoucherTotal - storeCreditApplied);
 
-  const totalSavings = round2(totalDiscount + voucherApplied + storeCreditApplied);
+  const totalSavings = round2(totalDiscount + (computed.gstOffSavings || 0) + voucherApplied + storeCreditApplied);
 
   return (
     <div className="rounded border p-4 space-y-2 text-sm bg-gray-50">
@@ -42,6 +46,13 @@ export default function Summary({
         <div className="flex justify-between text-red-600">
           <span>Code Discounts</span>
           <span className="tabular-nums">−{money(computed.overallDiscount)}</span>
+        </div>
+      )}
+
+      {computed.balanceDiscount > 0 && (
+        <div className="flex justify-between text-orange-600">
+          <span>Balance Discount (pre-tax)</span>
+          <span className="tabular-nums">−{money(computed.balanceDiscount)}</span>
         </div>
       )}
 
@@ -99,6 +110,20 @@ export default function Summary({
         <span>GST</span>
         <span className="tabular-nums">+{money(computed.gstTotal)}</span>
       </div>
+
+      {computed.gstOffSavings > 0 && (
+        <div className="flex justify-between text-red-600">
+          <span>Special Discount</span>
+          <span className="tabular-nums">−{money(computed.gstOffSavings)}</span>
+        </div>
+      )}
+
+      {totalPreTaxDiscount > 0 && (
+        <div className="flex justify-between text-xs text-muted-foreground border-t pt-1 mt-1">
+          <span>Total Discount</span>
+          <span className="tabular-nums text-red-600">{money(totalPreTaxDiscount)} ({discountPct}% off MRP)</span>
+        </div>
+      )}
 
       <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
         <span>Total</span>

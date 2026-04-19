@@ -45,23 +45,18 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
         {money(item.mrp)}
       </td>
       <td className="px-2 py-1 text-center">
-        <Select
-          value={String(item.quickDiscountPct || 0)}
-          onValueChange={(v) =>
-            onUpdate(item._id, { quickDiscountPct: Number(v) })
+        <Input
+          type="number"
+          min={0}
+          max={30}
+          value={item.quickDiscountPct || 0}
+          onChange={(e) =>
+            onUpdate(item._id, {
+              quickDiscountPct: Math.min(30, Math.max(0, Number(e.target.value) || 0)),
+            })
           }
-        >
-          <SelectTrigger className="h-7 w-20 mx-auto">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[0, 5, 10, 15, 20].map((p) => (
-              <SelectItem key={p} value={String(p)}>
-                {p}%
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          className="h-7 w-16 mx-auto text-center"
+        />
       </td>
       <td className="px-2 py-1 text-center">
         {money(item.alteration_charge) || 0}

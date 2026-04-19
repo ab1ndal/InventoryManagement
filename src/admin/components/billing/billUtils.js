@@ -40,7 +40,14 @@ export function priceItem(it) {
   };
 }
 
-export function computeBillTotals(items, selectedCodes, allDiscounts) {
+export function computePreTaxBalanceDiscount(computed, targetGrandTotal) {
+  if (targetGrandTotal >= computed.grandTotal || computed.taxableTotal <= 0) return 0;
+  const weightedGstRate = computed.gstTotal / computed.taxableTotal;
+  const reduction = computed.grandTotal - targetGrandTotal;
+  return round2(Math.max(0, reduction / (1 + weightedGstRate)));
+}
+
+export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0) {
   const priced = items.map(priceItem);
   // Subtotal = MRP total + alteration charges, before any discounts or GST
   const itemsSubtotal = round2(priced.reduce((s, p) => s + p.base + p.alteration, 0));
@@ -58,7 +65,7 @@ export function computeBillTotals(items, selectedCodes, allDiscounts) {
   const nonGstOffCodes = codes.filter(c => !gstOffCodes.includes(c));
 
   const nonGstOffDiscount = round2(applyOverallDiscounts(items, nonGstOffCodes, discounts));
-  const taxableTotal = Math.max(0, round2(preOverallTaxable - nonGstOffDiscount));
+  const taxableTotal = Math.max(0, round2(preOverallTaxable - nonGstOffDiscount - extraPreTaxDiscount));
 
   const itemTaxables = items.map((it) => priceItem(it).withCharges);
   const totalTaxableBefore = preOverallTaxable || 1;
@@ -66,15 +73,32 @@ export function computeBillTotals(items, selectedCodes, allDiscounts) {
     items.reduce((sum, it, idx) => {
       const share = itemTaxables[idx] / totalTaxableBefore;
       const reducedTaxable = taxableTotal * share;
-      const rate = Number(it.gstRate ?? 18);
+      const qty = Number(it.quantity || 1);
+      const alteration = Number(it.alteration_charge || it.stitching_charge || 0);
+      const cat = it.category || it.manual_category || null;
+
+      // Re-evaluate GST slab after overall discounts are applied.
+      // Slab is based on effective per-piece price (excl. alteration) after all discounts.
+      let rate = Number(it.gstRate ?? 18);
+      if (cat === 'SA' || cat === 'ST') {
+        rate = 5; // unstitched fabric — always 5%
+      } else if (cat !== null) {
+        const garmentTaxable = reducedTaxable - alteration;
+        const effectivePricePerUnit = qty > 0 ? garmentTaxable / qty : 0;
+        if (effectivePricePerUnit > 0) {
+          rate = effectivePricePerUnit <= 2500 ? 5 : 18;
+        }
+      }
+
       return sum + round2((reducedTaxable * rate) / 100);
     }, 0)
   );
 
   const hasGstOff = gstOffCodes.length > 0;
-  const gstTotal = hasGstOff ? 0 : rawGst;
-  const overallDiscount = round2(nonGstOffDiscount + (hasGstOff ? rawGst : 0));
-  const grandTotal = round2(taxableTotal + gstTotal);
+  const gstOffSavings = hasGstOff ? rawGst : 0;
+  const gstTotal = rawGst;
+  const overallDiscount = round2(nonGstOffDiscount);
+  const grandTotal = round2(taxableTotal + rawGst - gstOffSavings);
 
   return {
     itemsSubtotal,
@@ -84,7 +108,8 @@ export function computeBillTotals(items, selectedCodes, allDiscounts) {
     taxableTotal,
     gstTotal,
     grandTotal,
-    gstOffSavings: hasGstOff ? rawGst : 0,
+    gstOffSavings,
+    balanceDiscount: round2(extraPreTaxDiscount),
   };
 }
 

@@ -31,6 +31,7 @@ export default function AddItemDialog({
   onUpdate,
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
+  isBackdated,
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isEditing = !!editItem;
@@ -80,6 +81,7 @@ export default function AddItemDialog({
                   : undefined
               }
               onPicked={handleConfirm}
+              isBackdated={isBackdated}
             />
           </TabsContent>
           <TabsContent value="manual">

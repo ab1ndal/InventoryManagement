@@ -30,15 +30,14 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
       {/* 1. Store Header */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
+          position: "relative",
+          textAlign: "center",
           borderBottom: "1px solid #e5e7eb",
           paddingBottom: "8px",
           marginBottom: "8px",
         }}
       >
-        <img src={logo} alt="Bindal's Creation" style={{ height: "60px", flexShrink: 0 }} />
+        <img src={logo} alt="Bindal's Creation" style={{ position: "absolute", left: 0, top: 0, height: "100%", width: "auto", objectFit: "contain" }} />
         <div>
           <div
             style={{
@@ -79,7 +78,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
         <div style={{ marginBottom: "2px" }}>
           <strong>Original Date:</strong>{" "}
           {originalBillDate
-            ? new Date(originalBillDate).toLocaleDateString("en-GB")
+            ? new Date(originalBillDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
             : "—"}
         </div>
         <div style={{ marginBottom: "2px" }}>
@@ -184,8 +183,8 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
       >
         Issued:{" "}
         {issueDate
-          ? new Date(issueDate).toLocaleDateString("en-GB")
-          : new Date().toLocaleDateString("en-GB")}
+          ? new Date(issueDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
+          : new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
       </div>
 
       {/* 9. Note */}

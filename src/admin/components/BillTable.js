@@ -180,7 +180,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, paymentstatus, finalized, pdf_url",
+          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, paymentstatus, finalized, pdf_url",
           { count: "exact" }
         )
         .order("orderdate", { ascending: false })
@@ -542,21 +542,26 @@ export default function BillTable({ onEdit }) {
             <tbody>
               {bills.map((b) => (
                 <tr key={b.billid} className="border-t">
-                  <td className="p-2">{b.billid}</td>
+                  <td className="p-2">
+                    <div>{b.bill_number || b.billid}</div>
+                    {b.bill_number && <div className="text-xs text-muted-foreground">ID: {b.billid}</div>}
+                  </td>
                   <td className="p-2">
                     {b.customers ? `${b.customers.first_name} ${b.customers.last_name}` : "—"}
                   </td>
                   <td className="p-2">
-                    {b.orderdate ? new Date(b.orderdate).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
+                    {b.orderdate ? new Date(b.orderdate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
                   </td>
                   <td className="p-2 text-right">
-                    ₹{(b.totalamount || 0).toFixed(2)}
+                    ₹{((b.totalamount || 0) + (b.discount_total || 0)).toFixed(2)}
                   </td>
                   <td className="p-2 text-right">
                     ₹{(b.gst_total || 0).toFixed(2)}
                   </td>
                   <td className="p-2 text-right">
-                    ₹{(b.discount_total || 0).toFixed(2)}
+                    {b.discount_total != null && b.discount_total > 0
+                      ? `₹${Number(b.discount_total).toFixed(2)}`
+                      : "—"}
                   </td>
                   <td className="p-2 text-center">
                     <Badge variant={
@@ -683,7 +688,7 @@ export default function BillTable({ onEdit }) {
               </div>
               <div>
                 <span className="font-semibold">Date:</span>{" "}
-                {cancelBill.orderdate ? new Date(cancelBill.orderdate).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
+                {cancelBill.orderdate ? new Date(cancelBill.orderdate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
               </div>
               <div>
                 <span className="font-semibold">Grand Total:</span> ₹{Number(cancelBill.totalamount ?? 0).toFixed(2)}

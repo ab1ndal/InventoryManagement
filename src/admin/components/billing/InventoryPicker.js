@@ -12,7 +12,7 @@ import { Button } from "../../../components/ui/button";
 import { supabase } from "../../../lib/supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
-export default function InventoryPicker({ onPicked, initialVal }) {
+export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
   const isEditing = !!initialVal;
 
   const [query, setQuery] = useState(initialVal?.productid || "");
@@ -88,7 +88,7 @@ export default function InventoryPicker({ onPicked, initialVal }) {
       return;
     }
     const chosenVariant = variants.find((v) => v.variantid === variantId);
-    if (chosenVariant && qty > effectiveStock(chosenVariant)) {
+    if (!isBackdated && chosenVariant && qty > effectiveStock(chosenVariant)) {
       setError(`Only ${effectiveStock(chosenVariant)} left in stock`);
     } else {
       setError("");
@@ -100,19 +100,19 @@ export default function InventoryPicker({ onPicked, initialVal }) {
     if (isEditing) return;
     if (!selected) return;
 
-    const basePrice = selected.retailprice || 0;
-    const totalBase = basePrice * (1 - discount / 100) + Number(alterationCharge);
+    // GST slab is determined by per-piece taxable price (MRP after per-unit discount, excluding alteration)
+    const pricePerPiece = (selected.retailprice || 0) * (1 - discount / 100);
 
     let autoGst = 18;
     if (
       selected.categoryid === "SA" ||
       selected.categoryid === "ST" ||
-      totalBase < 2500
+      pricePerPiece <= 2500
     ) {
       autoGst = 5;
     }
     setGstRate(autoGst);
-  }, [selected, qty, discount, alterationCharge, isEditing]);
+  }, [selected, discount, isEditing]);
 
   return (
     <div className="grid gap-4">
@@ -169,7 +169,7 @@ export default function InventoryPicker({ onPicked, initialVal }) {
                   <SelectItem
                     key={v.variantid}
                     value={v.variantid}
-                    disabled={effectiveStock(v) <= 0}
+                    disabled={!isBackdated && effectiveStock(v) <= 0}
                   >
                     {v.color} | {v.size} | (Stock: {effectiveStock(v)})
                   </SelectItem>
@@ -203,24 +203,20 @@ export default function InventoryPicker({ onPicked, initialVal }) {
             />
           </div>
 
-          {/* Discount selector */}
+          {/* Discount input */}
           <div className="grid gap-1">
             <Label>Discount (%)</Label>
-            <Select
-              value={String(discount)}
-              onValueChange={(v) => setDiscount(Number(v))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[0, 5, 10, 15, 20].map((p) => (
-                  <SelectItem key={p} value={String(p)}>
-                    {p}%
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              type="number"
+              min={0}
+              max={30}
+              placeholder="0"
+              value={discount}
+              onChange={(e) => {
+                const v = Math.min(30, Math.max(0, Number(e.target.value) || 0));
+                setDiscount(v);
+              }}
+            />
           </div>
 
           {/* GST selector */}
