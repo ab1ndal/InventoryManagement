@@ -389,7 +389,8 @@ const InvoiceView = forwardRef(function InvoiceView(
         ))}
         {Number(computed?.balanceDiscount ?? 0) > 0 && (
           <div style={{ color: "#dc2626" }}>
-            Balance Adjustment: −₹{Number(computed.balanceDiscount).toFixed(2)}
+            Additional Store Discount: −₹
+            {Number(computed.balanceDiscount).toFixed(2)}
           </div>
         )}
         <div style={{ color: "#6b7280", fontSize: "10px", marginTop: 2 }}>
