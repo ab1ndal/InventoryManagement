@@ -410,9 +410,7 @@ const InvoiceView = forwardRef(function InvoiceView(
         )}
         {additionalDiscount > 0 && (
           <div style={{ color: "#dc2626" }}>
-            Bill Rounding (
-            {((additionalDiscount / effectiveTotal) * 100).toFixed(1)}% off): −₹
-            {additionalDiscount.toFixed(2)}
+            Bill Rounding: −₹{additionalDiscount.toFixed(2)}
           </div>
         )}
       </div>
