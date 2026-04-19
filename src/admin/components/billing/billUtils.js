@@ -47,7 +47,7 @@ export function computePreTaxBalanceDiscount(computed, targetGrandTotal) {
   return round2(Math.max(0, reduction / (1 + weightedGstRate)));
 }
 
-export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0) {
+export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0, voucherPreTax = 0) {
   const priced = items.map(priceItem);
   // Subtotal = MRP total + alteration charges, before any discounts or GST
   const itemsSubtotal = round2(priced.reduce((s, p) => s + p.base + p.alteration, 0));
@@ -58,14 +58,11 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
     priced.reduce((s, p) => s + p.withCharges, 0)
   );
 
-  // Separate gst_off codes — handled post-GST-computation to truly zero out GST
+  // All codes applied pre-tax — no post-GST special case
   const codes = selectedCodes || [];
   const discounts = allDiscounts || [];
-  const gstOffCodes = codes.filter(c => discounts.find(d => d.code === c && d.type === 'gst_off'));
-  const nonGstOffCodes = codes.filter(c => !gstOffCodes.includes(c));
-
-  const nonGstOffDiscount = round2(applyOverallDiscounts(items, nonGstOffCodes, discounts));
-  const taxableTotal = Math.max(0, round2(preOverallTaxable - nonGstOffDiscount - extraPreTaxDiscount));
+  const overallDiscount = round2(applyOverallDiscounts(items, codes, discounts));
+  const taxableTotal = Math.max(0, round2(preOverallTaxable - overallDiscount - extraPreTaxDiscount - voucherPreTax));
 
   const itemTaxables = items.map((it) => priceItem(it).withCharges);
   const totalTaxableBefore = preOverallTaxable || 1;
@@ -77,11 +74,10 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
       const alteration = Number(it.alteration_charge || it.stitching_charge || 0);
       const cat = it.category || it.manual_category || null;
 
-      // Re-evaluate GST slab after overall discounts are applied.
-      // Slab is based on effective per-piece price (excl. alteration) after all discounts.
+      // Re-evaluate GST slab after all discounts applied.
       let rate = Number(it.gstRate ?? 18);
       if (cat === 'SA' || cat === 'ST') {
-        rate = 5; // unstitched fabric — always 5%
+        rate = 5;
       } else if (cat !== null) {
         const garmentTaxable = reducedTaxable - alteration;
         const effectivePricePerUnit = qty > 0 ? garmentTaxable / qty : 0;
@@ -94,11 +90,8 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
     }, 0)
   );
 
-  const hasGstOff = gstOffCodes.length > 0;
-  const gstOffSavings = hasGstOff ? rawGst : 0;
   const gstTotal = rawGst;
-  const overallDiscount = round2(nonGstOffDiscount);
-  const grandTotal = round2(taxableTotal + rawGst - gstOffSavings);
+  const grandTotal = round2(taxableTotal + rawGst);
 
   return {
     itemsSubtotal,
@@ -108,8 +101,9 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
     taxableTotal,
     gstTotal,
     grandTotal,
-    gstOffSavings,
+    gstOffSavings: 0,
     balanceDiscount: round2(extraPreTaxDiscount),
+    voucherPreTax: round2(voucherPreTax),
   };
 }
 
@@ -228,9 +222,15 @@ export function valueOfDiscount(d, items) {
       const val = Number(r.value || d.value || 0);
       return total >= minTotal ? clampMax(val, d.max_discount) : 0;
     }
-    case "gst_off":
-      // Handled specially in computeBillTotals — valueOfDiscount returns 0 to avoid double-counting
-      return 0;
+    case "gst_off": {
+      // Pre-tax equivalent: discount that absorbs GST per item (taxable * rate / (100 + rate))
+      const gstOffAmt = round2(items.reduce((s, it) => {
+        const p = priceItem(it);
+        const rate = Number(it.gstRate ?? 18);
+        return s + round2(p.withCharges * rate / (100 + rate));
+      }, 0));
+      return clampMax(gstOffAmt, d.max_discount);
+    }
     default:
       return 0;
   }

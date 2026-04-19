@@ -154,7 +154,8 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
       {selected && (
         <>
           <div className="text-sm text-muted-foreground">
-            {selected.name} — MRP: ₹{selected.retailprice?.toLocaleString("en-IN")}
+            {selected.name} — MRP: ₹
+            {selected.retailprice?.toLocaleString("en-IN")}
           </div>
 
           {/* Variant selector */}
@@ -212,9 +213,11 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
               max={30}
               placeholder="0"
               value={discount}
-              onChange={(e) => {
-                const v = Math.min(30, Math.max(0, Number(e.target.value) || 0));
-                setDiscount(v);
+              onFocus={() => { if (Number(discount) === 0) setDiscount(""); }}
+              onChange={(e) => setDiscount(e.target.value)}
+              onBlur={() => {
+                const num = Math.min(30, Math.max(0, Number(discount) || 0));
+                setDiscount(num);
               }}
             />
           </div>
@@ -239,7 +242,9 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
           <Button
             disabled={!variantId || !!error}
             onClick={() => {
-              const chosenVariant = variants.find((v) => v.variantid === variantId);
+              const chosenVariant = variants.find(
+                (v) => v.variantid === variantId,
+              );
               onPicked({
                 _id: uuidv4(),
                 source: "inventory",

@@ -9,24 +9,21 @@ export default function Summary({
   onApplyStoreCredit,
   onRemoveVoucher,
 }) {
+  // voucher is pre-tax (baked into computed.grandTotal via computeBillTotals)
+  const voucherApplied = Number(computed.voucherPreTax ?? 0);
   const totalDiscount = round2(
     computed.itemLevelDiscountTotal + computed.overallDiscount
   );
-  const totalPreTaxDiscount = round2(totalDiscount + (computed.balanceDiscount || 0));
+  const totalPreTaxDiscount = round2(totalDiscount + (computed.balanceDiscount || 0) + voucherApplied);
   const discountPct = computed.itemsSubtotal > 0
     ? round2((totalPreTaxDiscount / computed.itemsSubtotal) * 100)
     : 0;
 
-  // D-24 deduction order: voucher before store credit; both floor at 0
-  const voucherAmount = Number(appliedVoucher?.value ?? 0);
-  const preVoucherTotal = computed.grandTotal;
-  // Voucher applies before store credit; clamp so total floors at 0
-  const voucherApplied = Math.min(voucherAmount, preVoucherTotal);
-  const postVoucherTotal = Math.max(0, preVoucherTotal - voucherApplied);
-  const storeCreditApplied = Math.min(Number(appliedStoreCredit || 0), postVoucherTotal);
-  const effectiveGrandTotal = Math.max(0, postVoucherTotal - storeCreditApplied);
+  // store credit is a customer payment applied after grand total
+  const storeCreditApplied = Math.min(Number(appliedStoreCredit || 0), computed.grandTotal);
+  const effectiveGrandTotal = Math.max(0, computed.grandTotal - storeCreditApplied);
 
-  const totalSavings = round2(totalDiscount + (computed.gstOffSavings || 0) + voucherApplied + storeCreditApplied);
+  const totalSavings = round2(totalPreTaxDiscount + storeCreditApplied);
 
   return (
     <div className="rounded border p-4 space-y-2 text-sm bg-gray-50">
@@ -49,16 +46,9 @@ export default function Summary({
         </div>
       )}
 
-      {computed.balanceDiscount > 0 && (
-        <div className="flex justify-between text-orange-600">
-          <span>Balance Discount (pre-tax)</span>
-          <span className="tabular-nums">−{money(computed.balanceDiscount)}</span>
-        </div>
-      )}
-
       {appliedVoucher && voucherApplied > 0 && (
         <div className="flex justify-between items-center bg-blue-50 border border-blue-200 text-blue-800 rounded px-3 py-1.5 text-sm">
-          <span>Voucher #{appliedVoucher.voucher_id}: {money(voucherApplied)} applied</span>
+          <span>Voucher #{appliedVoucher.voucher_id} (pre-tax): {money(voucherApplied)} applied</span>
           <div className="flex items-center gap-2">
             <span className="tabular-nums">−{money(voucherApplied)}</span>
             {onRemoveVoucher && (
@@ -75,9 +65,40 @@ export default function Summary({
         </div>
       )}
 
+      {computed.balanceDiscount > 0 && (
+        <div className="flex justify-between text-orange-600">
+          <span>Balance Discount (pre-tax)</span>
+          <span className="tabular-nums">−{money(computed.balanceDiscount)}</span>
+        </div>
+      )}
+
+      <div className="flex justify-between text-muted-foreground">
+        <span>GST</span>
+        <span className="tabular-nums">+{money(computed.gstTotal)}</span>
+      </div>
+
+      {totalPreTaxDiscount > 0 && (
+        <div className="flex justify-between text-xs text-muted-foreground border-t pt-1 mt-1">
+          <span>Total Discount</span>
+          <span className="tabular-nums text-red-600">{money(totalPreTaxDiscount)} ({discountPct}% off MRP)</span>
+        </div>
+      )}
+
+      <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
+        <span>Total</span>
+        <div className="text-right">
+          <div className="tabular-nums">{money(computed.grandTotal)}</div>
+          {totalSavings > 0 && (
+            <div className="text-xs font-normal text-green-600 tabular-nums">
+              (You save {money(totalSavings)})
+            </div>
+          )}
+        </div>
+      </div>
+
       {storeCreditApplied > 0 && (
         <div className="flex justify-between items-center bg-green-50 border border-green-200 text-green-800 rounded px-3 py-1.5 text-sm">
-          <span>Store credit applied</span>
+          <span>Paid via Store Credit</span>
           <div className="flex items-center gap-2">
             <span className="tabular-nums">−{money(storeCreditApplied)}</span>
             {onRemoveStoreCredit && (
@@ -106,36 +127,12 @@ export default function Summary({
         </div>
       )}
 
-      <div className="flex justify-between text-muted-foreground">
-        <span>GST</span>
-        <span className="tabular-nums">+{money(computed.gstTotal)}</span>
-      </div>
-
-      {computed.gstOffSavings > 0 && (
-        <div className="flex justify-between text-red-600">
-          <span>Special Discount</span>
-          <span className="tabular-nums">−{money(computed.gstOffSavings)}</span>
+      {storeCreditApplied > 0 && (
+        <div className="flex justify-between font-semibold text-sm border-t pt-1 mt-1">
+          <span>Net Payable</span>
+          <span className="tabular-nums">{money(effectiveGrandTotal)}</span>
         </div>
       )}
-
-      {totalPreTaxDiscount > 0 && (
-        <div className="flex justify-between text-xs text-muted-foreground border-t pt-1 mt-1">
-          <span>Total Discount</span>
-          <span className="tabular-nums text-red-600">{money(totalPreTaxDiscount)} ({discountPct}% off MRP)</span>
-        </div>
-      )}
-
-      <div className="flex justify-between font-bold text-base border-t pt-2 mt-1">
-        <span>Total</span>
-        <div className="text-right">
-          <div className="tabular-nums">{money(effectiveGrandTotal)}</div>
-          {totalSavings > 0 && (
-            <div className="text-xs font-normal text-green-600 tabular-nums">
-              (You save {money(totalSavings)})
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

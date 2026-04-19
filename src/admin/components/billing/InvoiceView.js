@@ -37,32 +37,78 @@ const InvoiceView = forwardRef(function InvoiceView(
   },
   ref,
 ) {
-  // Compute per-line GST breakdown
-  const lineItems = (items || []).map((item, idx) => {
+  // Distribute overall + balance + voucher discounts proportionally (mirrors buildBillItemsPayload)
+  const overallDiscount = Number(computed?.overallDiscount ?? 0);
+  const balanceDiscount = Number(computed?.balanceDiscount ?? 0);
+  const voucherPreTax = Number(
+    computed?.voucherPreTax ?? appliedVoucher?.value ?? 0,
+  );
+  const totalWithCharges = (items || []).reduce((s, item) => {
     const mrp = Number(item.mrp) || 0;
     const qty = Number(item.qty || item.quantity) || 0;
-    const gstRate = Number(item.gstRate) || 0;
     const disc = mrp * qty * ((Number(item.quickDiscountPct) || 0) / 100);
     const alteration = Number(
       item.alteration_charge || item.stitching_charge || 0,
     );
-    const afterDisc = mrp * qty - disc;
-    const withCharges = afterDisc + alteration;
-    const lineGross =
-      gstRate > 0 ? withCharges * (1 + gstRate / 100) : withCharges;
-    const taxable = withCharges;
-    const cgst = (taxable * (gstRate / 2)) / 100;
-    const sgst = (taxable * (gstRate / 2)) / 100;
+    return s + (mrp * qty - disc + alteration);
+  }, 0);
+  // clamp voucher to what's actually deductible pre-tax
+  const effectiveVoucher = Math.min(
+    voucherPreTax,
+    Math.max(0, totalWithCharges - overallDiscount - balanceDiscount),
+  );
+
+  // Compute per-line GST breakdown
+  const lineItems = (items || []).map((item, idx) => {
+    const mrp = Number(item.mrp) || 0;
+    const qty = Number(item.qty || item.quantity) || 0;
+    const disc = mrp * qty * ((Number(item.quickDiscountPct) || 0) / 100);
+    const alteration = Number(
+      item.alteration_charge || item.stitching_charge || 0,
+    );
+    const withCharges = mrp * qty - disc + alteration;
+
+    const proportion =
+      totalWithCharges > 0
+        ? withCharges / totalWithCharges
+        : 1 / Math.max((items || []).length, 1);
+    const itemOverallDisc =
+      overallDiscount > 0 ? overallDiscount * proportion : 0;
+    const itemBalanceDisc =
+      balanceDiscount > 0 ? balanceDiscount * proportion : 0;
+    const itemVoucherDisc =
+      effectiveVoucher > 0 ? effectiveVoucher * proportion : 0;
+    const adjustedTaxable = Math.max(
+      0,
+      withCharges - itemOverallDisc - itemBalanceDisc - itemVoucherDisc,
+    );
+
+    // Re-evaluate GST slab on adjusted per-piece price (mirrors buildBillItemsPayload)
+    let gstRate = Number(item.gstRate) || 0;
+    const cat = item.category || item.manual_category || null;
+    if (cat === "SA" || cat === "ST") {
+      gstRate = 5;
+    } else if (cat !== null) {
+      const garmentTaxable = adjustedTaxable - alteration;
+      const effectivePricePerUnit = qty > 0 ? garmentTaxable / qty : 0;
+      if (effectivePricePerUnit > 0) {
+        gstRate = effectivePricePerUnit <= 2500 ? 5 : 18;
+      }
+    }
+
+    const cgst = (adjustedTaxable * (gstRate / 2)) / 100;
+    const sgst = (adjustedTaxable * (gstRate / 2)) / 100;
+    const lineGross = adjustedTaxable + cgst + sgst;
     return {
       item,
       idx,
       mrp,
       qty,
       gstRate,
-      disc,
+      disc: disc + itemOverallDisc + itemBalanceDisc + itemVoucherDisc,
       alteration,
       lineGross,
-      taxable,
+      taxable: adjustedTaxable,
       cgst,
       sgst,
     };
@@ -91,15 +137,8 @@ const InvoiceView = forwardRef(function InvoiceView(
     computed?.preOverallTaxable ?? computed?.itemsSubtotal ?? 0,
   );
 
-  // Per-discount breakdown — filter to codes that actually yielded a non-zero amount
-  // gst_off codes handled separately below
-  const gstOffCodes = (appliedCodes || []).filter((code) => {
-    const d = (allDiscounts || []).find((d) => d.code === code);
-    return d?.type === "gst_off";
-  });
-
+  // Per-discount breakdown — all codes including gst_off (now pre-tax)
   const appliedDiscountDetails = (appliedCodes || [])
-    .filter((code) => !gstOffCodes.includes(code))
     .map((code) => {
       const d = (allDiscounts || []).find((disc) => disc.code === code);
       if (!d) return null;
@@ -111,15 +150,10 @@ const InvoiceView = forwardRef(function InvoiceView(
     })
     .filter(Boolean);
 
-  const gstOffSavings = Number(computed?.gstOffSavings ?? 0);
-  const hasGstOff = gstOffCodes.length > 0 && gstOffSavings > 0;
-
-  // Voucher / store-credit / net payable
+  // voucher is pre-tax (in grandTotal); store credit is a customer payment
   const grandTotal = Number(computed?.grandTotal ?? 0);
-  const voucherAmt = Math.min(Number(appliedVoucher?.value ?? 0), grandTotal);
-  const postVoucher = Math.max(0, grandTotal - voucherAmt);
-  const storeCreditAmt = Math.min(Number(appliedStoreCredit ?? 0), postVoucher);
-  const effectiveTotal = Math.max(0, postVoucher - storeCreditAmt);
+  const storeCreditAmt = Math.min(Number(appliedStoreCredit ?? 0), grandTotal);
+  const effectiveTotal = Math.max(0, grandTotal - storeCreditAmt);
 
   const paidAmt = Number(paymentAmount ?? 0);
   const shortfall = effectiveTotal - paidAmt;
@@ -127,13 +161,17 @@ const InvoiceView = forwardRef(function InvoiceView(
     paidAmt > 0 && shortfall > 0 && shortfall <= 100 ? shortfall : 0;
   const finalAmountDue = effectiveTotal - additionalDiscount;
 
-  // Total savings = original full price (MRP+GST+alterations) minus what was actually paid
+  // Total savings = item discounts + code discounts + balance discount + voucher + additional store discount
   const itemsSubtotal = Number(computed?.itemsSubtotal ?? 0);
-  const originalFullPrice = lineItems.reduce((s, l) => s + l.lineGross, 0);
   const totalSaved =
-    originalFullPrice > 0 ? originalFullPrice - finalAmountDue : 0;
-  const savingsPct =
-    originalFullPrice > 0 ? (totalSaved / originalFullPrice) * 100 : 0;
+    itemsSubtotal > 0
+      ? Number(computed?.itemLevelDiscountTotal ?? 0) +
+        Number(computed?.overallDiscount ?? 0) +
+        Number(computed?.balanceDiscount ?? 0) +
+        effectiveVoucher +
+        additionalDiscount
+      : 0;
+  const savingsPct = itemsSubtotal > 0 ? (totalSaved / itemsSubtotal) * 100 : 0;
 
   const thStyle = {
     padding: "6px 4px",
@@ -349,11 +387,6 @@ const InvoiceView = forwardRef(function InvoiceView(
             {code} ({pct}% off): −₹{amount.toFixed(2)}
           </div>
         ))}
-        {hasGstOff && (
-          <div style={{ color: "#dc2626" }}>
-            {gstOffCodes.join(", ")} (Special Discount): −₹{gstOffSavings.toFixed(2)}
-          </div>
-        )}
         {Number(computed?.balanceDiscount ?? 0) > 0 && (
           <div style={{ color: "#dc2626" }}>
             Balance Adjustment: −₹{Number(computed.balanceDiscount).toFixed(2)}
@@ -365,24 +398,19 @@ const InvoiceView = forwardRef(function InvoiceView(
         <div style={{ fontSize: "14px", fontWeight: 600, marginTop: 4 }}>
           Grand Total: ₹{grandTotal.toFixed(2)}
         </div>
-        {voucherAmt > 0 && (
-          <div style={{ color: "#dc2626" }}>
-            Voucher #{appliedVoucher.voucher_id}: −₹{voucherAmt.toFixed(2)}
+        {storeCreditAmt > 0 && (
+          <div style={{ color: "#16a34a" }}>
+            Paid via Store Credit: −₹{storeCreditAmt.toFixed(2)}
           </div>
         )}
         {storeCreditAmt > 0 && (
-          <div style={{ color: "#dc2626" }}>
-            Store Credit: −₹{storeCreditAmt.toFixed(2)}
-          </div>
-        )}
-        {(voucherAmt > 0 || storeCreditAmt > 0) && (
           <div style={{ fontWeight: 600 }}>
             Net Payable: ₹{effectiveTotal.toFixed(2)}
           </div>
         )}
         {additionalDiscount > 0 && (
           <div style={{ color: "#dc2626" }}>
-            Additional Store Discount (
+            Bill Rounding (
             {((additionalDiscount / effectiveTotal) * 100).toFixed(1)}% off): −₹
             {additionalDiscount.toFixed(2)}
           </div>
@@ -404,6 +432,11 @@ const InvoiceView = forwardRef(function InvoiceView(
           <strong>Amount Received:</strong> ₹
           {(additionalDiscount > 0 ? finalAmountDue : paidAmt).toFixed(2)}
         </div>
+        {storeCreditAmt > 0 && (
+          <div>
+            <strong>Store Credit Used:</strong> ₹{storeCreditAmt.toFixed(2)}
+          </div>
+        )}
       </div>
 
       {/* Savings callout */}

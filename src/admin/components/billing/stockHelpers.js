@@ -40,14 +40,30 @@ export function computeStockDelta(existingBillItems, newInventoryItems) {
  * @param {Array} items - BillingForm item objects
  * @returns {Array} Array of bill_items insert objects ready for Supabase insert
  */
-export function buildBillItemsPayload(billid, items, balanceDiscount = 0) {
+export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overallDiscount = 0) {
   const totalWithCharges = items.reduce((s, it) => s + priceItem(it).withCharges, 0);
   return items.map((it) => {
     const priced = priceItem(it);
     const proportion = totalWithCharges > 0 ? priced.withCharges / totalWithCharges : 1 / Math.max(items.length, 1);
+    const itemOverallDisc = overallDiscount > 0 ? round2(overallDiscount * proportion) : 0;
     const itemBalanceDisc = balanceDiscount > 0 ? round2(balanceDiscount * proportion) : 0;
-    const adjustedSubtotal = round2(priced.withCharges - itemBalanceDisc);
-    const gstRate = Number(it.gstRate ?? 18);
+    const adjustedSubtotal = round2(priced.withCharges - itemOverallDisc - itemBalanceDisc);
+
+    // Re-evaluate GST slab on effective per-piece price after all discounts
+    const qty = Number(it.quantity || 1);
+    const alteration = Number(it.alteration_charge || it.stitching_charge || 0);
+    const cat = it.category || it.manual_category || null;
+    let gstRate = Number(it.gstRate ?? 18);
+    if (cat === 'SA' || cat === 'ST') {
+      gstRate = 5;
+    } else if (cat !== null) {
+      const garmentTaxable = adjustedSubtotal - alteration;
+      const effectivePricePerUnit = qty > 0 ? garmentTaxable / qty : 0;
+      if (effectivePricePerUnit > 0) {
+        gstRate = effectivePricePerUnit <= 2500 ? 5 : 18;
+      }
+    }
+
     const adjustedGst = round2((adjustedSubtotal * gstRate) / 100);
     return {
       billid,
@@ -58,7 +74,7 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0) {
       product_code: it.productid || it.product_code || null,
       category: it.category || null,
       alteration_charge: it.alteration_charge || 0,
-      discount_total: round2(priced.itemDisc + itemBalanceDisc),
+      discount_total: round2(priced.itemDisc + itemOverallDisc + itemBalanceDisc),
       subtotal: adjustedSubtotal,
       gst_rate: gstRate,
       gst_amount: adjustedGst,

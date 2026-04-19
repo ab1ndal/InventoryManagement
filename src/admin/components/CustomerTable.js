@@ -79,9 +79,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
       return {
         ...c,
         total_spend: agg.total_spend,
-        last_purchased_at: agg.last_purchased_at
-          ? new Date(agg.last_purchased_at).toISOString().slice(0, 10)
-          : null,
+        last_purchased_at: agg.last_purchased_at ?? null,
       };
     });
 

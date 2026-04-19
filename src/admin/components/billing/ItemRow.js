@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Input } from "../../../components/ui/input";
 import {
   Select,
@@ -12,6 +13,7 @@ import { priceItem, money } from "./billUtils";
 
 export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
   const pricing = priceItem(item);
+  const [discountRaw, setDiscountRaw] = useState(null);
 
   return (
     <tr className="border-t text-xs">
@@ -49,12 +51,22 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
           type="number"
           min={0}
           max={30}
-          value={item.quickDiscountPct || 0}
-          onChange={(e) =>
-            onUpdate(item._id, {
-              quickDiscountPct: Math.min(30, Math.max(0, Number(e.target.value) || 0)),
-            })
+          value={
+            discountRaw !== null ? discountRaw : (item.quickDiscountPct ?? "")
           }
+          onFocus={() =>
+            setDiscountRaw(
+              item.quickDiscountPct === 0
+                ? ""
+                : String(item.quickDiscountPct ?? ""),
+            )
+          }
+          onChange={(e) => setDiscountRaw(e.target.value)}
+          onBlur={(e) => {
+            const val = Math.min(30, Math.max(0, Number(e.target.value) || 0));
+            onUpdate(item._id, { quickDiscountPct: val });
+            setDiscountRaw(null);
+          }}
           className="h-7 w-16 mx-auto text-center"
         />
       </td>

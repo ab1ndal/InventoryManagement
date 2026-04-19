@@ -228,9 +228,11 @@ export default function ManualItemForm({ onAdd, initialVal }) {
               max={30}
               placeholder="0"
               value={discountPct}
-              onChange={(e) => {
-                const v = Math.min(30, Math.max(0, Number(e.target.value) || 0));
-                setDiscountPct(v);
+              onFocus={() => { if (Number(discountPct) === 0) setDiscountPct(""); }}
+              onChange={(e) => setDiscountPct(e.target.value)}
+              onBlur={() => {
+                const num = Math.min(30, Math.max(0, Number(discountPct) || 0));
+                setDiscountPct(num);
               }}
             />
           </div>
@@ -265,7 +267,9 @@ export default function ManualItemForm({ onAdd, initialVal }) {
               value={zCode}
               onChange={(e) => setZCode(e.target.value.toUpperCase())}
             />
-            <p className="text-xs text-muted-foreground">Internal only — not shown to customer</p>
+            <p className="text-xs text-muted-foreground">
+              Internal only — not shown to customer
+            </p>
           </div>
         </div>
       </div>

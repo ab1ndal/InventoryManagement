@@ -338,8 +338,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   }, [selectedSalespersonIds]);
 
   const computed = useMemo(
-    () => computeBillTotals(items, selectedCodes, allDiscounts),
-    [items, selectedCodes, allDiscounts]
+    () => computeBillTotals(items, selectedCodes, allDiscounts, 0, Number(appliedVoucher?.value ?? 0)),
+    [items, selectedCodes, allDiscounts, appliedVoucher]
   );
 
   // When payment is less than the effective total, compute a pre-tax balance discount
@@ -347,15 +347,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const balanceAdjustedComputed = useMemo(() => {
     const paidAmt = Number(paymentAmount);
     if (!paidAmt || paidAmt <= 0 || computed.grandTotal <= 0) return computed;
-    const voucherAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
-    const postVoucher = Math.max(0, computed.grandTotal - voucherAmt);
-    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), postVoucher);
-    const effectiveGrandTotal = Math.max(0, postVoucher - storeCreditAmt);
+    // voucher is pre-tax (baked into computed.grandTotal); store credit is a payment method
+    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), computed.grandTotal);
+    const effectiveGrandTotal = Math.max(0, computed.grandTotal - storeCreditAmt);
     if (paidAmt >= effectiveGrandTotal) return computed;
     const shortfall = effectiveGrandTotal - paidAmt;
     const preDisc = computePreTaxBalanceDiscount(computed, computed.grandTotal - shortfall);
     if (preDisc <= 0) return computed;
-    return computeBillTotals(items, selectedCodes, allDiscounts, preDisc);
+    return computeBillTotals(items, selectedCodes, allDiscounts, preDisc, Number(appliedVoucher?.value ?? 0));
   }, [computed, paymentAmount, appliedVoucher, appliedStoreCredit, items, selectedCodes, allDiscounts]);
 
   const visibleDiscounts = useMemo(() => {
@@ -471,7 +470,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         if (delErr) throw new Error("Failed to remove old items: " + delErr.message);
 
         // Step G: Insert new bill_items
-        const billItemsPayload = buildBillItemsPayload(billId, items);
+        const billItemsPayload = buildBillItemsPayload(billId, items, 0, computed.overallDiscount);
         const { error: insErr } = await supabase.from("bill_items").insert(billItemsPayload);
         if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
 
@@ -584,7 +583,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       if (billError) throw new Error("Failed to save bill: " + billError.message);
 
       // Step D - Insert bill_items
-      const billItemsPayload = buildBillItemsPayload(bill.billid, items);
+      const billItemsPayload = buildBillItemsPayload(bill.billid, items, 0, computed.overallDiscount);
       const { error: itemsError } = await supabase.from("bill_items").insert(billItemsPayload);
       if (itemsError) {
         // Best-effort cleanup of dangling bills row (Pitfall 6)
@@ -646,11 +645,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       toast.error("Payment required", { description: "Select a payment method and enter the amount received before finalizing." });
       return;
     }
-    // Compute effective grand total (D-24 order: voucher before store credit, floor at 0)
-    const voucherAmt = Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal);
-    const postVoucher = Math.max(0, balanceAdjustedComputed.grandTotal - voucherAmt);
-    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), postVoucher);
-    const effectiveGrandTotal = Math.max(0, postVoucher - storeCreditAmt);
+    // voucher is pre-tax in grandTotal; store credit is a customer payment
+    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal);
+    const effectiveGrandTotal = Math.max(0, balanceAdjustedComputed.grandTotal - storeCreditAmt);
 
     if (!isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
       const diff = (paidAmt - effectiveGrandTotal).toFixed(2);
@@ -667,9 +664,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     setIsSaving(true);
     let activeBillId = billId;
     // Compute the consumed store credit (same clamping as Summary)
-    const vAmtForPersist = Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal);
-    const postVForPersist = Math.max(0, balanceAdjustedComputed.grandTotal - vAmtForPersist);
-    const storeCreditUsed = Math.min(Number(appliedStoreCredit || 0), postVForPersist);
+    // voucher is pre-tax; store credit is payment deducted from grandTotal
+    const storeCreditUsed = Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal);
     try {
       if (!activeBillId) {
         // New bill: validate, create, and finalize in one step
@@ -728,7 +724,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         setEffectiveBillNumber(bill.bill_number || null);
 
         // Insert bill_items with balance discount distributed proportionally
-        const billItemsPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount || 0);
+        const billItemsPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount || 0, balanceAdjustedComputed.overallDiscount);
         const { error: itemsError } = await supabase.from("bill_items").insert(billItemsPayload);
         if (itemsError) {
           await supabase.from("bills").delete().eq("billid", activeBillId);
@@ -777,7 +773,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         if ((balanceAdjustedComputed.balanceDiscount || 0) > 0) {
           const { error: delErr } = await supabase.from("bill_items").delete().eq("billid", activeBillId);
           if (!delErr) {
-            const updatedPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount);
+            const updatedPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount, balanceAdjustedComputed.overallDiscount);
             await supabase.from("bill_items").insert(updatedPayload);
           }
         }
@@ -810,9 +806,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       // D-18 + D-26: Decrement customer store credit by the amount actually consumed
       if (Number(appliedStoreCredit || 0) > 0) {
         // Recompute effective consumption using the same clamping the Summary uses
-        const vAmt = Math.min(Number(appliedVoucher?.value ?? 0), computed.grandTotal);
-        const postV = Math.max(0, computed.grandTotal - vAmt);
-        const consumed = Math.min(Number(appliedStoreCredit || 0), postV);
+        // voucher is pre-tax, grandTotal already reflects it
+        const consumed = Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal);
         if (consumed > 0) {
           const { data: custCredRow, error: credFetchErr } = await supabase
             .from('customers')
@@ -1141,14 +1136,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           {balanceAdjustedComputed.balanceDiscount > 0 && (
             <div><span className="font-semibold">Balance Discount (pre-tax):</span> −₹{balanceAdjustedComputed.balanceDiscount.toFixed(2)}</div>
           )}
-          {Number(appliedVoucher?.value ?? 0) > 0 && (
-            <div><span className="font-semibold">Voucher Applied:</span> −₹{Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal).toFixed(2)}</div>
+          {Number(appliedStoreCredit || 0) > 0 && (
+            <div><span className="font-semibold">Paid via Store Credit:</span> −₹{Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal).toFixed(2)}</div>
           )}
           {Number(appliedStoreCredit || 0) > 0 && (
-            <div><span className="font-semibold">Store Credit Applied:</span> −₹{Math.min(Number(appliedStoreCredit || 0), Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal))).toFixed(2)}</div>
-          )}
-          {(Number(appliedVoucher?.value ?? 0) > 0 || Number(appliedStoreCredit || 0) > 0) && (
-            <div><span className="font-semibold">Net Total:</span> ₹{Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal) - Math.min(Number(appliedStoreCredit || 0), Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedVoucher?.value ?? 0), balanceAdjustedComputed.grandTotal)))).toFixed(2)}</div>
+            <div><span className="font-semibold">Net Payable:</span> ₹{Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal)).toFixed(2)}</div>
           )}
           <div><span className="font-semibold">Payment Method:</span> {salesMethods.find(m => m.salesmethodid === salesMethodId)?.methodname || ""}</div>
           <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>
