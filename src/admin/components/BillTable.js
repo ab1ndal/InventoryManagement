@@ -14,13 +14,13 @@ import { generateInvoicePdf } from "./billing/generateInvoicePdf";
 import { computeBillTotals } from "./billing/billUtils";
 import { backCalcDiscountPct } from "./billing/stockHelpers";
 
-const ROWS_PER_PAGE = 15;
+const ROWS_PER_PAGE = 50;
 
 export default function BillTable({ onEdit }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [bills, setBills] = useState([]);
-  const [totalCount, setTotalCount] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "" });
   const [cancelBill, setCancelBill] = useState(null);
@@ -180,17 +180,16 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, paymentstatus, finalized, pdf_url",
-          { count: "exact" }
+          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, paymentstatus, finalized, pdf_url"
         )
-        .order("orderdate", { ascending: false })
-        .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE - 1);
+        .order("bill_number", { ascending: false, nullsFirst: false })
+        .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE); // fetch 51 to detect next page
 
       if (filters.search) {
         query = query.eq("billid", filters.search);
       }
 
-      const { data, error, count } = await query;
+      const { data, error } = await query;
       if (error) {
         toast({
           title: "Error loading bills",
@@ -198,8 +197,9 @@ export default function BillTable({ onEdit }) {
           variant: "destructive",
         });
       } else {
-        setBills(data || []);
-        setTotalCount(count || 0);
+        const hasNext = (data || []).length > ROWS_PER_PAGE;
+        setBills((data || []).slice(0, ROWS_PER_PAGE));
+        setHasNextPage(hasNext);
       }
       setLoading(false);
     };
@@ -502,7 +502,6 @@ export default function BillTable({ onEdit }) {
     }
   };
 
-  const totalPages = Math.ceil(totalCount / ROWS_PER_PAGE);
 
   return (
     <div className="space-y-3">
@@ -647,7 +646,7 @@ export default function BillTable({ onEdit }) {
       {/* Pagination */}
       <div className="flex justify-between items-center">
         <div className="text-sm text-muted-foreground">
-          Page {page} of {totalPages || 1}
+          Page {page}
         </div>
         <div className="flex gap-2">
           <Button
@@ -661,7 +660,7 @@ export default function BillTable({ onEdit }) {
           <Button
             variant="outline"
             size="sm"
-            disabled={page >= totalPages}
+            disabled={!hasNextPage}
             onClick={() => setPage((p) => p + 1)}
           >
             Next
