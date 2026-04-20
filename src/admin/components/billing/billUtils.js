@@ -23,13 +23,24 @@ export function normalizeItem(it) {
 }
 
 export function priceItem(it) {
-  const { qty, mrp, quickDiscountPct, alteration, alterGst, gstRate } =
+  const { qty, mrp, quickDiscountPct, alteration, alterGst, gstRate, stitchType } =
     normalizeItem(it);
   const base = mrp * qty;
   const itemDisc = round2((base * quickDiscountPct) / 100);
   const afterDisc = base - itemDisc;
   const withCharges = afterDisc + alteration;         // total pre-tax (item + alter pre-tax)
-  const itemGst = round2((afterDisc * gstRate) / 100);
+
+  let effectiveGstRate = gstRate;
+  if (stitchType === 'unstitched') {
+    effectiveGstRate = 5;
+  } else {
+    const pricePerUnit = qty > 0 ? afterDisc / qty : 0;
+    if (pricePerUnit > 0) {
+      effectiveGstRate = pricePerUnit > 2500 ? 18 : 5;
+    }
+  }
+
+  const itemGst = round2((afterDisc * effectiveGstRate) / 100);
   const gstAmt = round2(itemGst + alterGst);
   const total = round2(withCharges + gstAmt);
   return {
@@ -41,6 +52,7 @@ export function priceItem(it) {
     withCharges,
     subtotal: withCharges,
     gst_amount: gstAmt,
+    gstRate: effectiveGstRate,
     total,
   };
 }

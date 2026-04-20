@@ -83,12 +83,12 @@ const InvoiceView = forwardRef(function InvoiceView(
       withCharges - itemOverallDisc - itemBalanceDisc - itemVoucherDisc,
     );
 
-    // Re-evaluate GST slab on adjusted per-piece price (mirrors buildBillItemsPayload)
+    // Re-evaluate GST slab on adjusted per-piece price (mirrors computeBillTotals)
     let gstRate = Number(item.gstRate) || 0;
-    const cat = item.category || item.manual_category || null;
-    if (cat === "SA" || cat === "ST") {
+    const stitchType = item.stitchType || 'unstitched';
+    if (stitchType === 'unstitched') {
       gstRate = 5;
-    } else if (cat !== null) {
+    } else {
       const garmentTaxable = adjustedTaxable - alteration;
       const effectivePricePerUnit = qty > 0 ? garmentTaxable / qty : 0;
       if (effectivePricePerUnit > 0) {

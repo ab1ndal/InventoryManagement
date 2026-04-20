@@ -75,7 +75,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
       </td>
       <td className="px-2 py-1 text-center">
         <Select
-          value={String(item.gstRate ?? 18)}
+          value={String(pricing.gstRate ?? item.gstRate ?? 18)}
           onValueChange={(v) => onUpdate(item._id, { gstRate: Number(v) })}
         >
           <SelectTrigger className="h-7 w-16 mx-auto">

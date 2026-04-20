@@ -80,6 +80,7 @@ export default function BillTable({ onEdit }) {
         alteration_charge: bi.alteration_charge || 0,
         quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
         gstRate: bi.gst_rate ?? 18,
+        stitchType: bi.stitch_type || 'unstitched',
         size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
         color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
       }));
@@ -147,12 +148,13 @@ export default function BillTable({ onEdit }) {
       if (!regenRef.current) throw new Error("Invoice ref missing");
       const blob = await generateInvoicePdf(regenRef.current);
       // Use versioned filename so each regen gets a guaranteed-fresh URL (no CDN/browser cache)
-      const newPath = `bill-${billId}-v${Date.now()}.pdf`;
+      const billLabel = billRow.bill_number || billId;
+      const newPath = `bill-${billLabel}-v${Date.now()}.pdf`;
       // Delete legacy path and any previous versioned file stored in pdf_url
-      const oldPaths = [`bill-${billId}.pdf`];
+      const oldPaths = [`bill-${billLabel}.pdf`, `bill-${billId}.pdf`];
       if (bill.pdf_url) {
         const stored = decodeURIComponent(bill.pdf_url.split('/invoices/')[1]?.split('?')[0] || '');
-        if (stored && stored !== `bill-${billId}.pdf`) oldPaths.push(stored);
+        if (stored && !oldPaths.includes(stored)) oldPaths.push(stored);
       }
       await supabase.storage.from("invoices").remove(oldPaths);
       const { error: upErr } = await supabase.storage

@@ -179,10 +179,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       try {
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select("customerid, notes, payment_amount, saleslocationid, salesmethodid")
+          .select("customerid, notes, payment_amount, saleslocationid, salesmethodid, bill_number")
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
+        setEffectiveBillNumber(bill.bill_number || null);
 
         // Fetch applied_codes separately — column may not exist if migration not yet run
         const { data: codesRow } = await supabase
@@ -670,6 +671,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const handleConfirmFinalize = async () => {
     setIsSaving(true);
     let activeBillId = billId;
+    let pdfBillNumber = effectiveBillNumber;
     // Compute the consumed store credit (same clamping as Summary)
     // voucher is pre-tax; store credit is payment deducted from grandTotal
     const storeCreditUsed = Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal);
@@ -729,6 +731,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         if (billError) throw new Error("Failed to save bill: " + billError.message);
         activeBillId = bill.billid;
         setEffectiveBillNumber(bill.bill_number || null);
+        pdfBillNumber = bill.bill_number || null;
 
         // Insert bill_items with balance discount distributed proportionally
         const billItemsPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount || 0, balanceAdjustedComputed.overallDiscount);
@@ -837,7 +840,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       try {
         if (!invoiceRef.current) throw new Error("InvoiceView ref missing");
         const blob = await generateInvoicePdf(invoiceRef.current);
-        const path = `bill-${activeBillId}.pdf`;
+        const path = `bill-${pdfBillNumber || activeBillId}.pdf`;
         // Delete before upload so Supabase CDN cache is invalidated (upsert alone doesn't bust cache)
         await supabase.storage.from('invoices').remove([path]);
         const { error: upErr } = await supabase.storage
