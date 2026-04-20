@@ -2,13 +2,6 @@ import { useState, useEffect } from "react";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Button } from "../../../components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "../../../components/ui/select";
 import { supabase } from "../../../lib/supabaseClient";
 import { useToast } from "../../../components/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
@@ -57,7 +50,7 @@ export default function ManualItemForm({ onAdd, initialVal }) {
   const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  // Form fields — mirroring product entry
+  // Form fields
   const [categoryId, setCategoryId] = useState(initialVal?.categoryid || "");
   const [name, setName] = useState(initialVal?.product_name || initialVal?.manual_name || "");
   const [size, setSize] = useState(initialVal?.size || "");
@@ -66,8 +59,8 @@ export default function ManualItemForm({ onAdd, initialVal }) {
   const [mrp, setMrp] = useState(initialVal?.mrp || "");
   const [discountPct, setDiscountPct] = useState(initialVal?.quickDiscountPct ?? 0);
   const [alterationCharge, setAlterationCharge] = useState(initialVal?.alteration_charge || "");
-  const [gstRate, setGstRate] = useState(String(initialVal?.gstRate ?? 18));
-  // Z Code: show encoded if we have a stored cost_price, otherwise blank
+  const [stitchType, setStitchType] = useState(initialVal?.stitchType || 'unstitched');
+  const [gstRate, setGstRate] = useState(String(initialVal?.gstRate ?? 5));
   const [zCode, setZCode] = useState(
     initialVal?.cost_price ? encodePriceToZCode(initialVal.cost_price) : ""
   );
@@ -80,8 +73,6 @@ export default function ManualItemForm({ onAdd, initialVal }) {
       .then(({ data }) => {
         const list = data || [];
         setCategories(list);
-        // When editing, resolve categoryid from the stored category name
-        // (bill_items stores name, not categoryid)
         if (!categoryId && initialVal?.category) {
           const match = list.find((c) => c.name === initialVal.category);
           if (match) setCategoryId(match.categoryid);
@@ -89,6 +80,13 @@ export default function ManualItemForm({ onAdd, initialVal }) {
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-compute GST from stitchType + MRP + discount
+  useEffect(() => {
+    const pricePerPiece = Number(mrp || 0) * (1 - Number(discountPct || 0) / 100);
+    const autoGst = stitchType === 'stitched' && pricePerPiece > 2500 ? 18 : 5;
+    setGstRate(String(autoGst));
+  }, [stitchType, mrp, discountPct]);
 
   async function handleSubmit() {
     if (!name.trim()) return;
@@ -99,10 +97,8 @@ export default function ManualItemForm({ onAdd, initialVal }) {
 
       let manualItemId;
       if (isEditing) {
-        // Editing an existing bill item — reuse the existing BCX ID, don't insert again
         manualItemId = initialVal.productid || initialVal.manual_code || null;
       } else {
-        // New manual item — generate BCX ID and insert into manual_items
         manualItemId = await getNextManualItemId();
         const { error } = await supabase.from("manual_items").insert({
           manual_item_id: manualItemId,
@@ -135,8 +131,8 @@ export default function ManualItemForm({ onAdd, initialVal }) {
         gstRate: Number(gstRate),
         alteration_charge: Number(alterationCharge) || 0,
         cost_price: purchasePrice,
+        stitchType,
       });
-      // Retain values — do not reset state
     } catch (e) {
       toast({ title: "Failed to add item", description: e.message, variant: "destructive" });
     } finally {
@@ -146,27 +142,33 @@ export default function ManualItemForm({ onAdd, initialVal }) {
 
   return (
     <div className="grid gap-4">
+      {/* Stitched / Unstitched toggle */}
+      <div className="grid gap-1">
+        <Label>Item Type</Label>
+        <div className="flex rounded-md border overflow-hidden w-fit">
+          <button
+            type="button"
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${stitchType === 'unstitched' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            onClick={() => setStitchType('unstitched')}
+          >
+            Unstitched
+          </button>
+          <button
+            type="button"
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${stitchType === 'stitched' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            onClick={() => setStitchType('stitched')}
+          >
+            Stitched
+          </button>
+        </div>
+      </div>
+
       {/* Item Details */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
           Item Details
         </p>
         <div className="grid grid-cols-2 gap-2">
-          <div className="grid gap-1">
-            <Label>Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.categoryid} value={c.categoryid}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
           <div className="grid gap-1">
             <Label>
               Product Name <span className="text-destructive">*</span>
@@ -176,6 +178,19 @@ export default function ManualItemForm({ onAdd, initialVal }) {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+          </div>
+          <div className="grid gap-1">
+            <Label>Category (optional)</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">— none —</option>
+              {categories.map((c) => (
+                <option key={c.categoryid} value={c.categoryid}>{c.name}</option>
+              ))}
+            </select>
           </div>
           <div className="grid gap-1">
             <Label>Size</Label>
@@ -225,19 +240,19 @@ export default function ManualItemForm({ onAdd, initialVal }) {
             <Input
               type="number"
               min={0}
-              max={30}
+              max={50}
               placeholder="0"
               value={discountPct}
               onFocus={() => { if (Number(discountPct) === 0) setDiscountPct(""); }}
               onChange={(e) => setDiscountPct(e.target.value)}
               onBlur={() => {
-                const num = Math.min(30, Math.max(0, Number(discountPct) || 0));
+                const num = Math.min(50, Math.max(0, Number(discountPct) || 0));
                 setDiscountPct(num);
               }}
             />
           </div>
           <div className="grid gap-1">
-            <Label>Alteration Charge (Rs)</Label>
+            <Label>Alteration Charge <span className="text-xs text-muted-foreground">(incl. 5% GST)</span></Label>
             <Input
               type="number"
               placeholder="0.00"
@@ -246,19 +261,13 @@ export default function ManualItemForm({ onAdd, initialVal }) {
             />
           </div>
           <div className="grid gap-1">
-            <Label>GST Rate %</Label>
-            <Select value={gstRate} onValueChange={setGstRate}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select GST rate" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">0%</SelectItem>
-                <SelectItem value="5">5%</SelectItem>
-                <SelectItem value="12">12%</SelectItem>
-                <SelectItem value="18">18%</SelectItem>
-                <SelectItem value="28">28%</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>GST Rate (auto)</Label>
+            <div className="flex items-center h-9 px-3 rounded-md border bg-muted text-sm font-medium">
+              {gstRate}%
+              <span className="ml-2 text-xs text-muted-foreground font-normal">
+                {stitchType === 'unstitched' ? 'unstitched' : (Number(gstRate) === 18 ? 'stitched >₹2500' : 'stitched ≤₹2500')}
+              </span>
+            </div>
           </div>
           <div className="grid gap-1">
             <Label>Z Code (Purchase Price)</Label>

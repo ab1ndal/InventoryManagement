@@ -26,6 +26,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
   const [alterationCharge, setAlterationCharge] = useState(
     initialVal?.alteration_charge || 0
   );
+  const [stitchType, setStitchType] = useState(initialVal?.stitchType || 'unstitched');
   const [gstRate, setGstRate] = useState(initialVal?.gstRate || null);
   const [discount, setDiscount] = useState(initialVal?.quickDiscountPct || 0);
 
@@ -72,7 +73,6 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
   }, [selected]);
 
   // When editing, the original variant's stock is effectively higher by the original quantity
-  // (that stock is already reserved by this draft bill, so it's available to reassign)
   const originalVariantId = isEditing ? initialVal?.variantid : null;
   const originalQty = isEditing ? (initialVal?.quantity || 0) : 0;
 
@@ -95,27 +95,38 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
     }
   }, [qty, variantId, variants]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-compute GST only when adding new items (not editing)
+  // Auto-compute GST from stitchType + post-discount price (new items only)
   useEffect(() => {
     if (isEditing) return;
     if (!selected) return;
-
-    // GST slab is determined by per-piece taxable price (MRP after per-unit discount, excluding alteration)
     const pricePerPiece = (selected.retailprice || 0) * (1 - discount / 100);
-
-    let autoGst = 18;
-    if (
-      selected.categoryid === "SA" ||
-      selected.categoryid === "ST" ||
-      pricePerPiece <= 2500
-    ) {
-      autoGst = 5;
-    }
+    const autoGst = stitchType === 'stitched' && pricePerPiece > 2500 ? 18 : 5;
     setGstRate(autoGst);
-  }, [selected, discount, isEditing]);
+  }, [selected, discount, stitchType, isEditing]);
 
   return (
     <div className="grid gap-4">
+      {/* Stitched / Unstitched toggle */}
+      <div className="grid gap-1">
+        <Label>Item Type</Label>
+        <div className="flex rounded-md border overflow-hidden w-fit">
+          <button
+            type="button"
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${stitchType === 'unstitched' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            onClick={() => setStitchType('unstitched')}
+          >
+            Unstitched
+          </button>
+          <button
+            type="button"
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${stitchType === 'stitched' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            onClick={() => setStitchType('stitched')}
+          >
+            Stitched
+          </button>
+        </div>
+      </div>
+
       {/* Product search */}
       <div className="grid gap-1">
         <Label>Product ID</Label>
@@ -192,13 +203,13 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
             {error && <p className="text-red-500 text-sm">{error}</p>}
           </div>
 
-          {/* Alteration charge */}
+          {/* Alteration charge (5% GST inclusive) */}
           <div className="grid gap-1">
-            <Label>Alteration / Stitching Charges</Label>
+            <Label>Alteration / Stitching Charges <span className="text-xs text-muted-foreground">(incl. 5% GST)</span></Label>
             <Input
               type="number"
               min={0}
-              placeholder="Alteration / Stitching Charges"
+              placeholder="0"
               value={alterationCharge}
               onChange={(e) => setAlterationCharge(e.target.value)}
             />
@@ -210,33 +221,27 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
             <Input
               type="number"
               min={0}
-              max={30}
+              max={50}
               placeholder="0"
               value={discount}
               onFocus={() => { if (Number(discount) === 0) setDiscount(""); }}
               onChange={(e) => setDiscount(e.target.value)}
               onBlur={() => {
-                const num = Math.min(30, Math.max(0, Number(discount) || 0));
+                const num = Math.min(50, Math.max(0, Number(discount) || 0));
                 setDiscount(num);
               }}
             />
           </div>
 
-          {/* GST selector */}
+          {/* GST — auto-computed, shown read-only */}
           <div className="grid gap-1">
-            <Label>GST (%)</Label>
-            <Select
-              value={gstRate?.toString()}
-              onValueChange={(val) => setGstRate(Number(val))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select GST %" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5%</SelectItem>
-                <SelectItem value="18">18%</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>GST Rate (auto)</Label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">{gstRate ?? "—"}%</span>
+              <span className="text-xs text-muted-foreground">
+                {stitchType === 'unstitched' ? '(unstitched fabric — 5%)' : `(stitched — ${gstRate === 18 ? '>₹2500 → 18%' : '≤₹2500 → 5%'})`}
+              </span>
+            </div>
           </div>
 
           <Button
@@ -260,6 +265,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
                 quickDiscountPct: Number(discount) || 0,
                 gstRate: gstRate,
                 alteration_charge: Number(alterationCharge) || 0,
+                stitchType,
               });
             }}
           >

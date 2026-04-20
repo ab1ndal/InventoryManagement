@@ -36,35 +36,59 @@ export function computeStockDelta(existingBillItems, newInventoryItems) {
 /**
  * Build the bill_items insert payload from BillingForm items.
  *
+ * Alteration charges are treated as 5% GST-inclusive (as quoted to customer).
+ * GST slab for stitched items is re-evaluated on the post-discount item price.
+ *
  * @param {number} billid - The bill ID to associate items with
- * @param {Array} items - BillingForm item objects
+ * @param {Array} items - BillingForm item objects (must include stitchType)
+ * @param {number} balanceDiscount - Pre-tax balance discount to distribute
+ * @param {number} overallDiscount - Pre-tax overall discount to distribute
  * @returns {Array} Array of bill_items insert objects ready for Supabase insert
  */
 export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overallDiscount = 0) {
-  const totalWithCharges = items.reduce((s, it) => s + priceItem(it).withCharges, 0);
-  return items.map((it) => {
-    const priced = priceItem(it);
-    const proportion = totalWithCharges > 0 ? priced.withCharges / totalWithCharges : 1 / Math.max(items.length, 1);
-    const itemOverallDisc = overallDiscount > 0 ? round2(overallDiscount * proportion) : 0;
-    const itemBalanceDisc = balanceDiscount > 0 ? round2(balanceDiscount * proportion) : 0;
-    const adjustedSubtotal = round2(priced.withCharges - itemOverallDisc - itemBalanceDisc);
+  const pricedItems = items.map(priceItem);
+  const totalWithCharges = pricedItems.reduce((s, p) => s + p.withCharges, 0);
 
-    // Re-evaluate GST slab on effective per-piece price after all discounts
+  return items.map((it, idx) => {
+    const priced = pricedItems[idx];
+    const proportion =
+      totalWithCharges > 0
+        ? priced.withCharges / totalWithCharges
+        : 1 / Math.max(items.length, 1);
+
+    const itemOverallDisc =
+      overallDiscount > 0 ? round2(overallDiscount * proportion) : 0;
+    const itemBalanceDisc =
+      balanceDiscount > 0 ? round2(balanceDiscount * proportion) : 0;
+    const adjustedSubtotal = round2(
+      priced.withCharges - itemOverallDisc - itemBalanceDisc,
+    );
+
+    // Split adjustedSubtotal into item and alteration pre-tax portions
+    const alterProp =
+      priced.withCharges > 0 ? priced.alteration / priced.withCharges : 0;
+    const adjustedAlterPreTax = round2(adjustedSubtotal * alterProp);
+    const adjustedItemPreTax = round2(adjustedSubtotal - adjustedAlterPreTax);
+
+    // Re-evaluate GST slab: unstitched = always 5%; stitched = slab by post-discount price
     const qty = Number(it.quantity || 1);
-    const alteration = Number(it.alteration_charge || it.stitching_charge || 0);
-    const cat = it.category || it.manual_category || null;
+    const stitchType = it.stitchType || "unstitched";
     let gstRate = Number(it.gstRate ?? 18);
-    if (cat === 'SA' || cat === 'ST') {
+    console.log("gstRate", gstRate);
+    console.log("stitchType", stitchType);
+    if (stitchType === "unstitched") {
       gstRate = 5;
-    } else if (cat !== null) {
-      const garmentTaxable = adjustedSubtotal - alteration;
-      const effectivePricePerUnit = qty > 0 ? garmentTaxable / qty : 0;
+    } else {
+      const effectivePricePerUnit = qty > 0 ? adjustedItemPreTax / qty : 0;
       if (effectivePricePerUnit > 0) {
-        gstRate = effectivePricePerUnit <= 2500 ? 5 : 18;
+        gstRate = effectivePricePerUnit > 2500 ? 18 : 5;
       }
     }
 
-    const adjustedGst = round2((adjustedSubtotal * gstRate) / 100);
+    const itemGst = round2((adjustedItemPreTax * gstRate) / 100);
+    const alterGst = round2(adjustedAlterPreTax * 0.05);
+    const adjustedGst = round2(itemGst + alterGst);
+
     return {
       billid,
       quantity: it.quantity,
@@ -73,12 +97,15 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
       product_name: it.product_name || it.name || "",
       product_code: it.productid || it.product_code || null,
       category: it.category || null,
-      alteration_charge: it.alteration_charge || 0,
-      discount_total: round2(priced.itemDisc + itemOverallDisc + itemBalanceDisc),
+      alteration_charge: Number(it.alteration_charge || 0),
+      discount_total: round2(
+        priced.itemDisc + itemOverallDisc + itemBalanceDisc,
+      ),
       subtotal: adjustedSubtotal,
       gst_rate: gstRate,
       gst_amount: adjustedGst,
       total: round2(adjustedSubtotal + adjustedGst),
+      stitch_type: stitchType,
     };
   });
 }

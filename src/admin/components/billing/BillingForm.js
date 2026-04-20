@@ -76,6 +76,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [selectedSalespersonIds, setSelectedSalespersonIds] = useState([]);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [discountWarningAcked, setDiscountWarningAcked] = useState(false);
   const invoiceRef = useRef(null);
   const [customerName, setCustomerName] = useState("");
   const [customerDisplayText, setCustomerDisplayText] = useState("");
@@ -259,6 +260,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           alteration_charge: bi.alteration_charge || 0,
           quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
           gstRate: bi.gst_rate ?? 18,
+          stitchType: bi.stitch_type || (Number(bi.gst_rate) === 18 ? 'stitched' : 'unstitched'),
           size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
           color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
         })));
@@ -430,39 +432,41 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
 
         const newInventoryItems = items.filter(it => it.variantid);
 
-        // Step C: Compute stock delta
-        const deltaMap = computeStockDelta(existingItems || [], newInventoryItems);
-
-        // Step D: Fetch current stock for all affected variants (union of old + new variantids)
-        const allVariantIds = Object.keys(deltaMap);
+        // Stock delta computation + validation skipped for backdated bills
+        let deltaMap = {};
         let stockMap = {};
-        if (allVariantIds.length > 0) {
-          const { data: stockData, error: stockErr } = await supabase
-            .from("productsizecolors")
-            .select("variantid, stock, size, color")
-            .in("variantid", allVariantIds);
-          if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
-          stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
-        }
+        if (!isBackdated) {
+          // Step C: Compute stock delta
+          deltaMap = computeStockDelta(existingItems || [], newInventoryItems);
 
-        // Step E: Validate stock — for items being added or increased, check available stock
-        // Available = current_stock + old_qty_restored (delta for that variant from old items)
-        // We need: final stock = current_stock + delta >= 0
-        const stockErrors = [];
-        for (const [vid, delta] of Object.entries(deltaMap)) {
-          const currentStock = stockMap[vid]?.stock ?? 0;
-          const finalStock = currentStock + delta;
-          if (finalStock < 0) {
-            const item = newInventoryItems.find(it => it.variantid === vid);
-            const name = item?.product_name || vid;
-            const size = stockMap[vid]?.size || "";
-            const color = stockMap[vid]?.color || "";
-            stockErrors.push(`${name} (${size}/${color}): would result in ${finalStock} stock`);
+          // Step D: Fetch current stock for all affected variants
+          const allVariantIds = Object.keys(deltaMap);
+          if (allVariantIds.length > 0) {
+            const { data: stockData, error: stockErr } = await supabase
+              .from("productsizecolors")
+              .select("variantid, stock, size, color")
+              .in("variantid", allVariantIds);
+            if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+            stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
           }
-        }
-        if (stockErrors.length > 0) {
-          toast.error("Insufficient stock", { description: stockErrors.join("\n") });
-          return;
+
+          // Step E: Validate stock
+          const stockErrors = [];
+          for (const [vid, delta] of Object.entries(deltaMap)) {
+            const currentStock = stockMap[vid]?.stock ?? 0;
+            const finalStock = currentStock + delta;
+            if (finalStock < 0) {
+              const item = newInventoryItems.find(it => it.variantid === vid);
+              const name = item?.product_name || vid;
+              const size = stockMap[vid]?.size || "";
+              const color = stockMap[vid]?.color || "";
+              stockErrors.push(`${name} (${size}/${color}): would result in ${finalStock} stock`);
+            }
+          }
+          if (stockErrors.length > 0) {
+            toast.error("Insufficient stock", { description: stockErrors.join("\n") });
+            return;
+          }
         }
 
         // Step F: Delete old bill_items
@@ -501,18 +505,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           if (spInsErr) console.error("Failed to save salespersons:", spInsErr.message);
         }
 
-        // Step I: Apply stock deltas
+        // Step I: Apply stock deltas (skipped for backdated bills)
         const stockFailures = [];
-        for (const [vid, delta] of Object.entries(deltaMap)) {
-          if (delta === 0) continue;
-          const currentStock = stockMap[vid]?.stock ?? 0;
-          const { error: stockUpdateErr } = await supabase
-            .from("productsizecolors")
-            .update({ stock: currentStock + delta })
-            .eq("variantid", vid);
-          if (stockUpdateErr) {
-            console.error("Stock update failed for", vid, stockUpdateErr);
-            stockFailures.push(vid);
+        if (!isBackdated) {
+          for (const [vid, delta] of Object.entries(deltaMap)) {
+            if (delta === 0) continue;
+            const currentStock = stockMap[vid]?.stock ?? 0;
+            const { error: stockUpdateErr } = await supabase
+              .from("productsizecolors")
+              .update({ stock: currentStock + delta })
+              .eq("variantid", vid);
+            if (stockUpdateErr) {
+              console.error("Stock update failed for", vid, stockUpdateErr);
+              stockFailures.push(vid);
+            }
           }
         }
 
@@ -534,10 +540,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         return;
       }
 
-      // Step B - Stock validation per D-01
+      // Step B - Stock validation per D-01 (skipped for backdated bills)
       const inventoryItems = items.filter(it => it.variantid);
       let stockMap = {};
-      if (inventoryItems.length > 0) {
+      if (!isBackdated && inventoryItems.length > 0) {
         const variantIds = inventoryItems.map(it => it.variantid);
         const { data: stockData, error: stockErr } = await supabase
           .from("productsizecolors")
@@ -657,6 +663,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       toast.error("Payment mismatch", { description: msg + " Must be within ₹100." });
       return;
     }
+    setDiscountWarningAcked(false);
     setConfirmOpen(true);
   };
 
@@ -1129,6 +1136,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           <DialogTitle>Confirm Finalize</DialogTitle>
           <DialogDescription>This action cannot be undone.</DialogDescription>
         </DialogHeader>
+        {items.some(it => Number(it.quickDiscountPct || 0) > 30) && (
+          <div className="rounded bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-3 py-2 space-y-2">
+            <p className="font-semibold">Warning: One or more items have a discount above 30%.</p>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={discountWarningAcked}
+                onChange={(e) => setDiscountWarningAcked(e.target.checked)}
+                className="h-4 w-4"
+              />
+              I confirm this discount has been approved.
+            </label>
+          </div>
+        )}
         <div className="space-y-2 text-sm">
           <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
           <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
@@ -1147,7 +1168,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         </div>
         <div className="flex justify-end gap-2 pt-4">
           <Button variant="ghost" disabled={isSaving} onClick={() => setConfirmOpen(false)}>Keep Editing</Button>
-          <Button disabled={isSaving} onClick={handleConfirmFinalize}>{isSaving ? "Saving..." : "Confirm & Finalize"}</Button>
+          <Button
+            disabled={isSaving || (items.some(it => Number(it.quickDiscountPct || 0) > 30) && !discountWarningAcked)}
+            onClick={handleConfirmFinalize}
+          >{isSaving ? "Saving..." : "Confirm & Finalize"}</Button>
         </div>
       </DialogContent>
     </Dialog>

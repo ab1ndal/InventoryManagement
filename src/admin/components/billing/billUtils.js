@@ -9,28 +9,33 @@ export function money(n) {
 }
 
 export function normalizeItem(it) {
+  const alterGross = Number(it.alteration_charge || it.stitching_charge || 0);
+  const alterPreTax = alterGross / 1.05; // alteration is always 5% GST-inclusive
   return {
     qty: Number(it.quantity || 1),
     mrp: Number(it.mrp || 0),
     quickDiscountPct: Number(it.quickDiscountPct || 0),
-    // alteration_charge is the single source of truth; stitching_charge is legacy
-    alteration: Number(it.alteration_charge || it.stitching_charge || 0),
+    alteration: alterPreTax,                    // pre-tax alteration
+    alterGst: round2(alterGross - alterPreTax), // 5% GST on alteration
     gstRate: Number(it.gstRate ?? 18),
+    stitchType: it.stitchType || 'unstitched',
   };
 }
 
 export function priceItem(it) {
-  const { qty, mrp, quickDiscountPct, alteration, gstRate } =
+  const { qty, mrp, quickDiscountPct, alteration, alterGst, gstRate } =
     normalizeItem(it);
   const base = mrp * qty;
   const itemDisc = round2((base * quickDiscountPct) / 100);
   const afterDisc = base - itemDisc;
-  const withCharges = afterDisc + alteration;
-  const gstAmt = round2((withCharges * gstRate) / 100);
+  const withCharges = afterDisc + alteration;         // total pre-tax (item + alter pre-tax)
+  const itemGst = round2((afterDisc * gstRate) / 100);
+  const gstAmt = round2(itemGst + alterGst);
   const total = round2(withCharges + gstAmt);
   return {
     base,
     alteration,
+    alterGst,
     itemDisc,
     afterDisc,
     withCharges,
@@ -48,45 +53,50 @@ export function computePreTaxBalanceDiscount(computed, targetGrandTotal) {
 }
 
 export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0, voucherPreTax = 0) {
-  const priced = items.map(priceItem);
-  // Subtotal = MRP total + alteration charges, before any discounts or GST
-  const itemsSubtotal = round2(priced.reduce((s, p) => s + p.base + p.alteration, 0));
-  const itemLevelDiscountTotal = round2(
-    priced.reduce((s, p) => s + p.itemDisc, 0)
-  );
-  const preOverallTaxable = round2(
-    priced.reduce((s, p) => s + p.withCharges, 0)
-  );
+  const pricedItems = items.map(priceItem);
 
-  // All codes applied pre-tax — no post-GST special case
+  // Face value: MRP total + quoted alteration charges (both as entered by user)
+  const itemsSubtotal = round2(items.reduce((s, it) => {
+    return s + Number(it.mrp || 0) * Number(it.quantity || 1)
+             + Number(it.alteration_charge || it.stitching_charge || 0);
+  }, 0));
+
+  const itemLevelDiscountTotal = round2(pricedItems.reduce((s, p) => s + p.itemDisc, 0));
+  const preOverallTaxable = round2(pricedItems.reduce((s, p) => s + p.withCharges, 0));
+
   const codes = selectedCodes || [];
   const discounts = allDiscounts || [];
   const overallDiscount = round2(applyOverallDiscounts(items, codes, discounts));
   const taxableTotal = Math.max(0, round2(preOverallTaxable - overallDiscount - extraPreTaxDiscount - voucherPreTax));
 
-  const itemTaxables = items.map((it) => priceItem(it).withCharges);
+  const itemTaxables = pricedItems.map(p => p.withCharges);
   const totalTaxableBefore = preOverallTaxable || 1;
+
   const rawGst = round2(
-    items.reduce((sum, it, idx) => {
+    pricedItems.reduce((sum, p, idx) => {
+      const it = items[idx];
       const share = itemTaxables[idx] / totalTaxableBefore;
       const reducedTaxable = taxableTotal * share;
       const qty = Number(it.quantity || 1);
-      const alteration = Number(it.alteration_charge || it.stitching_charge || 0);
-      const cat = it.category || it.manual_category || null;
+      const stitchType = it.stitchType || 'unstitched';
 
-      // Re-evaluate GST slab after all discounts applied.
+      // Split reducedTaxable into item and alteration pre-tax portions
+      const alterProp = p.withCharges > 0 ? p.alteration / p.withCharges : 0;
+      const reducedAlterTaxable = reducedTaxable * alterProp;
+      const reducedItemTaxable = reducedTaxable - reducedAlterTaxable;
+
+      // GST rate: unstitched always 5%; stitched re-evaluates slab post-discount
       let rate = Number(it.gstRate ?? 18);
-      if (cat === 'SA' || cat === 'ST') {
+      if (stitchType === 'unstitched') {
         rate = 5;
-      } else if (cat !== null) {
-        const garmentTaxable = reducedTaxable - alteration;
-        const effectivePricePerUnit = qty > 0 ? garmentTaxable / qty : 0;
+      } else {
+        const effectivePricePerUnit = qty > 0 ? reducedItemTaxable / qty : 0;
         if (effectivePricePerUnit > 0) {
-          rate = effectivePricePerUnit <= 2500 ? 5 : 18;
+          rate = effectivePricePerUnit > 2500 ? 18 : 5;
         }
       }
 
-      return sum + round2((reducedTaxable * rate) / 100);
+      return sum + round2((reducedItemTaxable * rate) / 100) + round2(reducedAlterTaxable * 0.05);
     }, 0)
   );
 
@@ -223,12 +233,8 @@ export function valueOfDiscount(d, items) {
       return total >= minTotal ? clampMax(val, d.max_discount) : 0;
     }
     case "gst_off": {
-      // Pre-tax equivalent: discount that absorbs GST per item (taxable * rate / (100 + rate))
-      const gstOffAmt = round2(items.reduce((s, it) => {
-        const p = priceItem(it);
-        const rate = Number(it.gstRate ?? 18);
-        return s + round2(p.withCharges * rate / (100 + rate));
-      }, 0));
+      // Discount that absorbs GST: total GST across all items
+      const gstOffAmt = round2(items.reduce((s, it) => s + priceItem(it).gst_amount, 0));
       return clampMax(gstOffAmt, d.max_discount);
     }
     default:

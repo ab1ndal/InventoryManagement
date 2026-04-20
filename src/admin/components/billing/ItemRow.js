@@ -50,7 +50,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
         <Input
           type="number"
           min={0}
-          max={30}
+          max={50}
           value={
             discountRaw !== null ? discountRaw : (item.quickDiscountPct ?? "")
           }
@@ -63,7 +63,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
           }
           onChange={(e) => setDiscountRaw(e.target.value)}
           onBlur={(e) => {
-            const val = Math.min(30, Math.max(0, Number(e.target.value) || 0));
+            const val = Math.min(50, Math.max(0, Number(e.target.value) || 0));
             onUpdate(item._id, { quickDiscountPct: val });
             setDiscountRaw(null);
           }}
