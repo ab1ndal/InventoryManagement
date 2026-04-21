@@ -1,10 +1,21 @@
 // src/admin/pages/ExchangePage.js
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
+import { flushSync } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../../components/ui/dialog";
+import ReturnReceiptView from "../components/billing/ReturnReceiptView";
+import { generateInvoicePdf } from "../components/billing/generateInvoicePdf";
 import {
   computeMaxReturnQty,
   calcItemCredit,
@@ -12,6 +23,9 @@ import {
 } from "../components/billing/exchangeHelpers";
 
 export default function ExchangePage() {
+  const navigate = useNavigate();
+  const receiptRef = useRef(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState([]);      // array of bills
@@ -21,6 +35,8 @@ export default function ExchangePage() {
   const [reasonMap, setReasonMap] = useState({});              // bill_item_id -> reason text
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSaving, setConfirmSaving] = useState(false);
+  const [receiptReadyItems, setReceiptReadyItems] = useState([]); // for hidden PDF render
+  const [receiptReadyCredit, setReceiptReadyCredit] = useState(0);
 
   // --- search ---
   async function handleSearch(e) {
@@ -124,10 +140,121 @@ export default function ExchangePage() {
   );
   const canConfirm = selected.length > 0 && !confirmSaving;
 
-  // --- Task 3 fills these in ---
+  // --- confirm flow ---
   async function handleConfirm() {
-    // Placeholder — implemented in Task 3
+    if (selected.length === 0) return;
+    setConfirmSaving(true);
+    try {
+      // 1. Restock inventory items (D-06)
+      for (const ri of selected) {
+        if (ri.variantid) {
+          const { data: variant, error: ve } = await supabase
+            .from("productsizecolors")
+            .select("stock")
+            .eq("variantid", ri.variantid)
+            .single();
+          if (ve) throw new Error(`Variant lookup failed: ${ve.message}`);
+          if (variant) {
+            const { error } = await supabase
+              .from("productsizecolors")
+              .update({ stock: Number(variant.stock || 0) + Number(ri.returnQty) })
+              .eq("variantid", ri.variantid);
+            if (error) throw new Error(`Inventory restock failed: ${error.message}`);
+          }
+        }
+      }
+
+      // 2. Restock manual items (D-05) — requires migration_14 applied
+      for (const ri of selected) {
+        if (!ri.variantid && ri.manual_item_id) {
+          const { data: mi, error: me } = await supabase
+            .from("manual_items")
+            .select("stock")
+            .eq("manual_item_id", ri.manual_item_id)
+            .single();
+          if (me) {
+            console.warn(`Manual item lookup failed (column may be missing): ${me.message}`);
+            continue; // graceful degradation if migration_14 not applied
+          }
+          if (mi) {
+            await supabase
+              .from("manual_items")
+              .update({ stock: Number(mi.stock || 0) + Number(ri.returnQty) })
+              .eq("manual_item_id", ri.manual_item_id);
+          }
+        }
+      }
+
+      // 3. Insert exchanges rows (D-07)
+      const exchangeRows = selected.map(ri => ({
+        original_bill_item_id: ri.bill_item_id,
+        quantity: ri.returnQty,
+        reason: reasonMap[ri.bill_item_id]?.trim() || null,
+        customerid: loadedBill.customerid || null,
+        credit_amount: ri.creditAmount,
+        voucher_id: null, // D-07
+      }));
+      const { error: exErr } = await supabase.from("exchanges").insert(exchangeRows);
+      if (exErr) throw new Error(`Exchange record failed: ${exErr.message}`);
+
+      // 4. Update customers.store_credit (D-09, D-10) — skip if no customer
+      if (loadedBill.customerid) {
+        const { data: custRow, error: ce } = await supabase
+          .from("customers")
+          .select("store_credit")
+          .eq("customerid", loadedBill.customerid)
+          .single();
+        if (ce) throw new Error(`Customer lookup failed: ${ce.message}`);
+        if (custRow) {
+          const newBalance = Number(custRow.store_credit ?? 0) + totalCredit;
+          const { error: ue } = await supabase
+            .from("customers")
+            .update({ store_credit: newBalance })
+            .eq("customerid", loadedBill.customerid);
+          if (ue) throw new Error(`Store credit update failed: ${ue.message}`);
+        }
+      }
+
+      // 5. Generate PDF (D-13) — hidden receipt render + html2canvas
+      flushSync(() => {
+        setReceiptReadyItems(selected);
+        setReceiptReadyCredit(totalCredit);
+      });
+      // small wait for the hidden DOM to paint
+      await new Promise(r => setTimeout(r, 50));
+      if (receiptRef.current) {
+        try {
+          const blob = await generateInvoicePdf(receiptRef.current, "a5");
+          const url = URL.createObjectURL(blob);
+          window.open(url, "_blank");
+        } catch (pdfErr) {
+          console.error("PDF generation failed:", pdfErr);
+          toast.warning("Exchange saved but PDF failed", { description: pdfErr.message });
+        }
+      }
+
+      toast.success(`Exchange recorded. Credit ₹${totalCredit.toFixed(2)} added.`);
+
+      // 6. Navigate to /admin/bills with route state (D-14, D-17) — consumed in Plan 03
+      navigate("/admin/bills", {
+        state: {
+          openNewBill: true,
+          exchangeCredit: {
+            amount: totalCredit,
+            label: `Return Credit — Bill #${loadedBill.bill_number || loadedBill.billid}`,
+          },
+          prefilledCustomerId: loadedBill.customerid || null,
+        },
+      });
+    } catch (err) {
+      console.error(err);
+      toast.error("Exchange failed", { description: err.message });
+    } finally {
+      setConfirmSaving(false);
+      setConfirmOpen(false);
+    }
   }
+
   function handleCancel() {
     setLoadedBill(null);
     setBillItems([]);
@@ -258,6 +385,63 @@ export default function ExchangePage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="bg-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm Exchange</DialogTitle>
+            <DialogDescription>
+              Review returned items. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <div><strong>Bill:</strong> #{loadedBill?.bill_number || loadedBill?.billid}</div>
+            <div><strong>Customer:</strong> {loadedBill?.customers ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name}` : "—"}</div>
+            <div className="border rounded p-2 max-h-60 overflow-y-auto">
+              {selected.map(ri => (
+                <div key={ri.bill_item_id} className="flex justify-between py-1 border-b last:border-0">
+                  <span>{ri.product_name} × {ri.returnQty}</span>
+                  <span className="tabular-nums">₹{Number(ri.creditAmount).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="text-right font-semibold text-base pt-2">
+              Total Credit: ₹{totalCredit.toFixed(2)}
+            </div>
+            {!loadedBill?.customerid && (
+              <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                No customer on this bill — stock will be restored and PDF will print, but no store credit can be saved.
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" disabled={confirmSaving} onClick={() => setConfirmOpen(false)}>Keep Editing</Button>
+            <Button disabled={confirmSaving} onClick={handleConfirm}>
+              {confirmSaving ? "Processing..." : "Confirm Exchange"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
+        <ReturnReceiptView
+          ref={receiptRef}
+          mode="exchange"
+          billId={loadedBill?.bill_number || loadedBill?.billid || "—"}
+          originalBillDate={loadedBill?.orderdate}
+          customerName={loadedBill?.customers ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name}` : ""}
+          items={receiptReadyItems.map(ri => ({
+            product_name: ri.product_name,
+            quantity: ri.returnQty,
+            mrp: ri.mrp,
+            size: ri.size,
+            color: ri.color,
+            creditAmount: ri.creditAmount,
+          }))}
+          creditAmount={receiptReadyCredit}
+          issueDate={new Date()}
+        />
+      </div>
     </div>
   );
 }
