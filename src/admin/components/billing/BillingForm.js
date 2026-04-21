@@ -64,7 +64,7 @@ function isAutoApplyEligible(d, items, today) {
   return true;
 }
 
-export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
+export default function BillingForm({ billId, open, onOpenChange, onSubmit, exchangeCredit: exchangeCreditProp = null, prefilledCustomerId = null }) {
   const [items, setItems] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [notes, setNotes] = useState("");
@@ -86,6 +86,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [isBackdated, setIsBackdated] = useState(false);
   const [backdatedDate, setBackdatedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
+  const [exchangeCredit, setExchangeCredit] = useState(null); // { amount: number, label: string }
   const [customerStoreCreditBalance, setCustomerStoreCreditBalance] = useState(0);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null); // { voucher_id, value }
@@ -114,6 +115,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setCustomerDisplayText("");
       setEffectiveBillId(null);
       setAppliedStoreCredit(0);
+      setExchangeCredit(null);
       setCustomerStoreCreditBalance(0);
       setVoucherCode("");
       setAppliedVoucher(null);
@@ -124,6 +126,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
       setBackdatedDate(new Date().toISOString().split("T")[0]);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync exchangeCreditProp into state when dialog opens
+  useEffect(() => {
+    if (open && exchangeCreditProp) {
+      setExchangeCredit(exchangeCreditProp);
+    }
+  }, [open, exchangeCreditProp]);
+
+  // Auto-select prefilled customer for new bills
+  useEffect(() => {
+    if (open && !billId && prefilledCustomerId) {
+      setSelectedCustomerId(prefilledCustomerId);
+    }
+  }, [open, billId, prefilledCustomerId]);
 
   // Load discounts (and re-evaluate auto-apply eligibility) whenever the
   // dialog is open or the item list changes.
@@ -361,13 +377,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     if (!paidAmt || paidAmt <= 0 || computed.grandTotal <= 0) return computed;
     // voucher is pre-tax (baked into computed.grandTotal); store credit is a payment method
     const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), computed.grandTotal);
-    const effectiveGrandTotal = Math.max(0, computed.grandTotal - storeCreditAmt);
+    const afterStoreCredit = Math.max(0, computed.grandTotal - storeCreditAmt);
+    const exchangeCreditAmt = Math.min(Number(exchangeCredit?.amount || 0), afterStoreCredit);
+    const effectiveGrandTotal = Math.max(0, afterStoreCredit - exchangeCreditAmt);
     if (paidAmt >= effectiveGrandTotal) return computed;
     const shortfall = effectiveGrandTotal - paidAmt;
     const preDisc = computePreTaxBalanceDiscount(computed, computed.grandTotal - shortfall);
     if (preDisc <= 0) return computed;
     return computeBillTotals(items, selectedCodes, allDiscounts, preDisc, Number(appliedVoucher?.value ?? 0));
-  }, [computed, paymentAmount, appliedVoucher, appliedStoreCredit, items, selectedCodes, allDiscounts]);
+  }, [computed, paymentAmount, appliedVoucher, appliedStoreCredit, exchangeCredit, items, selectedCodes, allDiscounts]);
 
   const visibleDiscounts = useMemo(() => {
     if (!selectedCustomerId) return allDiscounts; // D-06: no filter without customer
@@ -717,11 +735,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
         }
 
         // Create bill as finalized
+        const exchangeNote = exchangeCredit?.amount > 0
+          ? `\n[Exchange credit applied: ${exchangeCredit.label} — ₹${Number(exchangeCredit.amount).toFixed(2)}]`
+          : "";
         const { data: bill, error: billError } = await supabase
           .from("bills")
           .insert({
             customerid: selectedCustomerId || null,
-            notes: notes || null,
+            notes: (notes || "") + exchangeNote || null,
             totalamount: balanceAdjustedComputed.grandTotal,
             gst_total: balanceAdjustedComputed.gstTotal,
             discount_total: balanceAdjustedComputed.itemLevelDiscountTotal + balanceAdjustedComputed.overallDiscount + balanceAdjustedComputed.balanceDiscount,
@@ -1102,6 +1123,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
               onRemoveStoreCredit={() => setAppliedStoreCredit(0)}
               onApplyStoreCredit={() => setAppliedStoreCredit(customerStoreCreditBalance)}
               onRemoveVoucher={() => setAppliedVoucher(null)}
+              exchangeCredit={exchangeCredit}
             />
 
             {/* Actions */}
@@ -1174,6 +1196,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           )}
           {Number(appliedStoreCredit || 0) > 0 && (
             <div><span className="font-semibold">Paid via Store Credit:</span> −₹{Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal).toFixed(2)}</div>
+          )}
+          {Number(exchangeCredit?.amount || 0) > 0 && (
+            <div><span className="font-semibold">Applied: {exchangeCredit.label}:</span> −₹{Math.min(Number(exchangeCredit.amount), Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal))).toFixed(2)}</div>
           )}
           {Number(appliedStoreCredit || 0) > 0 && (
             <div><span className="font-semibold">Net Payable:</span> ₹{Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal)).toFixed(2)}</div>
