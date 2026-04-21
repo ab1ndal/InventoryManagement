@@ -30,9 +30,9 @@ decisions:
   - "D-19: manual_items.stock column added via migration_14, default 1"
   - "buildReturnedQtyMap uses numeric bill_item_id keys (object, not Map) for simplicity"
 metrics:
-  duration: "~15 minutes"
-  completed: "2026-04-21T16:37:16Z"
-  tasks_completed: 2
+  duration: "~20 minutes"
+  completed: "2026-04-21"
+  tasks_completed: 3
   tasks_total: 3
   files_created: 3
   files_modified: 0
@@ -71,9 +71,9 @@ Coverage: full-qty return, partial-qty proportional, zero-qty guard, negative-qt
 | 1 (RED) | ec0105f | test(06-01): add failing exchangeHelpers tests + migration 14 SQL |
 | 2 (GREEN) | 472ee09 | feat(06-01): implement exchangeHelpers — credit formula + qty map |
 
-## Pending: Task 3 (Blocking Checkpoint)
+## Task 3: Migration Applied (Confirmed)
 
-Migration `migration_14_manual_items_stock.sql` must be applied manually in Supabase dashboard. See checkpoint message below. Plan is paused until user confirms migration is live.
+Migration `migration_14_manual_items_stock.sql` applied in Supabase dashboard. User confirmed `manual_items.stock` column exists with `data_type=integer, column_default=1, is_nullable=NO`. All 3 tasks complete.
 
 ## Deviations from Plan
 
