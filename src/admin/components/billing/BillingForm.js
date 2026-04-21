@@ -95,6 +95,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   const [salesMethods, setSalesMethods] = useState([]);
   const [salesLocationId, setSalesLocationId] = useState(null);
   const [salesMethodId, setSalesMethodId] = useState(null);
+  const [salespersonsList, setSalespersonsList] = useState([]);
 
   // Reset all form state when the dialog closes. Must NOT include `items` in
   // its dependency array — doing so would cause setItems([]) to create a new
@@ -163,12 +164,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
   useEffect(() => {
     if (!open) return;
     const loadLookups = async () => {
-      const [{ data: locs }, { data: methods }] = await Promise.all([
+      const [{ data: locs }, { data: methods }, { data: sps }] = await Promise.all([
         supabase.from("saleslocations").select("saleslocationid, locationname").order("saleslocationid"),
         supabase.from("salesmethods").select("salesmethodid, methodname").order("salesmethodid"),
+        supabase.from("salespersons").select("salesperson_id, name").eq("active", true).order("name"),
       ]);
       if (locs) setSalesLocations(locs);
       if (methods) setSalesMethods(methods);
+      if (sps) setSalespersonsList(sps);
     };
     loadLookups();
   }, [open]);
@@ -264,6 +267,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
           stitchType: bi.stitch_type || (Number(bi.gst_rate) === 18 ? 'stitched' : 'unstitched'),
           size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
           color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
+          salesperson_id: bi.salesperson_id || null,
         })));
       } catch (e) {
         toast.error("Error loading bill", { description: e.message });
@@ -339,6 +343,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
     supabase.from('salespersons').select('name').in('salesperson_id', selectedSalespersonIds)
       .then(({ data }) => setSalespersonNames((data ?? []).map(r => r.name)));
   }, [selectedSalespersonIds]);
+
+  const salespersonMap = useMemo(
+    () => Object.fromEntries(salespersonsList.map(s => [s.salesperson_id, s.name])),
+    [salespersonsList]
+  );
 
   const computed = useMemo(
     () => computeBillTotals(items, selectedCodes, allDiscounts, 0, Number(appliedVoucher?.value ?? 0)),
@@ -951,12 +960,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
                 <AddItemDialog
                   isBackdated={isBackdated}
                   onAdd={(item) => setItems((prev) => [...prev, item])}
+                  salespersons={salespersonsList}
                 />
               </div>
               <ItemTable
                 items={items}
                 setItems={setItems}
                 onEdit={(id) => setEditingItem(items.find((it) => it._id === id) ?? null)}
+                salespersonMap={salespersonMap}
               />
             </section>
 
@@ -968,6 +979,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit }) {
                 onOpenChange={(o) => { if (!o) setEditingItem(null); }}
                 isBackdated={isBackdated}
                 editItem={editingItem}
+                salespersons={salespersonsList}
                 onUpdate={(updated) => {
                   setItems((prev) =>
                     prev.map((it) => (it._id === updated._id ? updated : it))

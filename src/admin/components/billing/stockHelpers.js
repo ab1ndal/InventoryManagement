@@ -106,6 +106,7 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
       gst_amount: adjustedGst,
       total: round2(adjustedSubtotal + adjustedGst),
       stitch_type: stitchType,
+      salesperson_id: it.salesperson_id || null,
     };
   });
 }

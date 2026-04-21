@@ -12,7 +12,7 @@ import { Button } from "../../../components/ui/button";
 import { supabase } from "../../../lib/supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 
-export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
+export default function InventoryPicker({ onPicked, initialVal, isBackdated, salespersons = [] }) {
   const isEditing = !!initialVal;
 
   const [query, setQuery] = useState(initialVal?.productid || "");
@@ -29,6 +29,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
   const [stitchType, setStitchType] = useState(initialVal?.stitchType || 'unstitched');
   const [gstRate, setGstRate] = useState(initialVal?.gstRate || null);
   const [discount, setDiscount] = useState(initialVal?.quickDiscountPct || 0);
+  const [salespersonId, setSalespersonId] = useState(initialVal?.salesperson_id || null);
 
   // When editing, load the full product from Supabase on mount
   useEffect(() => {
@@ -244,6 +245,29 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
             </div>
           </div>
 
+          {/* Salesperson (optional) */}
+          {salespersons.length > 0 && (
+            <div className="grid gap-1">
+              <Label>Salesperson (optional)</Label>
+              <Select
+                value={salespersonId ? String(salespersonId) : "__none__"}
+                onValueChange={(v) => setSalespersonId(v === "__none__" ? null : Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="— none —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— none —</SelectItem>
+                  {salespersons.map((s) => (
+                    <SelectItem key={s.salesperson_id} value={String(s.salesperson_id)}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Button
             disabled={!variantId || !!error}
             onClick={() => {
@@ -266,6 +290,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated }) {
                 gstRate: gstRate,
                 alteration_charge: Number(alterationCharge) || 0,
                 stitchType,
+                salesperson_id: salespersonId || null,
               });
             }}
           >

@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Button } from "../../../components/ui/button";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "../../../components/ui/select";
 import { supabase } from "../../../lib/supabaseClient";
 import { useToast } from "../../../components/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
@@ -44,7 +51,7 @@ async function getNextManualItemId() {
   return `${prefix}${String(nextSuffix).padStart(3, "0")}`;
 }
 
-export default function ManualItemForm({ onAdd, initialVal }) {
+export default function ManualItemForm({ onAdd, initialVal, salespersons = [] }) {
   const { toast } = useToast();
   const isEditing = !!initialVal;
   const [categories, setCategories] = useState([]);
@@ -64,6 +71,7 @@ export default function ManualItemForm({ onAdd, initialVal }) {
   const [zCode, setZCode] = useState(
     initialVal?.cost_price ? encodePriceToZCode(initialVal.cost_price) : ""
   );
+  const [salespersonId, setSalespersonId] = useState(initialVal?.salesperson_id || null);
 
   useEffect(() => {
     supabase
@@ -132,6 +140,7 @@ export default function ManualItemForm({ onAdd, initialVal }) {
         alteration_charge: Number(alterationCharge) || 0,
         cost_price: purchasePrice,
         stitchType,
+        salesperson_id: salespersonId || null,
       });
     } catch (e) {
       toast({ title: "Failed to add item", description: e.message, variant: "destructive" });
@@ -282,6 +291,28 @@ export default function ManualItemForm({ onAdd, initialVal }) {
           </div>
         </div>
       </div>
+
+      {salespersons.length > 0 && (
+        <div className="grid gap-1">
+          <Label>Salesperson (optional)</Label>
+          <Select
+            value={salespersonId ? String(salespersonId) : "__none__"}
+            onValueChange={(v) => setSalespersonId(v === "__none__" ? null : Number(v))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="— none —" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">— none —</SelectItem>
+              {salespersons.map((s) => (
+                <SelectItem key={s.salesperson_id} value={String(s.salesperson_id)}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <Button onClick={handleSubmit} disabled={!name.trim() || saving}>
         {saving ? "Adding..." : "Add Item"}

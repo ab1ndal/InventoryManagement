@@ -1,6 +1,6 @@
 import ItemRow from "./ItemRow";
 
-export default function ItemTable({ items, setItems, onEdit }) {
+export default function ItemTable({ items, setItems, onEdit, salespersonMap = {} }) {
   const updateItem = (id, patch) => {
     setItems((prev) =>
       prev.map((it) => (it._id === id ? { ...it, ...patch } : it)),
@@ -17,6 +17,7 @@ export default function ItemTable({ items, setItems, onEdit }) {
           <thead className="sticky top-0 bg-muted/50">
             <tr>
               <th className="px-2 py-1.5 text-left font-medium">Product ID</th>
+              <th className="px-2 py-1.5 text-left font-medium">SP</th>
               <th className="px-2 py-1.5 text-center font-medium">Qty</th>
               <th className="px-2 py-1.5 text-center font-medium">MRP</th>
               <th className="px-2 py-1.5 text-center font-medium">Disc%</th>
@@ -36,11 +37,12 @@ export default function ItemTable({ items, setItems, onEdit }) {
                 onUpdate={updateItem}
                 onRemove={removeItem}
                 onEdit={onEdit}
+                salespersonMap={salespersonMap}
               />
             ))}
             {items.length === 0 && (
               <tr>
-                <td className="p-3 text-muted-foreground" colSpan={10}>
+                <td className="p-3 text-muted-foreground" colSpan={11}>
                   No items yet. Click "Add item".
                 </td>
               </tr>

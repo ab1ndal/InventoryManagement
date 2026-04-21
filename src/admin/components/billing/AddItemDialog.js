@@ -32,6 +32,7 @@ export default function AddItemDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   isBackdated,
+  salespersons = [],
 }) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isEditing = !!editItem;
@@ -82,6 +83,7 @@ export default function AddItemDialog({
               }
               onPicked={handleConfirm}
               isBackdated={isBackdated}
+              salespersons={salespersons}
             />
           </TabsContent>
           <TabsContent value="manual">
@@ -90,6 +92,7 @@ export default function AddItemDialog({
                 isEditing && editItem.source === "manual" ? editItem : undefined
               }
               onAdd={handleConfirm}
+              salespersons={salespersons}
             />
           </TabsContent>
         </Tabs>

@@ -11,7 +11,7 @@ import { Button } from "../../../components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { priceItem, money } from "./billUtils";
 
-export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
+export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {} }) {
   const pricing = priceItem(item);
   const [discountRaw, setDiscountRaw] = useState(null);
 
@@ -29,6 +29,9 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit }) {
             {[item.color, item.size].filter(Boolean).join(" / ")}
           </div>
         )}
+      </td>
+      <td className="px-2 py-1 text-xs text-muted-foreground">
+        {item.salesperson_id ? (salespersonMap[item.salesperson_id] ?? "—") : "—"}
       </td>
       <td className="px-2 py-1 text-center">
         <Input
