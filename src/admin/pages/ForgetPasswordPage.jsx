@@ -1,10 +1,9 @@
 // src/admin/pages/ForgotPasswordPage.jsx
 import { useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { useToast } from "../../components/hooks/use-toast";
+import { toast } from "sonner";
 
 export default function ForgotPasswordPage() {
-  const { toast } = useToast();
   const [email, setEmail] = useState("");
 
   const handleReset = async (e) => {
@@ -15,15 +14,11 @@ export default function ForgotPasswordPage() {
     });
 
     if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast("Error", { description: error.message, icon: "⚠️" });
     } else {
-      toast({
-        title: "Reset Link Sent",
+      toast("Reset Link Sent", {
         description: "Check your inbox for a password reset link.",
+        icon: "📧",
       });
     }
   };
