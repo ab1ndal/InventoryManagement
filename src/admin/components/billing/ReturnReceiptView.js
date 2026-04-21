@@ -11,7 +11,7 @@ const STORE = {
 };
 
 const ReturnReceiptView = forwardRef(function ReturnReceiptView(
-  { billId, originalBillDate, customerName, items, creditAmount, issueDate, mode = "cancel" },
+  { billId, originalBillDate, customerName, items, creditAmount, issueDate },
   ref
 ) {
   return (
@@ -67,7 +67,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
           marginBottom: "8px",
         }}
       >
-        {mode === "exchange" ? "EXCHANGE RECEIPT" : "STORE CREDIT RECEIPT"}
+        STORE CREDIT RECEIPT
       </div>
 
       {/* 3. Bill Details Block */}
@@ -89,7 +89,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
       {/* 4. Divider */}
       <div style={{ borderTop: "1px solid #e5e7eb", margin: "8px 0" }} />
 
-      {/* 5. Items Table */}
+      {/* 5. Items Cancelled Table */}
       <table
         style={{ width: "100%", borderCollapse: "collapse", marginBottom: "8px" }}
       >
@@ -122,9 +122,6 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
             >
               MRP
             </th>
-            {mode === "exchange" && (
-              <th style={{ padding: "4px", textAlign: "right", borderBottom: "1px solid #e5e7eb" }}>Credit</th>
-            )}
           </tr>
         </thead>
         <tbody>
@@ -137,9 +134,6 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
                 }}
               >
                 {it.product_name || "—"}
-                {mode === "exchange" && (it.size || it.color) && (
-                  <span style={{ color: "#6b7280", fontSize: "10px" }}> ({[it.size, it.color].filter(Boolean).join(" / ")})</span>
-                )}
               </td>
               <td
                 style={{
@@ -159,9 +153,6 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
               >
                 ₹{Number(it.mrp || 0).toFixed(2)}
               </td>
-              {mode === "exchange" && (
-                <td style={{ padding: "4px", textAlign: "right", borderBottom: "1px solid #f3f4f6" }}>₹{Number(it.creditAmount || 0).toFixed(2)}</td>
-              )}
             </tr>
           ))}
         </tbody>
@@ -205,9 +196,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
           textAlign: "center",
         }}
       >
-        {mode === "exchange"
-          ? `Store credit of ₹${Number(creditAmount || 0).toFixed(2)} has been added to your account.`
-          : "Store credit has been added to your account and will be automatically applied on your next purchase."}
+        Store credit has been added to your account and will be automatically applied on your next purchase.
       </div>
     </div>
   );

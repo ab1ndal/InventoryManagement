@@ -8,6 +8,7 @@ export default function Summary({
   onRemoveStoreCredit,
   onApplyStoreCredit,
   onRemoveVoucher,
+  exchangeCredit = null,    // { amount: number, label: string } | null
 }) {
   // voucher is pre-tax (baked into computed.grandTotal via computeBillTotals)
   const voucherApplied = Number(computed.voucherPreTax ?? 0);
@@ -21,9 +22,11 @@ export default function Summary({
 
   // store credit is a customer payment applied after grand total
   const storeCreditApplied = Math.min(Number(appliedStoreCredit || 0), computed.grandTotal);
-  const effectiveGrandTotal = Math.max(0, computed.grandTotal - storeCreditApplied);
+  const afterStoreCredit = Math.max(0, computed.grandTotal - storeCreditApplied);
+  const exchangeCreditApplied = Math.min(Number(exchangeCredit?.amount || 0), afterStoreCredit);
+  const effectiveGrandTotal = Math.max(0, afterStoreCredit - exchangeCreditApplied);
 
-  const totalSavings = round2(totalPreTaxDiscount + storeCreditApplied);
+  const totalSavings = round2(totalPreTaxDiscount + storeCreditApplied + exchangeCreditApplied);
 
   return (
     <div className="rounded border p-4 space-y-2 text-sm bg-gray-50">
@@ -115,6 +118,13 @@ export default function Summary({
         </div>
       )}
 
+      {exchangeCreditApplied > 0 && (
+        <div className="flex justify-between items-center bg-purple-50 border border-purple-200 text-purple-800 rounded px-3 py-1.5 text-sm">
+          <span>Applied: {exchangeCredit?.label || "Return Credit"}</span>
+          <span className="tabular-nums">−{money(exchangeCreditApplied)}</span>
+        </div>
+      )}
+
       {storeCreditApplied === 0 && Number(customerStoreCreditBalance || 0) > 0 && onApplyStoreCredit && (
         <div className="flex justify-end">
           <button
@@ -127,7 +137,7 @@ export default function Summary({
         </div>
       )}
 
-      {storeCreditApplied > 0 && (
+      {(storeCreditApplied > 0 || exchangeCreditApplied > 0) && (
         <div className="flex justify-between font-semibold text-sm border-t pt-1 mt-1">
           <span>Net Payable</span>
           <span className="tabular-nums">{money(effectiveGrandTotal)}</span>
