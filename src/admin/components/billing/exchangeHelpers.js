@@ -13,8 +13,13 @@ import { round2 } from "./billUtils";
  * @returns {number} credit amount rounded to 2 decimals (0 if returnQty <= 0 or bi invalid)
  */
 export function calcItemCredit(bi, returnQty) {
-  // TODO: implement in Task 2
-  return 0;
+  if (!bi || returnQty <= 0) return 0;
+  const fullQty = Number(bi.quantity || 1);
+  const proportion = returnQty / fullQty;
+  const discProp = Number(bi.discount_total || 0) * proportion;
+  const alterProp = Number(bi.alteration_charge || 0) * proportion;
+  const mrpPortion = Number(bi.mrp || 0) * returnQty;
+  return round2(mrpPortion - discProp + alterProp);
 }
 
 /**
@@ -24,8 +29,12 @@ export function calcItemCredit(bi, returnQty) {
  * @returns {Object<number, number>} map of bill_item_id -> total already returned
  */
 export function buildReturnedQtyMap(existingExchanges) {
-  // TODO: implement in Task 2
-  return {};
+  const map = {};
+  for (const ex of (existingExchanges || [])) {
+    const id = ex.original_bill_item_id;
+    map[id] = (map[id] || 0) + Number(ex.quantity || 0);
+  }
+  return map;
 }
 
 /**
@@ -36,8 +45,13 @@ export function buildReturnedQtyMap(existingExchanges) {
  * @returns {Array} billItems with extra field `maxReturnQty = quantity - alreadyReturned`, filtered to maxReturnQty > 0
  */
 export function computeMaxReturnQty(billItems, existingExchanges) {
-  // TODO: implement in Task 2
-  return [];
+  const alreadyReturned = buildReturnedQtyMap(existingExchanges);
+  return (billItems || [])
+    .map(bi => ({
+      ...bi,
+      maxReturnQty: Number(bi.quantity || 0) - (alreadyReturned[bi.bill_item_id] || 0),
+    }))
+    .filter(r => r.maxReturnQty > 0);
 }
 
 /**
@@ -49,6 +63,10 @@ export function computeMaxReturnQty(billItems, existingExchanges) {
  * @returns {Array} [{...bi, returnQty, creditAmount}, ...]
  */
 export function buildReturnedItemsWithCredit(billItems, returnQtyMap) {
-  // TODO: implement in Task 2
-  return [];
+  return (billItems || [])
+    .filter(bi => (returnQtyMap[bi.bill_item_id] || 0) > 0)
+    .map(bi => {
+      const returnQty = returnQtyMap[bi.bill_item_id];
+      return { ...bi, returnQty, creditAmount: calcItemCredit(bi, returnQty) };
+    });
 }
