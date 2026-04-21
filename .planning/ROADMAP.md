@@ -160,8 +160,37 @@ Plans:
 7. Invoice PDF shows "FREE" badge on cheapest qualifying items when buy_x_get_y discount is applied
 8. The `rules` JSONB column is fetched in BillingForm, enabling correct computation for all discount types
 
+### Phase 6: Exchange and Returns — bill lookup, partial item credit, store credit PDF, restock, and new bill generation
+
+**Goal:** Staff can search a finalized bill on ExchangePage, select any subset of items (partial qty allowed), confirm → restock inventory + manual items, insert exchanges rows, increment customers.store_credit, print an A5 exchange receipt PDF, and land on BillingForm pre-populated with the original customer and an "Additional Discount" equal to the exchange credit so a replacement purchase can be rung up immediately.
+
+**Requirements:** EX-SCHEMA-01, EX-CREDIT-01, EX-CREDIT-02, EX-CREDIT-03, EX-CREDIT-04, EX-UI-01, EX-UI-02, EX-UI-03, EX-SEARCH-01, EX-RECEIPT-01, EX-RESTOCK-01, EX-HANDOFF-01
+
+**Depends on:** Phase 5
+
+**Plans:** 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Foundation: migration_14 manual_items.stock, exchangeHelpers pure functions + unit tests (EX-SCHEMA-01, EX-CREDIT-01, EX-CREDIT-02)
+- [ ] 06-02-PLAN.md — ExchangePage search/selection/confirm + ReturnReceiptView exchange mode (EX-UI-01, EX-UI-02, EX-SEARCH-01, EX-RECEIPT-01, EX-RESTOCK-01, EX-CREDIT-03)
+- [ ] 06-03-PLAN.md — BillingPage route-state handoff + BillingForm exchangeCredit prop + Summary deduction row (EX-CREDIT-04, EX-UI-03, EX-HANDOFF-01)
+
+**Success criteria:**
+1. ExchangePage search finds finalized bills by bill_number (ilike) or customer first_name/last_name (finalized-only per D-02)
+2. Item selection UI presents each returnable bill_item with a qty input capped at `maxReturnQty = quantity - sum(existing exchanges.quantity)`; fully-returned items hidden
+3. Per-item credit matches D-08: `(mrp × returnQty) − (discount_total × returnQty/quantity) + (alteration_charge × returnQty/quantity)`; totals sum correctly across items
+4. On confirm: `productsizecolors.stock` incremented for inventory items; `manual_items.stock` incremented for manual items; `exchanges` rows inserted (voucher_id null); `customers.store_credit` incremented (if customer); A5 PDF opens in new tab
+5. Exchange of a bill with no customer: stock is restored, PDF prints, store_credit step skipped; no errors
+6. ReturnReceiptView accepts `mode="cancel"` (existing) and `mode="exchange"` (new A5 receipt with Credit column + D-12 note)
+7. After confirm, navigation to `/admin/bills` with route state `{ openNewBill: true, exchangeCredit: { amount, label }, prefilledCustomerId }`; BillingForm auto-opens with customer pre-selected and exchange credit visible in Summary
+8. Exchange credit applied as POST-GST deduction: `max(0, grandTotal − storeCredit − exchangeCredit)`; does NOT reduce taxableTotal or gstTotal (Pitfall 3)
+9. `window.history.replaceState({}, "")` called after consuming route state — back-navigation does not re-open BillingForm (Pitfall 4)
+10. Closing BillingForm without finalizing leaves customers.store_credit intact (D-18 — credit was written pre-navigation)
+
 ---
 
 ## Schema Migration Scripts
 
 All required SQL migrations are documented in Phase 2 notes. Provide as `.sql` files in `schema/` directory for manual execution in Supabase dashboard.
+
+Phase 6 adds: `schema/migration_14_manual_items_stock.sql` — `ALTER TABLE manual_items ADD COLUMN stock integer NOT NULL DEFAULT 1`.
