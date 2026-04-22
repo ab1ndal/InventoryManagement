@@ -470,8 +470,8 @@ export default function CustomerForm(props) {
                               (c) => c.customerid !== stableDefaults.customerid,
                             )
                             .sort((a, b) =>
-                              `${a.first_name} ${a.last_name}`.localeCompare(
-                                `${b.first_name} ${b.last_name}`,
+                              `${a.first_name} ${a.last_name || ""}`.localeCompare(
+                                `${b.first_name} ${b.last_name || ""}`,
                               ),
                             )
                             .map((c) => ({

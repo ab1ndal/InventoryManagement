@@ -34,6 +34,10 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     fetchCustomers();
   }, [refreshSignal]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+
   const fetchCustomers = async () => {
     // 1. Fetch customers with referrer join
     const { data: customersData, error: custErr } = await supabase
@@ -216,7 +220,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                   </td>
                   <td className="p-2 text-center w-[180px]">
                     {customer.referred_by_data
-                      ? `${customer.referred_by_data.first_name} ${customer.referred_by_data.last_name}`
+                      ? `${customer.referred_by_data.first_name} ${customer.referred_by_data.last_name || ""}`.trim()
                       : "-"}
                   </td>
                   <td className="p-2 text-center w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
@@ -233,12 +237,12 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                             customer.loyalty_tier === "bronze"
                               ? "bg-orange-400 text-black border-none"
                               : customer.loyalty_tier === "silver"
-                              ? "bg-zinc-300 text-black border-none"
-                              : customer.loyalty_tier === "gold"
-                              ? "bg-yellow-400 text-black border-none"
-                              : customer.loyalty_tier === "platinum"
-                              ? "bg-indigo-200 text-black border-none"
-                              : "bg-gray-100 text-gray-600"
+                                ? "bg-zinc-300 text-black border-none"
+                                : customer.loyalty_tier === "gold"
+                                  ? "bg-yellow-400 text-black border-none"
+                                  : customer.loyalty_tier === "platinum"
+                                    ? "bg-indigo-200 text-black border-none"
+                                    : "bg-gray-100 text-gray-600"
                           }
                         `}
                         >
@@ -317,7 +321,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
             size="sm"
             onClick={() =>
               setPage((p) =>
-                p * rowsPerPage >= filteredCustomers.length ? p : p + 1
+                p * rowsPerPage >= filteredCustomers.length ? p : p + 1,
               )
             }
             disabled={page * rowsPerPage >= filteredCustomers.length}
