@@ -951,7 +951,7 @@ export default function BillTable({ onEdit }) {
                 <div className="text-xs opacity-90">
                   ₹{Number(cancelBill?.totalamount ?? 0).toFixed(2)} added to{" "}
                   {cancelBill?.customers
-                    ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name}`
+                    ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
                     : "customer"}
                   's account. A return receipt will be printed.
                 </div>
