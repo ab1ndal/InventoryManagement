@@ -297,8 +297,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     if (!selectedCustomerId) { setCustomerName(""); setCustomerDisplayText(""); return; }
     supabase.from('customers').select('first_name, last_name, phone').eq('customerid', selectedCustomerId).single()
       .then(({ data }) => {
-        const name = data ? `${data.first_name} ${data.last_name}` : "";
-        const displayText = data ? `${data.first_name} ${data.last_name} | ${data.phone}` : "";
+        const name = data
+          ? `${data.first_name} ${data.last_name || ""}`.trim()
+          : "";
+        const displayText = data ? `${name} | ${data.phone || "No Phone"}` : "";
         setCustomerName(name);
         setCustomerDisplayText(displayText);
       });

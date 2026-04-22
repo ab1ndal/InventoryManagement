@@ -101,7 +101,8 @@ export default function BillTable({ onEdit }) {
       if (billRow.customerid) {
         const { data: cust } = await supabase
           .from("customers").select("first_name, last_name").eq("customerid", billRow.customerid).single();
-        if (cust) customerName = `${cust.first_name} ${cust.last_name}`;
+        if (cust)
+          customerName = `${cust.first_name} ${cust.last_name || ""}`.trim();
       }
 
       // Salesperson names
@@ -204,7 +205,7 @@ export default function BillTable({ onEdit }) {
           .eq("customerid", billRow.customerid)
           .single();
         if (cust) {
-          customerName = `${cust.first_name} ${cust.last_name}`;
+          customerName = `${cust.first_name} ${cust.last_name || ""}`.trim();
           // Normalize to +91XXXXXXXXXX
           const digits = (cust.phone || "").replace(/\D/g, "");
           customerPhone = digits.length === 10 ? `+91${digits}` : digits ? `+${digits}` : "";
@@ -479,7 +480,7 @@ export default function BillTable({ onEdit }) {
     if (!cancelBill) return;
     const { billid: billId, customerid, totalamount, orderdate } = cancelBill;
     const customerName = cancelBill.customers
-      ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name}`
+      ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
       : "";
     setCancelSaving(true);
     try {
@@ -662,16 +663,29 @@ export default function BillTable({ onEdit }) {
                 <tr key={b.billid} className="border-t">
                   <td className="p-2">
                     <div>{b.bill_number || b.billid}</div>
-                    {b.bill_number && <div className="text-xs text-muted-foreground">ID: {b.billid}</div>}
+                    {b.bill_number && (
+                      <div className="text-xs text-muted-foreground">
+                        ID: {b.billid}
+                      </div>
+                    )}
                   </td>
                   <td className="p-2">
-                    {b.customers ? `${b.customers.first_name} ${b.customers.last_name}` : "—"}
+                    {b.customers
+                      ? `${b.customers.first_name} ${b.customers.last_name || ""}`.trim()
+                      : "—"}
                   </td>
                   <td className="p-2">
-                    {b.orderdate ? new Date(b.orderdate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
+                    {b.orderdate
+                      ? new Date(b.orderdate).toLocaleDateString("en-IN", {
+                          timeZone: "Asia/Kolkata",
+                        })
+                      : "—"}
                   </td>
                   <td className="p-2 text-right">
-                    ₹{((b.totalamount || 0) + (b.discount_total || 0)).toFixed(2)}
+                    ₹
+                    {((b.totalamount || 0) + (b.discount_total || 0)).toFixed(
+                      2,
+                    )}
                   </td>
                   <td className="p-2 text-right">
                     ₹{(b.gst_total || 0).toFixed(2)}
@@ -682,12 +696,20 @@ export default function BillTable({ onEdit }) {
                       : "—"}
                   </td>
                   <td className="p-2 text-center">
-                    <Badge variant={
-                      b.paymentstatus === "finalized" ? "default" :
-                      b.paymentstatus === "cancelled" ? "destructive" : "secondary"
-                    }>
-                      {b.paymentstatus === "finalized" ? "Finalized" :
-                       b.paymentstatus === "cancelled" ? "Cancelled" : "Draft"}
+                    <Badge
+                      variant={
+                        b.paymentstatus === "finalized"
+                          ? "default"
+                          : b.paymentstatus === "cancelled"
+                            ? "destructive"
+                            : "secondary"
+                      }
+                    >
+                      {b.paymentstatus === "finalized"
+                        ? "Finalized"
+                        : b.paymentstatus === "cancelled"
+                          ? "Cancelled"
+                          : "Draft"}
                     </Badge>
                   </td>
                   <td className="p-2">
@@ -704,9 +726,17 @@ export default function BillTable({ onEdit }) {
                         size="icon"
                         variant="ghost"
                         disabled={!b.pdf_url}
-                        className={!b.pdf_url ? "opacity-40 cursor-not-allowed" : ""}
-                        title={b.pdf_url ? "View invoice PDF" : "PDF available after finalize"}
-                        onClick={() => b.pdf_url && window.open(b.pdf_url, "_blank")}
+                        className={
+                          !b.pdf_url ? "opacity-40 cursor-not-allowed" : ""
+                        }
+                        title={
+                          b.pdf_url
+                            ? "View invoice PDF"
+                            : "PDF available after finalize"
+                        }
+                        onClick={() =>
+                          b.pdf_url && window.open(b.pdf_url, "_blank")
+                        }
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
@@ -729,9 +759,11 @@ export default function BillTable({ onEdit }) {
                           title="Regenerate PDF"
                           onClick={() => handleRegenPdf(b)}
                         >
-                          {regeningBills.has(b.billid)
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <RefreshCw className="h-4 w-4" />}
+                          {regeningBills.has(b.billid) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
                         </Button>
                       )}
                       {b.paymentstatus !== "cancelled" && (
@@ -739,7 +771,11 @@ export default function BillTable({ onEdit }) {
                           size="icon"
                           variant="ghost"
                           className="hover:text-destructive"
-                          title={b.finalized ? "Cancel finalized bill" : "Cancel bill"}
+                          title={
+                            b.finalized
+                              ? "Cancel finalized bill"
+                              : "Cancel bill"
+                          }
                           aria-label="Cancel bill"
                           onClick={() => openCancelFlow(b)}
                         >
@@ -749,7 +785,11 @@ export default function BillTable({ onEdit }) {
                       <Button
                         size="icon"
                         variant="ghost"
-                        title={b.finalized ? "Delete finalized bill (restores stock)" : "Delete draft"}
+                        title={
+                          b.finalized
+                            ? "Delete finalized bill (restores stock)"
+                            : "Delete draft"
+                        }
                         onClick={() => handleDelete(b)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -775,9 +815,7 @@ export default function BillTable({ onEdit }) {
 
       {/* Pagination */}
       <div className="flex justify-between items-center">
-        <div className="text-sm text-muted-foreground">
-          Page {page}
-        </div>
+        <div className="text-sm text-muted-foreground">Page {page}</div>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -799,11 +837,21 @@ export default function BillTable({ onEdit }) {
       </div>
 
       {/* Dialog 1 — Step 1 confirm */}
-      <Dialog open={confirmOpen} onOpenChange={(o) => { if (!o) { setConfirmOpen(false); setCancelBill(null); } }}>
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setConfirmOpen(false);
+            setCancelBill(null);
+          }
+        }}
+      >
         <DialogContent className="bg-white max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {cancelBill?.finalized ? `Cancel Finalized Bill #${cancelBill?.billid}?` : `Cancel Draft Bill #${cancelBill?.billid}?`}
+              {cancelBill?.finalized
+                ? `Cancel Finalized Bill #${cancelBill?.billid}?`
+                : `Cancel Draft Bill #${cancelBill?.billid}?`}
             </DialogTitle>
             <DialogDescription>
               This will restore stock for all items. This cannot be undone.
@@ -813,22 +861,37 @@ export default function BillTable({ onEdit }) {
             <div className="space-y-2 text-sm">
               <div>
                 <span className="font-semibold">Customer:</span>{" "}
-                {cancelBill.customers ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name}` : "—"}
+                {cancelBill.customers
+                  ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
+                  : "—"}
               </div>
               <div>
                 <span className="font-semibold">Date:</span>{" "}
-                {cancelBill.orderdate ? new Date(cancelBill.orderdate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
+                {cancelBill.orderdate
+                  ? new Date(cancelBill.orderdate).toLocaleDateString("en-IN", {
+                      timeZone: "Asia/Kolkata",
+                    })
+                  : "—"}
               </div>
               <div>
-                <span className="font-semibold">Grand Total:</span> ₹{Number(cancelBill.totalamount ?? 0).toFixed(2)}
+                <span className="font-semibold">Grand Total:</span> ₹
+                {Number(cancelBill.totalamount ?? 0).toFixed(2)}
               </div>
               <div>
-                <span className="font-semibold">Status:</span> {cancelBill.finalized ? "Finalized" : "Draft"}
+                <span className="font-semibold">Status:</span>{" "}
+                {cancelBill.finalized ? "Finalized" : "Draft"}
               </div>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" disabled={cancelSaving} onClick={() => { setConfirmOpen(false); setCancelBill(null); }}>
+            <Button
+              variant="ghost"
+              disabled={cancelSaving}
+              onClick={() => {
+                setConfirmOpen(false);
+                setCancelBill(null);
+              }}
+            >
               Keep Bill
             </Button>
             <Button
@@ -836,19 +899,32 @@ export default function BillTable({ onEdit }) {
               disabled={cancelSaving}
               onClick={handleStep1Continue}
             >
-              {cancelSaving ? "Working..." : (cancelBill?.finalized ? "Continue" : "Cancel Draft")}
+              {cancelSaving
+                ? "Working..."
+                : cancelBill?.finalized
+                  ? "Continue"
+                  : "Cancel Draft"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Dialog 2 — Step 2 resolution */}
-      <Dialog open={resolveOpen} onOpenChange={(o) => { if (!o) { setResolveOpen(false); setCancelBill(null); } }}>
+      <Dialog
+        open={resolveOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setResolveOpen(false);
+            setCancelBill(null);
+          }
+        }}
+      >
         <DialogContent className="bg-white max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>How would you like to resolve this?</DialogTitle>
             <DialogDescription>
-              {cancelBill && `Bill #${cancelBill.billid} (₹${Number(cancelBill.totalamount ?? 0).toFixed(2)}) was finalized. Choose a resolution for the customer.`}
+              {cancelBill &&
+                `Bill #${cancelBill.billid} (₹${Number(cancelBill.totalamount ?? 0).toFixed(2)}) was finalized. Choose a resolution for the customer.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 pt-2">
@@ -860,7 +936,9 @@ export default function BillTable({ onEdit }) {
             >
               <div className="text-left">
                 <div className="font-semibold">Return payment to customer</div>
-                <div className="text-xs text-muted-foreground">Reverses customer spend. No store credit issued.</div>
+                <div className="text-xs text-muted-foreground">
+                  Reverses customer spend. No store credit issued.
+                </div>
               </div>
             </Button>
             <Button
@@ -881,7 +959,14 @@ export default function BillTable({ onEdit }) {
             </Button>
           </div>
           <div className="flex justify-end pt-4">
-            <Button variant="ghost" disabled={cancelSaving} onClick={() => { setResolveOpen(false); setCancelBill(null); }}>
+            <Button
+              variant="ghost"
+              disabled={cancelSaving}
+              onClick={() => {
+                setResolveOpen(false);
+                setCancelBill(null);
+              }}
+            >
               Go Back
             </Button>
           </div>
@@ -890,7 +975,15 @@ export default function BillTable({ onEdit }) {
 
       {/* Off-screen InvoiceView for PDF regen */}
       {regenBillData && (
-        <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
+        <div
+          style={{
+            position: "fixed",
+            top: "-9999px",
+            left: "-9999px",
+            pointerEvents: "none",
+          }}
+          aria-hidden="true"
+        >
           <InvoiceView
             ref={regenRef}
             billId={regenBillData.billId}
@@ -912,7 +1005,15 @@ export default function BillTable({ onEdit }) {
 
       {/* Off-screen ReturnReceiptView for PDF capture */}
       {receiptBill && (
-        <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
+        <div
+          style={{
+            position: "fixed",
+            top: "-9999px",
+            left: "-9999px",
+            pointerEvents: "none",
+          }}
+          aria-hidden="true"
+        >
           <ReturnReceiptView
             ref={receiptRef}
             billId={receiptBill.billId}

@@ -262,11 +262,18 @@ export default function BillingForm() {
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(customerOptions || []).map((c) => (
-                    <SelectItem key={c.customerid} value={String(c.customerid)}>
-                      {c.first_name} {c.last_name} — {c.phone}
-                    </SelectItem>
-                  ))}
+                  {(customerOptions || []).map((c) => {
+                    const name = `${c.first_name} ${c.last_name || ""}`.trim();
+                    const phoneDisplay = `${c.phone || "No Phone"}`;
+                    return (
+                      <SelectItem
+                        key={c.customerid}
+                        value={String(c.customerid)}
+                      >
+                        {name} — {phoneDisplay}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <Dialog
@@ -349,7 +356,7 @@ export default function BillingForm() {
                 setSelectedCodes((prev) =>
                   prev.includes(code)
                     ? prev.filter((c) => c !== code)
-                    : [...prev, code]
+                    : [...prev, code],
                 )
               }
             />

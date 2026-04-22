@@ -55,15 +55,19 @@ export default function CustomerSelector({
         />
         {showDropdown && customerOptions.length > 0 && (
           <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow">
-            {customerOptions.map((c) => (
-              <div
-                key={c.customerid}
-                className="px-3 py-2 cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSelect(c)}
-              >
-                {c.first_name} {c.last_name} | {c.phone}
-              </div>
-            ))}
+            {customerOptions.map((c) => {
+              const name = `${c.first_name} ${c.last_name || ""}`.trim();
+              const phoneDisplay = `${c.phone || "No Phone"}`;
+              return (
+                <div
+                  key={c.customerid}
+                  className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSelect(c)}
+                >
+                  {name} | {phoneDisplay}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -72,7 +76,7 @@ export default function CustomerSelector({
         onSubmit={(cust) => {
           setSelectedCustomerId(cust.customerid);
           setCustomerQuery(
-            `${cust.first_name} ${cust.last_name} | ${cust.phone}`
+            `${cust.first_name} ${cust.last_name} | ${cust.phone}`,
           );
           setShowDropdown(false);
         }}

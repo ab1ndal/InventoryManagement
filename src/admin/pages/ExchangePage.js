@@ -270,7 +270,9 @@ export default function ExchangePage() {
 
       {!loadedBill && (
         <Card>
-          <CardHeader><CardTitle>Find Bill</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Find Bill</CardTitle>
+          </CardHeader>
           <CardContent>
             <form onSubmit={handleSearch} className="flex gap-2 mb-4">
               <Input
@@ -279,22 +281,29 @@ export default function ExchangePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="max-w-md"
               />
-              <Button type="submit" disabled={searchLoading || !searchQuery.trim()}>
+              <Button
+                type="submit"
+                disabled={searchLoading || !searchQuery.trim()}
+              >
                 {searchLoading ? "Searching..." : "Search"}
               </Button>
             </form>
             {searchResults.length > 0 && (
               <div className="border rounded divide-y">
-                {searchResults.map(b => (
+                {searchResults.map((b) => (
                   <button
                     key={b.billid}
                     onClick={() => handleLoadBill(b)}
                     className="w-full text-left px-4 py-2 hover:bg-gray-50 flex justify-between items-center"
                   >
                     <span>
-                      <span className="font-semibold">#{b.bill_number || b.billid}</span>
+                      <span className="font-semibold">
+                        #{b.bill_number || b.billid}
+                      </span>
                       {" — "}
-                      {b.customers ? `${b.customers.first_name} ${b.customers.last_name}` : "(no customer)"}
+                      {b.customers
+                        ? `${b.customers.first_name} ${b.customers.last_name || ""}`.trim()
+                        : "Missing Customer"}
                       {" — "}
                       {new Date(b.orderdate).toLocaleDateString("en-IN")}
                     </span>
@@ -313,11 +322,16 @@ export default function ExchangePage() {
         <Card>
           <CardHeader>
             <CardTitle>
-              Return items from Bill #{loadedBill.bill_number || loadedBill.billid}
+              Return items from Bill #
+              {loadedBill.bill_number || loadedBill.billid}
             </CardTitle>
             <div className="text-sm text-muted-foreground">
-              Customer: {loadedBill.customers ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name}` : "—"}
-              {" · "}Date: {new Date(loadedBill.orderdate).toLocaleDateString("en-IN")}
+              Customer:{" "}
+              {loadedBill.customers
+                ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name || ""}`.trim()
+                : "Missing Customer"}
+              {" · "}Date:{" "}
+              {new Date(loadedBill.orderdate).toLocaleDateString("en-IN")}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -330,26 +344,43 @@ export default function ExchangePage() {
                 <div className="col-span-3">Reason (optional)</div>
                 <div className="col-span-1 text-right">Credit</div>
               </div>
-              {billItems.map(bi => {
+              {billItems.map((bi) => {
                 const rq = Number(returnQtyMap[bi.bill_item_id] || 0);
                 const credit = calcItemCredit(bi, rq);
                 return (
-                  <div key={bi.bill_item_id} className="grid grid-cols-12 gap-2 px-3 py-2 items-center border-b last:border-0 text-sm">
+                  <div
+                    key={bi.bill_item_id}
+                    className="grid grid-cols-12 gap-2 px-3 py-2 items-center border-b last:border-0 text-sm"
+                  >
                     <div className="col-span-4">
-                      <div className="font-medium">{bi.product_name || "—"}</div>
+                      <div className="font-medium">
+                        {bi.product_name || "—"}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {[bi.size, bi.color, bi.variantid ? null : "manual"].filter(Boolean).join(" / ")}
+                        {[bi.size, bi.color, bi.variantid ? null : "manual"]
+                          .filter(Boolean)
+                          .join(" / ")}
                       </div>
                     </div>
-                    <div className="col-span-1 text-right tabular-nums">₹{Number(bi.mrp || 0).toFixed(0)}</div>
-                    <div className="col-span-1 text-right tabular-nums">{bi.maxReturnQty}</div>
+                    <div className="col-span-1 text-right tabular-nums">
+                      ₹{Number(bi.mrp || 0).toFixed(0)}
+                    </div>
+                    <div className="col-span-1 text-right tabular-nums">
+                      {bi.maxReturnQty}
+                    </div>
                     <div className="col-span-2 text-right">
                       <Input
                         type="number"
                         min={0}
                         max={bi.maxReturnQty}
                         value={returnQtyMap[bi.bill_item_id] ?? 0}
-                        onChange={(e) => handleQtyChange(bi.bill_item_id, e.target.value, bi.maxReturnQty)}
+                        onChange={(e) =>
+                          handleQtyChange(
+                            bi.bill_item_id,
+                            e.target.value,
+                            bi.maxReturnQty,
+                          )
+                        }
                         className="text-right"
                       />
                     </div>
@@ -358,10 +389,14 @@ export default function ExchangePage() {
                         type="text"
                         placeholder="e.g., size mismatch"
                         value={reasonMap[bi.bill_item_id] ?? ""}
-                        onChange={(e) => handleReasonChange(bi.bill_item_id, e.target.value)}
+                        onChange={(e) =>
+                          handleReasonChange(bi.bill_item_id, e.target.value)
+                        }
                       />
                     </div>
-                    <div className="col-span-1 text-right tabular-nums">₹{credit.toFixed(2)}</div>
+                    <div className="col-span-1 text-right tabular-nums">
+                      ₹{credit.toFixed(2)}
+                    </div>
                   </div>
                 );
               })}
@@ -377,8 +412,13 @@ export default function ExchangePage() {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={handleCancel}>Cancel</Button>
-              <Button disabled={!canConfirm} onClick={() => setConfirmOpen(true)}>
+              <Button variant="outline" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button
+                disabled={!canConfirm}
+                onClick={() => setConfirmOpen(true)}
+              >
                 Review & Confirm
               </Button>
             </div>
@@ -395,13 +435,28 @@ export default function ExchangePage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
-            <div><strong>Bill:</strong> #{loadedBill?.bill_number || loadedBill?.billid}</div>
-            <div><strong>Customer:</strong> {loadedBill?.customers ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name}` : "—"}</div>
+            <div>
+              <strong>Bill:</strong> #
+              {loadedBill?.bill_number || loadedBill?.billid}
+            </div>
+            <div>
+              <strong>Customer:</strong>{" "}
+              {loadedBill?.customers
+                ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name || ""}`.trim()
+                : "Missing Customer"}
+            </div>
             <div className="border rounded p-2 max-h-60 overflow-y-auto">
-              {selected.map(ri => (
-                <div key={ri.bill_item_id} className="flex justify-between py-1 border-b last:border-0">
-                  <span>{ri.product_name} × {ri.returnQty}</span>
-                  <span className="tabular-nums">₹{Number(ri.creditAmount).toFixed(2)}</span>
+              {selected.map((ri) => (
+                <div
+                  key={ri.bill_item_id}
+                  className="flex justify-between py-1 border-b last:border-0"
+                >
+                  <span>
+                    {ri.product_name} × {ri.returnQty}
+                  </span>
+                  <span className="tabular-nums">
+                    ₹{Number(ri.creditAmount).toFixed(2)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -410,12 +465,19 @@ export default function ExchangePage() {
             </div>
             {!loadedBill?.customerid && (
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                No customer on this bill — stock will be restored and PDF will print, but no store credit can be saved.
+                No customer on this bill — stock will be restored and PDF will
+                print, but no store credit can be saved.
               </div>
             )}
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="ghost" disabled={confirmSaving} onClick={() => setConfirmOpen(false)}>Keep Editing</Button>
+            <Button
+              variant="ghost"
+              disabled={confirmSaving}
+              onClick={() => setConfirmOpen(false)}
+            >
+              Keep Editing
+            </Button>
             <Button disabled={confirmSaving} onClick={handleConfirm}>
               {confirmSaving ? "Processing..." : "Confirm Exchange"}
             </Button>
@@ -423,14 +485,26 @@ export default function ExchangePage() {
         </DialogContent>
       </Dialog>
 
-      <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
+      <div
+        style={{
+          position: "fixed",
+          top: "-9999px",
+          left: "-9999px",
+          pointerEvents: "none",
+        }}
+        aria-hidden="true"
+      >
         <ReturnReceiptView
           ref={receiptRef}
           mode="exchange"
           billId={loadedBill?.bill_number || loadedBill?.billid || "—"}
           originalBillDate={loadedBill?.orderdate}
-          customerName={loadedBill?.customers ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name}` : ""}
-          items={receiptReadyItems.map(ri => ({
+          customerName={
+            loadedBill?.customers
+              ? `${loadedBill.customers.first_name} ${loadedBill.customers.last_name || ""}`.trim()
+              : "Missing Customer"
+          }
+          items={receiptReadyItems.map((ri) => ({
             product_name: ri.product_name,
             quantity: ri.returnQty,
             mrp: ri.mrp,
