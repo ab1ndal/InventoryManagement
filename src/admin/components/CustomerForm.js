@@ -31,8 +31,21 @@ import CustomDropdown from "../../components/CustomDropdown";
 const formSchema = z.object({
   referred_by: z.coerce.number().optional(),
   first_name: z.string().min(1, "First name is required"),
-  last_name: z.string().min(1, "Last name is required"),
-  phone: z.string().regex(/^\+\d[\d\s]{9,20}$/, "Must start with country code"),
+  last_name: z
+    .string()
+    .optional()
+    .transform((v) => (v?.trim() === "" ? null : v)),
+  phone: z
+    .string()
+    .optional()
+    .transform((v) => {
+      const cleaned = v?.replace(/\s/g, "");
+      return cleaned === "" ? null : cleaned;
+    })
+    .refine(
+      (v) => v === null || /^\+\d{10,15}$/.test(v),
+      "Invalid phone format",
+    ),
   email: z.string().email("Invalid email").or(z.literal("")).optional(),
   address: z.string().optional(),
   loyalty_tier: z.string().optional(),
@@ -66,7 +79,7 @@ export default function CustomerForm(props) {
     defaultValues: {
       first_name: "",
       last_name: "",
-      phone: "+91",
+      phone: "",
       email: "",
       address: "",
       loyalty_tier: "bronze",
@@ -82,7 +95,7 @@ export default function CustomerForm(props) {
     () => ({
       first_name: "",
       last_name: "",
-      phone: "+91",
+      phone: "",
       email: "",
       address: "",
       loyalty_tier: "bronze",
@@ -91,7 +104,7 @@ export default function CustomerForm(props) {
       customer_notes: "",
       referred_by: null,
     }),
-    []
+    [],
   );
 
   const resetPayload = React.useMemo(
@@ -130,24 +143,29 @@ export default function CustomerForm(props) {
         stableDefaults.customer_ulid || uuidv4().replace(/-/g, "").slice(0, 26);
 
       // Check for duplicate phone numbers only when creating new
-      if (!stableDefaults.customer_ulid) {
+      const cleanedPhone = values.phone
+        ? values.phone.replace(/\s/g, "")
+        : null;
+      const payload = {
+        ...values,
+        phone: cleanedPhone,
+        last_name: values.last_name || null,
+        customer_ulid: ulid,
+        referred_by: values.referred_by || null,
+
+        is_guest: !cleanedPhone,
+      };
+      if (!stableDefaults.customer_ulid && cleanedPhone) {
         const { data: existing } = await supabase
           .from("customers")
           .select("customerid")
-          .eq("phone", values.phone);
+          .eq("phone", cleanedPhone);
 
         if (existing && existing.length > 0) {
           toast.warning("Phone number already exists");
           return;
         }
       }
-
-      const payload = {
-        ...values,
-        phone: values.phone.replace(/\s/g, ""),
-        customer_ulid: ulid,
-        referred_by: values.referred_by || null,
-      };
 
       const { data, error } = await supabase
         .from("customers")
@@ -167,6 +185,9 @@ export default function CustomerForm(props) {
       toast.error("Error", { description: err.message });
     }
   };
+
+  const phoneValue = form.watch("phone");
+  const isGuest = !phoneValue || phoneValue.replace(/\s/g, "").length < 5;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -216,7 +237,10 @@ export default function CustomerForm(props) {
                   <FormItem>
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Enter Last Name" />
+                      <Input
+                        {...field}
+                        placeholder="Enter Last Name (Optional)"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -237,6 +261,7 @@ export default function CustomerForm(props) {
                         onChange={(e) =>
                           field.onChange(formatLivePhoneInput(e.target.value))
                         }
+                        placeholder="Phone (Optional, e.g. +91XXXXXXXXXX)"
                       />
                     </FormControl>
                     <FormMessage />
@@ -326,6 +351,7 @@ export default function CustomerForm(props) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField
+                disabled={isGuest}
                 control={form.control}
                 name="store_credit"
                 render={({ field }) => {
@@ -372,7 +398,7 @@ export default function CustomerForm(props) {
                     // if there is a decimal part, clamp to two places
                     if (decPart !== undefined) {
                       field.onChange(
-                        `${intPart || "0"}.${decPart.slice(0, 2)}`
+                        `${intPart || "0"}.${decPart.slice(0, 2)}`,
                       );
                       return;
                     }
@@ -441,16 +467,19 @@ export default function CustomerForm(props) {
                           { value: "", label: "None" },
                           ...customers
                             .filter(
-                              (c) => c.customerid !== stableDefaults.customerid
+                              (c) => c.customerid !== stableDefaults.customerid,
                             )
                             .sort((a, b) =>
                               `${a.first_name} ${a.last_name}`.localeCompare(
-                                `${b.first_name} ${b.last_name}`
-                              )
+                                `${b.first_name} ${b.last_name}`,
+                              ),
                             )
                             .map((c) => ({
                               value: c.customerid,
-                              label: `${c.first_name} ${c.last_name} | ${c.phone}`,
+                              label: [
+                                `${c.first_name} ${c.last_name || ""}`.trim(),
+                                c.phone || "No Phone Provided",
+                              ].join(" | "),
                             })),
                         ]}
                         placeholder="Select Referrer"

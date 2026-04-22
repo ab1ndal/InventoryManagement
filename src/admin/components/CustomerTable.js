@@ -105,6 +105,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     }
   };
   function formatPhoneNumber(phone) {
+    if (!phone) return "-";
     try {
       const number = parsePhoneNumber(phone);
       return number.formatInternational();
@@ -113,25 +114,19 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     }
   }
 
+  const safe = (v) => (v || "").toString().toLowerCase();
+
   const filteredCustomers = customers.filter((c) => {
     const referredName = c.referred_by_data
       ? `${c.referred_by_data.first_name} ${c.referred_by_data.last_name}`
       : "";
     return (
-      c.first_name
-        ?.toLowerCase()
-        .includes(filters.first_name?.toLowerCase() || "") &&
-      c.last_name
-        ?.toLowerCase()
-        .includes(filters.last_name?.toLowerCase() || "") &&
-      c.phone?.includes(filters.phone || "") &&
-      c.email?.toLowerCase().includes(filters.email?.toLowerCase() || "") &&
-      c.loyalty_tier
-        ?.toLowerCase()
-        .includes(filters.loyalty_tier?.toLowerCase() || "") &&
-      referredName
-        .toLowerCase()
-        .includes((filters.referred_by || "").toLowerCase().trim())
+      safe(c.first_name).includes(safe(filters.first_name)) &&
+      safe(c.last_name).includes(safe(filters.last_name)) &&
+      safe(c.phone).includes(safe(filters.phone)) &&
+      safe(c.email).includes(safe(filters.email)) &&
+      safe(c.loyalty_tier).includes(safe(filters.loyalty_tier)) &&
+      safe(referredName).includes(safe(filters.referred_by))
     );
   });
 

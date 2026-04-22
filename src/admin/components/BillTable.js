@@ -4,13 +4,14 @@ import { flushSync } from "react-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw } from "lucide-react";
+import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageSquare } from "lucide-react";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import ReturnReceiptView from "./billing/ReturnReceiptView";
 import InvoiceView from "./billing/InvoiceView";
 import { generateInvoicePdf } from "./billing/generateInvoicePdf";
+import { generateBillText } from "./billing/generateBillText";
 import { computeBillTotals } from "./billing/billUtils";
 import { backCalcDiscountPct } from "./billing/stockHelpers";
 
@@ -173,6 +174,122 @@ export default function BillTable({ onEdit }) {
     } finally {
       setRegenBillData(null);
       setRegeningBills((prev) => { const s = new Set(prev); s.delete(billId); return s; });
+    }
+  };
+
+  // TODO: Enable when ready to roll out SMS bill sharing.
+  // Uses the sms: URI scheme — zero cost, no API key, no backend.
+  // Opens the device's native SMS app with the customer's number and bill text pre-filled.
+  // Staff taps Send manually — nothing is transmitted automatically.
+  // NOTE: Only works on mobile/tablet devices where SMS is available.
+  // Desktop browsers will either open a default messaging app or do nothing.
+  const handleSendSms = async (bill) => {
+    const { billid: billId } = bill;
+    try {
+      // Fetch bill core
+      const { data: billRow, error: billErr } = await supabase
+        .from("bills")
+        .select("applied_codes, payment_amount, salesmethodid, store_credit_used, orderdate, customerid, bill_number")
+        .eq("billid", billId)
+        .single();
+      if (billErr) throw billErr;
+
+      // Customer name + phone
+      let customerName = "";
+      let customerPhone = "";
+      if (billRow.customerid) {
+        const { data: cust } = await supabase
+          .from("customers")
+          .select("first_name, last_name, phone")
+          .eq("customerid", billRow.customerid)
+          .single();
+        if (cust) {
+          customerName = `${cust.first_name} ${cust.last_name}`;
+          // Normalize to +91XXXXXXXXXX
+          const digits = (cust.phone || "").replace(/\D/g, "");
+          customerPhone = digits.length === 10 ? `+91${digits}` : digits ? `+${digits}` : "";
+        }
+      }
+
+      // Bill items
+      const { data: billItems } = await supabase
+        .from("bill_items")
+        .select("*")
+        .eq("billid", billId);
+
+      const inventoryItems = (billItems || []).filter((bi) => bi.variantid);
+      let variantMap = {};
+      if (inventoryItems.length > 0) {
+        const { data: variants } = await supabase
+          .from("productsizecolors")
+          .select("variantid, size, color")
+          .in("variantid", inventoryItems.map((bi) => bi.variantid));
+        variantMap = Object.fromEntries((variants || []).map((v) => [v.variantid, v]));
+      }
+
+      const manualItems = (billItems || []).filter((bi) => !bi.variantid && bi.product_code);
+      let manualMap = {};
+      if (manualItems.length > 0) {
+        const { data: manuals } = await supabase
+          .from("manual_items")
+          .select("manual_item_id, size, color")
+          .in("manual_item_id", manualItems.map((bi) => bi.product_code));
+        manualMap = Object.fromEntries((manuals || []).map((m) => [m.manual_item_id, m]));
+      }
+
+      const items = (billItems || []).map((bi) => ({
+        product_name: bi.product_name || "",
+        quantity: bi.quantity,
+        mrp: bi.mrp,
+        alteration_charge: bi.alteration_charge || 0,
+        quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
+        gstRate: bi.gst_rate ?? 18,
+        stitchType: bi.stitch_type || "unstitched",
+        size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
+        color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
+      }));
+
+      const appliedCodes = billRow.applied_codes || [];
+      let allDiscounts = [];
+      if (appliedCodes.length > 0) {
+        const { data: discData } = await supabase
+          .from("discounts")
+          .select("id, code, type, value, max_discount, category, exclusive, auto_apply, min_total, start_date, end_date, active, rules")
+          .in("code", appliedCodes);
+        allDiscounts = discData || [];
+      }
+
+      let paymentMethod = "";
+      if (billRow.salesmethodid) {
+        const { data: meth } = await supabase
+          .from("salesmethods")
+          .select("methodname")
+          .eq("salesmethodid", billRow.salesmethodid)
+          .single();
+        paymentMethod = meth?.methodname || "";
+      }
+
+      const computed = computeBillTotals(items, appliedCodes, allDiscounts);
+
+      const text = generateBillText({
+        billNumber: billRow.bill_number || billId,
+        billDate: new Date(billRow.orderdate),
+        customerName,
+        items,
+        computed,
+        paymentMethod,
+        paymentAmount: billRow.payment_amount ?? 0,
+        appliedStoreCredit: Number(billRow.store_credit_used ?? 0),
+      });
+
+      // sms: URI — body separator is "?" on iOS, "&" on Android; "?" works on both
+      const encoded = encodeURIComponent(text);
+      const uri = customerPhone
+        ? `sms:${customerPhone}?body=${encoded}`
+        : `sms:?body=${encoded}`;
+      window.location.href = uri;
+    } catch (e) {
+      toast({ title: "Failed to prepare SMS", description: e.message, variant: "destructive" });
     }
   };
 
@@ -592,6 +709,17 @@ export default function BillTable({ onEdit }) {
                         onClick={() => b.pdf_url && window.open(b.pdf_url, "_blank")}
                       >
                         <FileText className="h-4 w-4" />
+                      </Button>
+                      {/* TODO: Remove `disabled` and `opacity-40` when ready to roll out SMS sending */}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled
+                        className="opacity-40 cursor-not-allowed"
+                        title="Send bill via SMS (coming soon)"
+                        onClick={() => handleSendSms(b)}
+                      >
+                        <MessageSquare className="h-4 w-4" />
                       </Button>
                       {b.finalized && (
                         <Button

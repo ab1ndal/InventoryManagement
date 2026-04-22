@@ -171,9 +171,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Foundation: migration_14 manual_items.stock, exchangeHelpers pure functions + unit tests (EX-SCHEMA-01, EX-CREDIT-01, EX-CREDIT-02)
-- [ ] 06-02-PLAN.md — ExchangePage search/selection/confirm + ReturnReceiptView exchange mode (EX-UI-01, EX-UI-02, EX-SEARCH-01, EX-RECEIPT-01, EX-RESTOCK-01, EX-CREDIT-03)
-- [ ] 06-03-PLAN.md — BillingPage route-state handoff + BillingForm exchangeCredit prop + Summary deduction row (EX-CREDIT-04, EX-UI-03, EX-HANDOFF-01)
+- [x] 06-01-PLAN.md — Foundation: migration_14 manual_items.stock, exchangeHelpers pure functions + unit tests (EX-SCHEMA-01, EX-CREDIT-01, EX-CREDIT-02)
+- [x] 06-02-PLAN.md — ExchangePage search/selection/confirm + ReturnReceiptView exchange mode (EX-UI-01, EX-UI-02, EX-SEARCH-01, EX-RECEIPT-01, EX-RESTOCK-01, EX-CREDIT-03)
+- [x] 06-03-PLAN.md — BillingPage route-state handoff + BillingForm exchangeCredit prop + Summary deduction row (EX-CREDIT-04, EX-UI-03, EX-HANDOFF-01)
 
 **Success criteria:**
 1. ExchangePage search finds finalized bills by bill_number (ilike) or customer first_name/last_name (finalized-only per D-02)
