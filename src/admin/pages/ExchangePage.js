@@ -276,7 +276,7 @@ export default function ExchangePage() {
           <CardContent>
             <form onSubmit={handleSearch} className="flex gap-2 mb-4">
               <Input
-                placeholder="Bill number (e.g., BC25001) or customer name"
+                placeholder="Bill number (e.g., FY26-000001) or customer name"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="max-w-md"

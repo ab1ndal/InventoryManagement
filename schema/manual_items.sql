@@ -7,6 +7,7 @@ create table public.manual_items (
   purchase_price numeric(10, 2) null default 0,
   mrp numeric(10, 2) null default 0,
   created_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  stock integer not null default 1,
   constraint manual_items_pkey primary key (manual_item_id),
   constraint manual_items_categoryid_fkey foreign KEY (categoryid) references categories (categoryid)
 ) TABLESPACE pg_default;
