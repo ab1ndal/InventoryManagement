@@ -95,10 +95,12 @@ const InvoiceView = forwardRef(function InvoiceView(
         gstRate = effectivePricePerUnit <= 2500 ? 5 : 18;
       }
     }
-
-    const cgst = (adjustedTaxable * (gstRate / 2)) / 100;
-    const sgst = (adjustedTaxable * (gstRate / 2)) / 100;
-    const lineGross = adjustedTaxable + cgst + sgst;
+    const garmentTaxable = adjustedTaxable - alteration;
+    const cgst =
+      (garmentTaxable * (gstRate / 2)) / 100 + (0.05 * alteration) / 1.05 / 2;
+    const sgst =
+      (garmentTaxable * (gstRate / 2)) / 100 + (0.05 * alteration) / 1.05 / 2;
+    const lineGross = garmentTaxable + cgst + sgst + alteration / 1.05;
     return {
       item,
       idx,
@@ -108,7 +110,7 @@ const InvoiceView = forwardRef(function InvoiceView(
       disc: disc + itemOverallDisc + itemBalanceDisc + itemVoucherDisc,
       alteration,
       lineGross,
-      taxable: adjustedTaxable,
+      taxable: garmentTaxable + alteration / 1.05,
       cgst,
       sgst,
     };
