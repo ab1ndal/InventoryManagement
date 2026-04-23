@@ -66,6 +66,7 @@ function isAutoApplyEligible(d, items, today) {
 
 export default function BillingForm({ billId, open, onOpenChange, onSubmit, exchangeCredit: exchangeCreditProp = null, prefilledCustomerId = null }) {
   const [items, setItems] = useState([]);
+  const [isFinalizedBill, setIsFinalizedBill] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [notes, setNotes] = useState("");
   const [allDiscounts, setAllDiscounts] = useState([]);
@@ -84,10 +85,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [effectiveBillId, setEffectiveBillId] = useState(null);
   const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
   const [isBackdated, setIsBackdated] = useState(false);
-  const [backdatedDate, setBackdatedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [backdatedDate, setBackdatedDate] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
   const [exchangeCredit, setExchangeCredit] = useState(null); // { amount: number, label: string }
-  const [customerStoreCreditBalance, setCustomerStoreCreditBalance] = useState(0);
+  const [customerStoreCreditBalance, setCustomerStoreCreditBalance] =
+    useState(0);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null); // { voucher_id, value }
   const [voucherError, setVoucherError] = useState("");
@@ -110,6 +114,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setAllDiscounts([]);
       setIsSaving(false);
       setEditingItem(null);
+      setIsFinalizedBill(false);
       setSelectedSalespersonIds([]);
       setPaymentAmount("");
       setCustomerDisplayText("");
@@ -180,11 +185,22 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   useEffect(() => {
     if (!open) return;
     const loadLookups = async () => {
-      const [{ data: locs }, { data: methods }, { data: sps }] = await Promise.all([
-        supabase.from("saleslocations").select("saleslocationid, locationname").order("saleslocationid"),
-        supabase.from("salesmethods").select("salesmethodid, methodname").order("salesmethodid"),
-        supabase.from("salespersons").select("salesperson_id, name").eq("active", true).order("name"),
-      ]);
+      const [{ data: locs }, { data: methods }, { data: sps }] =
+        await Promise.all([
+          supabase
+            .from("saleslocations")
+            .select("saleslocationid, locationname")
+            .order("saleslocationid"),
+          supabase
+            .from("salesmethods")
+            .select("salesmethodid, methodname")
+            .order("salesmethodid"),
+          supabase
+            .from("salespersons")
+            .select("salesperson_id, name")
+            .eq("active", true)
+            .order("name"),
+        ]);
       if (locs) setSalesLocations(locs);
       if (methods) setSalesMethods(methods);
       if (sps) setSalespersonsList(sps);
@@ -193,16 +209,36 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   }, [open]);
 
   useEffect(() => {
+    const uniqueIds = Array.from(
+      new Set(items.map((it) => it.salesperson_id).filter(Boolean)),
+    );
+
+    setSelectedSalespersonIds((prev) => {
+      // prevent unnecessary re-renders
+      if (
+        prev.length === uniqueIds.length &&
+        prev.every((id) => uniqueIds.includes(id))
+      ) {
+        return prev;
+      }
+      return uniqueIds;
+    });
+  }, [items]);
+
+  useEffect(() => {
     if (!open || !billId) return;
     const loadBill = async () => {
       try {
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select("customerid, notes, payment_amount, saleslocationid, salesmethodid, bill_number")
+          .select(
+            "customerid, notes, payment_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url",
+          )
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
         setEffectiveBillNumber(bill.bill_number || null);
+        setIsFinalizedBill(!!bill.finalized);
 
         // Fetch applied_codes separately — column may not exist if migration not yet run
         const { data: codesRow } = await supabase
@@ -223,7 +259,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bill_salespersons")
           .select("salesperson_id")
           .eq("billid", billId);
-        setSelectedSalespersonIds((spData || []).map(r => r.salesperson_id));
+        setSelectedSalespersonIds((spData || []).map((r) => r.salesperson_id));
 
         // Set form state from bill
         setSelectedCustomerId(bill.customerid || null);
@@ -238,7 +274,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .eq("billid", billId)
           .single();
         if (dateRow?.orderdate) {
-          setBackdatedDate(new Date(dateRow.orderdate).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }));
+          setBackdatedDate(
+            new Date(dateRow.orderdate).toLocaleDateString("en-CA", {
+              timeZone: "Asia/Kolkata",
+            }),
+          );
         }
 
         // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts
@@ -246,45 +286,73 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setSelectedCodes(savedCodes || []);
 
         // Fetch size/color for inventory variants
-        const inventoryBillItems = (billItems || []).filter(bi => bi.variantid);
+        const inventoryBillItems = (billItems || []).filter(
+          (bi) => bi.variantid,
+        );
         let variantMap = {};
         if (inventoryBillItems.length > 0) {
           const { data: variants } = await supabase
             .from("productsizecolors")
             .select("variantid, size, color")
-            .in("variantid", inventoryBillItems.map(bi => bi.variantid));
-          variantMap = Object.fromEntries((variants || []).map(v => [v.variantid, v]));
+            .in(
+              "variantid",
+              inventoryBillItems.map((bi) => bi.variantid),
+            );
+          variantMap = Object.fromEntries(
+            (variants || []).map((v) => [v.variantid, v]),
+          );
         }
 
         // Fetch size/color for manual items from manual_items table
-        const manualBillItems = (billItems || []).filter(bi => !bi.variantid && bi.product_code);
+        const manualBillItems = (billItems || []).filter(
+          (bi) => !bi.variantid && bi.product_code,
+        );
         let manualMap = {};
         if (manualBillItems.length > 0) {
           const { data: manuals } = await supabase
             .from("manual_items")
             .select("manual_item_id, size, color")
-            .in("manual_item_id", manualBillItems.map(bi => bi.product_code));
-          manualMap = Object.fromEntries((manuals || []).map(m => [m.manual_item_id, m]));
+            .in(
+              "manual_item_id",
+              manualBillItems.map((bi) => bi.product_code),
+            );
+          manualMap = Object.fromEntries(
+            (manuals || []).map((m) => [m.manual_item_id, m]),
+          );
         }
 
         // Reconstruct items — product_code in DB stores the BC-format productid for inventory items
-        setItems((billItems || []).map(bi => ({
-          _id: String(bi.bill_item_id),
-          source: bi.variantid ? "inventory" : "manual",
-          variantid: bi.variantid || null,
-          productid: bi.product_code || null,
-          product_name: bi.product_name || "",
-          category: bi.category || null,
-          quantity: bi.quantity,
-          mrp: bi.mrp,
-          alteration_charge: bi.alteration_charge || 0,
-          quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
-          gstRate: bi.gst_rate ?? 18,
-          stitchType: bi.stitch_type || (Number(bi.gst_rate) === 18 ? 'stitched' : 'unstitched'),
-          size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
-          color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
-          salesperson_id: bi.salesperson_id || null,
-        })));
+        setItems(
+          (billItems || []).map((bi) => ({
+            _id: String(bi.bill_item_id),
+            source: bi.variantid ? "inventory" : "manual",
+            variantid: bi.variantid || null,
+            productid: bi.product_code || null,
+            product_name: bi.product_name || "",
+            category: bi.category || null,
+            quantity: bi.quantity,
+            mrp: bi.mrp,
+            alteration_charge: bi.alteration_charge || 0,
+            quickDiscountPct: backCalcDiscountPct(
+              bi.discount_total,
+              bi.mrp,
+              bi.quantity,
+            ),
+            gstRate: bi.gst_rate ?? 18,
+            stitchType:
+              bi.stitch_type ||
+              (Number(bi.gst_rate) === 18 ? "stitched" : "unstitched"),
+            size:
+              variantMap[bi.variantid]?.size ||
+              manualMap[bi.product_code]?.size ||
+              null,
+            color:
+              variantMap[bi.variantid]?.color ||
+              manualMap[bi.product_code]?.color ||
+              null,
+            salesperson_id: bi.salesperson_id || null,
+          })),
+        );
       } catch (e) {
         toast.error("Error loading bill", { description: e.message });
       }
@@ -294,8 +362,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
   // Fetch customer display name for InvoiceView and CustomerSelector
   useEffect(() => {
-    if (!selectedCustomerId) { setCustomerName(""); setCustomerDisplayText(""); return; }
-    supabase.from('customers').select('first_name, last_name, phone').eq('customerid', selectedCustomerId).single()
+    if (!selectedCustomerId) {
+      setCustomerName("");
+      setCustomerDisplayText("");
+      return;
+    }
+    supabase
+      .from("customers")
+      .select("first_name, last_name, phone")
+      .eq("customerid", selectedCustomerId)
+      .single()
       .then(({ data }) => {
         const name = data
           ? `${data.first_name} ${data.last_name || ""}`.trim()
@@ -314,9 +390,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       return;
     }
     supabase
-      .from('customers')
-      .select('store_credit')
-      .eq('customerid', selectedCustomerId)
+      .from("customers")
+      .select("store_credit")
+      .eq("customerid", selectedCustomerId)
       .single()
       .then(({ data, error }) => {
         if (error || !data) {
@@ -349,7 +425,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         prev.filter((c) => {
           const disc = allDiscounts.find((d) => d.code === c);
           return !(disc && disc.once_per_customer && codes.has(c));
-        })
+        }),
       );
     };
     fetchUsedCodes();
@@ -357,19 +433,35 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
   // Fetch salesperson display names for InvoiceView
   useEffect(() => {
-    if (!selectedSalespersonIds?.length) { setSalespersonNames([]); return; }
-    supabase.from('salespersons').select('name').in('salesperson_id', selectedSalespersonIds)
-      .then(({ data }) => setSalespersonNames((data ?? []).map(r => r.name)));
+    if (!selectedSalespersonIds?.length) {
+      setSalespersonNames([]);
+      return;
+    }
+    supabase
+      .from("salespersons")
+      .select("name")
+      .in("salesperson_id", selectedSalespersonIds)
+      .then(({ data }) => setSalespersonNames((data ?? []).map((r) => r.name)));
   }, [selectedSalespersonIds]);
 
   const salespersonMap = useMemo(
-    () => Object.fromEntries(salespersonsList.map(s => [s.salesperson_id, s.name])),
-    [salespersonsList]
+    () =>
+      Object.fromEntries(
+        salespersonsList.map((s) => [s.salesperson_id, s.name]),
+      ),
+    [salespersonsList],
   );
 
   const computed = useMemo(
-    () => computeBillTotals(items, selectedCodes, allDiscounts, 0, Number(appliedVoucher?.value ?? 0)),
-    [items, selectedCodes, allDiscounts, appliedVoucher]
+    () =>
+      computeBillTotals(
+        items,
+        selectedCodes,
+        allDiscounts,
+        0,
+        Number(appliedVoucher?.value ?? 0),
+      ),
+    [items, selectedCodes, allDiscounts, appliedVoucher],
   );
 
   // When payment is less than the effective total, compute a pre-tax balance discount
@@ -378,21 +470,48 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     const paidAmt = Number(paymentAmount);
     if (!paidAmt || paidAmt <= 0 || computed.grandTotal <= 0) return computed;
     // voucher is pre-tax (baked into computed.grandTotal); store credit is a payment method
-    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), computed.grandTotal);
+    const storeCreditAmt = Math.min(
+      Number(appliedStoreCredit || 0),
+      computed.grandTotal,
+    );
     const afterStoreCredit = Math.max(0, computed.grandTotal - storeCreditAmt);
-    const exchangeCreditAmt = Math.min(Number(exchangeCredit?.amount || 0), afterStoreCredit);
-    const effectiveGrandTotal = Math.max(0, afterStoreCredit - exchangeCreditAmt);
+    const exchangeCreditAmt = Math.min(
+      Number(exchangeCredit?.amount || 0),
+      afterStoreCredit,
+    );
+    const effectiveGrandTotal = Math.max(
+      0,
+      afterStoreCredit - exchangeCreditAmt,
+    );
     if (paidAmt >= effectiveGrandTotal) return computed;
     const shortfall = effectiveGrandTotal - paidAmt;
-    const preDisc = computePreTaxBalanceDiscount(computed, computed.grandTotal - shortfall);
+    const preDisc = computePreTaxBalanceDiscount(
+      computed,
+      computed.grandTotal - shortfall,
+    );
     if (preDisc <= 0) return computed;
-    return computeBillTotals(items, selectedCodes, allDiscounts, preDisc, Number(appliedVoucher?.value ?? 0));
-  }, [computed, paymentAmount, appliedVoucher, appliedStoreCredit, exchangeCredit, items, selectedCodes, allDiscounts]);
+    return computeBillTotals(
+      items,
+      selectedCodes,
+      allDiscounts,
+      preDisc,
+      Number(appliedVoucher?.value ?? 0),
+    );
+  }, [
+    computed,
+    paymentAmount,
+    appliedVoucher,
+    appliedStoreCredit,
+    exchangeCredit,
+    items,
+    selectedCodes,
+    allDiscounts,
+  ]);
 
   const visibleDiscounts = useMemo(() => {
     if (!selectedCustomerId) return allDiscounts; // D-06: no filter without customer
     return allDiscounts.filter(
-      (d) => !(d.once_per_customer && usedCodeSet.has(d.code))
+      (d) => !(d.once_per_customer && usedCodeSet.has(d.code)),
     );
   }, [allDiscounts, usedCodeSet, selectedCustomerId]);
 
@@ -404,9 +523,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     try {
       const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const { data, error } = await supabase
-        .from('vouchers')
-        .select('voucher_id, customerid, expiry_date, value, redeemed')
-        .eq('voucher_id', code)
+        .from("vouchers")
+        .select("voucher_id, customerid, expiry_date, value, redeemed")
+        .eq("voucher_id", code)
         .maybeSingle();
       if (error) throw error;
       if (!data) {
@@ -422,21 +541,60 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         return;
       }
       if (
-        data.customerid !== null && data.customerid !== undefined &&
-        selectedCustomerId !== null && selectedCustomerId !== undefined &&
+        data.customerid !== null &&
+        data.customerid !== undefined &&
+        selectedCustomerId !== null &&
+        selectedCustomerId !== undefined &&
         String(data.customerid) !== String(selectedCustomerId)
       ) {
         setVoucherError("This voucher is assigned to a different customer.");
         return;
       }
       // Valid
-      setAppliedVoucher({ voucher_id: data.voucher_id, value: Number(data.value ?? 0) });
+      setAppliedVoucher({
+        voucher_id: data.voucher_id,
+        value: Number(data.value ?? 0),
+      });
       setVoucherCode("");
     } catch (e) {
-      setVoucherError(e?.message || "Could not apply voucher. Please try again.");
+      setVoucherError(
+        e?.message || "Could not apply voucher. Please try again.",
+      );
     } finally {
       setVoucherLoading(false);
     }
+  };
+
+  const regenerateBillPdf = async ({ activeBillId, pdfBillNumber }) => {
+    if (!invoiceRef.current) throw new Error("InvoiceView ref missing");
+
+    const blob = await generateInvoicePdf(invoiceRef.current);
+    const path = `bill-${pdfBillNumber || activeBillId}.pdf`;
+
+    // Delete previous object first so the new upload replaces it cleanly
+    await supabase.storage.from("invoices").remove([path]);
+
+    const { error: upErr } = await supabase.storage
+      .from("invoices")
+      .upload(path, blob, { contentType: "application/pdf" });
+
+    if (upErr) throw upErr;
+
+    const { data: urlData } = supabase.storage
+      .from("invoices")
+      .getPublicUrl(path);
+    const pdfUrl = urlData?.publicUrl ?? null;
+
+    if (pdfUrl) {
+      const { error: urlErr } = await supabase
+        .from("bills")
+        .update({ pdf_url: pdfUrl })
+        .eq("billid", activeBillId);
+
+      if (urlErr) throw urlErr;
+    }
+
+    return pdfUrl;
   };
 
   // BILL-01 + STOCK-01: New draft save | BILL-02 + STOCK-02: Draft update (Plan 03)
@@ -458,9 +616,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .select("variantid, quantity")
           .eq("billid", billId)
           .not("variantid", "is", null);
-        if (fetchErr) throw new Error("Could not fetch existing items: " + fetchErr.message);
+        if (fetchErr)
+          throw new Error(
+            "Could not fetch existing items: " + fetchErr.message,
+          );
 
-        const newInventoryItems = items.filter(it => it.variantid);
+        const newInventoryItems = items.filter((it) => it.variantid);
 
         // Stock delta computation + validation skipped for backdated bills
         let deltaMap = {};
@@ -476,8 +637,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               .from("productsizecolors")
               .select("variantid, stock, size, color")
               .in("variantid", allVariantIds);
-            if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
-            stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
+            if (stockErr)
+              throw new Error("Could not verify stock: " + stockErr.message);
+            stockMap = Object.fromEntries(
+              stockData.map((r) => [r.variantid, r]),
+            );
           }
 
           // Step E: Validate stock
@@ -486,53 +650,95 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             const currentStock = stockMap[vid]?.stock ?? 0;
             const finalStock = currentStock + delta;
             if (finalStock < 0) {
-              const item = newInventoryItems.find(it => it.variantid === vid);
+              const item = newInventoryItems.find((it) => it.variantid === vid);
               const name = item?.product_name || vid;
               const size = stockMap[vid]?.size || "";
               const color = stockMap[vid]?.color || "";
-              stockErrors.push(`${name} (${size}/${color}): would result in ${finalStock} stock`);
+              stockErrors.push(
+                `${name} (${size}/${color}): would result in ${finalStock} stock`,
+              );
             }
           }
           if (stockErrors.length > 0) {
-            toast.error("Insufficient stock", { description: stockErrors.join("\n") });
+            toast.error("Insufficient stock", {
+              description: stockErrors.join("\n"),
+            });
             return;
           }
         }
 
         // Step F: Delete old bill_items
-        const { error: delErr } = await supabase.from("bill_items").delete().eq("billid", billId);
-        if (delErr) throw new Error("Failed to remove old items: " + delErr.message);
+        const { error: delErr } = await supabase
+          .from("bill_items")
+          .delete()
+          .eq("billid", billId);
+        if (delErr)
+          throw new Error("Failed to remove old items: " + delErr.message);
 
         // Step G: Insert new bill_items
-        const billItemsPayload = buildBillItemsPayload(billId, items, 0, computed.overallDiscount);
-        const { error: insErr } = await supabase.from("bill_items").insert(billItemsPayload);
-        if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
+        const billItemsPayload = buildBillItemsPayload(
+          billId,
+          items,
+          0,
+          computed.overallDiscount,
+        );
+        const { error: insErr } = await supabase
+          .from("bill_items")
+          .insert(billItemsPayload);
+        if (insErr)
+          throw new Error("Failed to save updated items: " + insErr.message);
 
         // Step H: Update bills row
+        const totalsToUse = isFinalizedBill
+          ? balanceAdjustedComputed
+          : computed;
+        
         const { error: updErr } = await supabase
           .from("bills")
           .update({
             customerid: selectedCustomerId || null,
             notes: notes || null,
-            totalamount: computed.grandTotal,
-            gst_total: computed.gstTotal,
-            discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
-            taxable_total: computed.taxableTotal,
+            totalamount: totalsToUse.grandTotal,
+            gst_total: totalsToUse.gstTotal,
+            discount_total:
+              totalsToUse.itemLevelDiscountTotal +
+              totalsToUse.overallDiscount +
+              (isFinalizedBill ? Number(totalsToUse.balanceDiscount || 0) : 0),
+            taxable_total: totalsToUse.taxableTotal,
             applied_codes: selectedCodes,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
+            finalized: isFinalizedBill ? true : false,
+            paymentstatus: isFinalizedBill ? "finalized" : "draft",
+            store_credit_used: isFinalizedBill
+              ? Math.min(
+                  Number(appliedStoreCredit || 0),
+                  totalsToUse.grandTotal,
+                )
+              : 0,
+            orderdate: backdatedDate + "T00:00:00+05:30",
           })
           .eq("billid", billId);
         if (updErr) throw new Error("Failed to update bill: " + updErr.message);
 
         // Reconcile salesperson associations
-        const { error: spDelErr } = await supabase.from("bill_salespersons").delete().eq("billid", billId);
-        if (spDelErr) console.error("Failed to clear salespersons:", spDelErr.message);
+        const { error: spDelErr } = await supabase
+          .from("bill_salespersons")
+          .delete()
+          .eq("billid", billId);
+        if (spDelErr)
+          console.error("Failed to clear salespersons:", spDelErr.message);
         if (selectedSalespersonIds.length > 0) {
-          const spPayload = selectedSalespersonIds.map(spId => ({ billid: billId, salesperson_id: spId }));
-          const { error: spInsErr } = await supabase.from("bill_salespersons").insert(spPayload);
-          if (spInsErr) console.error("Failed to save salespersons:", spInsErr.message);
+          const spPayload = selectedSalespersonIds.map((spId) => ({
+            billid: billId,
+            salesperson_id: spId,
+          }));
+          const { error: spInsErr } = await supabase
+            .from("bill_salespersons")
+            .insert(spPayload);
+          if (spInsErr)
+            console.error("Failed to save salespersons:", spInsErr.message);
         }
 
         // Step I: Apply stock deltas (skipped for backdated bills)
@@ -571,26 +777,29 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
 
       // Step B - Stock validation per D-01 (skipped for backdated bills)
-      const inventoryItems = items.filter(it => it.variantid);
+      const inventoryItems = items.filter((it) => it.variantid);
       let stockMap = {};
       if (!isBackdated && inventoryItems.length > 0) {
-        const variantIds = inventoryItems.map(it => it.variantid);
+        const variantIds = inventoryItems.map((it) => it.variantid);
         const { data: stockData, error: stockErr } = await supabase
           .from("productsizecolors")
           .select("variantid, stock, size, color")
           .in("variantid", variantIds);
-        if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+        if (stockErr)
+          throw new Error("Could not verify stock: " + stockErr.message);
 
-        stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
-        const outOfStock = inventoryItems.filter(it => {
+        stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
+        const outOfStock = inventoryItems.filter((it) => {
           const available = stockMap[it.variantid]?.stock ?? 0;
           return it.quantity > available;
         });
         if (outOfStock.length > 0) {
-          const details = outOfStock.map(it => {
-            const avail = stockMap[it.variantid]?.stock ?? 0;
-            return `${it.product_name} (${stockMap[it.variantid]?.size || ''}/${stockMap[it.variantid]?.color || ''}): requested ${it.quantity}, available ${avail}`;
-          }).join("\n");
+          const details = outOfStock
+            .map((it) => {
+              const avail = stockMap[it.variantid]?.stock ?? 0;
+              return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
+            })
+            .join("\n");
           toast.error("Insufficient stock", { description: details });
           return;
         }
@@ -604,7 +813,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           notes: notes || null,
           totalamount: computed.grandTotal,
           gst_total: computed.gstTotal,
-          discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
+          discount_total:
+            computed.itemLevelDiscountTotal + computed.overallDiscount,
           taxable_total: computed.taxableTotal,
           paymentstatus: "draft",
           finalized: false,
@@ -616,11 +826,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         })
         .select("billid, bill_number")
         .single();
-      if (billError) throw new Error("Failed to save bill: " + billError.message);
+      if (billError)
+        throw new Error("Failed to save bill: " + billError.message);
 
       // Step D - Insert bill_items
-      const billItemsPayload = buildBillItemsPayload(bill.billid, items, 0, computed.overallDiscount);
-      const { error: itemsError } = await supabase.from("bill_items").insert(billItemsPayload);
+      const billItemsPayload = buildBillItemsPayload(
+        bill.billid,
+        items,
+        0,
+        computed.overallDiscount,
+      );
+      const { error: itemsError } = await supabase
+        .from("bill_items")
+        .insert(billItemsPayload);
       if (itemsError) {
         // Best-effort cleanup of dangling bills row (Pitfall 6)
         await supabase.from("bills").delete().eq("billid", bill.billid);
@@ -629,11 +847,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
       // Save salesperson associations
       if (selectedSalespersonIds.length > 0) {
-        const spPayload = selectedSalespersonIds.map(spId => ({
+        const spPayload = selectedSalespersonIds.map((spId) => ({
           billid: bill.billid,
           salesperson_id: spId,
         }));
-        const { error: spErr } = await supabase.from("bill_salespersons").insert(spPayload);
+        const { error: spErr } = await supabase
+          .from("bill_salespersons")
+          .insert(spPayload);
         if (spErr) console.error("Failed to save salespersons:", spErr.message);
       }
 
@@ -647,7 +867,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             .update({ stock: currentStock - it.quantity })
             .eq("variantid", it.variantid);
           if (stockUpdateErr) {
-            console.error("Stock update failed for", it.variantid, stockUpdateErr);
+            console.error(
+              "Stock update failed for",
+              it.variantid,
+              stockUpdateErr,
+            );
             newDraftStockFailures.push(it.variantid);
           }
         }
@@ -672,25 +896,39 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const openFinalizeConfirm = () => {
     // D-06: Customer required to finalize
     if (!selectedCustomerId) {
-      toast.error("Customer required", { description: "A customer must be selected before finalizing." });
+      toast.error("Customer required", {
+        description: "A customer must be selected before finalizing.",
+      });
       return;
     }
     // Validate payment fields
     const paidAmt = Number(paymentAmount);
     if (!salesMethodId || !paymentAmount) {
-      toast.error("Payment required", { description: "Select a payment method and enter the amount received before finalizing." });
+      toast.error("Payment required", {
+        description:
+          "Select a payment method and enter the amount received before finalizing.",
+      });
       return;
     }
     // voucher is pre-tax in grandTotal; store credit is a customer payment
-    const storeCreditAmt = Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal);
-    const effectiveGrandTotal = Math.max(0, balanceAdjustedComputed.grandTotal - storeCreditAmt);
+    const storeCreditAmt = Math.min(
+      Number(appliedStoreCredit || 0),
+      balanceAdjustedComputed.grandTotal,
+    );
+    const effectiveGrandTotal = Math.max(
+      0,
+      balanceAdjustedComputed.grandTotal - storeCreditAmt,
+    );
 
     if (!isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
       const diff = (paidAmt - effectiveGrandTotal).toFixed(2);
-      const msg = diff > 0
-        ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${effectiveGrandTotal.toFixed(2)}).`
-        : `Amount received is ₹${Math.abs(diff)} short of the total (₹${effectiveGrandTotal.toFixed(2)}).`;
-      toast.error("Payment mismatch", { description: msg + " Must be within ₹100." });
+      const msg =
+        diff > 0
+          ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${effectiveGrandTotal.toFixed(2)}).`
+          : `Amount received is ₹${Math.abs(diff)} short of the total (₹${effectiveGrandTotal.toFixed(2)}).`;
+      toast.error("Payment mismatch", {
+        description: msg + " Must be within ₹100.",
+      });
       return;
     }
     setDiscountWarningAcked(false);
@@ -703,7 +941,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     let pdfBillNumber = effectiveBillNumber;
     // Compute the consumed store credit (same clamping as Summary)
     // voucher is pre-tax; store credit is payment deducted from grandTotal
-    const storeCreditUsed = Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal);
+    const storeCreditUsed = Math.min(
+      Number(appliedStoreCredit || 0),
+      balanceAdjustedComputed.grandTotal,
+    );
     try {
       if (!activeBillId) {
         // New bill: validate, create, and finalize in one step
@@ -713,23 +954,28 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         // Stock validation
-        const inventoryItems = items.filter(it => it.variantid);
+        const inventoryItems = items.filter((it) => it.variantid);
         let stockMap = {};
         if (inventoryItems.length > 0) {
-          const variantIds = inventoryItems.map(it => it.variantid);
+          const variantIds = inventoryItems.map((it) => it.variantid);
           const { data: stockData, error: stockErr } = await supabase
             .from("productsizecolors")
             .select("variantid, stock, size, color")
             .in("variantid", variantIds);
-          if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
-          stockMap = Object.fromEntries(stockData.map(r => [r.variantid, r]));
+          if (stockErr)
+            throw new Error("Could not verify stock: " + stockErr.message);
+          stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
           if (!isBackdated) {
-            const outOfStock = inventoryItems.filter(it => (stockMap[it.variantid]?.stock ?? 0) < it.quantity);
+            const outOfStock = inventoryItems.filter(
+              (it) => (stockMap[it.variantid]?.stock ?? 0) < it.quantity,
+            );
             if (outOfStock.length > 0) {
-              const details = outOfStock.map(it => {
-                const avail = stockMap[it.variantid]?.stock ?? 0;
-                return `${it.product_name} (${stockMap[it.variantid]?.size || ''}/${stockMap[it.variantid]?.color || ''}): requested ${it.quantity}, available ${avail}`;
-              }).join("\n");
+              const details = outOfStock
+                .map((it) => {
+                  const avail = stockMap[it.variantid]?.stock ?? 0;
+                  return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
+                })
+                .join("\n");
               toast.error("Insufficient stock", { description: details });
               return;
             }
@@ -737,9 +983,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         // Create bill as finalized
-        const exchangeNote = exchangeCredit?.amount > 0
-          ? `\n[Exchange credit applied: ${exchangeCredit.label} — ₹${Number(exchangeCredit.amount).toFixed(2)}]`
-          : "";
+        const exchangeNote =
+          exchangeCredit?.amount > 0
+            ? `\n[Exchange credit applied: ${exchangeCredit.label} — ₹${Number(exchangeCredit.amount).toFixed(2)}]`
+            : "";
         const { data: bill, error: billError } = await supabase
           .from("bills")
           .insert({
@@ -747,7 +994,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             notes: (notes || "") + exchangeNote || null,
             totalamount: balanceAdjustedComputed.grandTotal,
             gst_total: balanceAdjustedComputed.gstTotal,
-            discount_total: balanceAdjustedComputed.itemLevelDiscountTotal + balanceAdjustedComputed.overallDiscount + balanceAdjustedComputed.balanceDiscount,
+            discount_total:
+              balanceAdjustedComputed.itemLevelDiscountTotal +
+              balanceAdjustedComputed.overallDiscount +
+              balanceAdjustedComputed.balanceDiscount,
             taxable_total: balanceAdjustedComputed.taxableTotal,
             paymentstatus: "finalized",
             finalized: true,
@@ -760,14 +1010,22 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           })
           .select("billid, bill_number")
           .single();
-        if (billError) throw new Error("Failed to save bill: " + billError.message);
+        if (billError)
+          throw new Error("Failed to save bill: " + billError.message);
         activeBillId = bill.billid;
         setEffectiveBillNumber(bill.bill_number || null);
         pdfBillNumber = bill.bill_number || null;
 
         // Insert bill_items with balance discount distributed proportionally
-        const billItemsPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount || 0, balanceAdjustedComputed.overallDiscount);
-        const { error: itemsError } = await supabase.from("bill_items").insert(billItemsPayload);
+        const billItemsPayload = buildBillItemsPayload(
+          activeBillId,
+          items,
+          balanceAdjustedComputed.balanceDiscount || 0,
+          balanceAdjustedComputed.overallDiscount,
+        );
+        const { error: itemsError } = await supabase
+          .from("bill_items")
+          .insert(billItemsPayload);
         if (itemsError) {
           await supabase.from("bills").delete().eq("billid", activeBillId);
           throw new Error("Failed to save bill items: " + itemsError.message);
@@ -775,9 +1033,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
         // Save salesperson associations
         if (selectedSalespersonIds.length > 0) {
-          const spPayload = selectedSalespersonIds.map(spId => ({ billid: activeBillId, salesperson_id: spId }));
-          const { error: spErr } = await supabase.from("bill_salespersons").insert(spPayload);
-          if (spErr) console.error("Failed to save salespersons:", spErr.message);
+          const spPayload = selectedSalespersonIds.map((spId) => ({
+            billid: activeBillId,
+            salesperson_id: spId,
+          }));
+          const { error: spErr } = await supabase
+            .from("bill_salespersons")
+            .insert(spPayload);
+          if (spErr)
+            console.error("Failed to save salespersons:", spErr.message);
         }
 
         // Decrement stock (skipped for backdated bills)
@@ -788,81 +1052,202 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               .from("productsizecolors")
               .update({ stock: currentStock - it.quantity })
               .eq("variantid", it.variantid);
-            if (stockUpdateErr) console.error("Stock update failed for", it.variantid, stockUpdateErr);
+            if (stockUpdateErr)
+              console.error(
+                "Stock update failed for",
+                it.variantid,
+                stockUpdateErr,
+              );
           }
         }
 
         // Force InvoiceView to render with new bill ID before PDF capture
         flushSync(() => setEffectiveBillId(activeBillId));
       } else {
-        // Existing draft: update to finalized with adjusted totals
+        // Existing bill (draft or re-finalization): full update
+
+        // Capture original store_credit_used before overwriting (needed for delta on re-finalization)
+        let origStoreCreditUsed = 0;
+        if (isFinalizedBill) {
+          const { data: origBill } = await supabase
+            .from("bills")
+            .select("store_credit_used")
+            .eq("billid", activeBillId)
+            .single();
+          origStoreCreditUsed = Number(origBill?.store_credit_used ?? 0);
+        }
+
+        // Stock delta for inventory items
+        const { data: existingItems, error: fetchErr } = await supabase
+          .from("bill_items")
+          .select("variantid, quantity")
+          .eq("billid", activeBillId)
+          .not("variantid", "is", null);
+        if (fetchErr) throw new Error("Could not fetch existing items: " + fetchErr.message);
+
+        const newInventoryItems = items.filter((it) => it.variantid);
+        let deltaMap = {};
+        let stockMap = {};
+
+        if (!isBackdated) {
+          deltaMap = computeStockDelta(existingItems || [], newInventoryItems);
+          const allVariantIds = Object.keys(deltaMap);
+          if (allVariantIds.length > 0) {
+            const { data: stockData, error: stockErr } = await supabase
+              .from("productsizecolors")
+              .select("variantid, stock, size, color")
+              .in("variantid", allVariantIds);
+            if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+            stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
+          }
+          const stockErrors = [];
+          for (const [vid, delta] of Object.entries(deltaMap)) {
+            const currentStock = stockMap[vid]?.stock ?? 0;
+            if (currentStock + delta < 0) {
+              const item = newInventoryItems.find((it) => it.variantid === vid);
+              const size = stockMap[vid]?.size || "";
+              const color = stockMap[vid]?.color || "";
+              stockErrors.push(
+                `${item?.product_name || vid} (${size}/${color}): would result in ${currentStock + delta} stock`,
+              );
+            }
+          }
+          if (stockErrors.length > 0) {
+            toast.error("Insufficient stock", { description: stockErrors.join("\n") });
+            return;
+          }
+        }
+
+        // Update bill row — all fields
         const { error: billErr } = await supabase
-          .from('bills')
+          .from("bills")
           .update({
             finalized: true,
-            paymentstatus: 'finalized',
+            paymentstatus: "finalized",
+            customerid: selectedCustomerId || null,
+            notes: notes || null,
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,
             totalamount: balanceAdjustedComputed.grandTotal,
             gst_total: balanceAdjustedComputed.gstTotal,
-            discount_total: balanceAdjustedComputed.itemLevelDiscountTotal + balanceAdjustedComputed.overallDiscount + balanceAdjustedComputed.balanceDiscount,
+            discount_total:
+              balanceAdjustedComputed.itemLevelDiscountTotal +
+              balanceAdjustedComputed.overallDiscount +
+              balanceAdjustedComputed.balanceDiscount,
             taxable_total: balanceAdjustedComputed.taxableTotal,
+            applied_codes: selectedCodes,
+            saleslocationid: salesLocationId || null,
+            salesmethodid: salesMethodId || null,
+            orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .eq('billid', activeBillId);
+          .eq("billid", activeBillId);
         if (billErr) throw billErr;
 
-        // Redistribute balance discount proportionally across bill_items
-        if ((balanceAdjustedComputed.balanceDiscount || 0) > 0) {
-          const { error: delErr } = await supabase.from("bill_items").delete().eq("billid", activeBillId);
-          if (!delErr) {
-            const updatedPayload = buildBillItemsPayload(activeBillId, items, balanceAdjustedComputed.balanceDiscount, balanceAdjustedComputed.overallDiscount);
-            await supabase.from("bill_items").insert(updatedPayload);
+        // Delete + re-insert bill_items to reflect all edits and balance discount
+        const { error: delErr } = await supabase
+          .from("bill_items")
+          .delete()
+          .eq("billid", activeBillId);
+        if (delErr) throw new Error("Failed to remove old items: " + delErr.message);
+
+        const updatedPayload = buildBillItemsPayload(
+          activeBillId,
+          items,
+          balanceAdjustedComputed.balanceDiscount || 0,
+          balanceAdjustedComputed.overallDiscount,
+        );
+        const { error: insErr } = await supabase.from("bill_items").insert(updatedPayload);
+        if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
+
+        // Reconcile salesperson associations
+        await supabase.from("bill_salespersons").delete().eq("billid", activeBillId);
+        if (selectedSalespersonIds.length > 0) {
+          await supabase.from("bill_salespersons").insert(
+            selectedSalespersonIds.map((spId) => ({ billid: activeBillId, salesperson_id: spId })),
+          );
+        }
+
+        // Apply stock deltas
+        if (!isBackdated) {
+          for (const [vid, delta] of Object.entries(deltaMap)) {
+            if (delta === 0) continue;
+            const currentStock = stockMap[vid]?.stock ?? 0;
+            const { error: stockUpdateErr } = await supabase
+              .from("productsizecolors")
+              .update({ stock: currentStock + delta })
+              .eq("variantid", vid);
+            if (stockUpdateErr) console.error("Stock update failed for", vid, stockUpdateErr);
+          }
+        }
+
+        // Re-finalization: adjust customer store credit by delta only
+        if (isFinalizedBill && selectedCustomerId) {
+          const creditDelta = storeCreditUsed - origStoreCreditUsed;
+          if (creditDelta !== 0) {
+            const { data: custRow } = await supabase
+              .from("customers")
+              .select("store_credit")
+              .eq("customerid", selectedCustomerId)
+              .single();
+            const newBalance = Math.max(0, Number(custRow?.store_credit ?? 0) - creditDelta);
+            await supabase
+              .from("customers")
+              .update({ store_credit: newBalance })
+              .eq("customerid", selectedCustomerId);
           }
         }
       }
 
       // Step 3: Insert discount_usage rows for each applied code
       if (selectedCodes && selectedCodes.length > 0) {
-        const usageRows = selectedCodes.map(code => ({
+        // Re-finalization: remove stale usage rows before re-inserting
+        if (isFinalizedBill) {
+          await supabase.from("discount_usage").delete().eq("billid", activeBillId);
+        }
+        const usageRows = selectedCodes.map((code) => ({
           customerid: selectedCustomerId,
           code,
           billid: activeBillId,
         }));
-        const { error: duErr } = await supabase.from('discount_usage').insert(usageRows);
+        const { error: duErr } = await supabase
+          .from("discount_usage")
+          .insert(usageRows);
         if (duErr) throw duErr;
       }
 
-      // D-23: Mark applied voucher redeemed
-      if (appliedVoucher?.voucher_id) {
+      // D-23: Mark applied voucher redeemed (skip on re-finalization — already redeemed)
+      if (appliedVoucher?.voucher_id && !isFinalizedBill) {
         const { error: vErr } = await supabase
-          .from('vouchers')
+          .from("vouchers")
           .update({
             redeemed: true,
             redeemed_at: new Date().toISOString(),
             redeemed_billid: activeBillId,
           })
-          .eq('voucher_id', appliedVoucher.voucher_id);
+          .eq("voucher_id", appliedVoucher.voucher_id);
         if (vErr) throw vErr;
       }
 
-      // D-18 + D-26: Decrement customer store credit by the amount actually consumed
-      if (Number(appliedStoreCredit || 0) > 0) {
-        // Recompute effective consumption using the same clamping the Summary uses
-        // voucher is pre-tax, grandTotal already reflects it
-        const consumed = Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal);
+      // D-18 + D-26: Decrement customer store credit (new bill or draft→finalized only;
+      // re-finalization credit delta is handled in the else block above)
+      if (Number(appliedStoreCredit || 0) > 0 && !isFinalizedBill) {
+        const consumed = Math.min(
+          Number(appliedStoreCredit || 0),
+          balanceAdjustedComputed.grandTotal,
+        );
         if (consumed > 0) {
           const { data: custCredRow, error: credFetchErr } = await supabase
-            .from('customers')
-            .select('store_credit')
-            .eq('customerid', selectedCustomerId)
+            .from("customers")
+            .select("store_credit")
+            .eq("customerid", selectedCustomerId)
             .single();
           if (credFetchErr) throw credFetchErr;
           const currentBalance = Number(custCredRow?.store_credit ?? 0);
           const newBalance = Math.max(0, currentBalance - consumed);
           const { error: credUpdErr } = await supabase
-            .from('customers')
+            .from("customers")
             .update({ store_credit: newBalance })
-            .eq('customerid', selectedCustomerId);
+            .eq("customerid", selectedCustomerId);
           if (credUpdErr) throw credUpdErr;
         }
       }
@@ -870,34 +1255,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       // Steps 5-7: PDF generate + upload + pdf_url update
       let pdfUrl = null;
       try {
-        if (!invoiceRef.current) throw new Error("InvoiceView ref missing");
-        const blob = await generateInvoicePdf(invoiceRef.current);
-        const path = `bill-${pdfBillNumber || activeBillId}.pdf`;
-        // Delete before upload so Supabase CDN cache is invalidated (upsert alone doesn't bust cache)
-        await supabase.storage.from('invoices').remove([path]);
-        const { error: upErr } = await supabase.storage
-          .from('invoices')
-          .upload(path, blob, { contentType: 'application/pdf' });
-        if (upErr) throw upErr;
-        const { data: urlData } = supabase.storage.from('invoices').getPublicUrl(path);
-        pdfUrl = urlData?.publicUrl ?? null;
-        if (pdfUrl) {
-          const { error: urlErr } = await supabase
-            .from('bills')
-            .update({ pdf_url: pdfUrl })
-            .eq('billid', activeBillId);
-          if (urlErr) throw urlErr;
-        }
+        pdfUrl = await regenerateBillPdf({ activeBillId, pdfBillNumber });
       } catch (pdfErr) {
         console.error("PDF generation failed:", pdfErr);
         toast.error("PDF generation failed", {
-          description: pdfErr?.message || "Bill is finalized. You can reprint from the Bill List.",
+          description:
+            pdfErr?.message ||
+            "Bill is finalized. You can reprint from the Bill List.",
         });
       }
 
       // Step 8: open PDF in new tab if we got a URL
       if (pdfUrl) {
-        window.open(pdfUrl, '_blank');
+        window.open(pdfUrl, "_blank");
       }
 
       // Steps 9-10: success toast + close
@@ -914,198 +1284,227 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto bg-white">
-        <DialogHeader>
-          <DialogTitle>
-            {billId ? `Edit Bill #${billId}` : "New Bill"}
-          </DialogTitle>
-          <DialogDescription>
-            {billId ? "Edit existing bill details" : "Create a new bill"}
-          </DialogDescription>
-        </DialogHeader>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Billing</CardTitle>
-            <div className="text-sm text-muted-foreground">
-              {billId ? `Bill ID: ${billId}` : "New Bill"}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Customer */}
-            <section className="grid gap-3">
-              <Label>Customer</Label>
-              <CustomerSelector
-                selectedCustomerId={selectedCustomerId}
-                setSelectedCustomerId={setSelectedCustomerId}
-                displayName={customerDisplayText}
-              />
-            </section>
-
-            {/* Salesperson(s) */}
-            <section className="grid gap-3">
-              <SalespersonSelector
-                selectedIds={selectedSalespersonIds}
-                setSelectedIds={setSelectedSalespersonIds}
-              />
-            </section>
-
-            {/* Bill date + stock control */}
-            <section className="space-y-2">
-              <div className="grid gap-1">
-                <Label>Bill Date</Label>
-                <Input
-                  type="date"
-                  value={backdatedDate}
-                  max={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => setBackdatedDate(e.target.value)}
-                  className="w-48"
-                />
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle>
+              {billId ? `Edit Bill #${billId}` : "New Bill"}
+            </DialogTitle>
+            <DialogDescription>
+              {billId ? "Edit existing bill details" : "Create a new bill"}
+            </DialogDescription>
+          </DialogHeader>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Billing</CardTitle>
+              <div className="text-sm text-muted-foreground">
+                {billId ? `Bill ID: ${billId}` : "New Bill"}
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="backdated-bill"
-                  checked={isBackdated}
-                  onChange={(e) => setIsBackdated(e.target.checked)}
-                  className="h-4 w-4 cursor-pointer"
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Customer */}
+              <section className="grid gap-3">
+                <Label>Customer</Label>
+                <CustomerSelector
+                  selectedCustomerId={selectedCustomerId}
+                  setSelectedCustomerId={setSelectedCustomerId}
+                  displayName={customerDisplayText}
                 />
-                <Label htmlFor="backdated-bill" className="cursor-pointer text-sm font-normal text-muted-foreground">
-                  Skip stock decrement (backdated entry)
-                </Label>
-              </div>
-            </section>
+              </section>
 
-            {/* Items */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Items</Label>
-                <AddItemDialog
-                  isBackdated={isBackdated}
-                  onAdd={(item) => setItems((prev) => [...prev, item])}
-                  salespersons={salespersonsList}
+              {/* Salesperson(s) */}
+              <section className="grid gap-3">
+                <SalespersonSelector
+                  selectedIds={selectedSalespersonIds}
+                  setSelectedIds={setSelectedSalespersonIds}
                 />
-              </div>
-              <ItemTable
-                items={items}
-                setItems={setItems}
-                onEdit={(id) => setEditingItem(items.find((it) => it._id === id) ?? null)}
-                salespersonMap={salespersonMap}
-              />
-            </section>
+              </section>
 
-            {/* Edit item dialog — opened programmatically from the pencil icon */}
-            {editingItem && (
-              <AddItemDialog
-                key={editingItem._id}
-                open={!!editingItem}
-                onOpenChange={(o) => { if (!o) setEditingItem(null); }}
-                isBackdated={isBackdated}
-                editItem={editingItem}
-                salespersons={salespersonsList}
-                onUpdate={(updated) => {
-                  setItems((prev) =>
-                    prev.map((it) => (it._id === updated._id ? updated : it))
-                  );
-                  setEditingItem(null);
-                }}
-              />
-            )}
-
-            {/* Discounts */}
-            <section className="space-y-2">
-              <Label>Overall Discounts</Label>
-              <DiscountSelector
-                discounts={visibleDiscounts}
-                selectedCodes={selectedCodes}
-                onToggle={(code) =>
-                  setSelectedCodes((prev) =>
-                    prev.includes(code)
-                      ? prev.filter((c) => c !== code)
-                      : [...prev, code]
-                  )
-                }
-              />
-            </section>
-
-            {/* Promotional Voucher */}
-            <section className="space-y-2">
-              <Label>Promotional Voucher</Label>
-              {appliedVoucher ? (
-                <div className="flex justify-between items-center bg-blue-50 border border-blue-200 text-blue-800 rounded px-3 py-1.5 text-sm">
-                  <span>Voucher #{appliedVoucher.voucher_id}: ₹{Number(appliedVoucher.value).toFixed(2)} applied</span>
-                  <button
-                    type="button"
-                    className="ml-2 text-blue-600 hover:text-blue-900"
-                    aria-label="Remove voucher"
-                    onClick={() => { setAppliedVoucher(null); setVoucherError(""); }}
-                  >
-                    ✕
-                  </button>
+              {/* Bill date + stock control */}
+              <section className="space-y-2">
+                <div className="grid gap-1">
+                  <Label>Bill Date</Label>
+                  <Input
+                    type="date"
+                    value={backdatedDate}
+                    max={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => setBackdatedDate(e.target.value)}
+                    className="w-48"
+                  />
                 </div>
-              ) : (
-                <>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter voucher code"
-                      value={voucherCode}
-                      onChange={(e) => setVoucherCode(e.target.value)}
-                      disabled={voucherLoading}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={handleApplyVoucher}
-                      disabled={voucherLoading || !voucherCode.trim()}
-                    >
-                      {voucherLoading ? "Applying..." : "Apply Voucher"}
-                    </Button>
-                  </div>
-                  {voucherError && (
-                    <p className="text-xs text-destructive mt-1">{voucherError}</p>
-                  )}
-                </>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="backdated-bill"
+                    checked={isBackdated}
+                    onChange={(e) => setIsBackdated(e.target.checked)}
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                  <Label
+                    htmlFor="backdated-bill"
+                    className="cursor-pointer text-sm font-normal text-muted-foreground"
+                  >
+                    Skip stock decrement (backdated entry)
+                  </Label>
+                </div>
+              </section>
+
+              {/* Items */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Items</Label>
+                  <AddItemDialog
+                    isBackdated={isBackdated}
+                    onAdd={(item) => setItems((prev) => [...prev, item])}
+                    salespersons={salespersonsList}
+                  />
+                </div>
+                <ItemTable
+                  items={items}
+                  setItems={setItems}
+                  onEdit={(id) =>
+                    setEditingItem(items.find((it) => it._id === id) ?? null)
+                  }
+                  salespersonMap={salespersonMap}
+                />
+              </section>
+
+              {/* Edit item dialog — opened programmatically from the pencil icon */}
+              {editingItem && (
+                <AddItemDialog
+                  key={editingItem._id}
+                  open={!!editingItem}
+                  onOpenChange={(o) => {
+                    if (!o) setEditingItem(null);
+                  }}
+                  isBackdated={isBackdated}
+                  editItem={editingItem}
+                  salespersons={salespersonsList}
+                  onUpdate={(updated) => {
+                    setItems((prev) =>
+                      prev.map((it) => (it._id === updated._id ? updated : it)),
+                    );
+                    setEditingItem(null);
+                  }}
+                />
               )}
-            </section>
 
-            {/* Sale Context */}
-            <section className="space-y-2">
-              <Label>Sale Details</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={salesLocationId ? String(salesLocationId) : ""} onValueChange={(v) => setSalesLocationId(Number(v))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {salesLocations.map((l) => (
-                      <SelectItem key={l.saleslocationid} value={String(l.saleslocationid)}>
-                        {l.locationname}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={salesMethodId ? String(salesMethodId) : ""} onValueChange={(v) => setSalesMethodId(Number(v))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Payment method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {salesMethods.map((m) => (
-                      <SelectItem key={m.salesmethodid} value={String(m.salesmethodid)}>
-                        {m.methodname}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </section>
+              {/* Discounts */}
+              <section className="space-y-2">
+                <Label>Overall Discounts</Label>
+                <DiscountSelector
+                  discounts={visibleDiscounts}
+                  selectedCodes={selectedCodes}
+                  onToggle={(code) =>
+                    setSelectedCodes((prev) =>
+                      prev.includes(code)
+                        ? prev.filter((c) => c !== code)
+                        : [...prev, code],
+                    )
+                  }
+                />
+              </section>
 
-            {/* Notes */}
-            <Notes notes={notes} setNotes={setNotes} />
+              {/* Promotional Voucher */}
+              <section className="space-y-2">
+                <Label>Promotional Voucher</Label>
+                {appliedVoucher ? (
+                  <div className="flex justify-between items-center bg-blue-50 border border-blue-200 text-blue-800 rounded px-3 py-1.5 text-sm">
+                    <span>
+                      Voucher #{appliedVoucher.voucher_id}: ₹
+                      {Number(appliedVoucher.value).toFixed(2)} applied
+                    </span>
+                    <button
+                      type="button"
+                      className="ml-2 text-blue-600 hover:text-blue-900"
+                      aria-label="Remove voucher"
+                      onClick={() => {
+                        setAppliedVoucher(null);
+                        setVoucherError("");
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter voucher code"
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value)}
+                        disabled={voucherLoading}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={handleApplyVoucher}
+                        disabled={voucherLoading || !voucherCode.trim()}
+                      >
+                        {voucherLoading ? "Applying..." : "Apply Voucher"}
+                      </Button>
+                    </div>
+                    {voucherError && (
+                      <p className="text-xs text-destructive mt-1">
+                        {voucherError}
+                      </p>
+                    )}
+                  </>
+                )}
+              </section>
 
-            {/* Payment */}
-            <section className="space-y-2">
-              <Label>Payment Amount</Label>
-              <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">₹</span>
+              {/* Sale Context */}
+              <section className="space-y-2">
+                <Label>Sale Details</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select
+                    value={salesLocationId ? String(salesLocationId) : ""}
+                    onValueChange={(v) => setSalesLocationId(Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {salesLocations.map((l) => (
+                        <SelectItem
+                          key={l.saleslocationid}
+                          value={String(l.saleslocationid)}
+                        >
+                          {l.locationname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={salesMethodId ? String(salesMethodId) : ""}
+                    onValueChange={(v) => setSalesMethodId(Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {salesMethods.map((m) => (
+                        <SelectItem
+                          key={m.salesmethodid}
+                          value={String(m.salesmethodid)}
+                        >
+                          {m.methodname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </section>
+
+              {/* Notes */}
+              <Notes notes={notes} setNotes={setNotes} />
+
+              {/* Payment */}
+              <section className="space-y-2">
+                <Label>Payment Amount</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                    ₹
+                  </span>
                   <Input
                     type="number"
                     placeholder="Amount received"
@@ -1114,109 +1513,187 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     onChange={(e) => setPaymentAmount(e.target.value)}
                   />
                 </div>
-            </section>
+              </section>
 
-            {/* Summary */}
-            <Summary
-              computed={balanceAdjustedComputed}
-              appliedStoreCredit={appliedStoreCredit}
-              appliedVoucher={appliedVoucher}
-              customerStoreCreditBalance={customerStoreCreditBalance}
-              onRemoveStoreCredit={() => setAppliedStoreCredit(0)}
-              onApplyStoreCredit={() => setAppliedStoreCredit(customerStoreCreditBalance)}
-              onRemoveVoucher={() => setAppliedVoucher(null)}
-              exchangeCredit={exchangeCredit}
-            />
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => onOpenChange?.(false)}>
-                Cancel
-              </Button>
-              <Button disabled={isSaving} onClick={handleSaveDraft}>
-                {isSaving ? "Saving..." : "Save Draft"}
-              </Button>
-              <Button disabled={isSaving} onClick={openFinalizeConfirm}>
-                {isSaving ? "Saving..." : "Finalize"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </DialogContent>
-
-    </Dialog>
-
-    {/* Off-screen InvoiceView for html2canvas PDF capture */}
-    {open && (
-      <div style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }} aria-hidden="true">
-        <InvoiceView
-          ref={invoiceRef}
-          billId={effectiveBillId ?? billId}
-          billNumber={effectiveBillNumber}
-          billDate={new Date(backdatedDate)}
-          customerName={customerName}
-          salespersonNames={salespersonNames}
-          items={items}
-          computed={balanceAdjustedComputed}
-          paymentMethod={salesMethods.find(m => m.salesmethodid === salesMethodId)?.methodname || ""}
-          paymentAmount={paymentAmount}
-          appliedCodes={selectedCodes}
-          allDiscounts={allDiscounts}
-          appliedVoucher={appliedVoucher}
-          appliedStoreCredit={appliedStoreCredit}
-        />
-      </div>
-    )}
-
-    {/* Finalize Confirmation Dialog */}
-    <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-      <DialogContent className="bg-white max-w-md">
-        <DialogHeader>
-          <DialogTitle>Confirm Finalize</DialogTitle>
-          <DialogDescription>This action cannot be undone.</DialogDescription>
-        </DialogHeader>
-        {items.some(it => Number(it.quickDiscountPct || 0) > 30) && (
-          <div className="rounded bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-3 py-2 space-y-2">
-            <p className="font-semibold">Warning: One or more items have a discount above 30%.</p>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={discountWarningAcked}
-                onChange={(e) => setDiscountWarningAcked(e.target.checked)}
-                className="h-4 w-4"
+              {/* Summary */}
+              <Summary
+                computed={balanceAdjustedComputed}
+                appliedStoreCredit={appliedStoreCredit}
+                appliedVoucher={appliedVoucher}
+                customerStoreCreditBalance={customerStoreCreditBalance}
+                onRemoveStoreCredit={() => setAppliedStoreCredit(0)}
+                onApplyStoreCredit={() =>
+                  setAppliedStoreCredit(customerStoreCreditBalance)
+                }
+                onRemoveVoucher={() => setAppliedVoucher(null)}
+                exchangeCredit={exchangeCredit}
               />
-              I confirm this discount has been approved.
-            </label>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => onOpenChange?.(false)}>
+                  Cancel
+                </Button>
+                <Button disabled={isSaving} onClick={handleSaveDraft}>
+                  {isSaving ? "Saving..." : "Save Draft"}
+                </Button>
+                <Button disabled={isSaving} onClick={openFinalizeConfirm}>
+                  {isSaving ? "Saving..." : "Finalize"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </DialogContent>
+      </Dialog>
+
+      {/* Off-screen InvoiceView for html2canvas PDF capture */}
+      {open && (
+        <div
+          style={{
+            position: "fixed",
+            top: "-9999px",
+            left: "-9999px",
+            pointerEvents: "none",
+          }}
+          aria-hidden="true"
+        >
+          <InvoiceView
+            ref={invoiceRef}
+            billId={effectiveBillId ?? billId}
+            billNumber={effectiveBillNumber}
+            billDate={new Date(backdatedDate)}
+            customerName={customerName}
+            salespersonNames={salespersonNames}
+            items={items}
+            computed={balanceAdjustedComputed}
+            paymentMethod={
+              salesMethods.find((m) => m.salesmethodid === salesMethodId)
+                ?.methodname || ""
+            }
+            paymentAmount={paymentAmount}
+            appliedCodes={selectedCodes}
+            allDiscounts={allDiscounts}
+            appliedVoucher={appliedVoucher}
+            appliedStoreCredit={appliedStoreCredit}
+          />
+        </div>
+      )}
+
+      {/* Finalize Confirmation Dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Finalize</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          {items.some((it) => Number(it.quickDiscountPct || 0) > 30) && (
+            <div className="rounded bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-3 py-2 space-y-2">
+              <p className="font-semibold">
+                Warning: One or more items have a discount above 30%.
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={discountWarningAcked}
+                  onChange={(e) => setDiscountWarningAcked(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                I confirm this discount has been approved.
+              </label>
+            </div>
+          )}
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-semibold">Bill #:</span> {billId ?? "(new)"}
+            </div>
+            <div>
+              <span className="font-semibold">Customer:</span>{" "}
+              {customerName || "—"}
+            </div>
+            <div>
+              <span className="font-semibold">Grand Total:</span> ₹
+              {balanceAdjustedComputed.grandTotal.toFixed(2)}
+            </div>
+            {balanceAdjustedComputed.balanceDiscount > 0 && (
+              <div>
+                <span className="font-semibold">
+                  Balance Discount (pre-tax):
+                </span>{" "}
+                −₹{balanceAdjustedComputed.balanceDiscount.toFixed(2)}
+              </div>
+            )}
+            {Number(appliedStoreCredit || 0) > 0 && (
+              <div>
+                <span className="font-semibold">Paid via Store Credit:</span> −₹
+                {Math.min(
+                  Number(appliedStoreCredit || 0),
+                  balanceAdjustedComputed.grandTotal,
+                ).toFixed(2)}
+              </div>
+            )}
+            {Number(exchangeCredit?.amount || 0) > 0 && (
+              <div>
+                <span className="font-semibold">
+                  Applied: {exchangeCredit.label}:
+                </span>{" "}
+                −₹
+                {Math.min(
+                  Number(exchangeCredit.amount),
+                  Math.max(
+                    0,
+                    balanceAdjustedComputed.grandTotal -
+                      Math.min(
+                        Number(appliedStoreCredit || 0),
+                        balanceAdjustedComputed.grandTotal,
+                      ),
+                  ),
+                ).toFixed(2)}
+              </div>
+            )}
+            {Number(appliedStoreCredit || 0) > 0 && (
+              <div>
+                <span className="font-semibold">Net Payable:</span> ₹
+                {Math.max(
+                  0,
+                  balanceAdjustedComputed.grandTotal -
+                    Math.min(
+                      Number(appliedStoreCredit || 0),
+                      balanceAdjustedComputed.grandTotal,
+                    ),
+                ).toFixed(2)}
+              </div>
+            )}
+            <div>
+              <span className="font-semibold">Payment Method:</span>{" "}
+              {salesMethods.find((m) => m.salesmethodid === salesMethodId)
+                ?.methodname || ""}
+            </div>
+            <div>
+              <span className="font-semibold">Amount Received:</span> ₹
+              {Number(paymentAmount).toFixed(2)}
+            </div>
           </div>
-        )}
-        <div className="space-y-2 text-sm">
-          <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
-          <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
-          <div><span className="font-semibold">Grand Total:</span> ₹{balanceAdjustedComputed.grandTotal.toFixed(2)}</div>
-          {balanceAdjustedComputed.balanceDiscount > 0 && (
-            <div><span className="font-semibold">Balance Discount (pre-tax):</span> −₹{balanceAdjustedComputed.balanceDiscount.toFixed(2)}</div>
-          )}
-          {Number(appliedStoreCredit || 0) > 0 && (
-            <div><span className="font-semibold">Paid via Store Credit:</span> −₹{Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal).toFixed(2)}</div>
-          )}
-          {Number(exchangeCredit?.amount || 0) > 0 && (
-            <div><span className="font-semibold">Applied: {exchangeCredit.label}:</span> −₹{Math.min(Number(exchangeCredit.amount), Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal))).toFixed(2)}</div>
-          )}
-          {Number(appliedStoreCredit || 0) > 0 && (
-            <div><span className="font-semibold">Net Payable:</span> ₹{Math.max(0, balanceAdjustedComputed.grandTotal - Math.min(Number(appliedStoreCredit || 0), balanceAdjustedComputed.grandTotal)).toFixed(2)}</div>
-          )}
-          <div><span className="font-semibold">Payment Method:</span> {salesMethods.find(m => m.salesmethodid === salesMethodId)?.methodname || ""}</div>
-          <div><span className="font-semibold">Amount Received:</span> ₹{Number(paymentAmount).toFixed(2)}</div>
-        </div>
-        <div className="flex justify-end gap-2 pt-4">
-          <Button variant="ghost" disabled={isSaving} onClick={() => setConfirmOpen(false)}>Keep Editing</Button>
-          <Button
-            disabled={isSaving || (items.some(it => Number(it.quickDiscountPct || 0) > 30) && !discountWarningAcked)}
-            onClick={handleConfirmFinalize}
-          >{isSaving ? "Saving..." : "Confirm & Finalize"}</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="ghost"
+              disabled={isSaving}
+              onClick={() => setConfirmOpen(false)}
+            >
+              Keep Editing
+            </Button>
+            <Button
+              disabled={
+                isSaving ||
+                (items.some((it) => Number(it.quickDiscountPct || 0) > 30) &&
+                  !discountWarningAcked)
+              }
+              onClick={handleConfirmFinalize}
+            >
+              {isSaving ? "Saving..." : "Confirm & Finalize"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
