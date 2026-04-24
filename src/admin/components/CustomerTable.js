@@ -53,7 +53,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     //    Aggregate in JS (small dataset, no RPC needed).
     const { data: billsData, error: billsErr } = await supabase
       .from("bills")
-      .select("customerid, net_amount, totalamount, store_credit_used, orderdate, paymentstatus, finalized")
+      .select("customerid, totalamount, exchange_credit_used, orderdate, paymentstatus, finalized")
       .eq("finalized", true)
       .neq("paymentstatus", "cancelled");
     if (billsErr) {
@@ -62,15 +62,16 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
       return;
     }
 
-    // 3. Aggregate per customer: sum(net_amount + store_credit_used), max(orderdate)
-    //    total_spend = cash paid + store credit used (true value of goods received)
+    // 3. Aggregate per customer: sum(totalamount - exchange_credit_used), max(orderdate)
+    //    total_spend = full goods value minus exchange credit (which is not real money spent)
+    //    store_credit_used is already part of totalamount so no need to add it separately
     const aggByCustomer = {};
     for (const b of billsData || []) {
       if (b.customerid == null) continue;
-      const cash = Number(b.net_amount ?? b.totalamount ?? 0);
-      const creditUsed = Number(b.store_credit_used ?? 0);
+      const total = Number(b.totalamount ?? 0);
+      const exchangeCredit = Number(b.exchange_credit_used ?? 0);
       const prev = aggByCustomer[b.customerid] || { total_spend: 0, last_purchased_at: null };
-      prev.total_spend += cash + creditUsed;
+      prev.total_spend += total - exchangeCredit;
       if (b.orderdate && (!prev.last_purchased_at || b.orderdate > prev.last_purchased_at)) {
         prev.last_purchased_at = b.orderdate;
       }

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computePreTaxBalanceDiscount, priceItem } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
+import { computeCreditsApplied } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import {
@@ -470,18 +471,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     const paidAmt = Number(paymentAmount);
     if (!paidAmt || paidAmt <= 0 || computed.grandTotal <= 0) return computed;
     // voucher is pre-tax (baked into computed.grandTotal); store credit is a payment method
-    const storeCreditAmt = Math.min(
-      Number(appliedStoreCredit || 0),
+    const { effectiveTotal: effectiveGrandTotal } = computeCreditsApplied(
       computed.grandTotal,
-    );
-    const afterStoreCredit = Math.max(0, computed.grandTotal - storeCreditAmt);
-    const exchangeCreditAmt = Math.min(
-      Number(exchangeCredit?.amount || 0),
-      afterStoreCredit,
-    );
-    const effectiveGrandTotal = Math.max(
-      0,
-      afterStoreCredit - exchangeCreditAmt,
+      appliedStoreCredit,
+      exchangeCredit?.amount,
     );
     if (paidAmt >= effectiveGrandTotal) return computed;
     const shortfall = effectiveGrandTotal - paidAmt;
@@ -910,14 +903,18 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       });
       return;
     }
-    // voucher is pre-tax in grandTotal; store credit is a customer payment
-    const storeCreditAmt = Math.min(
-      Number(appliedStoreCredit || 0),
+    // Block when exchange credit alone covers or exceeds the new bill
+    if (Number(exchangeCredit?.amount || 0) >= balanceAdjustedComputed.grandTotal) {
+      toast.error("New bill value must exceed the refund amount", {
+        description: `Exchange credit of ₹${Number(exchangeCredit.amount).toFixed(2)} covers the full bill. Add more items first.`,
+      });
+      return;
+    }
+
+    const { effectiveTotal: effectiveGrandTotal } = computeCreditsApplied(
       balanceAdjustedComputed.grandTotal,
-    );
-    const effectiveGrandTotal = Math.max(
-      0,
-      balanceAdjustedComputed.grandTotal - storeCreditAmt,
+      appliedStoreCredit,
+      exchangeCredit?.amount,
     );
 
     if (!isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
@@ -939,11 +936,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     setIsSaving(true);
     let activeBillId = billId;
     let pdfBillNumber = effectiveBillNumber;
-    // Compute the consumed store credit (same clamping as Summary)
-    // voucher is pre-tax; store credit is payment deducted from grandTotal
-    const storeCreditUsed = Math.min(
-      Number(appliedStoreCredit || 0),
+    // Single source of truth for credit splitting (mirrors Summary + balance-adjusted memo)
+    const { storeCreditUsed, exchangeCreditUsed } = computeCreditsApplied(
       balanceAdjustedComputed.grandTotal,
+      appliedStoreCredit,
+      exchangeCredit?.amount,
     );
     try {
       if (!activeBillId) {
@@ -983,15 +980,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         // Create bill as finalized
-        const exchangeNote =
-          exchangeCredit?.amount > 0
-            ? `\n[Exchange credit applied: ${exchangeCredit.label} — ₹${Number(exchangeCredit.amount).toFixed(2)}]`
-            : "";
         const { data: bill, error: billError } = await supabase
           .from("bills")
           .insert({
             customerid: selectedCustomerId || null,
-            notes: (notes || "") + exchangeNote || null,
+            notes: notes || null,
             totalamount: balanceAdjustedComputed.grandTotal,
             gst_total: balanceAdjustedComputed.gstTotal,
             discount_total:
@@ -1004,6 +997,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             applied_codes: selectedCodes,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
             store_credit_used: storeCreditUsed,
+            exchange_credit_used: exchangeCreditUsed,
+            exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
             orderdate: backdatedDate + "T00:00:00+05:30",
@@ -1015,6 +1010,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         activeBillId = bill.billid;
         setEffectiveBillNumber(bill.bill_number || null);
         pdfBillNumber = bill.bill_number || null;
+
+        // Link exchange rows to this new bill
+        if (exchangeCredit?.exchangeIds?.length) {
+          await supabase
+            .from("exchanges")
+            .update({ new_billid: activeBillId })
+            .in("exchangeid", exchangeCredit.exchangeIds);
+        }
 
         // Insert bill_items with balance discount distributed proportionally
         const billItemsPayload = buildBillItemsPayload(
@@ -1229,27 +1232,23 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
 
       // D-18 + D-26: Decrement customer store credit (new bill or draft→finalized only;
-      // re-finalization credit delta is handled in the else block above)
-      if (Number(appliedStoreCredit || 0) > 0 && !isFinalizedBill) {
-        const consumed = Math.min(
-          Number(appliedStoreCredit || 0),
-          balanceAdjustedComputed.grandTotal,
-        );
-        if (consumed > 0) {
-          const { data: custCredRow, error: credFetchErr } = await supabase
-            .from("customers")
-            .select("store_credit")
-            .eq("customerid", selectedCustomerId)
-            .single();
-          if (credFetchErr) throw credFetchErr;
-          const currentBalance = Number(custCredRow?.store_credit ?? 0);
-          const newBalance = Math.max(0, currentBalance - consumed);
-          const { error: credUpdErr } = await supabase
-            .from("customers")
-            .update({ store_credit: newBalance })
-            .eq("customerid", selectedCustomerId);
-          if (credUpdErr) throw credUpdErr;
-        }
+      // re-finalization credit delta is handled in the else block above).
+      // Exchange credit is separate — not drawn from store_credit balance.
+      const totalCreditToDeduct = storeCreditUsed;
+      if (totalCreditToDeduct > 0 && !isFinalizedBill && selectedCustomerId) {
+        const { data: custCredRow, error: credFetchErr } = await supabase
+          .from("customers")
+          .select("store_credit")
+          .eq("customerid", selectedCustomerId)
+          .single();
+        if (credFetchErr) throw credFetchErr;
+        const currentBalance = Number(custCredRow?.store_credit ?? 0);
+        const newBalance = Math.max(0, currentBalance - totalCreditToDeduct);
+        const { error: credUpdErr } = await supabase
+          .from("customers")
+          .update({ store_credit: newBalance })
+          .eq("customerid", selectedCustomerId);
+        if (credUpdErr) throw credUpdErr;
       }
 
       // Steps 5-7: PDF generate + upload + pdf_url update
@@ -1575,6 +1574,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             allDiscounts={allDiscounts}
             appliedVoucher={appliedVoucher}
             appliedStoreCredit={appliedStoreCredit}
+            exchangeCredit={exchangeCredit}
           />
         </div>
       )}

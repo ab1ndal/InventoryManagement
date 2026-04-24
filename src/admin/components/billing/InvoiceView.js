@@ -1,6 +1,7 @@
 import React, { forwardRef } from "react";
 import logo from "../../../assets/LOGO-Bill.png";
 import { getFreeItems, valueOfDiscount } from './billUtils';
+import { computeCreditsApplied } from './exchangeHelpers';
 
 const STORE = {
   name: "BINDAL'S CREATION",
@@ -34,6 +35,7 @@ const InvoiceView = forwardRef(function InvoiceView(
     allDiscounts,
     appliedVoucher,
     appliedStoreCredit,
+    exchangeCredit = null,
   },
   ref,
 ) {
@@ -152,10 +154,13 @@ const InvoiceView = forwardRef(function InvoiceView(
     })
     .filter(Boolean);
 
-  // voucher is pre-tax (in grandTotal); store credit is a customer payment
+  // voucher is pre-tax (in grandTotal); store/exchange credits are customer payments
   const grandTotal = Number(computed?.grandTotal ?? 0);
-  const storeCreditAmt = Math.min(Number(appliedStoreCredit ?? 0), grandTotal);
-  const effectiveTotal = Math.max(0, grandTotal - storeCreditAmt);
+  const {
+    storeCreditUsed: storeCreditAmt,
+    exchangeCreditUsed: exchangeCreditAmt,
+    effectiveTotal,
+  } = computeCreditsApplied(grandTotal, appliedStoreCredit, exchangeCredit?.amount);
 
   const paidAmt = Number(paymentAmount ?? 0);
   const shortfall = effectiveTotal - paidAmt;
@@ -406,8 +411,25 @@ const InvoiceView = forwardRef(function InvoiceView(
             Paid via Store Credit: −₹{storeCreditAmt.toFixed(2)}
           </div>
         )}
-        {storeCreditAmt > 0 && (
-          <div style={{ fontWeight: 600 }}>
+        {exchangeCreditAmt > 0 && (
+          <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px dashed #e5e7eb" }}>
+            <div style={{ color: "#7c3aed", fontWeight: 600 }}>
+              Exchange Credit — Bill #{exchangeCredit?.sourceBillNumber}: −₹{exchangeCreditAmt.toFixed(2)}
+            </div>
+            {exchangeCredit?.items?.length > 0 && (
+              <div style={{ paddingLeft: 8, marginTop: 2, fontSize: "10px", color: "#6d28d9" }}>
+                {exchangeCredit.items.map((it, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>{it.product_name} × {it.returnQty}</span>
+                    <span>−₹{Number(it.creditAmount).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {(storeCreditAmt > 0 || exchangeCreditAmt > 0) && (
+          <div style={{ fontWeight: 600, marginTop: 4 }}>
             Net Payable: ₹{effectiveTotal.toFixed(2)}
           </div>
         )}
@@ -436,6 +458,11 @@ const InvoiceView = forwardRef(function InvoiceView(
         {storeCreditAmt > 0 && (
           <div>
             <strong>Store Credit Used:</strong> ₹{storeCreditAmt.toFixed(2)}
+          </div>
+        )}
+        {exchangeCreditAmt > 0 && (
+          <div>
+            <strong>Exchange Credit (Bill #{exchangeCredit?.sourceBillNumber}):</strong> ₹{exchangeCreditAmt.toFixed(2)}
           </div>
         )}
       </div>

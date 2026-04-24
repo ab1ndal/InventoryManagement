@@ -1,5 +1,5 @@
 // src/admin/pages/ExchangePage.js
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
@@ -17,9 +17,13 @@ import {
 import ReturnReceiptView from "../components/billing/ReturnReceiptView";
 import { generateInvoicePdf } from "../components/billing/generateInvoicePdf";
 import {
-  computeMaxReturnQty,
-  calcItemCredit,
+  buildReturnedQtyMap,
   buildReturnedItemsWithCredit,
+  calcItemCredit,
+  isExchangeEligible,
+  isWithinExchangeWindow,
+  daysSinceBill,
+  EXCHANGE_WINDOW_DAYS,
 } from "../components/billing/exchangeHelpers";
 
 export default function ExchangePage() {
@@ -28,15 +32,77 @@ export default function ExchangePage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);      // array of bills
-  const [loadedBill, setLoadedBill] = useState(null);          // selected bill with customer
-  const [billItems, setBillItems] = useState([]);              // returnable items with maxReturnQty
-  const [returnQtyMap, setReturnQtyMap] = useState({});        // bill_item_id -> returnQty
-  const [reasonMap, setReasonMap] = useState({});              // bill_item_id -> reason text
+  const [searchResults, setSearchResults] = useState([]);
+  const [loadedBill, setLoadedBill] = useState(null);
+  const [billItems, setBillItems] = useState([]);
+  const [returnQtyMap, setReturnQtyMap] = useState({});
+  const [reasonMap, setReasonMap] = useState({});
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmSaving, setConfirmSaving] = useState(false);
-  const [receiptReadyItems, setReceiptReadyItems] = useState([]); // for hidden PDF render
+  const [receiptReadyItems, setReceiptReadyItems] = useState([]);
   const [receiptReadyCredit, setReceiptReadyCredit] = useState(0);
+
+  // history
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const HISTORY_PAGE_SIZE = 20;
+
+  const fetchHistory = useCallback(async (page = 0) => {
+    setHistoryLoading(true);
+    try {
+      const from = page * HISTORY_PAGE_SIZE;
+      const to = from + HISTORY_PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("exchanges")
+        .select(`
+          exchangeid, returndate, quantity, credit_amount, new_billid, reason,
+          bill_items!inner(product_name, product_code, variantid, productsizecolors(size, color), bills!inner(bill_number)),
+          customers(first_name, last_name),
+          new_bill:bills!exchanges_new_billid_fkey(bill_number)
+        `, { count: "exact" })
+        .order("returndate", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      setHistoryTotal(count || 0);
+
+      // Fetch size/color for manual items (no variantid; product_code = manual_item_id)
+      const manualCodes = (data || [])
+        .map((ex) => ex.bill_items)
+        .filter((bi) => bi && !bi.variantid && bi.product_code)
+        .map((bi) => bi.product_code);
+
+      let manualMap = {};
+      if (manualCodes.length > 0) {
+        const { data: manuals } = await supabase
+          .from("manual_items")
+          .select("manual_item_id, size, color")
+          .in("manual_item_id", manualCodes);
+        manualMap = Object.fromEntries(
+          (manuals || []).map((m) => [m.manual_item_id, { size: m.size, color: m.color }]),
+        );
+      }
+
+      // Attach size/color to each exchange's bill_item for uniform render
+      const enriched = (data || []).map((ex) => {
+        const bi = ex.bill_items;
+        if (!bi) return ex;
+        const sizeColor = bi.variantid
+          ? bi.productsizecolors
+          : (manualMap[bi.product_code] || null);
+        return { ...ex, bill_items: { ...bi, _sizeColor: sizeColor } };
+      });
+
+      setHistory(enriched);
+    } catch (err) {
+      console.error("History fetch failed:", err.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchHistory(historyPage); }, [fetchHistory, historyPage]);
 
   // --- search ---
   async function handleSearch(e) {
@@ -46,7 +112,6 @@ export default function ExchangePage() {
     setSearchLoading(true);
     setSearchResults([]);
     try {
-      // Step 1: exact/partial bill_number match (finalized only — D-02)
       const { data: byNum, error: e1 } = await supabase
         .from("bills")
         .select("billid, bill_number, orderdate, customerid, totalamount, customers(first_name, last_name)")
@@ -56,7 +121,6 @@ export default function ExchangePage() {
         .limit(20);
       if (e1) throw e1;
 
-      // Step 2: if no bill_number hits, search by customer name (two-step to avoid PostgREST inner-join ambiguity)
       let byName = [];
       if (!byNum || byNum.length === 0) {
         const { data: custs } = await supabase
@@ -89,29 +153,79 @@ export default function ExchangePage() {
 
   // --- load bill ---
   async function handleLoadBill(bill) {
+    if (!isWithinExchangeWindow(bill.orderdate)) {
+      const days = daysSinceBill(bill.orderdate);
+      toast.error("Exchange window closed", {
+        description: `Bill #${bill.bill_number || bill.billid} is ${days} days old. Exchanges accepted within ${EXCHANGE_WINDOW_DAYS} days of purchase only.`,
+      });
+      return;
+    }
+
     try {
       const { data: items, error: e1 } = await supabase
         .from("bill_items")
-        .select("bill_item_id, billid, product_name, product_code, size, color, category, quantity, mrp, discount_total, alteration_charge, variantid, manual_item_id")
+        .select("bill_item_id, billid, product_name, product_code, category, quantity, mrp, discount_total, alteration_charge, stitch_type, total, variantid")
         .eq("billid", bill.billid);
       if (e1) throw e1;
 
-      const billItemIds = (items || []).map(bi => bi.bill_item_id);
+      const rawItems = items || [];
+
+      // Fetch size/color for inventory items via variantid → productsizecolors
+      const inventoryItems = rawItems.filter((bi) => bi.variantid);
+      let variantMap = {};
+      if (inventoryItems.length > 0) {
+        const { data: variants } = await supabase
+          .from("productsizecolors")
+          .select("variantid, size, color")
+          .in("variantid", inventoryItems.map((bi) => bi.variantid));
+        variantMap = Object.fromEntries((variants || []).map((v) => [v.variantid, v]));
+      }
+
+      // Fetch size/color for manual items via product_code → manual_item_id
+      const manualItems = rawItems.filter((bi) => !bi.variantid && bi.product_code);
+      let manualSizeMap = {};
+      if (manualItems.length > 0) {
+        const { data: manuals } = await supabase
+          .from("manual_items")
+          .select("manual_item_id, size, color")
+          .in("manual_item_id", manualItems.map((bi) => bi.product_code));
+        manualSizeMap = Object.fromEntries((manuals || []).map((m) => [m.manual_item_id, m]));
+      }
+
+      const allItems = rawItems.map((bi) => {
+        const sc = bi.variantid
+          ? variantMap[bi.variantid]
+          : manualSizeMap[bi.product_code];
+        return { ...bi, size: sc?.size || null, color: sc?.color || null };
+      });
+
+      const eligibleIds = allItems
+        .filter(isExchangeEligible)
+        .map(item => item.bill_item_id);
       let existing = [];
-      if (billItemIds.length > 0) {
+      if (eligibleIds.length > 0) {
         const { data: ex } = await supabase
           .from("exchanges")
           .select("original_bill_item_id, quantity")
-          .in("original_bill_item_id", billItemIds);
+          .in("original_bill_item_id", eligibleIds);
         existing = ex || [];
       }
-      const returnable = computeMaxReturnQty(items || [], existing);
-      if (returnable.length === 0) {
-        toast.info("All items on this bill have already been returned.");
+      const returnedQtyMap = buildReturnedQtyMap(existing);
+
+      const augmented = allItems.map(item => {
+        const eligible = isExchangeEligible(item);
+        const maxReturnQty = eligible
+          ? Math.max(0, Number(item.quantity || 0) - (returnedQtyMap[item.bill_item_id] || 0))
+          : 0;
+        return { ...item, isEligible: eligible, maxReturnQty };
+      });
+
+      if (!augmented.some(item => item.isEligible && item.maxReturnQty > 0)) {
+        toast.info("No eligible items remain to exchange on this bill.");
         return;
       }
       setLoadedBill(bill);
-      setBillItems(returnable);
+      setBillItems(augmented);
       setReturnQtyMap({});
       setReasonMap({});
       setSearchResults([]);
@@ -129,7 +243,6 @@ export default function ExchangePage() {
     setReasonMap(prev => ({ ...prev, [bill_item_id]: v }));
   }
 
-  // --- computed totals for preview ---
   const selected = useMemo(
     () => buildReturnedItemsWithCredit(billItems, returnQtyMap),
     [billItems, returnQtyMap]
@@ -145,7 +258,7 @@ export default function ExchangePage() {
     if (selected.length === 0) return;
     setConfirmSaving(true);
     try {
-      // 1. Restock inventory items (D-06)
+      // 1. Restock inventory variants
       for (const ri of selected) {
         if (ri.variantid) {
           const { data: variant, error: ve } = await supabase
@@ -164,7 +277,7 @@ export default function ExchangePage() {
         }
       }
 
-      // 2. Restock manual items (D-05) — requires migration_14 applied
+      // 2. Restock manual items
       for (const ri of selected) {
         if (!ri.variantid && ri.manual_item_id) {
           const { data: mi, error: me } = await supabase
@@ -173,8 +286,8 @@ export default function ExchangePage() {
             .eq("manual_item_id", ri.manual_item_id)
             .single();
           if (me) {
-            console.warn(`Manual item lookup failed (column may be missing): ${me.message}`);
-            continue; // graceful degradation if migration_14 not applied
+            console.warn(`Manual item lookup failed: ${me.message}`);
+            continue;
           }
           if (mi) {
             await supabase
@@ -185,42 +298,27 @@ export default function ExchangePage() {
         }
       }
 
-      // 3. Insert exchanges rows (D-07)
+      // 3. Insert exchange rows — capture IDs for linking to the new bill
       const exchangeRows = selected.map(ri => ({
         original_bill_item_id: ri.bill_item_id,
         quantity: ri.returnQty,
         reason: reasonMap[ri.bill_item_id]?.trim() || null,
         customerid: loadedBill.customerid || null,
         credit_amount: ri.creditAmount,
-        voucher_id: null, // D-07
+        voucher_id: null,
       }));
-      const { error: exErr } = await supabase.from("exchanges").insert(exchangeRows);
+      const { data: insertedExchanges, error: exErr } = await supabase
+        .from("exchanges")
+        .insert(exchangeRows)
+        .select("exchangeid");
       if (exErr) throw new Error(`Exchange record failed: ${exErr.message}`);
+      const exchangeIds = (insertedExchanges || []).map(e => e.exchangeid);
 
-      // 4. Update customers.store_credit (D-09, D-10) — skip if no customer
-      if (loadedBill.customerid) {
-        const { data: custRow, error: ce } = await supabase
-          .from("customers")
-          .select("store_credit")
-          .eq("customerid", loadedBill.customerid)
-          .single();
-        if (ce) throw new Error(`Customer lookup failed: ${ce.message}`);
-        if (custRow) {
-          const newBalance = Number(custRow.store_credit ?? 0) + totalCredit;
-          const { error: ue } = await supabase
-            .from("customers")
-            .update({ store_credit: newBalance })
-            .eq("customerid", loadedBill.customerid);
-          if (ue) throw new Error(`Store credit update failed: ${ue.message}`);
-        }
-      }
-
-      // 5. Generate PDF (D-13) — hidden receipt render + html2canvas
+      // 4. Print return receipt
       flushSync(() => {
         setReceiptReadyItems(selected);
         setReceiptReadyCredit(totalCredit);
       });
-      // small wait for the hidden DOM to paint
       await new Promise(r => setTimeout(r, 50));
       if (receiptRef.current) {
         try {
@@ -233,19 +331,29 @@ export default function ExchangePage() {
         }
       }
 
-      toast.success(`Exchange recorded. Credit ₹${totalCredit.toFixed(2)} added.`);
+      toast.success(`Exchange recorded. ₹${totalCredit.toFixed(2)} exchange credit applied to new bill.`);
 
-      // 6. Navigate to /admin/bills with route state (D-14, D-17) — consumed in Plan 03
+      // 6. Navigate to new bill — carry exchange data so BillingForm can auto-apply credit
+      //    and link the exchanges rows back to the new bill after finalization.
       navigate("/admin/bills", {
         state: {
           openNewBill: true,
           exchangeCredit: {
             amount: totalCredit,
-            label: `Return Credit — Bill #${loadedBill.bill_number || loadedBill.billid}`,
+            label: `Exchange Credit — Bill #${loadedBill.bill_number || loadedBill.billid}`,
+            sourceBillNumber: loadedBill.bill_number || String(loadedBill.billid),
+            items: selected.map(ri => ({
+              product_name: ri.product_name,
+              returnQty: ri.returnQty,
+              creditAmount: ri.creditAmount,
+            })),
+            exchangeIds,
           },
           prefilledCustomerId: loadedBill.customerid || null,
         },
       });
+
+      fetchHistory();
     } catch (err) {
       console.error(err);
       toast.error("Exchange failed", { description: err.message });
@@ -281,10 +389,7 @@ export default function ExchangePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="max-w-md"
               />
-              <Button
-                type="submit"
-                disabled={searchLoading || !searchQuery.trim()}
-              >
+              <Button type="submit" disabled={searchLoading || !searchQuery.trim()}>
                 {searchLoading ? "Searching..." : "Search"}
               </Button>
             </form>
@@ -297,9 +402,7 @@ export default function ExchangePage() {
                     className="w-full text-left px-4 py-2 hover:bg-gray-50 flex justify-between items-center"
                   >
                     <span>
-                      <span className="font-semibold">
-                        #{b.bill_number || b.billid}
-                      </span>
+                      <span className="font-semibold">#{b.bill_number || b.billid}</span>
                       {" — "}
                       {b.customers
                         ? `${b.customers.first_name} ${b.customers.last_name || ""}`.trim()
@@ -322,8 +425,7 @@ export default function ExchangePage() {
         <Card>
           <CardHeader>
             <CardTitle>
-              Return items from Bill #
-              {loadedBill.bill_number || loadedBill.billid}
+              Return items from Bill #{loadedBill.bill_number || loadedBill.billid}
             </CardTitle>
             <div className="text-sm text-muted-foreground">
               Customer:{" "}
@@ -346,56 +448,61 @@ export default function ExchangePage() {
               </div>
               {billItems.map((bi) => {
                 const rq = Number(returnQtyMap[bi.bill_item_id] || 0);
-                const credit = calcItemCredit(bi, rq);
+                const credit = bi.isEligible ? calcItemCredit(bi, rq) : 0;
                 return (
                   <div
                     key={bi.bill_item_id}
-                    className="grid grid-cols-12 gap-2 px-3 py-2 items-center border-b last:border-0 text-sm"
+                    className={`grid grid-cols-12 gap-2 px-3 py-2 items-center border-b last:border-0 text-sm${
+                      !bi.isEligible ? " bg-gray-50 opacity-60" : ""
+                    }`}
                   >
                     <div className="col-span-4">
-                      <div className="font-medium">
-                        {bi.product_name || "—"}
-                      </div>
+                      <div className="font-medium">{bi.product_name || "—"}</div>
                       <div className="text-xs text-muted-foreground">
                         {[bi.size, bi.color, bi.variantid ? null : "manual"]
                           .filter(Boolean)
                           .join(" / ")}
+                        {!bi.isEligible && (
+                          <span className="ml-1 inline-block rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-700">
+                            Altered
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="col-span-1 text-right tabular-nums">
                       ₹{Number(bi.mrp || 0).toFixed(0)}
                     </div>
-                    <div className="col-span-1 text-right tabular-nums">
-                      {bi.maxReturnQty}
-                    </div>
+                    <div className="col-span-1 text-right tabular-nums">{bi.quantity}</div>
                     <div className="col-span-2 text-right">
-                      <Input
-                        type="number"
-                        min={0}
-                        max={bi.maxReturnQty}
-                        value={returnQtyMap[bi.bill_item_id] ?? 0}
-                        onChange={(e) =>
-                          handleQtyChange(
-                            bi.bill_item_id,
-                            e.target.value,
-                            bi.maxReturnQty,
-                          )
-                        }
-                        className="text-right"
-                      />
+                      {bi.isEligible ? (
+                        <Input
+                          type="number"
+                          min={0}
+                          max={bi.maxReturnQty}
+                          value={returnQtyMap[bi.bill_item_id] ?? 0}
+                          onChange={(e) =>
+                            handleQtyChange(bi.bill_item_id, e.target.value, bi.maxReturnQty)
+                          }
+                          className="text-right"
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </div>
                     <div className="col-span-3">
-                      <Input
-                        type="text"
-                        placeholder="e.g., size mismatch"
-                        value={reasonMap[bi.bill_item_id] ?? ""}
-                        onChange={(e) =>
-                          handleReasonChange(bi.bill_item_id, e.target.value)
-                        }
-                      />
+                      {bi.isEligible ? (
+                        <Input
+                          type="text"
+                          placeholder="e.g., size mismatch"
+                          value={reasonMap[bi.bill_item_id] ?? ""}
+                          onChange={(e) => handleReasonChange(bi.bill_item_id, e.target.value)}
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not eligible for exchange</span>
+                      )}
                     </div>
-                    <div className="col-span-1 text-right tabular-nums">
-                      ₹{credit.toFixed(2)}
+                    <div className="col-span-1 text-right tabular-nums text-muted-foreground">
+                      {bi.isEligible ? `₹${credit.toFixed(2)}` : "—"}
                     </div>
                   </div>
                 );
@@ -412,13 +519,8 @@ export default function ExchangePage() {
             </div>
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button
-                disabled={!canConfirm}
-                onClick={() => setConfirmOpen(true)}
-              >
+              <Button variant="outline" onClick={handleCancel}>Cancel</Button>
+              <Button disabled={!canConfirm} onClick={() => setConfirmOpen(true)}>
                 Review & Confirm
               </Button>
             </div>
@@ -430,15 +532,10 @@ export default function ExchangePage() {
         <DialogContent className="bg-white max-w-lg">
           <DialogHeader>
             <DialogTitle>Confirm Exchange</DialogTitle>
-            <DialogDescription>
-              Review returned items. This cannot be undone.
-            </DialogDescription>
+            <DialogDescription>Review returned items. This cannot be undone.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
-            <div>
-              <strong>Bill:</strong> #
-              {loadedBill?.bill_number || loadedBill?.billid}
-            </div>
+            <div><strong>Bill:</strong> #{loadedBill?.bill_number || loadedBill?.billid}</div>
             <div>
               <strong>Customer:</strong>{" "}
               {loadedBill?.customers
@@ -447,16 +544,9 @@ export default function ExchangePage() {
             </div>
             <div className="border rounded p-2 max-h-60 overflow-y-auto">
               {selected.map((ri) => (
-                <div
-                  key={ri.bill_item_id}
-                  className="flex justify-between py-1 border-b last:border-0"
-                >
-                  <span>
-                    {ri.product_name} × {ri.returnQty}
-                  </span>
-                  <span className="tabular-nums">
-                    ₹{Number(ri.creditAmount).toFixed(2)}
-                  </span>
+                <div key={ri.bill_item_id} className="flex justify-between py-1 border-b last:border-0">
+                  <span>{ri.product_name} × {ri.returnQty}</span>
+                  <span className="tabular-nums">₹{Number(ri.creditAmount).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -465,17 +555,12 @@ export default function ExchangePage() {
             </div>
             {!loadedBill?.customerid && (
               <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                No customer on this bill — stock will be restored and PDF will
-                print, but no store credit can be saved.
+                No customer on this bill — stock will be restored and PDF will print, but no store credit can be saved.
               </div>
             )}
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <Button
-              variant="ghost"
-              disabled={confirmSaving}
-              onClick={() => setConfirmOpen(false)}
-            >
+            <Button variant="ghost" disabled={confirmSaving} onClick={() => setConfirmOpen(false)}>
               Keep Editing
             </Button>
             <Button disabled={confirmSaving} onClick={handleConfirm}>
@@ -485,13 +570,112 @@ export default function ExchangePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Recent exchange history */}
+      {!loadedBill && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Exchanges</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {historyLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : history.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No exchanges recorded yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-xs font-semibold text-muted-foreground">
+                      <th className="text-left py-2 pr-3">Date</th>
+                      <th className="text-left py-2 pr-3">Original Bill</th>
+                      <th className="text-left py-2 pr-3">Item</th>
+                      <th className="text-left py-2 pr-3">Reason</th>
+                      <th className="text-right py-2 pr-3">Qty</th>
+                      <th className="text-right py-2 pr-3">Credit</th>
+                      <th className="text-left py-2 pr-3">Applied To</th>
+                      <th className="text-left py-2">Customer</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {history.map((ex) => {
+                      const bi = ex.bill_items;
+                      const origBill = bi?.bills?.bill_number;
+                      const newBill = ex.new_bill?.bill_number;
+                      const cust = ex.customers;
+                      return (
+                        <tr key={ex.exchangeid} className="hover:bg-gray-50">
+                          <td className="py-2 pr-3 whitespace-nowrap">
+                            {new Date(ex.returndate).toLocaleDateString("en-IN")}
+                          </td>
+                          <td className="py-2 pr-3 font-medium">
+                            {origBill ? `#${origBill}` : "—"}
+                          </td>
+                          <td className="py-2 pr-3">
+                            <div>{bi?.product_name || "—"}</div>
+                            {(bi?._sizeColor?.size || bi?._sizeColor?.color) && (
+                              <div className="text-xs text-muted-foreground">
+                                {[bi._sizeColor.size, bi._sizeColor.color].filter(Boolean).join(" / ")}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-2 pr-3 text-xs text-muted-foreground">
+                            {ex.reason || "—"}
+                          </td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{ex.quantity}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">
+                            ₹{Number(ex.credit_amount).toFixed(2)}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {newBill ? (
+                              <span className="font-medium">#{newBill}</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">Pending</span>
+                            )}
+                          </td>
+                          <td className="py-2">
+                            {cust
+                              ? `${cust.first_name} ${cust.last_name || ""}`.trim()
+                              : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {historyTotal > HISTORY_PAGE_SIZE && (
+              <div className="flex items-center justify-between pt-3 text-sm">
+                <span className="text-muted-foreground">
+                  {historyPage * HISTORY_PAGE_SIZE + 1}–{Math.min((historyPage + 1) * HISTORY_PAGE_SIZE, historyTotal)} of {historyTotal}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={historyPage === 0}
+                    onClick={() => setHistoryPage(p => p - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={(historyPage + 1) * HISTORY_PAGE_SIZE >= historyTotal}
+                    onClick={() => setHistoryPage(p => p + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Hidden DOM for return receipt PDF */}
       <div
-        style={{
-          position: "fixed",
-          top: "-9999px",
-          left: "-9999px",
-          pointerEvents: "none",
-        }}
+        style={{ position: "fixed", top: "-9999px", left: "-9999px", pointerEvents: "none" }}
         aria-hidden="true"
       >
         <ReturnReceiptView

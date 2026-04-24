@@ -1,4 +1,5 @@
 import { money, round2 } from "./billUtils";
+import { computeCreditsApplied } from "./exchangeHelpers";
 
 export default function Summary({
   computed,
@@ -8,7 +9,7 @@ export default function Summary({
   onRemoveStoreCredit,
   onApplyStoreCredit,
   onRemoveVoucher,
-  exchangeCredit = null,    // { amount: number, label: string } | null
+  exchangeCredit = null,    // { amount, label, sourceBillNumber, items[] } | null
 }) {
   // voucher is pre-tax (baked into computed.grandTotal via computeBillTotals)
   const voucherApplied = Number(computed.voucherPreTax ?? 0);
@@ -20,11 +21,11 @@ export default function Summary({
     ? round2((totalPreTaxDiscount / computed.itemsSubtotal) * 100)
     : 0;
 
-  // store credit is a customer payment applied after grand total
-  const storeCreditApplied = Math.min(Number(appliedStoreCredit || 0), computed.grandTotal);
-  const afterStoreCredit = Math.max(0, computed.grandTotal - storeCreditApplied);
-  const exchangeCreditApplied = Math.min(Number(exchangeCredit?.amount || 0), afterStoreCredit);
-  const effectiveGrandTotal = Math.max(0, afterStoreCredit - exchangeCreditApplied);
+  const {
+    storeCreditUsed: storeCreditApplied,
+    exchangeCreditUsed: exchangeCreditApplied,
+    effectiveTotal: effectiveGrandTotal,
+  } = computeCreditsApplied(computed.grandTotal, appliedStoreCredit, exchangeCredit?.amount);
 
   const totalSavings = round2(totalPreTaxDiscount + storeCreditApplied + exchangeCreditApplied);
 
@@ -119,9 +120,21 @@ export default function Summary({
       )}
 
       {exchangeCreditApplied > 0 && (
-        <div className="flex justify-between items-center bg-purple-50 border border-purple-200 text-purple-800 rounded px-3 py-1.5 text-sm">
-          <span>Applied: {exchangeCredit?.label || "Return Credit"}</span>
-          <span className="tabular-nums">−{money(exchangeCreditApplied)}</span>
+        <div className="bg-purple-50 border border-purple-200 text-purple-800 rounded px-3 py-2 text-sm space-y-1">
+          <div className="flex justify-between font-medium">
+            <span>{exchangeCredit?.label || "Exchange Credit"}</span>
+            <span className="tabular-nums">−{money(exchangeCreditApplied)}</span>
+          </div>
+          {exchangeCredit?.items?.length > 0 && (
+            <div className="pl-2 border-l border-purple-300 space-y-0.5 text-xs text-purple-700">
+              {exchangeCredit.items.map((it, i) => (
+                <div key={i} className="flex justify-between">
+                  <span>{it.product_name} × {it.returnQty}</span>
+                  <span className="tabular-nums">−{money(it.creditAmount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
