@@ -141,6 +141,7 @@ function Field({ label, required, optional, children, error }) {
 
 // ─── Multi-category dropdown ─────────────────────────────────────────────────
 
+// options: [{categoryid, name}]; value: categoryid[]
 function CategoryMultiSelect({ value = [], onChange, options }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -155,16 +156,20 @@ function CategoryMultiSelect({ value = [], onChange, options }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const toggle = (name) => {
-    if (value.includes(name)) onChange(value.filter((v) => v !== name));
-    else onChange([...value, name]);
+  const toggle = (categoryid) => {
+    if (value.includes(categoryid)) onChange(value.filter((v) => v !== categoryid));
+    else onChange([...value, categoryid]);
   };
+
+  const selectedNames = value
+    .map((id) => options.find((o) => o.categoryid === id)?.name)
+    .filter(Boolean);
 
   const displayLabel =
     value.length === 0
       ? "All categories"
       : value.length === 1
-        ? value[0]
+        ? selectedNames[0] ?? value[0]
         : `${value.length} categories selected`;
 
   return (
@@ -197,16 +202,16 @@ function CategoryMultiSelect({ value = [], onChange, options }) {
               No categories found
             </p>
           )}
-          {options.map((name) => (
+          {options.map((opt) => (
             <label
-              key={name}
+              key={opt.categoryid}
               className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent text-sm"
             >
               <Checkbox
-                checked={value.includes(name)}
-                onCheckedChange={() => toggle(name)}
+                checked={value.includes(opt.categoryid)}
+                onCheckedChange={() => toggle(opt.categoryid)}
               />
-              <span>{name}</span>
+              <span>{opt.name}</span>
             </label>
           ))}
         </div>
@@ -281,10 +286,10 @@ export default function DiscountForm({ defaultValues, onSuccess, onCancel }) {
   useEffect(() => {
     supabase
       .from("categories")
-      .select("name")
+      .select("categoryid, name")
       .order("name")
       .then(({ data }) => {
-        setCategoryOptions((data || []).map((c) => c.name));
+        setCategoryOptions(data || []);
       });
   }, []);
 

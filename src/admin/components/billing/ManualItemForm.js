@@ -101,8 +101,6 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
     setSaving(true);
     try {
       const purchasePrice = decodeZCode(zCode);
-      const categoryName = categories.find((c) => c.categoryid === categoryId)?.name || initialVal?.category || null;
-
       let manualItemId;
       if (isEditing) {
         manualItemId = initialVal.productid || initialVal.manual_code || null;
@@ -129,8 +127,8 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
         manual_name: name.trim(),
         manual_code: manualItemId,
         categoryid: categoryId || null,
-        category: categoryName,
-        manual_category: categoryName,
+        category: categoryId || null,
+        manual_category: categoryId || null,
         size: size || null,
         color: color || null,
         quantity: Number(qty) || 1,

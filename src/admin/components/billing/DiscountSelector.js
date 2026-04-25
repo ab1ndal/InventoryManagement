@@ -1,17 +1,25 @@
 import { Checkbox } from "../../../components/ui/checkbox";
 import { Badge } from "../../../components/ui/badge";
 
-function discountLabel(d) {
+function resolveCatNames(ids, categoryMap) {
+  if (!ids || ids.length === 0) return null;
+  const names = ids.map((id) => categoryMap?.[id] || id).join(", ");
+  return names;
+}
+
+function discountLabel(d, categoryMap) {
   const r = d.rules || {};
+  const cats = r.categories?.length > 0 ? r.categories : r.category ? [r.category] : [];
+  const catDisplay = resolveCatNames(cats, categoryMap);
   switch (d.type) {
     case "flat":
       return `₹${d.value} off${d.max_discount ? ` (max ₹${d.max_discount})` : ""}`;
     case "percentage":
       return `${d.value}% off${d.max_discount ? ` (max ₹${d.max_discount})` : ""}`;
     case "buy_x_get_y":
-      return `Buy ${r.buy_qty || 2} Get ${r.get_qty || 1} Free${r.category ? ` on ${r.category}` : ""}`;
+      return `Buy ${r.buy_qty || 2} Get ${r.get_qty || 1} Free${catDisplay ? ` on ${catDisplay}` : ""}`;
     case "fixed_price":
-      return `Fixed price ₹${r.fixed_total}${r.category ? ` for ${r.category}` : ""}`;
+      return `Fixed price ₹${r.fixed_total}${catDisplay ? ` for ${catDisplay}` : ""}`;
     case "conditional": {
       const minTotal = r.min_total || d.min_total;
       const val = r.value || d.value;
@@ -22,7 +30,7 @@ function discountLabel(d) {
   }
 }
 
-function DiscountRow({ d, selectedCodes, onToggle, isAuto }) {
+function DiscountRow({ d, selectedCodes, onToggle, isAuto, categoryMap }) {
   const selected = selectedCodes.includes(d.code);
   return (
     <label
@@ -61,7 +69,7 @@ function DiscountRow({ d, selectedCodes, onToggle, isAuto }) {
           )}
         </div>
         <p className="text-sm text-muted-foreground mt-0.5">
-          {discountLabel(d)}
+          {discountLabel(d, categoryMap)}
         </p>
         {(d.start_date || d.end_date) && (
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -75,7 +83,7 @@ function DiscountRow({ d, selectedCodes, onToggle, isAuto }) {
   );
 }
 
-export default function DiscountSelector({ discounts, selectedCodes, onToggle }) {
+export default function DiscountSelector({ discounts, selectedCodes, onToggle, categoryMap = {} }) {
   const autoOffers = discounts.filter((d) => d.auto_apply);
   const optionalOffers = discounts.filter((d) => !d.auto_apply);
 
@@ -101,6 +109,7 @@ export default function DiscountSelector({ discounts, selectedCodes, onToggle })
               selectedCodes={selectedCodes}
               onToggle={onToggle}
               isAuto
+              categoryMap={categoryMap}
             />
           ))}
         </div>
@@ -117,6 +126,7 @@ export default function DiscountSelector({ discounts, selectedCodes, onToggle })
               selectedCodes={selectedCodes}
               onToggle={onToggle}
               isAuto={false}
+              categoryMap={categoryMap}
             />
           ))}
         </div>

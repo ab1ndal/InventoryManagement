@@ -6,6 +6,16 @@ import { Pencil, Trash2, Code } from "lucide-react";
 
 export default function DiscountTable({ onEdit, refresh }) {
   const [discounts, setDiscounts] = useState([]);
+  const [categoryMap, setCategoryMap] = useState({});
+
+  useEffect(() => {
+    supabase
+      .from("categories")
+      .select("categoryid, name")
+      .then(({ data }) => {
+        if (data) setCategoryMap(Object.fromEntries(data.map((c) => [c.categoryid, c.name])));
+      });
+  }, []);
 
   useEffect(() => {
     fetchDiscounts();
@@ -106,7 +116,7 @@ export default function DiscountTable({ onEdit, refresh }) {
               <td className="px-2 py-1 text-center">
                 {formatCurrency(d.max_discount)}
               </td>
-              <td className="px-2 py-1 text-center">{d.category || "—"}</td>
+              <td className="px-2 py-1 text-center">{d.category ? (categoryMap[d.category] || d.category) : "—"}</td>
               <td className="px-2 py-1 text-center">
                 {d.auto_apply ? "Yes" : "No"}
               </td>

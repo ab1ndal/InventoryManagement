@@ -280,7 +280,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
                 productid: selected.productid,
                 variantid: variantId,
                 product_name: selected.name,
-                category: selected.categoryid,
+                category: selected.categoryid || null,
                 size: chosenVariant?.size || null,
                 color: chosenVariant?.color || null,
                 stock: chosenVariant?.stock ?? null,

@@ -103,6 +103,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [salesLocationId, setSalesLocationId] = useState(null);
   const [salesMethodId, setSalesMethodId] = useState(null);
   const [salespersonsList, setSalespersonsList] = useState([]);
+  const [categoryMap, setCategoryMap] = useState({});
 
   // Reset all form state when the dialog closes. Must NOT include `items` in
   // its dependency array — doing so would cause setItems([]) to create a new
@@ -147,6 +148,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setSelectedCustomerId(prefilledCustomerId);
     }
   }, [open, billId, prefilledCustomerId]);
+
+  // Fetch categories once for categoryid → name resolution
+  useEffect(() => {
+    supabase
+      .from("categories")
+      .select("categoryid, name")
+      .then(({ data }) => {
+        if (data) setCategoryMap(Object.fromEntries(data.map((c) => [c.categoryid, c.name])));
+      });
+  }, []);
 
   // Load discounts (and re-evaluate auto-apply eligibility) whenever the
   // dialog is open or the item list changes.
@@ -1421,6 +1432,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 <DiscountSelector
                   discounts={visibleDiscounts}
                   selectedCodes={selectedCodes}
+                  categoryMap={categoryMap}
                   onToggle={(code) =>
                     setSelectedCodes((prev) =>
                       prev.includes(code)
