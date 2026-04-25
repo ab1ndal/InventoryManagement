@@ -333,19 +333,29 @@ export default function BillTable({ onEdit }) {
   };
 
   const restoreStockForBill = async (billId) => {
-    // TODO(CR-02): This restore uses a non-atomic read-modify-write pattern. Concurrent
-    // finalize/cancel operations between the read and write can silently corrupt stock counts.
-    // Fix: create a Supabase RPC `adjust_stock(p_variantid uuid, p_delta integer)` that performs
-    // an atomic `UPDATE productsizecolors SET stock = stock + p_delta WHERE variantid = p_variantid`
-    // and replace the block below with:
-    //   await supabase.rpc('adjust_stock', { p_variantid: bi.variantid, p_delta: bi.quantity });
-    // See schema/migration_adjust_stock.sql for the required migration.
     const { data: billItems } = await supabase
       .from("bill_items")
-      .select("variantid, quantity")
+      .select("bill_item_id, variantid, quantity")
       .eq("billid", billId)
       .not("variantid", "is", null);
+
+    // Deduct already-exchanged quantities — those items were restocked at exchange time
+    const billItemIds = (billItems || []).map((bi) => bi.bill_item_id);
+    let exchangedQtyMap = {};
+    if (billItemIds.length > 0) {
+      const { data: exchanges } = await supabase
+        .from("exchanges")
+        .select("original_bill_item_id, quantity")
+        .in("original_bill_item_id", billItemIds);
+      for (const ex of exchanges || []) {
+        exchangedQtyMap[ex.original_bill_item_id] =
+          (exchangedQtyMap[ex.original_bill_item_id] || 0) + Number(ex.quantity);
+      }
+    }
+
     for (const bi of billItems || []) {
+      const netQty = bi.quantity - (exchangedQtyMap[bi.bill_item_id] || 0);
+      if (netQty <= 0) continue;
       const { data: variant } = await supabase
         .from("productsizecolors")
         .select("stock")
@@ -354,7 +364,7 @@ export default function BillTable({ onEdit }) {
       if (variant) {
         await supabase
           .from("productsizecolors")
-          .update({ stock: variant.stock + bi.quantity })
+          .update({ stock: variant.stock + netQty })
           .eq("variantid", bi.variantid);
       }
     }
@@ -578,28 +588,12 @@ export default function BillTable({ onEdit }) {
       ? `Delete finalized Bill #${billId}? This will restore stock and reverse customer spend. This cannot be undone.`
       : `Delete draft Bill #${billId}? This will restore stock.`;
     if (!window.confirm(confirmMsg)) return;
-    try {
-      // Fetch bill_items to restore stock
-      const { data: billItems } = await supabase
-        .from("bill_items")
-        .select("variantid, quantity")
-        .eq("billid", billId)
-        .not("variantid", "is", null);
 
-      // Restore stock for each inventory item
-      for (const bi of billItems || []) {
-        const { data: variant } = await supabase
-          .from("productsizecolors")
-          .select("stock")
-          .eq("variantid", bi.variantid)
-          .single();
-        if (variant) {
-          await supabase
-            .from("productsizecolors")
-            .update({ stock: variant.stock + bi.quantity })
-            .eq("variantid", bi.variantid);
-        }
-      }
+    // Optimistic removal
+    setBills((prev) => prev.filter((b) => b.billid !== billId));
+
+    try {
+      await restoreStockForBill(billId);
 
       // For finalized bills: refund store credit + delete discount_usage + remove PDF
       if (finalized && customerid) {
@@ -616,8 +610,12 @@ export default function BillTable({ onEdit }) {
       if (error) throw error;
 
       toast({ title: `Bill #${billId} deleted` });
-      setBills((prev) => prev.filter((b) => b.billid !== billId));
     } catch (e) {
+      // Revert optimistic removal
+      setBills((prev) => {
+        if (prev.some((b) => b.billid === billId)) return prev;
+        return [...prev, bill].sort((a, b) => new Date(b.orderdate || 0) - new Date(a.orderdate || 0));
+      });
       toast({ title: "Delete failed", description: e.message, variant: "destructive" });
     }
   };

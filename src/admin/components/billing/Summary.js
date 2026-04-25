@@ -10,6 +10,7 @@ export default function Summary({
   onApplyStoreCredit,
   onRemoveVoucher,
   exchangeCredit = null,    // { amount, label, sourceBillNumber, items[] } | null
+  onRemoveExchangeCredit,
 }) {
   // voucher is pre-tax (baked into computed.grandTotal via computeBillTotals)
   const voucherApplied = Number(computed.voucherPreTax ?? 0);
@@ -121,9 +122,21 @@ export default function Summary({
 
       {exchangeCreditApplied > 0 && (
         <div className="bg-purple-50 border border-purple-200 text-purple-800 rounded px-3 py-2 text-sm space-y-1">
-          <div className="flex justify-between font-medium">
+          <div className="flex justify-between font-medium items-center">
             <span>{exchangeCredit?.label || "Exchange Credit"}</span>
-            <span className="tabular-nums">−{money(exchangeCreditApplied)}</span>
+            <div className="flex items-center gap-2">
+              <span className="tabular-nums">−{money(exchangeCreditApplied)}</span>
+              {onRemoveExchangeCredit && (
+                <button
+                  type="button"
+                  className="text-purple-600 hover:text-purple-900"
+                  aria-label="Remove exchange credit"
+                  onClick={onRemoveExchangeCredit}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
           {exchangeCredit?.items?.length > 0 && (
             <div className="pl-2 border-l border-purple-300 space-y-0.5 text-xs text-purple-700">

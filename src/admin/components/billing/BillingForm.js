@@ -90,7 +90,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     () => new Date().toISOString().split("T")[0],
   );
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
-  const [exchangeCredit, setExchangeCredit] = useState(null); // { amount: number, label: string }
+  const [exchangeCredit, setExchangeCredit] = useState(null); // { amount: number, label: string, exchangeIds: number[] }
+  const [availableExchangeCredit, setAvailableExchangeCredit] = useState(null); // { amount, exchangeIds } pending in DB
   const [customerStoreCreditBalance, setCustomerStoreCreditBalance] =
     useState(0);
   const [voucherCode, setVoucherCode] = useState("");
@@ -407,6 +408,32 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setAppliedStoreCredit(balance);
       });
   }, [selectedCustomerId]);
+
+  // Fetch pending (unredeemed) exchange credits for selected customer
+  useEffect(() => {
+    if (!selectedCustomerId || exchangeCreditProp) {
+      setAvailableExchangeCredit(null);
+      return;
+    }
+    supabase
+      .from("exchanges")
+      .select("exchangeid, credit_amount, quantity, bill_items!inner(product_name, bills!inner(bill_number))")
+      .eq("customerid", selectedCustomerId)
+      .is("new_billid", null)
+      .then(({ data }) => {
+        if (!data || data.length === 0) { setAvailableExchangeCredit(null); return; }
+        const total = data.reduce((s, e) => s + Number(e.credit_amount || 0), 0);
+        const exchangeIds = data.map((e) => e.exchangeid);
+        const bills = [...new Set(data.map((e) => e.bill_items?.bills?.bill_number).filter(Boolean))];
+        const label = `Exchange Credit${bills.length ? ` — Bill${bills.length > 1 ? "s" : ""} #${bills.join(", #")}` : ""}`;
+        const items = data.map((e) => ({
+          product_name: e.bill_items?.product_name || "Unknown",
+          returnQty: Number(e.quantity || 0),
+          creditAmount: Number(e.credit_amount || 0),
+        }));
+        setAvailableExchangeCredit({ amount: total, exchangeIds, label, items });
+      });
+  }, [selectedCustomerId, exchangeCreditProp]);
 
   // D-05: Query discount_usage when customer changes to hide once_per_customer discounts already used
   useEffect(() => {
@@ -1514,6 +1541,24 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 </div>
               </section>
 
+              {/* Apply pending exchange credit (deferred redemption) */}
+              {availableExchangeCredit && !exchangeCredit && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="text-xs text-purple-700 hover:text-purple-900 underline"
+                    onClick={() => setExchangeCredit({
+                      amount: availableExchangeCredit.amount,
+                      label: availableExchangeCredit.label,
+                      exchangeIds: availableExchangeCredit.exchangeIds,
+                      items: availableExchangeCredit.items,
+                    })}
+                  >
+                    Apply exchange credit (₹{availableExchangeCredit.amount.toFixed(2)})
+                  </button>
+                </div>
+              )}
+
               {/* Summary */}
               <Summary
                 computed={balanceAdjustedComputed}
@@ -1526,6 +1571,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 }
                 onRemoveVoucher={() => setAppliedVoucher(null)}
                 exchangeCredit={exchangeCredit}
+                onRemoveExchangeCredit={availableExchangeCredit ? () => setExchangeCredit(null) : undefined}
               />
 
               {/* Actions */}

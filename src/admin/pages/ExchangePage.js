@@ -41,6 +41,7 @@ export default function ExchangePage() {
   const [confirmSaving, setConfirmSaving] = useState(false);
   const [receiptReadyItems, setReceiptReadyItems] = useState([]);
   const [receiptReadyCredit, setReceiptReadyCredit] = useState(0);
+  const [pendingCredit, setPendingCredit] = useState(null); // { amount, exchangeIds, customerId, sourceBillNumber, items[] }
 
   // history
   const [history, setHistory] = useState([]);
@@ -214,10 +215,12 @@ export default function ExchangePage() {
 
       const augmented = allItems.map(item => {
         const eligible = isExchangeEligible(item);
+        const returnedQty = returnedQtyMap[item.bill_item_id] || 0;
         const maxReturnQty = eligible
-          ? Math.max(0, Number(item.quantity || 0) - (returnedQtyMap[item.bill_item_id] || 0))
+          ? Math.max(0, Number(item.quantity || 0) - returnedQty)
           : 0;
-        return { ...item, isEligible: eligible, maxReturnQty };
+        const isExchanged = eligible && returnedQty > 0 && maxReturnQty === 0;
+        return { ...item, isEligible: eligible, maxReturnQty, isExchanged };
       });
 
       if (!augmented.some(item => item.isEligible && item.maxReturnQty > 0)) {
@@ -331,10 +334,11 @@ export default function ExchangePage() {
         }
       }
 
-      toast.success(`Exchange recorded. ₹${totalCredit.toFixed(2)} exchange credit applied to new bill.`);
+      toast.success(`Exchange recorded. ₹${totalCredit.toFixed(2)} credit saved — redeem on any future bill.`);
 
-      // 6. Navigate to new bill — carry exchange data so BillingForm can auto-apply credit
-      //    and link the exchanges rows back to the new bill after finalization.
+      fetchHistory();
+
+      // Navigate to bills page; pre-fill exchange credit so new bill can be created immediately
       navigate("/admin/bills", {
         state: {
           openNewBill: true,
@@ -352,8 +356,6 @@ export default function ExchangePage() {
           prefilledCustomerId: loadedBill.customerid || null,
         },
       });
-
-      fetchHistory();
     } catch (err) {
       console.error(err);
       toast.error("Exchange failed", { description: err.message });
@@ -369,6 +371,7 @@ export default function ExchangePage() {
     setReturnQtyMap({});
     setReasonMap({});
     setConfirmOpen(false);
+    setPendingCredit(null);
   }
 
   // --- render ---
@@ -453,7 +456,7 @@ export default function ExchangePage() {
                   <div
                     key={bi.bill_item_id}
                     className={`grid grid-cols-12 gap-2 px-3 py-2 items-center border-b last:border-0 text-sm${
-                      !bi.isEligible ? " bg-gray-50 opacity-60" : ""
+                      (!bi.isEligible || bi.isExchanged) ? " bg-gray-50 opacity-60" : ""
                     }`}
                   >
                     <div className="col-span-4">
@@ -462,6 +465,11 @@ export default function ExchangePage() {
                         {[bi.size, bi.color, bi.variantid ? null : "manual"]
                           .filter(Boolean)
                           .join(" / ")}
+                        {bi.isExchanged && (
+                          <span className="ml-1 inline-block rounded bg-blue-100 px-1 py-0.5 text-[10px] font-medium text-blue-700">
+                            Exchanged
+                          </span>
+                        )}
                         {!bi.isEligible && (
                           <span className="ml-1 inline-block rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-700">
                             Altered
@@ -474,7 +482,7 @@ export default function ExchangePage() {
                     </div>
                     <div className="col-span-1 text-right tabular-nums">{bi.quantity}</div>
                     <div className="col-span-2 text-right">
-                      {bi.isEligible ? (
+                      {bi.isEligible && !bi.isExchanged ? (
                         <Input
                           type="number"
                           min={0}
@@ -490,13 +498,15 @@ export default function ExchangePage() {
                       )}
                     </div>
                     <div className="col-span-3">
-                      {bi.isEligible ? (
+                      {bi.isEligible && !bi.isExchanged ? (
                         <Input
                           type="text"
                           placeholder="e.g., size mismatch"
                           value={reasonMap[bi.bill_item_id] ?? ""}
                           onChange={(e) => handleReasonChange(bi.bill_item_id, e.target.value)}
                         />
+                      ) : bi.isExchanged ? (
+                        <span className="text-xs text-muted-foreground">Already exchanged</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">Not eligible for exchange</span>
                       )}
@@ -569,6 +579,53 @@ export default function ExchangePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Post-exchange success banner */}
+      {pendingCredit && !loadedBill && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <p className="font-semibold text-green-800">
+                  Exchange recorded — ₹{pendingCredit.amount.toFixed(2)} credit saved
+                </p>
+                <p className="text-sm text-green-700 mt-0.5">
+                  Customer can redeem on any future bill, or create one now.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPendingCredit(null)}
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    navigate("/admin/bills", {
+                      state: {
+                        openNewBill: true,
+                        exchangeCredit: {
+                          amount: pendingCredit.amount,
+                          label: pendingCredit.label,
+                          sourceBillNumber: pendingCredit.sourceBillNumber,
+                          items: pendingCredit.items,
+                          exchangeIds: pendingCredit.exchangeIds,
+                        },
+                        prefilledCustomerId: pendingCredit.customerId,
+                      },
+                    })
+                  }
+                >
+                  Create New Bill Now
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent exchange history */}
       {!loadedBill && (
