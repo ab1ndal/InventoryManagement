@@ -15,6 +15,7 @@ create table public.bills (
   applied_codes text[] null default '{}'::text[],
   payment_amount numeric(10, 2) null,
   net_amount numeric(10, 2) null,
+  final_amount numeric(10, 2) null,
   store_credit_used numeric(10, 2) not null default 0,
   bill_number text null,
   salesperson_ids integer[] null,
