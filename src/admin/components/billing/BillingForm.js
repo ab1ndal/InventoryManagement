@@ -143,6 +143,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setBillPayments([]);
       setAddPaymentAmount("");
       setAddPaymentMethodId(null);
+      setIsAddingPayment(false);
       setPartialConfirmOpen(false);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
