@@ -1,4 +1,4 @@
-import { priceItem, normalizeItem, computeBillTotals } from "../billUtils";
+import { priceItem, normalizeItem, computeBillTotals, computeAlterationDeposit } from "../billUtils";
 import { backCalcDiscountPct } from "../stockHelpers";
 
 describe("normalizeItem", () => {
@@ -118,5 +118,41 @@ describe("backCalcDiscountPct", () => {
     // 10 / (30 * 1) * 100 = 33.333...
     const result = backCalcDiscountPct(10, 30, 1);
     expect(result).toBeCloseTo(33.33, 2);
+  });
+});
+
+describe("computeAlterationDeposit", () => {
+  it("returns 0 when no items have alteration charges", () => {
+    const items = [
+      { quantity: 1, mrp: 500, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+      { quantity: 2, mrp: 300, quickDiscountPct: 10, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+    ];
+    expect(computeAlterationDeposit(items)).toBe(0);
+  });
+
+  it("sums total (with GST) of items that have alteration charges", () => {
+    const items = [
+      { quantity: 1, mrp: 500, quickDiscountPct: 0, alteration_charge: 50, gstRate: 5, stitchType: "stitched" },
+    ];
+    const result = computeAlterationDeposit(items);
+    expect(result).toBeCloseTo(575, 0);
+  });
+
+  it("ignores items without alteration charges", () => {
+    const items = [
+      { quantity: 1, mrp: 500, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+      { quantity: 1, mrp: 400, quickDiscountPct: 0, alteration_charge: 50, gstRate: 5, stitchType: "stitched" },
+    ];
+    const withAltOnly = [items[1]];
+    expect(computeAlterationDeposit(items)).toBeCloseTo(computeAlterationDeposit(withAltOnly), 2);
+  });
+
+  it("sums across multiple altered items", () => {
+    const items = [
+      { quantity: 1, mrp: 500, quickDiscountPct: 0, alteration_charge: 50, gstRate: 5, stitchType: "stitched" },
+      { quantity: 1, mrp: 400, quickDiscountPct: 0, alteration_charge: 30, gstRate: 5, stitchType: "stitched" },
+    ];
+    const individual = items.map((it) => computeAlterationDeposit([it]));
+    expect(computeAlterationDeposit(items)).toBeCloseTo(individual[0] + individual[1], 2);
   });
 });

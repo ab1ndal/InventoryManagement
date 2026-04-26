@@ -129,6 +129,14 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
   };
 }
 
+export function computeAlterationDeposit(items) {
+  return round2(
+    items
+      .filter((it) => Number(it.alteration_charge || it.stitching_charge || 0) > 0)
+      .reduce((s, it) => s + priceItem(it).total, 0)
+  );
+}
+
 function applyOverallDiscounts(items, codes, allDiscounts) {
   if (!codes || codes.length === 0) return 0;
   const active = allDiscounts.filter((d) => codes.includes(d.code));
