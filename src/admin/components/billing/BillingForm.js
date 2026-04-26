@@ -1006,6 +1006,35 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     setConfirmOpen(true);
   };
 
+  const openPartialFinalizeConfirm = () => {
+    if (!selectedCustomerId) {
+      toast.error("Customer required", {
+        description: "A customer must be selected before finalizing.",
+      });
+      return;
+    }
+    if (!salesMethodId || !paymentAmount) {
+      toast.error("Payment required", {
+        description: "Select a payment method and enter the amount received.",
+      });
+      return;
+    }
+    const paidAmt = Number(paymentAmount);
+    if (paidAmt <= 0) {
+      toast.error("Amount must be greater than zero");
+      return;
+    }
+    const alterMin = computeAlterationDeposit(items);
+    if (alterMin > 0 && paidAmt < alterMin) {
+      toast.error("Insufficient initial payment", {
+        description: `Must pay at least ₹${alterMin.toFixed(2)} to cover altered items.`,
+      });
+      return;
+    }
+    setDiscountWarningAcked(false);
+    setPartialConfirmOpen(true);
+  };
+
   const handleConfirmFinalize = async () => {
     setIsSaving(true);
     let activeBillId = billId;
@@ -1355,6 +1384,210 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     }
   };
 
+  const handleConfirmPartialFinalize = async () => {
+    setIsSaving(true);
+    let activeBillId = null;
+    let pdfBillNumber = null;
+    const { storeCreditUsed, exchangeCreditUsed, effectiveTotal } = computeCreditsApplied(
+      computed.grandTotal,
+      appliedStoreCredit,
+      exchangeCredit?.amount,
+    );
+    try {
+      if (items.length === 0) {
+        toast.error("Add at least one item");
+        return;
+      }
+
+      // Stock validation
+      const inventoryItems = items.filter((it) => it.variantid);
+      let stockMap = {};
+      if (inventoryItems.length > 0) {
+        const variantIds = inventoryItems.map((it) => it.variantid);
+        const { data: stockData, error: stockErr } = await supabase
+          .from("productsizecolors")
+          .select("variantid, stock, size, color")
+          .in("variantid", variantIds);
+        if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+        stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
+        if (!isBackdated) {
+          const outOfStock = inventoryItems.filter(
+            (it) => (stockMap[it.variantid]?.stock ?? 0) < it.quantity,
+          );
+          if (outOfStock.length > 0) {
+            const details = outOfStock
+              .map((it) => {
+                const avail = stockMap[it.variantid]?.stock ?? 0;
+                return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
+              })
+              .join("\n");
+            toast.error("Insufficient stock", { description: details });
+            return;
+          }
+        }
+      }
+
+      // Create bill as partial — use computed (no balance discount)
+      const { data: bill, error: billError } = await supabase
+        .from("bills")
+        .insert({
+          customerid: selectedCustomerId || null,
+          notes: notes || null,
+          totalamount: computed.grandTotal,
+          gst_total: computed.gstTotal,
+          discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
+          taxable_total: computed.taxableTotal,
+          net_amount: effectiveTotal,
+          paymentstatus: "partial",
+          finalized: true,
+          applied_codes: selectedCodes,
+          payment_amount: Number(paymentAmount),
+          store_credit_used: storeCreditUsed,
+          exchange_credit_used: exchangeCreditUsed,
+          exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
+          saleslocationid: salesLocationId || null,
+          salesmethodid: salesMethodId || null,
+          orderdate: backdatedDate + "T00:00:00+05:30",
+        })
+        .select("billid, bill_number")
+        .single();
+      if (billError) throw new Error("Failed to save bill: " + billError.message);
+      activeBillId = bill.billid;
+      pdfBillNumber = bill.bill_number || null;
+      setEffectiveBillNumber(bill.bill_number || null);
+
+      // Link exchange rows
+      if (exchangeCredit?.exchangeIds?.length) {
+        await supabase
+          .from("exchanges")
+          .update({ new_billid: activeBillId })
+          .in("exchangeid", exchangeCredit.exchangeIds);
+      }
+
+      // Insert bill_items — no balance discount for partial
+      const billItemsPayload = buildBillItemsPayload(
+        activeBillId,
+        items,
+        0,
+        computed.overallDiscount,
+      );
+      const { error: itemsError } = await supabase
+        .from("bill_items")
+        .insert(billItemsPayload);
+      if (itemsError) {
+        await supabase.from("bills").delete().eq("billid", activeBillId);
+        throw new Error("Failed to save bill items: " + itemsError.message);
+      }
+
+      // Save salesperson associations
+      if (selectedSalespersonIds.length > 0) {
+        const spPayload = selectedSalespersonIds.map((spId) => ({
+          billid: activeBillId,
+          salesperson_id: spId,
+        }));
+        const { error: spErr } = await supabase
+          .from("bill_salespersons")
+          .insert(spPayload);
+        if (spErr) console.error("Failed to save salespersons:", spErr.message);
+      }
+
+      // Decrement stock
+      if (!isBackdated) {
+        for (const it of inventoryItems) {
+          const currentStock = stockMap[it.variantid]?.stock ?? 0;
+          const { error: stockUpdateErr } = await supabase
+            .from("productsizecolors")
+            .update({ stock: currentStock - it.quantity })
+            .eq("variantid", it.variantid);
+          if (stockUpdateErr)
+            console.error("Stock update failed for", it.variantid, stockUpdateErr);
+        }
+      }
+
+      // Insert initial payment record
+      const { data: paymentRecord, error: payErr } = await supabase
+        .from("bill_payments")
+        .insert({
+          billid: activeBillId,
+          amount: Number(paymentAmount),
+          salesmethodid: salesMethodId,
+        })
+        .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
+        .single();
+      if (payErr) throw new Error("Failed to record payment: " + payErr.message);
+
+      // Discount usage rows
+      if (selectedCodes?.length > 0) {
+        const usageRows = selectedCodes.map((code) => ({
+          customerid: selectedCustomerId,
+          code,
+          billid: activeBillId,
+        }));
+        const { error: duErr } = await supabase
+          .from("discount_usage")
+          .insert(usageRows);
+        if (duErr) throw duErr;
+      }
+
+      // Mark voucher redeemed
+      if (appliedVoucher?.voucher_id) {
+        const { error: vErr } = await supabase
+          .from("vouchers")
+          .update({
+            redeemed: true,
+            redeemed_at: new Date().toISOString(),
+            redeemed_billid: activeBillId,
+          })
+          .eq("voucher_id", appliedVoucher.voucher_id);
+        if (vErr) throw vErr;
+      }
+
+      // Decrement store credit
+      if (storeCreditUsed > 0 && selectedCustomerId) {
+        const { data: custCredRow, error: credFetchErr } = await supabase
+          .from("customers")
+          .select("store_credit")
+          .eq("customerid", selectedCustomerId)
+          .single();
+        if (credFetchErr) throw credFetchErr;
+        const currentBalance = Number(custCredRow?.store_credit ?? 0);
+        await supabase
+          .from("customers")
+          .update({ store_credit: Math.max(0, currentBalance - storeCreditUsed) })
+          .eq("customerid", selectedCustomerId);
+      }
+
+      // Set state so InvoiceView renders with payment history before PDF capture
+      setBillPayments([paymentRecord]);
+      setBillPaymentStatus("partial");
+
+      // PDF generation
+      flushSync(() => setEffectiveBillId(activeBillId));
+      let pdfUrl = null;
+      try {
+        pdfUrl = await regenerateBillPdf({ activeBillId, pdfBillNumber });
+      } catch (pdfErr) {
+        console.error("PDF generation failed:", pdfErr);
+        toast.error("PDF generation failed", {
+          description: pdfErr?.message || "Bill saved. Reprint from Bill List.",
+        });
+      }
+      if (pdfUrl) window.open(pdfUrl, "_blank");
+
+      const balanceDue = effectiveTotal - Number(paymentAmount);
+      toast.success(
+        `Bill #${activeBillId} saved — ₹${balanceDue.toFixed(2)} balance due`
+      );
+      setPartialConfirmOpen(false);
+      onOpenChange?.(false);
+      onSubmit?.();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1630,6 +1863,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 <Button disabled={isSaving} onClick={handleSaveDraft}>
                   {isSaving ? "Saving..." : "Save Draft"}
                 </Button>
+                {showPartialButton && (
+                  <Button
+                    variant="outline"
+                    disabled={isSaving}
+                    onClick={openPartialFinalizeConfirm}
+                    className="border-amber-500 text-amber-700 hover:bg-amber-50"
+                  >
+                    {isSaving ? "Saving..." : "Partial Payment"}
+                  </Button>
+                )}
                 <Button disabled={isSaving} onClick={openFinalizeConfirm}>
                   {isSaving ? "Saving..." : "Finalize"}
                 </Button>
@@ -1784,6 +2027,78 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               onClick={handleConfirmFinalize}
             >
               {isSaving ? "Saving..." : "Confirm & Finalize"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Partial Payment Confirmation Dialog */}
+      <Dialog open={partialConfirmOpen} onOpenChange={setPartialConfirmOpen}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Partial Payment</DialogTitle>
+            <DialogDescription>
+              Bill will be finalized with partial payment. Goods are held until paid in full.
+            </DialogDescription>
+          </DialogHeader>
+          {items.some((it) => Number(it.quickDiscountPct || 0) > 30) && (
+            <div className="rounded bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-3 py-2 space-y-2">
+              <p className="font-semibold">Warning: One or more items have a discount above 30%.</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={discountWarningAcked}
+                  onChange={(e) => setDiscountWarningAcked(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                I confirm this discount has been approved.
+              </label>
+            </div>
+          )}
+          <div className="space-y-2 text-sm">
+            <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
+            <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
+            <div>
+              <span className="font-semibold">Grand Total:</span>{" "}
+              ₹{computed.grandTotal.toFixed(2)}
+            </div>
+            <div>
+              <span className="font-semibold">Amount Received Now:</span>{" "}
+              ₹{Number(paymentAmount).toFixed(2)}
+            </div>
+            <div className="font-bold text-red-600">
+              <span className="font-semibold">Balance Due on Pickup:</span>{" "}
+              ₹{Math.max(0, (() => {
+                const { effectiveTotal } = computeCreditsApplied(
+                  computed.grandTotal,
+                  appliedStoreCredit,
+                  exchangeCredit?.amount,
+                );
+                return effectiveTotal - Number(paymentAmount);
+              })()).toFixed(2)}
+            </div>
+            <div className="rounded bg-red-50 border border-red-300 text-red-700 text-xs px-3 py-2 font-semibold text-center">
+              ⚠ GOODS WILL NOT BE RELEASED UNTIL PAYMENT IN FULL
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="ghost"
+              disabled={isSaving}
+              onClick={() => setPartialConfirmOpen(false)}
+            >
+              Keep Editing
+            </Button>
+            <Button
+              disabled={
+                isSaving ||
+                (items.some((it) => Number(it.quickDiscountPct || 0) > 30) &&
+                  !discountWarningAcked)
+              }
+              onClick={handleConfirmPartialFinalize}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isSaving ? "Saving..." : "Confirm Partial Payment"}
             </Button>
           </div>
         </DialogContent>
