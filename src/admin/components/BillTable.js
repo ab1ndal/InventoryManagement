@@ -300,7 +300,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, paymentstatus, finalized, pdf_url"
+          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, paymentstatus, finalized, pdf_url"
         )
         .order("bill_number", { ascending: false, nullsFirst: false })
         .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE); // fetch 51 to detect next page
@@ -702,13 +702,25 @@ export default function BillTable({ onEdit }) {
                             ? "destructive"
                             : "secondary"
                       }
+                      className={
+                        b.paymentstatus === "partial"
+                          ? "bg-amber-100 text-amber-800 border border-amber-300 hover:bg-amber-100"
+                          : undefined
+                      }
                     >
                       {b.paymentstatus === "finalized"
                         ? "Finalized"
                         : b.paymentstatus === "cancelled"
                           ? "Cancelled"
-                          : "Draft"}
+                          : b.paymentstatus === "partial"
+                            ? "Pending Payment"
+                            : "Draft"}
                     </Badge>
+                    {b.paymentstatus === "partial" && b.net_amount != null && b.payment_amount != null && (
+                      <div className="text-xs text-red-600 mt-0.5 tabular-nums">
+                        Due: ₹{Math.max(0, Number(b.net_amount) - Number(b.payment_amount)).toFixed(2)}
+                      </div>
+                    )}
                   </td>
                   <td className="p-2">
                     <div className="flex gap-1 justify-center">
