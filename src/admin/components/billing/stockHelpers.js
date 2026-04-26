@@ -49,17 +49,27 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
   const pricedItems = items.map(priceItem);
   const totalWithCharges = pricedItems.reduce((s, p) => s + p.withCharges, 0);
 
+  let sumOverallDisc = 0;
+  let sumBalanceDisc = 0;
+
   return items.map((it, idx) => {
     const priced = pricedItems[idx];
+    const isLast = idx === items.length - 1;
     const proportion =
       totalWithCharges > 0
         ? priced.withCharges / totalWithCharges
         : 1 / Math.max(items.length, 1);
 
-    const itemOverallDisc =
-      overallDiscount > 0 ? round2(overallDiscount * proportion) : 0;
-    const itemBalanceDisc =
-      balanceDiscount > 0 ? round2(balanceDiscount * proportion) : 0;
+    let itemOverallDisc, itemBalanceDisc;
+    if (isLast) {
+      itemOverallDisc = overallDiscount > 0 ? round2(overallDiscount - sumOverallDisc) : 0;
+      itemBalanceDisc = balanceDiscount > 0 ? round2(balanceDiscount - sumBalanceDisc) : 0;
+    } else {
+      itemOverallDisc = overallDiscount > 0 ? round2(overallDiscount * proportion) : 0;
+      itemBalanceDisc = balanceDiscount > 0 ? round2(balanceDiscount * proportion) : 0;
+      sumOverallDisc += itemOverallDisc;
+      sumBalanceDisc += itemBalanceDisc;
+    }
     const adjustedSubtotal = round2(
       priced.withCharges - itemOverallDisc - itemBalanceDisc,
     );

@@ -57,11 +57,31 @@ export function priceItem(it) {
   };
 }
 
-export function computePreTaxBalanceDiscount(computed, targetGrandTotal) {
+export function computePreTaxBalanceDiscount(computed, targetGrandTotal, items = null, selectedCodes = null, allDiscounts = null, voucherPreTax = 0) {
   if (targetGrandTotal >= computed.grandTotal || computed.taxableTotal <= 0) return 0;
-  const weightedGstRate = computed.gstTotal / computed.taxableTotal;
   const reduction = computed.grandTotal - targetGrandTotal;
-  return round2(Math.max(0, reduction / (1 + weightedGstRate)));
+
+  if (!items) {
+    // Closed-form fallback (exact only when no GST slab transitions)
+    const weightedGstRate = computed.gstTotal / computed.taxableTotal;
+    return round2(Math.max(0, reduction / (1 + weightedGstRate)));
+  }
+
+  // Binary search to handle 18%→5% slab transitions (stitched items crossing ₹2500/unit).
+  // Invariant: grandTotal(lo) > target, grandTotal(hi) <= target.
+  // Result is hi — the smallest D_pretax that brings grandTotal to target.
+  let lo = 0;
+  let hi = computed.taxableTotal;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    const trial = computeBillTotals(items, selectedCodes, allDiscounts, mid, voucherPreTax);
+    if (trial.grandTotal > targetGrandTotal) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return round2(Math.max(0, hi));
 }
 
 export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0, voucherPreTax = 0) {

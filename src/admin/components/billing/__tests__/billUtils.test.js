@@ -17,80 +17,96 @@ describe("normalizeItem", () => {
       mrp: 200,
       quickDiscountPct: 15,
       alteration_charge: 100,
-      gstRate: 12,
+      gstRate: 18,
     });
     expect(result.qty).toBe(3);
     expect(result.mrp).toBe(200);
     expect(result.quickDiscountPct).toBe(15);
-    expect(result.alteration).toBe(100);
-    expect(result.gstRate).toBe(12);
+    // alteration_charge is GST-inclusive; normalizeItem strips GST (÷1.05) to get pre-tax
+    expect(result.alteration).toBeCloseTo(100 / 1.05, 2);
+    expect(result.gstRate).toBe(18);
   });
 });
 
 describe("priceItem", () => {
-  it("Item A: no discount, 18% GST, with alteration", () => {
-    // qty=2, mrp=500, disc=0%, alt=50, gst=18%
-    // base=1000, itemDisc=0, withCharges=1050, gst=189, total=1239
+  it("Item A: no discount, 18% GST (stitched >2500/unit), with alteration", () => {
+    // qty=1, mrp=3000, disc=0%, alt=105 (gross; pre-tax=100), stitched
+    // pricePerUnit=3000 > 2500 → 18% slab
+    // base=3000, itemDisc=0, withCharges=3100, itemGst=540, alterGst=5, total=3645
     const item = {
-      quantity: 2,
-      mrp: 500,
+      quantity: 1,
+      mrp: 3000,
       quickDiscountPct: 0,
-      alteration_charge: 50,
+      alteration_charge: 105,
       gstRate: 18,
+      stitchType: "stitched",
     };
     const result = priceItem(item);
-    expect(result.base).toBeCloseTo(1000, 2);
+    expect(result.base).toBeCloseTo(3000, 2);
     expect(result.itemDisc).toBeCloseTo(0, 2);
-    expect(result.withCharges).toBeCloseTo(1050, 2);
-    expect(result.subtotal).toBeCloseTo(1050, 2);
-    expect(result.gst_amount).toBeCloseTo(189, 2);
-    expect(result.total).toBeCloseTo(1239, 2);
+    expect(result.withCharges).toBeCloseTo(3100, 2);
+    expect(result.subtotal).toBeCloseTo(3100, 2);
+    expect(result.gst_amount).toBeCloseTo(545, 2);
+    expect(result.total).toBeCloseTo(3645, 2);
   });
 
-  it("Item B: 10% discount, 12% GST, no alteration", () => {
-    // qty=1, mrp=1000, disc=10%, alt=0, gst=12%
-    // base=1000, itemDisc=100, withCharges=900, gst=108, total=1008
+  it("Item B: 10% discount, 5% GST (stitched ≤2500/unit), no alteration", () => {
+    // qty=1, mrp=1000, disc=10%, alt=0, stitched
+    // pricePerUnit=900 < 2500 → 5% slab (GST only supports 5% and 18%)
+    // base=1000, itemDisc=100, withCharges=900, gst=45, total=945
     const item = {
       quantity: 1,
       mrp: 1000,
       quickDiscountPct: 10,
       alteration_charge: 0,
-      gstRate: 12,
+      gstRate: 18,
+      stitchType: "stitched",
     };
     const result = priceItem(item);
     expect(result.base).toBeCloseTo(1000, 2);
     expect(result.itemDisc).toBeCloseTo(100, 2);
     expect(result.withCharges).toBeCloseTo(900, 2);
     expect(result.subtotal).toBeCloseTo(900, 2);
-    expect(result.gst_amount).toBeCloseTo(108, 2);
-    expect(result.total).toBeCloseTo(1008, 2);
+    expect(result.gst_amount).toBeCloseTo(45, 2);
+    expect(result.total).toBeCloseTo(945, 2);
   });
 
   it("treats 0 quantity as 1 (normalizeItem floor): base = mrp * 1", () => {
     // normalizeItem uses `Number(it.quantity || 1)`, so qty=0 → qty=1
-    const item = { quantity: 0, mrp: 500, quickDiscountPct: 10, alteration_charge: 50, gstRate: 18 };
+    // qty=1, mrp=3000, disc=10%, alt=105 (gross; pre-tax=100), stitched
+    // afterDisc=2700 > 2500 → 18%; withCharges=2800, itemGst=486, alterGst=5, total=3291
+    const item = { quantity: 0, mrp: 3000, quickDiscountPct: 10, alteration_charge: 105, gstRate: 18, stitchType: "stitched" };
     const result = priceItem(item);
-    // qty=1, mrp=500, disc=10%, alt=50, gst=18%
-    // base=500, itemDisc=50, withCharges=500, gst=90, total=590
-    expect(result.base).toBeCloseTo(500, 2);
-    expect(result.itemDisc).toBeCloseTo(50, 2);
-    expect(result.withCharges).toBeCloseTo(500, 2); // 500-50+50
-    expect(result.subtotal).toBeCloseTo(500, 2);
-    expect(result.gst_amount).toBeCloseTo(90, 2);
-    expect(result.total).toBeCloseTo(590, 2);
+    expect(result.base).toBeCloseTo(3000, 2);
+    expect(result.itemDisc).toBeCloseTo(300, 2);
+    expect(result.withCharges).toBeCloseTo(2800, 2); // 2700 + 100
+    expect(result.subtotal).toBeCloseTo(2800, 2);
+    expect(result.gst_amount).toBeCloseTo(491, 2); // 486 + 5
+    expect(result.total).toBeCloseTo(3291, 2);
   });
 });
 
 describe("computeBillTotals", () => {
-  it("single item no discounts: grandTotal = subtotal + gst", () => {
+  it("single stitched item >2500/unit, no discounts: 18% GST", () => {
+    // mrp=3000 > 2500 → 18% slab for stitched
     const items = [
-      { quantity: 1, mrp: 1000, quickDiscountPct: 0, alteration_charge: 0, gstRate: 18 },
+      { quantity: 1, mrp: 3000, quickDiscountPct: 0, alteration_charge: 0, gstRate: 18, stitchType: "stitched" },
     ];
     const result = computeBillTotals(items, [], []);
     expect(result.overallDiscount).toBeCloseTo(0, 2);
+    expect(result.taxableTotal).toBeCloseTo(3000, 2);
+    expect(result.gstTotal).toBeCloseTo(540, 2);
+    expect(result.grandTotal).toBeCloseTo(3540, 2);
+  });
+
+  it("single unstitched item: always 5% GST regardless of gstRate field", () => {
+    const items = [
+      { quantity: 1, mrp: 1000, quickDiscountPct: 0, alteration_charge: 0, gstRate: 18, stitchType: "unstitched" },
+    ];
+    const result = computeBillTotals(items, [], []);
     expect(result.taxableTotal).toBeCloseTo(1000, 2);
-    expect(result.gstTotal).toBeCloseTo(180, 2);
-    expect(result.grandTotal).toBeCloseTo(1180, 2);
+    expect(result.gstTotal).toBeCloseTo(50, 2);
+    expect(result.grandTotal).toBeCloseTo(1050, 2);
   });
 
   it("empty items returns all zeros", () => {

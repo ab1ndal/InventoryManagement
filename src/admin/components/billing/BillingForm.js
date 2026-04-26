@@ -262,7 +262,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const { data: bill, error: billErr } = await supabase
           .from("bills")
           .select(
-            "customerid, notes, payment_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount",
+            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount",
           )
           .eq("billid", billId)
           .single();
@@ -312,6 +312,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setSalesLocationId(bill.saleslocationid || null);
         setSalesMethodId(bill.salesmethodid || null);
         setPaymentAmount(bill.payment_amount ?? "");
+        setFinalAmount(bill.final_amount != null ? String(bill.final_amount) : "");
         // Restore the saved bill date (from DB orderdate) into the date picker
         const { data: dateRow } = await supabase
           .from("bills")
@@ -553,6 +554,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     const preDisc = computePreTaxBalanceDiscount(
       computed,
       computed.grandTotal - shortfall,
+      items,
+      selectedCodes,
+      allDiscounts,
+      Number(appliedVoucher?.value ?? 0),
     );
     if (preDisc <= 0) return computed;
     return computeBillTotals(
@@ -649,12 +654,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     const blob = await generateInvoicePdf(invoiceRef.current);
     const path = `bill-${pdfBillNumber || activeBillId}.pdf`;
 
-    // Delete previous object first so the new upload replaces it cleanly
-    await supabase.storage.from("invoices").remove([path]);
-
     const { error: upErr } = await supabase.storage
       .from("invoices")
-      .upload(path, blob, { contentType: "application/pdf" });
+      .upload(path, blob, { contentType: "application/pdf", upsert: true });
 
     if (upErr) throw upErr;
 
@@ -754,11 +756,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           throw new Error("Failed to remove old items: " + delErr.message);
 
         // Step G: Insert new bill_items
+        const totalsForItems = isFinalizedBill ? balanceAdjustedComputed : computed;
         const billItemsPayload = buildBillItemsPayload(
           billId,
           items,
-          0,
-          computed.overallDiscount,
+          isFinalizedBill ? (totalsForItems.balanceDiscount || 0) : 0,
+          totalsForItems.overallDiscount,
         );
         const { error: insErr } = await supabase
           .from("bill_items")
@@ -785,6 +788,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             taxable_total: totalsToUse.taxableTotal,
             applied_codes: selectedCodes,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
+            final_amount: finalAmount !== "" ? Number(finalAmount) : null,
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
             finalized: isFinalizedBill ? true : false,
@@ -898,6 +902,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           finalized: false,
           applied_codes: selectedCodes,
           payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
+          final_amount: finalAmount !== "" ? Number(finalAmount) : null,
           saleslocationid: salesLocationId || null,
           salesmethodid: salesMethodId || null,
           orderdate: backdatedDate + "T00:00:00+05:30",
@@ -1195,8 +1200,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           }
         }
 
-        // Force InvoiceView to render with new bill ID before PDF capture
-        flushSync(() => setEffectiveBillId(activeBillId));
+        // Flush finalized state into InvoiceView before PDF capture
+        flushSync(() => {
+          setBillPaymentStatus("finalized");
+          setEffectiveBillId(activeBillId);
+        });
       } else {
         // Existing bill (draft or re-finalization): full update
 
@@ -1382,6 +1390,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (credUpdErr) throw credUpdErr;
       }
 
+      // Flush finalized state into InvoiceView before PDF capture (covers existing-bill path)
+      flushSync(() => {
+        setBillPaymentStatus("finalized");
+        setEffectiveBillId(activeBillId);
+      });
+
       // Steps 5-7: PDF generate + upload + pdf_url update
       let pdfUrl = null;
       try {
@@ -1414,122 +1428,212 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
   const handleConfirmPartialFinalize = async () => {
     setIsSaving(true);
-    let activeBillId = null;
-    let pdfBillNumber = null;
+    let activeBillId = billId || null;
+    let pdfBillNumber = billId ? effectiveBillNumber : null;
     const billComputed = Number(finalAmount) > 0 ? balanceAdjustedComputed : computed;
     const { storeCreditUsed, exchangeCreditUsed, effectiveTotal } = computeCreditsApplied(
       billComputed.grandTotal,
       appliedStoreCredit,
       exchangeCredit?.amount,
     );
+    const isNewBill = !billId;
     try {
       if (items.length === 0) {
         toast.error("Add at least one item");
         return;
       }
 
-      // Stock validation
       const inventoryItems = items.filter((it) => it.variantid);
-      let stockMap = {};
-      if (inventoryItems.length > 0) {
-        const variantIds = inventoryItems.map((it) => it.variantid);
-        const { data: stockData, error: stockErr } = await supabase
-          .from("productsizecolors")
-          .select("variantid, stock, size, color")
-          .in("variantid", variantIds);
-        if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
-        stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
-        if (!isBackdated) {
-          const outOfStock = inventoryItems.filter(
-            (it) => (stockMap[it.variantid]?.stock ?? 0) < it.quantity,
-          );
-          if (outOfStock.length > 0) {
-            const details = outOfStock
-              .map((it) => {
-                const avail = stockMap[it.variantid]?.stock ?? 0;
-                return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
-              })
-              .join("\n");
-            toast.error("Insufficient stock", { description: details });
-            return;
+
+      if (isNewBill) {
+        // ── NEW BILL: absolute stock validation + insert + full stock decrement ──
+        let stockMap = {};
+        if (inventoryItems.length > 0) {
+          const variantIds = inventoryItems.map((it) => it.variantid);
+          const { data: stockData, error: stockErr } = await supabase
+            .from("productsizecolors")
+            .select("variantid, stock, size, color")
+            .in("variantid", variantIds);
+          if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+          stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
+          if (!isBackdated) {
+            const outOfStock = inventoryItems.filter(
+              (it) => (stockMap[it.variantid]?.stock ?? 0) < it.quantity,
+            );
+            if (outOfStock.length > 0) {
+              const details = outOfStock
+                .map((it) => {
+                  const avail = stockMap[it.variantid]?.stock ?? 0;
+                  return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
+                })
+                .join("\n");
+              toast.error("Insufficient stock", { description: details });
+              return;
+            }
           }
         }
-      }
 
-      // Create bill as partial — use computed (no balance discount)
-      const { data: bill, error: billError } = await supabase
-        .from("bills")
-        .insert({
-          customerid: selectedCustomerId || null,
-          notes: notes || null,
-          totalamount: billComputed.grandTotal,
-          gst_total: billComputed.gstTotal,
-          discount_total: billComputed.itemLevelDiscountTotal + billComputed.overallDiscount + billComputed.balanceDiscount,
-          taxable_total: billComputed.taxableTotal,
-          net_amount: effectiveTotal,
-          paymentstatus: "partial",
-          finalized: true,
-          applied_codes: selectedCodes,
-          payment_amount: Number(paymentAmount),
-          store_credit_used: storeCreditUsed,
-          exchange_credit_used: exchangeCreditUsed,
-          exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
-          saleslocationid: salesLocationId || null,
-          salesmethodid: salesMethodId || null,
-          orderdate: backdatedDate + "T00:00:00+05:30",
-        })
-        .select("billid, bill_number")
-        .single();
-      if (billError) throw new Error("Failed to save bill: " + billError.message);
-      activeBillId = bill.billid;
-      pdfBillNumber = bill.bill_number || null;
-      setEffectiveBillNumber(bill.bill_number || null);
+        const { data: bill, error: billError } = await supabase
+          .from("bills")
+          .insert({
+            customerid: selectedCustomerId || null,
+            notes: notes || null,
+            totalamount: billComputed.grandTotal,
+            gst_total: billComputed.gstTotal,
+            discount_total: billComputed.itemLevelDiscountTotal + billComputed.overallDiscount + billComputed.balanceDiscount,
+            taxable_total: billComputed.taxableTotal,
+            net_amount: effectiveTotal,
+            final_amount: finalAmount !== "" ? Number(finalAmount) : null,
+            paymentstatus: "partial",
+            finalized: true,
+            applied_codes: selectedCodes,
+            payment_amount: Number(paymentAmount),
+            store_credit_used: storeCreditUsed,
+            exchange_credit_used: exchangeCreditUsed,
+            exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
+            saleslocationid: salesLocationId || null,
+            salesmethodid: salesMethodId || null,
+            orderdate: backdatedDate + "T00:00:00+05:30",
+          })
+          .select("billid, bill_number")
+          .single();
+        if (billError) throw new Error("Failed to save bill: " + billError.message);
+        activeBillId = bill.billid;
+        pdfBillNumber = bill.bill_number || null;
+        setEffectiveBillNumber(bill.bill_number || null);
 
-      // Link exchange rows
-      if (exchangeCredit?.exchangeIds?.length) {
-        await supabase
-          .from("exchanges")
-          .update({ new_billid: activeBillId })
-          .in("exchangeid", exchangeCredit.exchangeIds);
-      }
+        if (exchangeCredit?.exchangeIds?.length) {
+          await supabase
+            .from("exchanges")
+            .update({ new_billid: activeBillId })
+            .in("exchangeid", exchangeCredit.exchangeIds);
+        }
 
-      // Insert bill_items — use billComputed for balance discount and overall discount
-      const billItemsPayload = buildBillItemsPayload(
-        activeBillId,
-        items,
-        billComputed.balanceDiscount || 0,
-        billComputed.overallDiscount,
-      );
-      const { error: itemsError } = await supabase
-        .from("bill_items")
-        .insert(billItemsPayload);
-      if (itemsError) {
-        await supabase.from("bills").delete().eq("billid", activeBillId);
-        throw new Error("Failed to save bill items: " + itemsError.message);
-      }
+        const billItemsPayload = buildBillItemsPayload(
+          activeBillId,
+          items,
+          billComputed.balanceDiscount || 0,
+          billComputed.overallDiscount,
+        );
+        const { error: itemsError } = await supabase
+          .from("bill_items")
+          .insert(billItemsPayload);
+        if (itemsError) {
+          await supabase.from("bills").delete().eq("billid", activeBillId);
+          throw new Error("Failed to save bill items: " + itemsError.message);
+        }
 
-      // Save salesperson associations
-      if (selectedSalespersonIds.length > 0) {
-        const spPayload = selectedSalespersonIds.map((spId) => ({
-          billid: activeBillId,
-          salesperson_id: spId,
-        }));
-        const { error: spErr } = await supabase
-          .from("bill_salespersons")
-          .insert(spPayload);
-        if (spErr) console.error("Failed to save salespersons:", spErr.message);
-      }
+        if (selectedSalespersonIds.length > 0) {
+          await supabase.from("bill_salespersons").insert(
+            selectedSalespersonIds.map((spId) => ({ billid: activeBillId, salesperson_id: spId })),
+          );
+        }
 
-      // Decrement stock
-      if (!isBackdated) {
-        for (const it of inventoryItems) {
-          const currentStock = stockMap[it.variantid]?.stock ?? 0;
-          const { error: stockUpdateErr } = await supabase
-            .from("productsizecolors")
-            .update({ stock: currentStock - it.quantity })
-            .eq("variantid", it.variantid);
-          if (stockUpdateErr)
-            console.error("Stock update failed for", it.variantid, stockUpdateErr);
+        if (!isBackdated) {
+          for (const it of inventoryItems) {
+            const currentStock = stockMap[it.variantid]?.stock ?? 0;
+            await supabase
+              .from("productsizecolors")
+              .update({ stock: currentStock - it.quantity })
+              .eq("variantid", it.variantid);
+          }
+        }
+      } else {
+        // ── EXISTING DRAFT: delta stock validation + bill update (stock already decremented) ──
+        const { data: existingItems } = await supabase
+          .from("bill_items")
+          .select("variantid, quantity")
+          .eq("billid", activeBillId)
+          .not("variantid", "is", null);
+
+        const newInventoryItems = items.filter((it) => it.variantid);
+        let deltaMap = {};
+        let stockMap = {};
+
+        if (!isBackdated) {
+          deltaMap = computeStockDelta(existingItems || [], newInventoryItems);
+          const allVariantIds = Object.keys(deltaMap);
+          if (allVariantIds.length > 0) {
+            const { data: stockData, error: stockErr } = await supabase
+              .from("productsizecolors")
+              .select("variantid, stock, size, color")
+              .in("variantid", allVariantIds);
+            if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
+            stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
+            const stockErrors = [];
+            for (const [vid, delta] of Object.entries(deltaMap)) {
+              if ((stockMap[vid]?.stock ?? 0) + delta < 0) {
+                const item = newInventoryItems.find((it) => it.variantid === vid);
+                const size = stockMap[vid]?.size || "";
+                const color = stockMap[vid]?.color || "";
+                stockErrors.push(`${item?.product_name || vid} (${size}/${color}): insufficient stock`);
+              }
+            }
+            if (stockErrors.length > 0) {
+              toast.error("Insufficient stock", { description: stockErrors.join("\n") });
+              return;
+            }
+          }
+        }
+
+        const { error: billErr } = await supabase
+          .from("bills")
+          .update({
+            customerid: selectedCustomerId || null,
+            notes: notes || null,
+            totalamount: billComputed.grandTotal,
+            gst_total: billComputed.gstTotal,
+            discount_total: billComputed.itemLevelDiscountTotal + billComputed.overallDiscount + billComputed.balanceDiscount,
+            taxable_total: billComputed.taxableTotal,
+            net_amount: effectiveTotal,
+            final_amount: finalAmount !== "" ? Number(finalAmount) : null,
+            paymentstatus: "partial",
+            finalized: true,
+            applied_codes: selectedCodes,
+            payment_amount: Number(paymentAmount),
+            store_credit_used: storeCreditUsed,
+            exchange_credit_used: exchangeCreditUsed,
+            exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
+            saleslocationid: salesLocationId || null,
+            salesmethodid: salesMethodId || null,
+            orderdate: backdatedDate + "T00:00:00+05:30",
+          })
+          .eq("billid", activeBillId);
+        if (billErr) throw billErr;
+
+        await supabase.from("bill_items").delete().eq("billid", activeBillId);
+        const updatedPayload = buildBillItemsPayload(
+          activeBillId,
+          items,
+          billComputed.balanceDiscount || 0,
+          billComputed.overallDiscount,
+        );
+        const { error: insErr } = await supabase.from("bill_items").insert(updatedPayload);
+        if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
+
+        await supabase.from("bill_salespersons").delete().eq("billid", activeBillId);
+        if (selectedSalespersonIds.length > 0) {
+          await supabase.from("bill_salespersons").insert(
+            selectedSalespersonIds.map((spId) => ({ billid: activeBillId, salesperson_id: spId })),
+          );
+        }
+
+        if (!isBackdated) {
+          for (const [vid, delta] of Object.entries(deltaMap)) {
+            if (delta === 0) continue;
+            const currentStock = stockMap[vid]?.stock ?? 0;
+            await supabase
+              .from("productsizecolors")
+              .update({ stock: currentStock + delta })
+              .eq("variantid", vid);
+          }
+        }
+
+        if (exchangeCredit?.exchangeIds?.length) {
+          await supabase
+            .from("exchanges")
+            .update({ new_billid: activeBillId })
+            .in("exchangeid", exchangeCredit.exchangeIds);
         }
       }
 
@@ -1544,7 +1648,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
         .single();
       if (payErr) {
-        await supabase.from("bills").delete().eq("billid", activeBillId);
+        if (isNewBill) await supabase.from("bills").delete().eq("billid", activeBillId);
         throw new Error("Failed to record payment: " + payErr.message);
       }
 
@@ -1589,12 +1693,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .eq("customerid", selectedCustomerId);
       }
 
-      // Set state so InvoiceView renders with payment history before PDF capture
-      setBillPayments([paymentRecord]);
-      setBillPaymentStatus("partial");
-
-      // PDF generation
-      flushSync(() => setEffectiveBillId(activeBillId));
+      // Flush all payment state into InvoiceView before PDF capture
+      flushSync(() => {
+        setBillPayments([paymentRecord]);
+        setBillPaymentStatus("partial");
+        setEffectiveBillId(activeBillId);
+      });
       let pdfUrl = null;
       try {
         pdfUrl = await regenerateBillPdf({ activeBillId, pdfBillNumber });
@@ -1661,10 +1765,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .eq("billid", billId);
         if (updErr) throw updErr;
 
-        setBillPaymentStatus("finalized");
-
-        // Regenerate PDF with full payment status
-        flushSync(() => setEffectiveBillId(billId));
+        // Flush finalized state into InvoiceView before PDF capture
+        flushSync(() => {
+          setBillPaymentStatus("finalized");
+          setEffectiveBillId(billId);
+        });
         let pdfUrl = null;
         try {
           pdfUrl = await regenerateBillPdf({

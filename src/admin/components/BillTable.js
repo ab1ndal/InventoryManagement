@@ -41,7 +41,7 @@ export default function BillTable({ onEdit }) {
       // Fetch bill core data
       const { data: billRow, error: billErr } = await supabase
         .from("bills")
-        .select("applied_codes, payment_amount, saleslocationid, salesmethodid, store_credit_used, orderdate, customerid, bill_number")
+        .select("applied_codes, payment_amount, net_amount, paymentstatus, saleslocationid, salesmethodid, store_credit_used, exchange_credit_used, exchange_source_bill, orderdate, customerid, bill_number")
         .eq("billid", billId)
         .single();
       if (billErr) throw billErr;
@@ -129,6 +129,20 @@ export default function BillTable({ onEdit }) {
         .from("vouchers").select("voucher_id, value").eq("redeemed_billid", billId).maybeSingle();
       if (voucherRow) appliedVoucher = { voucher_id: voucherRow.voucher_id, value: Number(voucherRow.value ?? 0) };
 
+      // Payment history (needed for partial bill PDF)
+      let billPayments = [];
+      const { data: paymentsData } = await supabase
+        .from("bill_payments")
+        .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
+        .eq("billid", billId)
+        .order("recorded_at", { ascending: true });
+      if (paymentsData) billPayments = paymentsData;
+
+      // Exchange credit (if any)
+      const exchangeCredit = billRow.exchange_credit_used > 0
+        ? { amount: Number(billRow.exchange_credit_used), sourceBillNumber: billRow.exchange_source_bill }
+        : null;
+
       const computed = computeBillTotals(items, appliedCodes, allDiscounts);
 
       flushSync(() => setRegenBillData({
@@ -145,6 +159,9 @@ export default function BillTable({ onEdit }) {
         allDiscounts,
         appliedVoucher,
         appliedStoreCredit: Number(billRow.store_credit_used ?? 0),
+        exchangeCredit,
+        billPayments,
+        paymentStatus: billRow.paymentstatus || "finalized",
       }));
 
       if (!regenRef.current) throw new Error("Invoice ref missing");
@@ -1009,6 +1026,9 @@ export default function BillTable({ onEdit }) {
             allDiscounts={regenBillData.allDiscounts}
             appliedVoucher={regenBillData.appliedVoucher}
             appliedStoreCredit={regenBillData.appliedStoreCredit}
+            exchangeCredit={regenBillData.exchangeCredit}
+            billPayments={regenBillData.billPayments}
+            paymentStatus={regenBillData.paymentStatus}
           />
         </div>
       )}
