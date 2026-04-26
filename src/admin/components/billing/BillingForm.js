@@ -111,6 +111,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [salesMethodId, setSalesMethodId] = useState(null);
   const [salespersonsList, setSalespersonsList] = useState([]);
   const [categoryMap, setCategoryMap] = useState({});
+  const [loadedNetAmount, setLoadedNetAmount] = useState(null); // net_amount from DB for loaded bills
 
   // Reset all form state when the dialog closes. Must NOT include `items` in
   // its dependency array — doing so would cause setItems([]) to create a new
@@ -145,6 +146,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setAddPaymentMethodId(null);
       setIsAddingPayment(false);
       setPartialConfirmOpen(false);
+      setLoadedNetAmount(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -266,6 +268,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setEffectiveBillNumber(bill.bill_number || null);
         setIsFinalizedBill(!!bill.finalized);
         setBillPaymentStatus(bill.paymentstatus || "draft");
+        if (bill.net_amount != null) {
+          setLoadedNetAmount(Number(bill.net_amount));
+        }
 
         if (bill.paymentstatus === "partial") {
           const { data: payments } = await supabase
@@ -1888,7 +1893,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 <section className="space-y-3">
                   <PaymentHistory
                     payments={billPayments}
-                    netAmount={(() => {
+                    netAmount={loadedNetAmount ?? (() => {
                       const { effectiveTotal } = computeCreditsApplied(
                         computed.grandTotal,
                         appliedStoreCredit,
