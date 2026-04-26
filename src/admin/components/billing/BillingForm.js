@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
-import { computeBillTotals, computePreTaxBalanceDiscount, priceItem } from "./billUtils";
+import { computeBillTotals, computePreTaxBalanceDiscount, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { computeCreditsApplied } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
@@ -31,6 +31,7 @@ import Summary from "./Summary";
 import Notes from "./Notes";
 import SalespersonSelector from "./SalespersonSelector";
 import InvoiceView from "./InvoiceView";
+import PaymentHistory from "./PaymentHistory";
 import { generateInvoicePdf } from "./generateInvoicePdf";
 import {
   Dialog,
@@ -96,6 +97,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     useState(0);
   const [voucherCode, setVoucherCode] = useState("");
   const [appliedVoucher, setAppliedVoucher] = useState(null); // { voucher_id, value }
+  const [billPaymentStatus, setBillPaymentStatus] = useState("draft"); // 'draft'|'partial'|'finalized'|'cancelled'
+  const [billPayments, setBillPayments] = useState([]);               // payment records for partial bills
+  const [addPaymentAmount, setAddPaymentAmount] = useState("");
+  const [addPaymentMethodId, setAddPaymentMethodId] = useState(null);
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [partialConfirmOpen, setPartialConfirmOpen] = useState(false);
   const [voucherError, setVoucherError] = useState("");
   const [voucherLoading, setVoucherLoading] = useState(false);
   const [salesLocations, setSalesLocations] = useState([]);
@@ -132,6 +139,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setSalesLocationId(null);
       setSalesMethodId(null);
       setBackdatedDate(new Date().toISOString().split("T")[0]);
+      setBillPaymentStatus("draft");
+      setBillPayments([]);
+      setAddPaymentAmount("");
+      setAddPaymentMethodId(null);
+      setPartialConfirmOpen(false);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -245,13 +257,25 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const { data: bill, error: billErr } = await supabase
           .from("bills")
           .select(
-            "customerid, notes, payment_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url",
+            "customerid, notes, payment_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount",
           )
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
         setEffectiveBillNumber(bill.bill_number || null);
         setIsFinalizedBill(!!bill.finalized);
+        setBillPaymentStatus(bill.paymentstatus || "draft");
+
+        if (bill.paymentstatus === "partial") {
+          const { data: payments } = await supabase
+            .from("bill_payments")
+            .select(
+              "payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)"
+            )
+            .eq("billid", billId)
+            .order("recorded_at", { ascending: true });
+          setBillPayments(payments || []);
+        }
 
         // Fetch applied_codes separately — column may not exist if migration not yet run
         const { data: codesRow } = await supabase
@@ -545,6 +569,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       (d) => !(d.once_per_customer && usedCodeSet.has(d.code)),
     );
   }, [allDiscounts, usedCodeSet, selectedCustomerId]);
+
+  const showPartialButton = useMemo(() => {
+    if (isFinalizedBill) return false;
+    if (!paymentAmount || Number(paymentAmount) <= 0) return false;
+    const { effectiveTotal } = computeCreditsApplied(
+      computed.grandTotal,
+      appliedStoreCredit,
+      exchangeCredit?.amount
+    );
+    return effectiveTotal - Number(paymentAmount) > 100;
+  }, [isFinalizedBill, paymentAmount, computed, appliedStoreCredit, exchangeCredit]);
 
   const handleApplyVoucher = async () => {
     const code = voucherCode.trim();
