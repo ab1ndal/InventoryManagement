@@ -103,6 +103,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [addPaymentMethodId, setAddPaymentMethodId] = useState(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [partialConfirmOpen, setPartialConfirmOpen] = useState(false);
+  const [finalAmount, setFinalAmount] = useState("");
   const [voucherError, setVoucherError] = useState("");
   const [voucherLoading, setVoucherLoading] = useState(false);
   const [salesLocations, setSalesLocations] = useState([]);
@@ -146,6 +147,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setAddPaymentMethodId(null);
       setIsAddingPayment(false);
       setPartialConfirmOpen(false);
+      setFinalAmount("");
       setLoadedNetAmount(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -536,16 +538,18 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   // When payment is less than the effective total, compute a pre-tax balance discount
   // so the final bill total exactly matches what the customer paid.
   const balanceAdjustedComputed = useMemo(() => {
-    const paidAmt = Number(paymentAmount);
-    if (!paidAmt || paidAmt <= 0 || computed.grandTotal <= 0) return computed;
-    // voucher is pre-tax (baked into computed.grandTotal); store credit is a payment method
+    const hasFinalAmount = Number(finalAmount) > 0;
+    const targetAmt = hasFinalAmount ? Number(finalAmount) : Number(paymentAmount);
+    if (!targetAmt || targetAmt <= 0 || computed.grandTotal <= 0) return computed;
     const { effectiveTotal: effectiveGrandTotal } = computeCreditsApplied(
       computed.grandTotal,
       appliedStoreCredit,
       exchangeCredit?.amount,
     );
-    if (paidAmt >= effectiveGrandTotal) return computed;
-    const shortfall = effectiveGrandTotal - paidAmt;
+    if (targetAmt >= effectiveGrandTotal) return computed;
+    // In partial scenario (shortfall > ₹100) without explicit finalAmount, don't auto-discount
+    if (!hasFinalAmount && effectiveGrandTotal - targetAmt > 100) return computed;
+    const shortfall = effectiveGrandTotal - targetAmt;
     const preDisc = computePreTaxBalanceDiscount(
       computed,
       computed.grandTotal - shortfall,
@@ -560,13 +564,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     );
   }, [
     computed,
+    finalAmount,
     paymentAmount,
-    appliedVoucher,
     appliedStoreCredit,
     exchangeCredit,
     items,
     selectedCodes,
     allDiscounts,
+    appliedVoucher,
   ]);
 
   const visibleDiscounts = useMemo(() => {
@@ -1030,6 +1035,23 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       toast.error("Amount must be greater than zero");
       return;
     }
+    if (Number(finalAmount) > 0) {
+      const { effectiveTotal } = computeCreditsApplied(
+        computed.grandTotal,
+        appliedStoreCredit,
+        exchangeCredit?.amount,
+      );
+      if (Number(finalAmount) > effectiveTotal + 0.01) {
+        toast.error("Final amount exceeds bill total", {
+          description: `Maximum: ₹${effectiveTotal.toFixed(2)}`,
+        });
+        return;
+      }
+      if (Number(paymentAmount) > Number(finalAmount) + 0.01) {
+        toast.error("Deposit cannot exceed final amount");
+        return;
+      }
+    }
     const alterMin = computeAlterationDeposit(items);
     if (alterMin > 0 && paidAmt < alterMin) {
       toast.error("Insufficient initial payment", {
@@ -1394,8 +1416,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     setIsSaving(true);
     let activeBillId = null;
     let pdfBillNumber = null;
+    const billComputed = Number(finalAmount) > 0 ? balanceAdjustedComputed : computed;
     const { storeCreditUsed, exchangeCreditUsed, effectiveTotal } = computeCreditsApplied(
-      computed.grandTotal,
+      billComputed.grandTotal,
       appliedStoreCredit,
       exchangeCredit?.amount,
     );
@@ -1439,10 +1462,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         .insert({
           customerid: selectedCustomerId || null,
           notes: notes || null,
-          totalamount: computed.grandTotal,
-          gst_total: computed.gstTotal,
-          discount_total: computed.itemLevelDiscountTotal + computed.overallDiscount,
-          taxable_total: computed.taxableTotal,
+          totalamount: billComputed.grandTotal,
+          gst_total: billComputed.gstTotal,
+          discount_total: billComputed.itemLevelDiscountTotal + billComputed.overallDiscount + billComputed.balanceDiscount,
+          taxable_total: billComputed.taxableTotal,
           net_amount: effectiveTotal,
           paymentstatus: "partial",
           finalized: true,
@@ -1470,12 +1493,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .in("exchangeid", exchangeCredit.exchangeIds);
       }
 
-      // Insert bill_items — no balance discount for partial
+      // Insert bill_items — use billComputed for balance discount and overall discount
       const billItemsPayload = buildBillItemsPayload(
         activeBillId,
         items,
-        0,
-        computed.overallDiscount,
+        billComputed.balanceDiscount || 0,
+        billComputed.overallDiscount,
       );
       const { error: itemsError } = await supabase
         .from("bill_items")
@@ -1888,6 +1911,30 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               {/* Notes */}
               <Notes notes={notes} setNotes={setNotes} />
 
+              {showPartialButton && (
+                <section className="space-y-2">
+                  <Label>
+                    Final Amount{" "}
+                    <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+                  </Label>
+                  <div className="text-xs text-muted-foreground">
+                    Agreed total customer will pay — applies a discount to reduce the bill
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                      ₹
+                    </span>
+                    <Input
+                      type="number"
+                      placeholder="Leave blank for full bill total"
+                      className="pl-7"
+                      value={finalAmount}
+                      onChange={(e) => setFinalAmount(e.target.value)}
+                    />
+                  </div>
+                </section>
+              )}
+
               {/* Payment — show add-payment UI for partial bills, otherwise standard input */}
               {billPaymentStatus === "partial" ? (
                 <section className="space-y-3">
@@ -2199,17 +2246,23 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
             <div>
               <span className="font-semibold">Grand Total:</span>{" "}
-              ₹{computed.grandTotal.toFixed(2)}
+              ₹{balanceAdjustedComputed.grandTotal.toFixed(2)}
             </div>
             <div>
               <span className="font-semibold">Amount Received Now:</span>{" "}
               ₹{Number(paymentAmount).toFixed(2)}
             </div>
+            {Number(finalAmount) > 0 && (
+              <div>
+                <span className="font-semibold">Agreed Final Amount:</span>{" "}
+                ₹{Number(finalAmount).toFixed(2)}
+              </div>
+            )}
             <div className="font-bold text-red-600">
               <span className="font-semibold">Balance Due on Pickup:</span>{" "}
               ₹{Math.max(0, (() => {
                 const { effectiveTotal } = computeCreditsApplied(
-                  computed.grandTotal,
+                  balanceAdjustedComputed.grandTotal,
                   appliedStoreCredit,
                   exchangeCredit?.amount,
                 );
