@@ -1592,6 +1592,80 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     }
   };
 
+  const handleAddPayment = async () => {
+    const amt = Number(addPaymentAmount);
+    if (!amt || amt <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    if (!addPaymentMethodId) {
+      toast.error("Select a payment method");
+      return;
+    }
+    setIsAddingPayment(true);
+    try {
+      const { data: billRow, error: billFetchErr } = await supabase
+        .from("bills")
+        .select("net_amount")
+        .eq("billid", billId)
+        .single();
+      if (billFetchErr) throw billFetchErr;
+      const netAmount = Number(billRow?.net_amount ?? 0);
+
+      const { data: newPayment, error: payErr } = await supabase
+        .from("bill_payments")
+        .insert({ billid: billId, amount: amt, salesmethodid: addPaymentMethodId })
+        .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
+        .single();
+      if (payErr) throw new Error("Failed to record payment: " + payErr.message);
+
+      const updatedPayments = [...billPayments, newPayment];
+      const totalPaid = updatedPayments.reduce((s, p) => s + Number(p.amount), 0);
+      setBillPayments(updatedPayments);
+      setAddPaymentAmount("");
+      setAddPaymentMethodId(null);
+
+      if (totalPaid >= netAmount) {
+        // Fully paid — flip bill to finalized
+        const { error: updErr } = await supabase
+          .from("bills")
+          .update({ paymentstatus: "finalized" })
+          .eq("billid", billId);
+        if (updErr) throw updErr;
+
+        setBillPaymentStatus("finalized");
+
+        // Regenerate PDF with full payment status
+        flushSync(() => setEffectiveBillId(billId));
+        let pdfUrl = null;
+        try {
+          pdfUrl = await regenerateBillPdf({
+            activeBillId: billId,
+            pdfBillNumber: effectiveBillNumber,
+          });
+        } catch (pdfErr) {
+          console.error("PDF generation failed:", pdfErr);
+          toast.error("PDF generation failed", {
+            description: pdfErr?.message || "Reprint from Bill List.",
+          });
+        }
+        if (pdfUrl) window.open(pdfUrl, "_blank");
+
+        toast.success("Bill fully paid — finalized!");
+        onSubmit?.();
+      } else {
+        const remaining = netAmount - totalPaid;
+        toast.success(
+          `₹${amt.toFixed(2)} recorded. Balance remaining: ₹${remaining.toFixed(2)}`
+        );
+      }
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setIsAddingPayment(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1809,22 +1883,76 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               {/* Notes */}
               <Notes notes={notes} setNotes={setNotes} />
 
-              {/* Payment */}
-              <section className="space-y-2">
-                <Label>Payment Amount</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
-                    ₹
-                  </span>
-                  <Input
-                    type="number"
-                    placeholder="Amount received"
-                    className="pl-7"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
+              {/* Payment — show add-payment UI for partial bills, otherwise standard input */}
+              {billPaymentStatus === "partial" ? (
+                <section className="space-y-3">
+                  <PaymentHistory
+                    payments={billPayments}
+                    netAmount={(() => {
+                      const { effectiveTotal } = computeCreditsApplied(
+                        computed.grandTotal,
+                        appliedStoreCredit,
+                        exchangeCredit?.amount,
+                      );
+                      return effectiveTotal;
+                    })()}
                   />
-                </div>
-              </section>
+                  <div className="space-y-2">
+                    <Label>Record Additional Payment</Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                          ₹
+                        </span>
+                        <Input
+                          type="number"
+                          placeholder="Amount"
+                          className="pl-7"
+                          value={addPaymentAmount}
+                          onChange={(e) => setAddPaymentAmount(e.target.value)}
+                        />
+                      </div>
+                      <Select
+                        value={addPaymentMethodId ? String(addPaymentMethodId) : ""}
+                        onValueChange={(v) => setAddPaymentMethodId(Number(v))}
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder="Method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {salesMethods.map((m) => (
+                            <SelectItem key={m.salesmethodid} value={String(m.salesmethodid)}>
+                              {m.methodname}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        disabled={isAddingPayment}
+                        onClick={handleAddPayment}
+                      >
+                        {isAddingPayment ? "Saving..." : "Record"}
+                      </Button>
+                    </div>
+                  </div>
+                </section>
+              ) : (
+                <section className="space-y-2">
+                  <Label>Payment Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                      ₹
+                    </span>
+                    <Input
+                      type="number"
+                      placeholder="Amount received"
+                      className="pl-7"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                    />
+                  </div>
+                </section>
+              )}
 
               {/* Apply pending exchange credit (deferred redemption) */}
               {availableExchangeCredit && !exchangeCredit && (
@@ -1916,6 +2044,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             appliedVoucher={appliedVoucher}
             appliedStoreCredit={appliedStoreCredit}
             exchangeCredit={exchangeCredit}
+            billPayments={billPayments}
+            paymentStatus={billPaymentStatus}
           />
         </div>
       )}
