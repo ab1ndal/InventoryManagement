@@ -573,6 +573,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
   const showPartialButton = useMemo(() => {
     if (isFinalizedBill) return false;
+    if (billPaymentStatus === "partial") return false;
     if (!paymentAmount || Number(paymentAmount) <= 0) return false;
     const { effectiveTotal } = computeCreditsApplied(
       computed.grandTotal,
@@ -580,7 +581,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       exchangeCredit?.amount
     );
     return effectiveTotal - Number(paymentAmount) > 100;
-  }, [isFinalizedBill, paymentAmount, computed, appliedStoreCredit, exchangeCredit]);
+  }, [isFinalizedBill, billPaymentStatus, paymentAmount, computed, appliedStoreCredit, exchangeCredit]);
 
   const handleApplyVoucher = async () => {
     const code = voucherCode.trim();
@@ -1514,7 +1515,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         })
         .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
         .single();
-      if (payErr) throw new Error("Failed to record payment: " + payErr.message);
+      if (payErr) {
+        await supabase.from("bills").delete().eq("billid", activeBillId);
+        throw new Error("Failed to record payment: " + payErr.message);
+      }
 
       // Discount usage rows
       if (selectedCodes?.length > 0) {
