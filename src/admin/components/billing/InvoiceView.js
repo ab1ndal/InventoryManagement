@@ -36,6 +36,8 @@ const InvoiceView = forwardRef(function InvoiceView(
     appliedVoucher,
     appliedStoreCredit,
     exchangeCredit = null,
+    billPayments = [],
+    paymentStatus = "finalized",
   },
   ref,
 ) {
@@ -440,6 +442,95 @@ const InvoiceView = forwardRef(function InvoiceView(
         )}
       </div>
 
+      {/* Goods-withheld warning for partial bills */}
+      {paymentStatus === "partial" && (
+        <div
+          style={{
+            border: "2px solid #dc2626",
+            borderRadius: "4px",
+            padding: "8px 12px",
+            margin: "8px 0",
+            backgroundColor: "#fef2f2",
+            color: "#dc2626",
+            fontWeight: 700,
+            textAlign: "center",
+            fontSize: "12px",
+            letterSpacing: "0.5px",
+          }}
+        >
+          ⚠ GOODS WILL NOT BE RELEASED UNTIL PAYMENT IN FULL
+        </div>
+      )}
+
+      {/* Payment history for multi-payment bills */}
+      {billPayments.length > 0 && (
+        <div
+          style={{
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: "1px solid #e5e7eb",
+            marginBottom: 8,
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: "11px" }}>
+            Payment History
+          </div>
+          <table style={{ width: "100%", fontSize: "10px", borderCollapse: "collapse" }}>
+            <tbody>
+              {billPayments.map((p, i) => (
+                <tr key={p.payment_id ?? i} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "2px 4px" }}>{formatDate(p.recorded_at)}</td>
+                  <td style={{ padding: "2px 4px" }}>
+                    {p.salesmethods?.methodname || p.methodname || "—"}
+                  </td>
+                  <td style={{ padding: "2px 4px", textAlign: "right" }}>
+                    ₹{Number(p.amount).toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {(() => {
+            const totalPaid = billPayments.reduce((s, p) => s + Number(p.amount), 0);
+            const balanceDue = Math.max(0, effectiveTotal - totalPaid);
+            return (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontWeight: 600,
+                    marginTop: 4,
+                    fontSize: "11px",
+                  }}
+                >
+                  <span>Total Paid</span>
+                  <span>₹{totalPaid.toFixed(2)}</span>
+                </div>
+                {balanceDue > 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontWeight: 700,
+                      color: "#dc2626",
+                      fontSize: "11px",
+                    }}
+                  >
+                    <span>Balance Due</span>
+                    <span>₹{balanceDue.toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <div style={{ color: "#16a34a", fontWeight: 600, fontSize: "11px" }}>
+                    ✓ PAID IN FULL
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* 5. Payment Footer */}
       <div
         style={{
@@ -448,13 +539,22 @@ const InvoiceView = forwardRef(function InvoiceView(
           marginBottom: "8px",
         }}
       >
-        <div>
-          <strong>Payment Method:</strong> {paymentMethod}
-        </div>
-        <div>
-          <strong>Amount Received:</strong> ₹
-          {(additionalDiscount > 0 ? finalAmountDue : paidAmt).toFixed(2)}
-        </div>
+        {billPayments.length === 0 ? (
+          <>
+            <div>
+              <strong>Payment Method:</strong> {paymentMethod}
+            </div>
+            <div>
+              <strong>Amount Received:</strong> ₹
+              {(additionalDiscount > 0 ? finalAmountDue : paidAmt).toFixed(2)}
+            </div>
+          </>
+        ) : (
+          <div>
+            <strong>Payment Status:</strong>{" "}
+            {paymentStatus === "partial" ? "Partial — Balance Due" : "Paid in Full"}
+          </div>
+        )}
         {storeCreditAmt > 0 && (
           <div>
             <strong>Store Credit Used:</strong> ₹{storeCreditAmt.toFixed(2)}
