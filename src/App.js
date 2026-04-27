@@ -3,8 +3,9 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  Navigate,
 } from "react-router-dom";
+import StorefrontLayout from "./storefront/components/StorefrontLayout";
+import HomePage from "./storefront/pages/HomePage";
 import AdminLayout from "./admin/components/AdminLayout";
 import InventoryPage from "./admin/pages/InventoryPage";
 import BillingPage from "./admin/pages/BillingPage";
@@ -30,9 +31,13 @@ function App() {
     <TooltipProvider>
       <Router>
         <Routes>
+          {/* Storefront */}
+          <Route path="/" element={<StorefrontLayout />}>
+            <Route index element={<HomePage />} />
+          </Route>
+
           {/* Public Pages */}
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
-          <Route path="/" element={<Navigate to="/admin/inventory" />} />
           <Route path="/admin/login" element={<LoginPage />} />
           <Route path="/admin/signup" element={<SignupPage />} />
           <Route

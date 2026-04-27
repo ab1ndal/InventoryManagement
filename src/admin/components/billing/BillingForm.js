@@ -792,7 +792,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
             finalized: isFinalizedBill ? true : false,
-            paymentstatus: isFinalizedBill ? "finalized" : "draft",
+            paymentstatus: billPaymentStatus === "partial" ? "partial" : (isFinalizedBill ? "finalized" : "draft"),
             store_credit_used: isFinalizedBill
               ? Math.min(
                   Number(appliedStoreCredit || 0),
