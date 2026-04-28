@@ -180,12 +180,12 @@ export function getFreeItems(d, items) {
   const get = Number(r.get_qty || 1);
   const eligible = [];
   items.forEach((it, itemIndex) => {
-    if (matchesCategories(it, d)) {
-      const p = priceItem(it);
-      const unitPrice = p.withCharges / (it.quantity || 1);
-      for (let i = 0; i < (it.quantity || 1); i++) {
-        eligible.push({ itemIndex, unitPrice });
-      }
+    if (!matchesCategories(it, d)) return;
+    if (it.unit_type === "meter") return;
+    const p = priceItem(it);
+    const unitPrice = p.withCharges / (it.quantity || 1);
+    for (let i = 0; i < (it.quantity || 1); i++) {
+      eligible.push({ itemIndex, unitPrice });
     }
   });
   eligible.sort((a, b) => a.unitPrice - b.unitPrice);
@@ -255,6 +255,7 @@ export function valueOfDiscount(d, items) {
       const eligible = [];
       items.forEach((it) => {
         if (!matchesCategories(it, d)) return;
+        if (it.unit_type === "meter") return;
         const p = priceItem(it);
         const unitPrice = p.withCharges / (it.quantity || 1);
         for (let i = 0; i < (it.quantity || 1); i++) {
