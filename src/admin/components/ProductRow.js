@@ -17,9 +17,14 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
     0
   );
 
-  const formatStock = (value) => {
-    if (isNaN(value)) return "0 pcs";
-    return `${Number(value).toLocaleString("en-IN")} pcs`;
+  const formatStock = (value, unitType = "piece") => {
+    if (isNaN(value)) return unitType === "meter" ? "0 m" : "0 pcs";
+    const num = Number(value);
+    const formatted =
+      unitType === "meter"
+        ? num.toLocaleString("en-IN", { maximumFractionDigits: 3 })
+        : num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    return `${formatted} ${unitType === "meter" ? "m" : "pcs"}`;
   };
 
   const formatINRCurrency = (value) => {
@@ -114,7 +119,7 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
         <td>{uniqueSizes}</td>
         <td>{uniqueColors}</td>
         <td>{product.description}</td>
-        <td style={{ textAlign: "center" }}>{formatStock(totalStock)}</td>
+        <td style={{ textAlign: "center" }}>{formatStock(totalStock, product.unit_type || "piece")}</td>
         <td>
           <EditButton onClick={() => setOpen(true)} />
           <PrintButton onClick={() => printLabel(product)} />
