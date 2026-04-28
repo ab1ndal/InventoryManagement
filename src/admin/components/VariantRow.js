@@ -1,9 +1,14 @@
-const formatStock = (value) => {
-  if (isNaN(value)) return "0 pcs";
-  return `${Number(value).toLocaleString("en-IN")} pcs`;
+const formatStock = (value, unitType = "piece") => {
+  if (isNaN(value)) return unitType === "meter" ? "0 m" : "0 pcs";
+  const num = Number(value);
+  const formatted =
+    unitType === "meter"
+      ? num.toLocaleString("en-IN", { maximumFractionDigits: 3 })
+      : num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  return `${formatted} ${unitType === "meter" ? "m" : "pcs"}`;
 };
 
-const VariantRow = ({ row, colSpan }) => {
+const VariantRow = ({ row, colSpan, unitType = "piece" }) => {
   return (
     <tr className="variant-row">
       <td colSpan={colSpan}>
@@ -17,7 +22,7 @@ const VariantRow = ({ row, colSpan }) => {
           </div>
           <div className="variant-separator">|</div>
           <div className="variant-part">
-            <strong>Stock:</strong> {formatStock(row.stock)}
+            <strong>Stock:</strong> {formatStock(row.stock, unitType)}
           </div>
         </div>
       </td>

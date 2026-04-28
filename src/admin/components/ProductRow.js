@@ -127,6 +127,7 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
             key={`${product.productid}-${index}`}
             row={row}
             colSpan={12}
+            unitType={product.unit_type || "piece"}
           />
         ))}
 
