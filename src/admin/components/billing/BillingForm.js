@@ -377,6 +377,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             product_name: bi.product_name || "",
             category: bi.category || null,
             quantity: bi.quantity,
+            unit_type: bi.unit_type || "piece",
             mrp: bi.mrp,
             alteration_charge: bi.alteration_charge || 0,
             quickDiscountPct: backCalcDiscountPct(
