@@ -37,6 +37,7 @@ const formSchema = z.object({
   retailprice: z.coerce.number().nonnegative(),
   description: z.string().optional(),
   producturl: z.string().url().optional(),
+  unit_type: z.enum(["piece", "meter"]).default("piece"),
   variants: z.array(variantSchema).optional(),
 });
 
@@ -58,6 +59,7 @@ export default function ProductEditDialog({
       retailprice: 0,
       description: "",
       producturl: "",
+      unit_type: "piece",
       variants: [],
     },
   });
@@ -116,6 +118,9 @@ export default function ProductEditDialog({
     control: form.control,
     name: "variants",
   });
+
+  const watchedUnitType = form.watch("unit_type");
+  const isMeter = watchedUnitType === "meter";
 
   const hasEditedNameRef = React.useRef(false);
 
@@ -315,6 +320,42 @@ export default function ProductEditDialog({
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="unit_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unit Type</FormLabel>
+                  <FormControl>
+                    <div className="flex rounded-md border overflow-hidden w-fit">
+                      <button
+                        type="button"
+                        className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                          field.value === "piece"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                        onClick={() => field.onChange("piece")}
+                      >
+                        Piece
+                      </button>
+                      <button
+                        type="button"
+                        className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+                          field.value === "meter"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                        onClick={() => field.onChange("meter")}
+                      >
+                        Meter
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               <div className="md:col-span-2">
                 <FormField
@@ -423,7 +464,9 @@ export default function ProductEditDialog({
 
                   <Input
                     type="number"
-                    placeholder="Stock"
+                    placeholder={isMeter ? "Stock (m)" : "Stock"}
+                    step={isMeter ? "0.001" : "1"}
+                    min="0"
                     {...form.register(`variants.${index}.stock`, {
                       valueAsNumber: true,
                     })}
