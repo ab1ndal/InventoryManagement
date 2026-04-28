@@ -75,3 +75,26 @@ describe("computeStockDelta", () => {
     expect(Object.keys(delta)).toHaveLength(0);
   });
 });
+
+describe("computeStockDelta — meter (decimal) quantities", () => {
+  it("new meter item: 2.5 quantity → delta -2.5", () => {
+    const existing = [];
+    const newItems = [{ variantid: "v1", quantity: 2.5 }];
+    const delta = computeStockDelta(existing, newItems);
+    expect(delta["v1"]).toBeCloseTo(-2.5);
+  });
+
+  it("existing 2.5, new 1.0 → delta +1.5 (stock restored)", () => {
+    const existing = [{ variantid: "v1", quantity: 2.5 }];
+    const newItems = [{ variantid: "v1", quantity: 1.0 }];
+    const delta = computeStockDelta(existing, newItems);
+    expect(delta["v1"]).toBeCloseTo(1.5);
+  });
+
+  it("existing 2.5, removed from bill → delta +2.5", () => {
+    const existing = [{ variantid: "v1", quantity: 2.5 }];
+    const newItems = [];
+    const delta = computeStockDelta(existing, newItems);
+    expect(delta["v1"]).toBeCloseTo(2.5);
+  });
+});
