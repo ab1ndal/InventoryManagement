@@ -263,6 +263,7 @@ const ProductTable = forwardRef(
             retailprice: productData.retailprice,
             description: productData.description,
             producturl: productData.producturl,
+            unit_type: productData.unit_type,
           })
           .eq("productid", productData.productid);
 
