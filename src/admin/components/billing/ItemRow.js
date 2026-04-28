@@ -34,24 +34,29 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
         {item.salesperson_id ? (salespersonMap[item.salesperson_id] ?? "—") : "—"}
       </td>
       <td className="px-2 py-1 text-center">
-        <Input
-          type="number"
-          min={item.unit_type === "meter" ? 0.1 : 1}
-          step={item.unit_type === "meter" ? 0.1 : 1}
-          value={item.quantity}
-          onChange={(e) =>
-            onUpdate(item._id, {
-              quantity:
-                item.unit_type === "meter"
-                  ? parseFloat(e.target.value || "0.1")
-                  : parseInt(e.target.value || "1", 10),
-            })
-          }
-          className="h-7 w-14 mx-auto text-center"
-        />
+        <div className="flex items-center justify-center gap-1">
+          <Input
+            type="number"
+            min={item.unit_type === "meter" ? 0.01 : 1}
+            step={item.unit_type === "meter" ? 0.01 : 1}
+            value={item.quantity}
+            onChange={(e) =>
+              onUpdate(item._id, {
+                quantity:
+                  item.unit_type === "meter"
+                    ? parseFloat(e.target.value || "0.01")
+                    : parseInt(e.target.value || "1", 10),
+              })
+            }
+            className="h-7 w-14 text-center"
+          />
+          {item.unit_type === "meter" && (
+            <span className="text-xs text-muted-foreground">m</span>
+          )}
+        </div>
       </td>
       <td className="px-2 py-1 text-s text-center tabular-nums">
-        {money(item.mrp)}
+        {money(item.mrp)}{item.unit_type === "meter" && <span className="text-xs text-muted-foreground">/m</span>}
       </td>
       <td className="px-2 py-1 text-center">
         <Input
