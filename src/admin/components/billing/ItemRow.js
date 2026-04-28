@@ -36,11 +36,15 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
       <td className="px-2 py-1 text-center">
         <Input
           type="number"
-          min={1}
+          min={item.unit_type === "meter" ? 0.1 : 1}
+          step={item.unit_type === "meter" ? 0.1 : 1}
           value={item.quantity}
           onChange={(e) =>
             onUpdate(item._id, {
-              quantity: parseInt(e.target.value || "1", 10),
+              quantity:
+                item.unit_type === "meter"
+                  ? parseFloat(e.target.value || "0.1")
+                  : parseInt(e.target.value || "1", 10),
             })
           }
           className="h-7 w-14 mx-auto text-center"
