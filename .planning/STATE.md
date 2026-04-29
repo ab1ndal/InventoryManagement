@@ -81,6 +81,12 @@ The verification report (`04-VERIFICATION.md`) found that ROADMAP Phase 4 Succes
 - `schema/migration_02_cost_price.sql` — ADD COLUMN cost_price to bill_items
 - `schema/migration_04_store_credit_used.sql` — ADD COLUMN store_credit_used numeric(10,2) to bills
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260428-tgs | Supplier page with contact form, transaction history, payment tracking, and bill image uploads | 2026-04-29 | 548f90e | [260428-tgs-supplier-page-with-contact-form-transact](.planning/quick/260428-tgs-supplier-page-with-contact-form-transact/) |
+
 ## Blockers
 
 None — all functional work complete. ROADMAP SC-3/SC-4 documentation alignment is a developer decision (see above).
@@ -98,3 +104,4 @@ None — all functional work complete. ROADMAP SC-3/SC-4 documentation alignment
 
 Last session: 2026-04-21T09:01:25.457Z
 Stopped at: Phase 06 context gathered
+Last activity: 2026-04-29 - Completed quick task 260428-tgs: Supplier page with contact form, transaction history, payment tracking, and bill image uploads
