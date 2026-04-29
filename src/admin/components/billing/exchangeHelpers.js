@@ -56,6 +56,15 @@ export function buildReturnedQtyMap(existingExchanges) {
   return map;
 }
 
+/**
+ * Unused exchange credit after applying to a bill.
+ * > 0 only when exchangeAmt exceeds (grandTotal - storeCreditUsed).
+ */
+export function computeExchangeBalance(grandTotal, storeCreditAvail, exchangeAmt) {
+  const { exchangeCreditUsed } = computeCreditsApplied(grandTotal, storeCreditAvail, exchangeAmt);
+  return Math.max(0, round2(Number(exchangeAmt || 0) - exchangeCreditUsed));
+}
+
 /** Filter items to those with returnQtyMap > 0; attach returnQty and creditAmount. */
 export function buildReturnedItemsWithCredit(billItems, returnQtyMap) {
   return (billItems || [])

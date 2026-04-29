@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computePreTaxBalanceDiscount, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
-import { computeCreditsApplied } from "./exchangeHelpers";
+import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import {
@@ -92,6 +92,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   );
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
   const [exchangeCredit, setExchangeCredit] = useState(null); // { amount: number, label: string, exchangeIds: number[] }
+  const [exchangeBalanceMode, setExchangeBalanceMode] = useState(null); // "store_credit" | "cash_refund" | null
+  const [exchangeBalanceAcknowledged, setExchangeBalanceAcknowledged] = useState(false);
   const [availableExchangeCredit, setAvailableExchangeCredit] = useState(null); // { amount, exchangeIds } pending in DB
   const [customerStoreCreditBalance, setCustomerStoreCreditBalance] =
     useState(0);
@@ -133,6 +135,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setEffectiveBillId(null);
       setAppliedStoreCredit(0);
       setExchangeCredit(null);
+      setExchangeBalanceMode(null);
+      setExchangeBalanceAcknowledged(false);
       setCustomerStoreCreditBalance(0);
       setVoucherCode("");
       setAppliedVoucher(null);
@@ -599,6 +603,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     return effectiveTotal - Number(paymentAmount) > 100;
   }, [isFinalizedBill, billPaymentStatus, paymentAmount, computed, appliedStoreCredit, exchangeCredit]);
 
+  const exchangeBalance = useMemo(
+    () => computeExchangeBalance(balanceAdjustedComputed.grandTotal, appliedStoreCredit, exchangeCredit?.amount),
+    [balanceAdjustedComputed, appliedStoreCredit, exchangeCredit],
+  );
+
   const handleApplyVoucher = async () => {
     const code = voucherCode.trim();
     if (!code) return;
@@ -985,19 +994,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       });
       return;
     }
-    // Validate payment fields
-    const paidAmt = Number(paymentAmount);
-    if (!salesMethodId || !paymentAmount) {
-      toast.error("Payment required", {
-        description:
-          "Select a payment method and enter the amount received before finalizing.",
+    // Warn cashier to add more items before handling balance
+    if (exchangeBalance > 0 && !exchangeBalanceAcknowledged) {
+      toast.error("Review exchange balance", {
+        description: `Exchange credit has ₹${exchangeBalance.toFixed(2)} excess. Add more items or confirm balance handling in the summary.`,
       });
       return;
     }
-    // Block when exchange credit alone covers or exceeds the new bill
-    if (Number(exchangeCredit?.amount || 0) >= balanceAdjustedComputed.grandTotal) {
-      toast.error("New bill value must exceed the refund amount", {
-        description: `Exchange credit of ₹${Number(exchangeCredit.amount).toFixed(2)} covers the full bill. Add more items first.`,
+    // Require balance mode once acknowledged
+    if (exchangeBalance > 0 && !exchangeBalanceMode) {
+      toast.error("Select balance option", {
+        description: `Choose to add ₹${exchangeBalance.toFixed(2)} to store credit or refund as cash.`,
       });
       return;
     }
@@ -1008,7 +1015,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       exchangeCredit?.amount,
     );
 
-    if (!isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
+    // Validate payment fields only when customer still owes money
+    const paidAmt = Number(paymentAmount);
+    if (effectiveGrandTotal > 0) {
+      if (!salesMethodId || !paymentAmount) {
+        toast.error("Payment required", {
+          description:
+            "Select a payment method and enter the amount received before finalizing.",
+        });
+        return;
+      }
+    }
+
+    if (effectiveGrandTotal > 0 && !isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
       const diff = (paidAmt - effectiveGrandTotal).toFixed(2);
       const msg =
         diff > 0
@@ -1136,6 +1155,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             store_credit_used: storeCreditUsed,
             exchange_credit_used: exchangeCreditUsed,
             exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
+            exchange_cash_refund: exchangeBalanceMode === "cash_refund" ? exchangeBalance : 0,
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
             orderdate: backdatedDate + "T00:00:00+05:30",
@@ -1271,6 +1291,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             notes: notes || null,
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,
+            exchange_cash_refund: exchangeBalanceMode === "cash_refund" ? exchangeBalance : 0,
             totalamount: balanceAdjustedComputed.grandTotal,
             gst_total: balanceAdjustedComputed.gstTotal,
             discount_total:
@@ -1389,6 +1410,21 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .update({ store_credit: newBalance })
           .eq("customerid", selectedCustomerId);
         if (credUpdErr) throw credUpdErr;
+      }
+
+      // Add unused exchange balance to store credit when customer chooses that option
+      if (exchangeBalance > 0 && exchangeBalanceMode === "store_credit" && selectedCustomerId) {
+        const { data: custRow, error: fetchErr } = await supabase
+          .from("customers")
+          .select("store_credit")
+          .eq("customerid", selectedCustomerId)
+          .single();
+        if (fetchErr) throw fetchErr;
+        const { error: updErr } = await supabase
+          .from("customers")
+          .update({ store_credit: Number(custRow?.store_credit ?? 0) + exchangeBalance })
+          .eq("customerid", selectedCustomerId);
+        if (updErr) throw updErr;
       }
 
       // Flush finalized state into InvoiceView before PDF capture (covers existing-bill path)
@@ -2143,6 +2179,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 onRemoveVoucher={() => setAppliedVoucher(null)}
                 exchangeCredit={exchangeCredit}
                 onRemoveExchangeCredit={availableExchangeCredit ? () => setExchangeCredit(null) : undefined}
+                exchangeBalanceMode={exchangeBalanceMode}
+                onSetExchangeBalanceMode={setExchangeBalanceMode}
+                exchangeBalanceAcknowledged={exchangeBalanceAcknowledged}
+                onAcknowledgeExchangeBalance={() => setExchangeBalanceAcknowledged(true)}
               />
 
               {/* Actions */}
@@ -2202,6 +2242,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             appliedVoucher={appliedVoucher}
             appliedStoreCredit={appliedStoreCredit}
             exchangeCredit={exchangeCredit}
+            exchangeCashRefund={exchangeBalanceMode === "cash_refund" ? exchangeBalance : 0}
             billPayments={billPayments}
             paymentStatus={billPaymentStatus}
           />

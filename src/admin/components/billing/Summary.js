@@ -1,5 +1,5 @@
 import { money, round2 } from "./billUtils";
-import { computeCreditsApplied } from "./exchangeHelpers";
+import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 
 export default function Summary({
   computed,
@@ -11,6 +11,10 @@ export default function Summary({
   onRemoveVoucher,
   exchangeCredit = null,    // { amount, label, sourceBillNumber, items[] } | null
   onRemoveExchangeCredit,
+  exchangeBalanceMode = null,   // "store_credit" | "cash_refund" | null
+  onSetExchangeBalanceMode,
+  exchangeBalanceAcknowledged = false,
+  onAcknowledgeExchangeBalance,
 }) {
   // voucher is pre-tax (baked into computed.grandTotal via computeBillTotals)
   const voucherApplied = Number(computed.voucherPreTax ?? 0);
@@ -27,6 +31,8 @@ export default function Summary({
     exchangeCreditUsed: exchangeCreditApplied,
     effectiveTotal: effectiveGrandTotal,
   } = computeCreditsApplied(computed.grandTotal, appliedStoreCredit, exchangeCredit?.amount);
+
+  const exchangeBalance = computeExchangeBalance(computed.grandTotal, appliedStoreCredit, exchangeCredit?.amount);
 
   const totalSavings = round2(totalPreTaxDiscount + storeCreditApplied + exchangeCreditApplied);
 
@@ -148,6 +154,58 @@ export default function Summary({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {exchangeBalance > 0 && !exchangeBalanceAcknowledged && onAcknowledgeExchangeBalance && (
+        <div className="bg-orange-50 border border-orange-400 rounded px-3 py-2 space-y-2 text-sm">
+          <div className="font-semibold text-orange-800">
+            ⚠ Exchange credit ({money(exchangeBalance)} excess) covers this bill in full.
+          </div>
+          <div className="text-orange-700">
+            Consider adding more items to use the credit. If nothing to add, proceed to handle the balance.
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="text-xs px-2 py-1 rounded border border-orange-400 text-orange-800 hover:bg-orange-100"
+              onClick={onAcknowledgeExchangeBalance}
+            >
+              Nothing to add — handle balance
+            </button>
+          </div>
+        </div>
+      )}
+
+      {exchangeBalance > 0 && exchangeBalanceAcknowledged && onSetExchangeBalanceMode && (
+        <div className="bg-amber-50 border border-amber-300 rounded px-3 py-2 space-y-1.5 text-sm">
+          <div className="font-medium text-amber-800">
+            Exchange Balance: {money(exchangeBalance)} — how to return?
+          </div>
+          <div className="flex gap-3">
+            <label className="flex items-center gap-1.5 cursor-pointer text-amber-900">
+              <input
+                type="radio"
+                name="exchangeBalanceMode"
+                value="store_credit"
+                checked={exchangeBalanceMode === "store_credit"}
+                onChange={() => onSetExchangeBalanceMode("store_credit")}
+                className="accent-amber-600"
+              />
+              Add to Store Credit
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer text-amber-900">
+              <input
+                type="radio"
+                name="exchangeBalanceMode"
+                value="cash_refund"
+                checked={exchangeBalanceMode === "cash_refund"}
+                onChange={() => onSetExchangeBalanceMode("cash_refund")}
+                className="accent-amber-600"
+              />
+              Cash Refund to Customer
+            </label>
+          </div>
         </div>
       )}
 

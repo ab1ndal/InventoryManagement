@@ -36,6 +36,7 @@ const InvoiceView = forwardRef(function InvoiceView(
     appliedVoucher,
     appliedStoreCredit,
     exchangeCredit = null,
+    exchangeCashRefund = 0,
     billPayments = [],
     paymentStatus = "finalized",
   },
@@ -435,6 +436,20 @@ const InvoiceView = forwardRef(function InvoiceView(
         {(storeCreditAmt > 0 || exchangeCreditAmt > 0) && (
           <div style={{ fontWeight: 600, marginTop: 4 }}>
             Net Payable: ₹{effectiveTotal.toFixed(2)}
+          </div>
+        )}
+        {Number(exchangeCashRefund) > 0 && (
+          <div style={{
+            marginTop: 8,
+            padding: "6px 10px",
+            backgroundColor: "#fef3c7",
+            border: "1px solid #f59e0b",
+            borderRadius: "4px",
+            color: "#92400e",
+            fontWeight: 600,
+          }}>
+            Exchange Bill Refunded: ₹{Number(exchangeCashRefund).toFixed(2)} returned to customer
+            {exchangeCredit?.sourceBillNumber ? ` (Ref: Bill #${exchangeCredit.sourceBillNumber})` : ""}
           </div>
         )}
         {additionalDiscount > 0 && (
