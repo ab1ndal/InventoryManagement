@@ -360,9 +360,11 @@ const InvoiceView = forwardRef(function InvoiceView(
                       </div>
                     )}
                   </td>
-                  <td style={tdRight}>{qty}</td>
                   <td style={tdRight}>
-                    ₹{mrp.toFixed(2)}
+                    {item.unit_type === "meter" ? `${qty}m` : qty}
+                  </td>
+                  <td style={tdRight}>
+                    ₹{mrp.toFixed(2)}{item.unit_type === "meter" && <span style={{ color: "#6b7280", fontSize: "10px" }}>/m</span>}
                     {alteration > 0 && (
                       <div style={{ color: "#6b7280", fontSize: "10px" }}>
                         +₹{alteration.toFixed(2)} Alt

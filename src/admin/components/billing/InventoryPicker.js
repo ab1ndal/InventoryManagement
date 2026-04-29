@@ -36,7 +36,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
     if (!initialVal?.productid) return;
     supabase
       .from("products")
-      .select("productid, categoryid, purchaseprice, retailprice, name")
+      .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
       .eq("productid", initialVal.productid)
       .single()
       .then(({ data }) => {
@@ -54,7 +54,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
       }
       const { data, error } = await supabase
         .from("products")
-        .select("productid, categoryid, purchaseprice, retailprice, name")
+        .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
         .ilike("productid", `%${query}%`)
         .limit(10);
       if (!error) setResults(data || []);
@@ -82,6 +82,8 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
     return variant.stock + bonus;
   };
 
+  const isMeter = selected?.unit_type === "meter";
+
   // Validate quantity
   useEffect(() => {
     if (!variantId || !qty) {
@@ -89,8 +91,9 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
       return;
     }
     const chosenVariant = variants.find((v) => v.variantid === variantId);
-    if (!isBackdated && chosenVariant && qty > effectiveStock(chosenVariant)) {
-      setError(`Only ${effectiveStock(chosenVariant)} left in stock`);
+    if (!isBackdated && chosenVariant && Number(qty) > effectiveStock(chosenVariant)) {
+      const unit = isMeter ? "m" : "pcs";
+      setError(`Only ${effectiveStock(chosenVariant)} ${unit} left in stock`);
     } else {
       setError("");
     }
@@ -184,7 +187,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
                     value={v.variantid}
                     disabled={!isBackdated && effectiveStock(v) <= 0}
                   >
-                    {v.color} | {v.size} | (Stock: {effectiveStock(v)})
+                    {v.color} | {v.size} | (Stock: {effectiveStock(v)}{isMeter ? " m" : " pcs"})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -193,11 +196,12 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
 
           {/* Quantity input */}
           <div className="grid gap-1">
-            <Label>Quantity</Label>
+            <Label>Quantity {isMeter && <span className="text-xs text-muted-foreground">(meters)</span>}</Label>
             <Input
               type="number"
-              min={1}
-              placeholder="Enter Quantity"
+              min={isMeter ? 0.01 : 1}
+              step={isMeter ? 0.01 : 1}
+              placeholder={isMeter ? "Enter meters" : "Enter Quantity"}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
             />
@@ -290,6 +294,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
                 gstRate: gstRate,
                 alteration_charge: Number(alterationCharge) || 0,
                 stitchType,
+                unit_type: selected.unit_type || "piece",
                 salesperson_id: salespersonId || null,
               });
             }}

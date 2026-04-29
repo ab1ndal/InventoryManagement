@@ -61,7 +61,8 @@ export function generateBillText({
     const name = item.product_name || "—";
     const variantStr = variant ? ` (${variant})` : "";
     const alterStr = alteration > 0 ? ` +Alt ${fmt(alteration)}` : "";
-    return `${i + 1}. ${name}${variantStr} × ${qty} = ${fmt(lineTotal)}${alterStr}`;
+    const qtyStr = item.unit_type === "meter" ? `${qty}m @ ${fmt(mrp)}/m` : `× ${qty}`;
+    return `${i + 1}. ${name}${variantStr} ${qtyStr} = ${fmt(lineTotal)}${alterStr}`;
   });
 
   const parts = [

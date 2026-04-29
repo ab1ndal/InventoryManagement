@@ -72,6 +72,7 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
     initialVal?.cost_price ? encodePriceToZCode(initialVal.cost_price) : ""
   );
   const [salespersonId, setSalespersonId] = useState(initialVal?.salesperson_id || null);
+  const [unitType, setUnitType] = useState(initialVal?.unit_type || "piece");
 
   useEffect(() => {
     supabase
@@ -138,6 +139,7 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
         alteration_charge: Number(alterationCharge) || 0,
         cost_price: purchasePrice,
         stitchType,
+        unit_type: unitType,
         salesperson_id: salespersonId || null,
       });
     } catch (e) {
@@ -170,6 +172,27 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
         </div>
       </div>
 
+      {/* Piece / Meter toggle */}
+      <div className="grid gap-1">
+        <Label>Unit</Label>
+        <div className="flex rounded-md border overflow-hidden w-fit">
+          <button
+            type="button"
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${unitType === 'piece' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            onClick={() => setUnitType('piece')}
+          >
+            Piece
+          </button>
+          <button
+            type="button"
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${unitType === 'meter' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            onClick={() => setUnitType('meter')}
+          >
+            Meter
+          </button>
+        </div>
+      </div>
+
       {/* Item Details */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -191,7 +214,12 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
             <select
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCategoryId(val);
+                const cat = categories.find((c) => c.categoryid === val);
+                if (cat?.categoryid?.startsWith("FAB-")) setUnitType("meter");
+              }}
             >
               <option value="">— none —</option>
               {categories.map((c) => (
@@ -225,16 +253,17 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
         </p>
         <div className="grid grid-cols-2 gap-2">
           <div className="grid gap-1">
-            <Label>Qty</Label>
+            <Label>Qty{unitType === 'meter' && <span className="text-xs text-muted-foreground ml-1">(m)</span>}</Label>
             <Input
               type="number"
-              min={1}
+              min={unitType === 'meter' ? 0.01 : 1}
+              step={unitType === 'meter' ? 0.01 : 1}
               value={qty}
               onChange={(e) => setQty(e.target.value)}
             />
           </div>
           <div className="grid gap-1">
-            <Label>MRP (Rs)</Label>
+            <Label>MRP (Rs){unitType === 'meter' && <span className="text-xs text-muted-foreground ml-1">/m</span>}</Label>
             <Input
               type="number"
               placeholder="0.00"

@@ -48,7 +48,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
                     : parseInt(e.target.value || "1", 10),
               })
             }
-            className="h-7 w-14 text-center"
+            className="h-7 w-20 text-center"
           />
           {item.unit_type === "meter" && (
             <span className="text-xs text-muted-foreground">m</span>
@@ -79,7 +79,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
             onUpdate(item._id, { quickDiscountPct: val });
             setDiscountRaw(null);
           }}
-          className="h-7 w-16 mx-auto text-center"
+          className="h-7 w-20 mx-auto text-center"
         />
       </td>
       <td className="px-2 py-1 text-center">
