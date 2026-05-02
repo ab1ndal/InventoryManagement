@@ -140,6 +140,7 @@ export default function ShopPage() {
         onSetPrice={setPrice}
         onClearAll={clearAll}
         onClose={() => setShowAllFilters(false)}
+        availableOptions={availableOptions}
       />
 
       <ActiveChips
