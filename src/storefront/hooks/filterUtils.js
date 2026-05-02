@@ -9,17 +9,25 @@ function matchExcluding(entry, filters, exclude) {
     if (filters.priceMin !== null && entry.retailprice < filters.priceMin) return false;
     if (filters.priceMax !== null && entry.retailprice > filters.priceMax) return false;
   }
-  if (exclude !== "colors" && filters.colors.length > 0) {
-    if (!(entry.colors || []).some((c) => filters.colors.includes(c))) return false;
+
+  const needColors = exclude !== "colors" && filters.colors.length > 0;
+  const needSizes = exclude !== "sizes" && filters.sizes.length > 0;
+
+  if (needColors || needSizes) {
+    const variants = entry.variants || [];
+    const hasMatch = variants.some((v) => {
+      if (needColors && !filters.colors.includes(v.color)) return false;
+      if (needSizes && !filters.sizes.includes(v.size)) return false;
+      return true;
+    });
+    if (!hasMatch) return false;
   }
-  if (exclude !== "sizes" && filters.sizes.length > 0) {
-    if (!(entry.sizes || []).some((s) => filters.sizes.includes(s))) return false;
-  }
+
   return true;
 }
 
 export function computeAvailableOptions(catalogIndex, filters) {
-  if (!catalogIndex.length) {
+  if (!catalogIndex || !catalogIndex.length) {
     return { categories: new Set(), colors: new Set(), sizes: new Set(), fabrics: new Set() };
   }
 
@@ -29,9 +37,24 @@ export function computeAvailableOptions(catalogIndex, filters) {
   const fabrics = new Set();
 
   for (const entry of catalogIndex) {
+    const variants = entry.variants || [];
     if (matchExcluding(entry, filters, "categories")) cats.add(entry.categoryid);
-    if (matchExcluding(entry, filters, "colors")) (entry.colors || []).forEach((c) => colors.add(c));
-    if (matchExcluding(entry, filters, "sizes")) (entry.sizes || []).forEach((s) => sizes.add(s));
+    if (matchExcluding(entry, filters, "colors")) {
+      // collect colors from variants that satisfy the size filter (if active)
+      const needSizes = filters.sizes.length > 0;
+      variants.forEach((v) => {
+        if (needSizes && !filters.sizes.includes(v.size)) return;
+        if (v.color) colors.add(v.color);
+      });
+    }
+    if (matchExcluding(entry, filters, "sizes")) {
+      // collect sizes from variants that satisfy the color filter (if active)
+      const needColors = filters.colors.length > 0;
+      variants.forEach((v) => {
+        if (needColors && !filters.colors.includes(v.color)) return;
+        if (v.size) sizes.add(v.size);
+      });
+    }
     if (matchExcluding(entry, filters, "fabrics") && entry.fabric) fabrics.add(entry.fabric);
   }
 

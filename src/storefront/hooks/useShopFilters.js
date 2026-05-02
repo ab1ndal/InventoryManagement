@@ -27,7 +27,7 @@ export default function useShopFilters() {
   const [sizeOptions, setSizeOptions] = useState([]);
   const [fabricOptions, setFabricOptions] = useState([]);
   const [priceBounds, setPriceBounds] = useState({ min: 0, max: 25000 });
-  const [catalogIndex, setCatalogIndex] = useState([]);
+  const [catalogIndex, setCatalogIndex] = useState(null);
 
   useEffect(() => {
     async function fetchOptions() {
@@ -66,9 +66,8 @@ export default function useShopFilters() {
       if (allProducts.data && variants.data) {
         const variantMap = {};
         variants.data.forEach((v) => {
-          if (!variantMap[v.productid]) variantMap[v.productid] = { colors: [], sizes: [] };
-          if (v.color) variantMap[v.productid].colors.push(v.color);
-          if (v.size) variantMap[v.productid].sizes.push(v.size);
+          if (!variantMap[v.productid]) variantMap[v.productid] = [];
+          variantMap[v.productid].push({ color: v.color || null, size: v.size || null });
         });
 
         setCatalogIndex(
@@ -77,8 +76,7 @@ export default function useShopFilters() {
             categoryid: p.categoryid,
             fabric: p.fabric,
             retailprice: Number(p.retailprice),
-            colors: variantMap[p.productid]?.colors || [],
-            sizes: variantMap[p.productid]?.sizes || [],
+            variants: variantMap[p.productid] || [],
           }))
         );
       }
@@ -141,7 +139,7 @@ export default function useShopFilters() {
   }, []);
 
   const availableOptions = useMemo(
-    () => computeAvailableOptions(catalogIndex, filters),
+    () => (catalogIndex !== null ? computeAvailableOptions(catalogIndex, filters) : null),
     [catalogIndex, filters]
   );
 
