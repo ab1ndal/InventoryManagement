@@ -14,8 +14,8 @@ const REVIEWS = [
     id: 2,
     name: "Anjali Mehta",
     location: "Mumbai",
-    rating: 5,
-    text: "Wore a Bindal's lehenga for my cousin's wedding and received so many compliments. The craftsmanship is truly top-notch.",
+    rating: 4,
+    text: "Wore a Bindal's lehenga for my cousin's wedding and received so many compliments. Craftsmanship is beautiful — wish there were more size options.",
   },
   {
     id: 3,

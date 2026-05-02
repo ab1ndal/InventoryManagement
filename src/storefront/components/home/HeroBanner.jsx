@@ -84,15 +84,23 @@ export default function HeroBanner() {
         </div>
 
         {/* Trust mini-bar */}
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-12 text-[11px] text-storefront-cream/40 tracking-widest uppercase font-montserrat">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 mt-12 text-[11px] text-storefront-cream/65 tracking-widest uppercase font-montserrat">
           <span>🌍 Worldwide Shipping</span>
-          <span aria-hidden="true" className="text-storefront-gold/40">✦</span>
+          <span aria-hidden="true" className="text-storefront-gold/60">✦</span>
           <span>100% Authentic</span>
-          <span aria-hidden="true" className="text-storefront-gold/40">✦</span>
+          <span aria-hidden="true" className="text-storefront-gold/60">✦</span>
           <span>Easy Returns</span>
-          <span aria-hidden="true" className="text-storefront-gold/40">✦</span>
+          <span aria-hidden="true" className="text-storefront-gold/60">✦</span>
           <span>Secure Checkout</span>
         </div>
+      </div>
+
+      {/* Scroll indicator */}
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1.5 animate-bounce">
+        <span className="font-montserrat text-[9px] tracking-[0.3em] uppercase text-storefront-cream/40">Scroll</span>
+        <svg width="16" height="10" viewBox="0 0 16 10" fill="none" aria-hidden="true">
+          <path d="M1 1L8 8L15 1" stroke="#FAFAF9" strokeOpacity="0.4" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
       </div>
 
       {/* Bottom fade into page */}

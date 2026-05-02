@@ -27,7 +27,7 @@ export default function BestsellerGrid() {
     supabase
       .from("products")
       .select("productid, name, retailprice, producturl, fabric, categoryid, categories(name)")
-      .order("retailprice", { ascending: false })
+      .order("productid", { ascending: false })
       .limit(6)
       .then(({ data }) => {
         setProducts(data || []);
@@ -38,20 +38,21 @@ export default function BestsellerGrid() {
   return (
     <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="text-center mb-12">
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-          <span className="font-montserrat text-xs tracking-[0.25em] uppercase text-storefront-gold">
-            Bestsellers
-          </span>
-          <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
+      <div className="flex items-end justify-between mb-12">
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
+            <span className="font-montserrat text-xs tracking-[0.25em] uppercase text-storefront-gold">
+              Featured
+            </span>
+          </div>
+          <h2 className="font-cormorant font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
+            Curated Picks
+          </h2>
+          <p className="font-montserrat text-sm text-storefront-muted mt-2 max-w-sm">
+            Handpicked pieces — timeless, versatile, crafted to perfection.
+          </p>
         </div>
-        <h2 className="font-cormorant font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
-          Most Loved Pieces
-        </h2>
-        <p className="font-montserrat text-sm text-storefront-muted mt-3 max-w-md mx-auto">
-          Our customers' all-time favourites — timeless, versatile, and crafted to perfection.
-        </p>
       </div>
 
       {loading ? (

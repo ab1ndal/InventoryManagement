@@ -86,13 +86,10 @@ export default function StorefrontHeader() {
               <Heart size={20} />
             </button>
             <button
-              aria-label="Cart (0 items)"
+              aria-label="Cart"
               className="relative p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors cursor-pointer"
             >
               <ShoppingBag size={20} />
-              <span className="absolute top-0.5 right-0.5 bg-storefront-gold text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center leading-none">
-                0
-              </span>
             </button>
 
             {/* Mobile hamburger */}
