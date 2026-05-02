@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "lib/supabaseClient";
-import { computeAvailableOptions } from "./filterUtils";
 
 const PAGE_SIZE = 24;
 
@@ -12,6 +11,76 @@ const INITIAL_FILTERS = {
   priceMin: null,
   priceMax: null,
 };
+
+// Returns product IDs matching all filters except the excluded dimension.
+// Mirrors the runQuery join logic so results are always consistent.
+async function getMatchingPids(filters, excludeDim) {
+  const colors = excludeDim === "colors" ? [] : filters.colors;
+  const sizes = excludeDim === "sizes" ? [] : filters.sizes;
+  const categories = excludeDim === "categories" ? [] : filters.categories;
+  const fabrics = excludeDim === "fabrics" ? [] : filters.fabrics;
+
+  let productIds = null;
+  if (colors.length > 0 || sizes.length > 0) {
+    let q = supabase.from("productsizecolors").select("productid");
+    if (colors.length > 0) q = q.in("color", colors);
+    if (sizes.length > 0) q = q.in("size", sizes);
+    const { data } = await q;
+    productIds = [...new Set((data || []).map((r) => r.productid))];
+    if (productIds.length === 0) return [];
+  }
+
+  let q = supabase.from("products").select("productid");
+  if (categories.length > 0) q = q.in("categoryid", categories);
+  if (productIds !== null) q = q.in("productid", productIds);
+  if (filters.priceMin !== null) q = q.gte("retailprice", filters.priceMin);
+  if (filters.priceMax !== null) q = q.lte("retailprice", filters.priceMax);
+  if (fabrics.length > 0) q = q.in("fabric", fabrics);
+
+  const { data } = await q;
+  return (data || []).map((r) => r.productid);
+}
+
+async function fetchAvailableOptionsFromDB(filters) {
+  const [catPids, colorPids, sizePids, fabricPids] = await Promise.all([
+    getMatchingPids(filters, "categories"),
+    getMatchingPids(filters, "colors"),
+    getMatchingPids(filters, "sizes"),
+    getMatchingPids(filters, "fabrics"),
+  ]);
+
+  const [cats, colorRows, sizeRows, fabRows] = await Promise.all([
+    catPids.length
+      ? supabase.from("products").select("categoryid").in("productid", catPids)
+      : Promise.resolve({ data: [] }),
+    // Apply active size filter so colors returned co-occur with selected sizes
+    colorPids.length
+      ? (() => {
+          let q = supabase.from("productsizecolors").select("color").in("productid", colorPids);
+          if (filters.sizes.length) q = q.in("size", filters.sizes);
+          return q;
+        })()
+      : Promise.resolve({ data: [] }),
+    // Apply active color filter so sizes returned co-occur with selected colors
+    sizePids.length
+      ? (() => {
+          let q = supabase.from("productsizecolors").select("size").in("productid", sizePids);
+          if (filters.colors.length) q = q.in("color", filters.colors);
+          return q;
+        })()
+      : Promise.resolve({ data: [] }),
+    fabricPids.length
+      ? supabase.from("products").select("fabric").in("productid", fabricPids).not("fabric", "is", null)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  return {
+    categories: new Set((cats.data || []).map((r) => r.categoryid).filter(Boolean)),
+    colors: new Set((colorRows.data || []).map((r) => r.color).filter(Boolean)),
+    sizes: new Set((sizeRows.data || []).map((r) => r.size).filter(Boolean)),
+    fabrics: new Set((fabRows.data || []).map((r) => r.fabric).filter(Boolean)),
+  };
+}
 
 export default function useShopFilters() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
@@ -27,20 +96,21 @@ export default function useShopFilters() {
   const [sizeOptions, setSizeOptions] = useState([]);
   const [fabricOptions, setFabricOptions] = useState([]);
   const [priceBounds, setPriceBounds] = useState({ min: 0, max: 25000 });
-  const [catalogIndex, setCatalogIndex] = useState(null);
+
+  const [availableOptions, setAvailableOptions] = useState(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     async function fetchOptions() {
-      const [cats, variants, fabrics, priceRange, allProducts] = await Promise.all([
+      const [cats, variants, fabrics, priceRange] = await Promise.all([
         supabase.from("categories").select("categoryid, name").order("name"),
-        supabase.from("productsizecolors").select("productid, color, size").limit(10000),
+        supabase.from("productsizecolors").select("color, size").limit(50000),
         supabase.from("products").select("fabric").not("fabric", "is", null).limit(10000),
         supabase
           .from("products")
           .select("retailprice")
           .order("retailprice", { ascending: false })
           .limit(1),
-        supabase.from("products").select("productid, categoryid, fabric, retailprice").limit(10000),
       ]);
 
       setCategoryOptions(cats.data || []);
@@ -62,27 +132,33 @@ export default function useShopFilters() {
         const max = Math.ceil(Number(priceRange.data[0].retailprice) / 500) * 500;
         setPriceBounds({ min: 0, max: max || 25000 });
       }
-
-      if (allProducts.data && variants.data) {
-        const variantMap = {};
-        variants.data.forEach((v) => {
-          if (!variantMap[v.productid]) variantMap[v.productid] = [];
-          variantMap[v.productid].push({ color: v.color || null, size: v.size || null });
-        });
-
-        setCatalogIndex(
-          allProducts.data.map((p) => ({
-            productid: p.productid,
-            categoryid: p.categoryid,
-            fabric: p.fabric,
-            retailprice: Number(p.retailprice),
-            variants: variantMap[p.productid] || [],
-          }))
-        );
-      }
     }
     fetchOptions();
   }, []);
+
+  // Debounced server-side available options — fires only when filters are active
+  useEffect(() => {
+    const hasActiveFilters =
+      filters.categories.length > 0 ||
+      filters.colors.length > 0 ||
+      filters.sizes.length > 0 ||
+      filters.fabrics.length > 0 ||
+      filters.priceMin !== null ||
+      filters.priceMax !== null;
+
+    if (!hasActiveFilters) {
+      setAvailableOptions(null);
+      return;
+    }
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const available = await fetchAvailableOptionsFromDB(filters);
+      setAvailableOptions(available);
+    }, 200);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [filters]);
 
   const runQuery = useCallback(async (currentFilters, currentOffset, append) => {
     append ? setLoadingMore(true) : setLoading(true);
@@ -137,11 +213,6 @@ export default function useShopFilters() {
       setLoadingMore(false);
     }
   }, []);
-
-  const availableOptions = useMemo(
-    () => (catalogIndex !== null ? computeAvailableOptions(catalogIndex, filters) : null),
-    [catalogIndex, filters]
-  );
 
   useEffect(() => {
     setOffset(0);
