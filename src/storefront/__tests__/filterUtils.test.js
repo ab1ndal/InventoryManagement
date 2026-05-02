@@ -48,6 +48,16 @@ describe("computeAvailableOptions", () => {
     const r = computeAvailableOptions(CATALOG, { ...NO_FILTERS, categories: ["cat-kurta"], colors: ["red"] });
     expect(r.sizes).toEqual(new Set(["S", "M"]));
   });
+
+  it("handles entries with missing colors/sizes without crashing", () => {
+    const catalogWithNulls = [
+      { productid: "p4", categoryid: "cat-kurta", fabric: "cotton", retailprice: 500, colors: null, sizes: undefined },
+      ...CATALOG,
+    ];
+    expect(() => computeAvailableOptions(catalogWithNulls, NO_FILTERS)).not.toThrow();
+    const r = computeAvailableOptions(catalogWithNulls, { ...NO_FILTERS, colors: ["red"] });
+    expect(r.categories).toEqual(new Set(["cat-kurta", "cat-saree"]));
+  });
 });
 
 describe("sortByAvailability", () => {

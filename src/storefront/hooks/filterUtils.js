@@ -10,10 +10,10 @@ function matchExcluding(entry, filters, exclude) {
     if (filters.priceMax !== null && entry.retailprice > filters.priceMax) return false;
   }
   if (exclude !== "colors" && filters.colors.length > 0) {
-    if (!entry.colors.some((c) => filters.colors.includes(c))) return false;
+    if (!(entry.colors || []).some((c) => filters.colors.includes(c))) return false;
   }
   if (exclude !== "sizes" && filters.sizes.length > 0) {
-    if (!entry.sizes.some((s) => filters.sizes.includes(s))) return false;
+    if (!(entry.sizes || []).some((s) => filters.sizes.includes(s))) return false;
   }
   return true;
 }
@@ -30,8 +30,8 @@ export function computeAvailableOptions(catalogIndex, filters) {
 
   for (const entry of catalogIndex) {
     if (matchExcluding(entry, filters, "categories")) cats.add(entry.categoryid);
-    if (matchExcluding(entry, filters, "colors")) entry.colors.forEach((c) => colors.add(c));
-    if (matchExcluding(entry, filters, "sizes")) entry.sizes.forEach((s) => sizes.add(s));
+    if (matchExcluding(entry, filters, "colors")) (entry.colors || []).forEach((c) => colors.add(c));
+    if (matchExcluding(entry, filters, "sizes")) (entry.sizes || []).forEach((s) => sizes.add(s));
     if (matchExcluding(entry, filters, "fabrics") && entry.fabric) fabrics.add(entry.fabric);
   }
 
@@ -40,10 +40,13 @@ export function computeAvailableOptions(catalogIndex, filters) {
 
 export function sortByAvailability(items, getKey, availableSet) {
   if (!availableSet) return items;
-  return [...items].sort((a, b) => {
-    const aAvail = availableSet.has(getKey(a));
-    const bAvail = availableSet.has(getKey(b));
-    if (aAvail === bAvail) return 0;
-    return aAvail ? -1 : 1;
-  });
+  return items
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => {
+      const aAvail = availableSet.has(getKey(a.item));
+      const bAvail = availableSet.has(getKey(b.item));
+      if (aAvail !== bAvail) return aAvail ? -1 : 1;
+      return a.i - b.i;
+    })
+    .map(({ item }) => item);
 }
