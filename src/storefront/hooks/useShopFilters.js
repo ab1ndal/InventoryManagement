@@ -33,14 +33,14 @@ export default function useShopFilters() {
     async function fetchOptions() {
       const [cats, variants, fabrics, priceRange, allProducts] = await Promise.all([
         supabase.from("categories").select("categoryid, name").order("name"),
-        supabase.from("productsizecolors").select("productid, color, size"),
-        supabase.from("products").select("fabric").not("fabric", "is", null),
+        supabase.from("productsizecolors").select("productid, color, size").limit(10000),
+        supabase.from("products").select("fabric").not("fabric", "is", null).limit(10000),
         supabase
           .from("products")
           .select("retailprice")
           .order("retailprice", { ascending: false })
           .limit(1),
-        supabase.from("products").select("productid, categoryid, fabric, retailprice"),
+        supabase.from("products").select("productid, categoryid, fabric, retailprice").limit(10000),
       ]);
 
       setCategoryOptions(cats.data || []);
