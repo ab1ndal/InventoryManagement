@@ -7,6 +7,7 @@ import {
 import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
+import ProductDetailPage from "./storefront/pages/ProductDetailPage";
 import AdminLayout from "./admin/components/AdminLayout";
 import InventoryPage from "./admin/pages/InventoryPage";
 import BillingPage from "./admin/pages/BillingPage";
@@ -36,6 +37,7 @@ function App() {
           <Route path="/" element={<StorefrontLayout />}>
             <Route index element={<HomePage />} />
             <Route path="shop" element={<ShopPage />} />
+            <Route path="product/:productid" element={<ProductDetailPage />} />
           </Route>
 
           {/* Public Pages */}
