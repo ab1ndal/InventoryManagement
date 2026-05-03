@@ -1,0 +1,166 @@
+<h2>Multi-Select Filter Dropdown Style</h2>
+<p class="subtitle">When user clicks "Color ▾" or "Size ▾" — what opens?</p>
+
+<div class="cards">
+
+  <!-- Option A: Inline dropdown panel -->
+  <div class="card" data-choice="inline-panel" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#FAFAF9;padding:14px;font-family:'Helvetica Neue',sans-serif;min-height:260px;border-bottom:1px solid #D6D3D1;">
+      <!-- Filter bar -->
+      <div style="display:flex;gap:4px;margin-bottom:0;padding-bottom:8px;border-bottom:1px solid #D6D3D1;">
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;">COLOR ▾</div>
+        <div style="border:1px solid #1C1917;padding:3px 10px;font-size:7px;color:#1C1917;font-weight:700;letter-spacing:1px;background:#fff;position:relative;">SIZE ▲</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;">PRICE ▾</div>
+      </div>
+      <!-- Dropdown panel (open under SIZE) -->
+      <div style="background:#fff;border:1px solid #1C1917;border-top:none;padding:10px;margin-bottom:8px;">
+        <div style="font-size:7px;color:#78716C;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;">Select sizes (multi)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+          <div style="border:1px solid #1C1917;background:#1C1917;padding:4px 10px;font-size:8px;color:#FAFAF9;font-weight:600;">XS</div>
+          <div style="border:1px solid #1C1917;background:#1C1917;padding:4px 10px;font-size:8px;color:#FAFAF9;font-weight:600;">S</div>
+          <div style="border:1px solid #D6D3D1;padding:4px 10px;font-size:8px;color:#78716C;">M</div>
+          <div style="border:1px solid #D6D3D1;padding:4px 10px;font-size:8px;color:#78716C;">L</div>
+          <div style="border:1px solid #D6D3D1;padding:4px 10px;font-size:8px;color:#78716C;">XL</div>
+          <div style="border:1px solid #D6D3D1;padding:4px 10px;font-size:8px;color:#78716C;">XXL</div>
+          <div style="border:1px solid #D6D3D1;padding:4px 10px;font-size:8px;color:#78716C;">Free</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid #e8e3de;padding-top:6px;">
+          <span style="font-size:7px;color:#78716C;letter-spacing:1px;">2 selected</span>
+          <span style="font-size:7px;color:#A16207;letter-spacing:1px;font-weight:600;text-transform:uppercase;">Apply</span>
+        </div>
+      </div>
+      <!-- Active chips -->
+      <div style="display:flex;gap:4px;">
+        <div style="background:#1C1917;padding:3px 8px;font-size:7px;color:#FAFAF9;letter-spacing:1px;display:flex;align-items:center;gap:4px;">XS <span style="color:#A16207;">×</span></div>
+        <div style="background:#1C1917;padding:3px 8px;font-size:7px;color:#FAFAF9;letter-spacing:1px;display:flex;align-items:center;gap:4px;">S <span style="color:#A16207;">×</span></div>
+        <div style="border:1px solid #D6D3D1;padding:3px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">Clear all</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Dropdown Panel</h3>
+      <p>Opens a panel directly below the filter button. Inline, no overlay. Selected chips appear below filter bar. Clean, no interruption to layout.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Full-width filter drawer from top -->
+  <div class="card" data-choice="top-drawer" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#FAFAF9;padding:14px;font-family:'Helvetica Neue',sans-serif;min-height:260px;border-bottom:1px solid #D6D3D1;overflow:hidden;">
+      <!-- Filter bar -->
+      <div style="display:flex;gap:4px;margin-bottom:0;padding-bottom:8px;border-bottom:1px solid #D6D3D1;">
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;">COLOR ▾</div>
+        <div style="border:1px solid #A16207;padding:3px 10px;font-size:7px;color:#A16207;font-weight:700;letter-spacing:1px;">SIZE ▲</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;">PRICE ▾</div>
+      </div>
+      <!-- Full-width expanded panel -->
+      <div style="background:#fff;border-bottom:2px solid #1C1917;padding:12px;margin-bottom:6px;">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+          <div>
+            <div style="font-size:7px;color:#78716C;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Category</div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <label style="display:flex;align-items:center;gap:4px;font-size:7px;color:#1C1917;"><span style="width:8px;height:8px;background:#1C1917;border-radius:1px;flex-shrink:0;"></span>Sarees</label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:7px;color:#78716C;"><span style="width:8px;height:8px;border:1px solid #D6D3D1;border-radius:1px;flex-shrink:0;"></span>Lehengas</label>
+              <label style="display:flex;align-items:center;gap:4px;font-size:7px;color:#78716C;"><span style="width:8px;height:8px;border:1px solid #D6D3D1;border-radius:1px;flex-shrink:0;"></span>Suits</label>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:7px;color:#78716C;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Size</div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px;">
+              <div style="background:#1C1917;padding:2px 6px;font-size:7px;color:#FAFAF9;">XS</div>
+              <div style="border:1px solid #D6D3D1;padding:2px 6px;font-size:7px;color:#78716C;">S</div>
+              <div style="border:1px solid #D6D3D1;padding:2px 6px;font-size:7px;color:#78716C;">M</div>
+              <div style="border:1px solid #D6D3D1;padding:2px 6px;font-size:7px;color:#78716C;">L</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:7px;color:#78716C;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Color</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+              <div style="width:14px;height:14px;border-radius:50%;background:#c0392b;border:2px solid #1C1917;"></div>
+              <div style="width:14px;height:14px;border-radius:50%;background:#2980b9;"></div>
+              <div style="width:14px;height:14px;border-radius:50%;background:#27ae60;"></div>
+              <div style="width:14px;height:14px;border-radius:50%;background:#8e44ad;"></div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:7px;color:#78716C;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Price</div>
+            <div style="background:#D6D3D1;height:2px;border-radius:1px;margin:8px 0;position:relative;">
+              <div style="position:absolute;left:15%;top:-4px;width:10px;height:10px;background:#1C1917;border-radius:50%;"></div>
+              <div style="position:absolute;left:65%;top:-4px;width:10px;height:10px;background:#1C1917;border-radius:50%;"></div>
+              <div style="position:absolute;left:15%;right:35%;top:0;height:2px;background:#1C1917;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:7px;color:#78716C;">
+              <span>₹500</span><span>₹20,000</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;padding-top:6px;border-top:1px solid #e8e3de;">
+          <span style="font-size:7px;color:#78716C;letter-spacing:1px;">Clear all</span>
+          <span style="font-size:7px;color:#FAFAF9;background:#1C1917;padding:3px 10px;letter-spacing:1px;font-weight:600;">APPLY FILTERS</span>
+        </div>
+      </div>
+      <!-- Dimmed grid preview -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;opacity:0.3;">
+        <div style="background:#e8e3de;height:40px;"></div>
+        <div style="background:#e8e3de;height:40px;"></div>
+        <div style="background:#e8e3de;height:40px;"></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Expanded Filter Panel</h3>
+      <p>Clicking any filter expands a full-width panel showing all filters at once (4 columns). Grid dims behind it. One-shot filter experience — set everything then apply.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Side drawer -->
+  <div class="card" data-choice="side-drawer" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#FAFAF9;padding:14px;font-family:'Helvetica Neue',sans-serif;min-height:260px;border-bottom:1px solid #D6D3D1;overflow:hidden;">
+      <!-- Filter bar -->
+      <div style="display:flex;gap:4px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #D6D3D1;">
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;">COLOR ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;">SIZE ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;">PRICE ▾</div>
+        <div style="margin-left:auto;border:1px solid #1C1917;padding:3px 10px;font-size:7px;color:#1C1917;letter-spacing:1px;font-weight:700;">⊞ FILTERS</div>
+      </div>
+      <!-- Grid + side drawer overlay -->
+      <div style="display:flex;gap:0;position:relative;">
+        <!-- Dimmed grid -->
+        <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;opacity:0.25;">
+          <div style="background:#e8e3de;aspect-ratio:3/4;"></div>
+          <div style="background:#e8e3de;aspect-ratio:3/4;"></div>
+          <div style="background:#d6d0ca;aspect-ratio:3/4;"></div>
+        </div>
+        <!-- Side drawer -->
+        <div style="position:absolute;right:0;top:0;width:45%;background:#fff;border-left:1px solid #1C1917;height:100%;padding:10px;box-shadow:-4px 0 12px rgba(0,0,0,0.08);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #D6D3D1;">
+            <span style="font-size:8px;font-weight:700;color:#1C1917;letter-spacing:2px;text-transform:uppercase;">Filters</span>
+            <span style="font-size:8px;color:#78716C;">✕</span>
+          </div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Size</div>
+            <div style="display:flex;flex-wrap:wrap;gap:3px;">
+              <div style="background:#1C1917;padding:2px 6px;font-size:7px;color:#FAFAF9;">S</div>
+              <div style="background:#1C1917;padding:2px 6px;font-size:7px;color:#FAFAF9;">M</div>
+              <div style="border:1px solid #D6D3D1;padding:2px 6px;font-size:7px;color:#78716C;">L</div>
+              <div style="border:1px solid #D6D3D1;padding:2px 6px;font-size:7px;color:#78716C;">XL</div>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;">
+            <div style="font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Color</div>
+            <div style="display:flex;gap:4px;">
+              <div style="width:12px;height:12px;border-radius:50%;background:#c0392b;border:2px solid #1C1917;"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#2980b9;border:2px solid #1C1917;"></div>
+              <div style="width:12px;height:12px;border-radius:50%;background:#27ae60;"></div>
+            </div>
+          </div>
+          <div style="margin-top:auto;padding-top:6px;border-top:1px solid #D6D3D1;">
+            <div style="background:#1C1917;padding:5px;text-align:center;font-size:7px;color:#FAFAF9;letter-spacing:2px;font-weight:700;">APPLY</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Side Drawer</h3>
+      <p>Clicking "Filters" slides in a panel from the right. Grid dims. All filters in one scrollable panel. Common on mobile-first sites. Feels modal-ish.</p>
+    </div>
+  </div>
+
+</div>

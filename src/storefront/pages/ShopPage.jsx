@@ -5,7 +5,7 @@ import FilterBar from "../components/shop/FilterBar";
 import AllFiltersPanel from "../components/shop/AllFiltersPanel";
 import ProductGrid from "../components/shop/ProductGrid";
 
-function ActiveChips({ filters, categoryOptions, onClearOne, onClearAll }) {
+function ActiveChips({ filters, categoryOptions, sizeDisplayMap, onClearOne, onClearAll }) {
   const chips = [];
 
   filters.categories.forEach((id) => {
@@ -13,7 +13,7 @@ function ActiveChips({ filters, categoryOptions, onClearOne, onClearAll }) {
     if (cat) chips.push({ label: cat.name, field: "categories", value: id });
   });
   filters.colors.forEach((v) => chips.push({ label: v, field: "colors", value: v }));
-  filters.sizes.forEach((v) => chips.push({ label: v, field: "sizes", value: v }));
+  filters.sizes.forEach((v) => chips.push({ label: sizeDisplayMap[v] ?? v, field: "sizes", value: v }));
   filters.fabrics.forEach((v) => chips.push({ label: v, field: "fabrics", value: v }));
   if (filters.priceMin !== null || filters.priceMax !== null) {
     const min = filters.priceMin != null ? `₹${Number(filters.priceMin).toLocaleString("en-IN")}` : "₹0";
@@ -67,6 +67,7 @@ export default function ShopPage() {
     categoryOptions,
     colorOptions,
     sizeOptions,
+    sizeDisplayMap,
     fabricOptions,
     priceBounds,
     availableOptions,
@@ -123,6 +124,7 @@ export default function ShopPage() {
         categoryOptions={categoryOptions}
         colorOptions={colorOptions}
         sizeOptions={sizeOptions}
+        sizeDisplayMap={sizeDisplayMap}
         fabricOptions={fabricOptions}
         availableOptions={availableOptions}
       />
@@ -133,6 +135,7 @@ export default function ShopPage() {
         categoryOptions={categoryOptions}
         colorOptions={colorOptions}
         sizeOptions={sizeOptions}
+        sizeDisplayMap={sizeDisplayMap}
         fabricOptions={fabricOptions}
         priceBounds={priceBounds}
         onToggle={toggle}
@@ -146,6 +149,7 @@ export default function ShopPage() {
       <ActiveChips
         filters={filters}
         categoryOptions={categoryOptions}
+        sizeDisplayMap={sizeDisplayMap}
         onClearOne={clearOne}
         onClearAll={clearAll}
       />

@@ -94,6 +94,7 @@ export default function useShopFilters() {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);
   const [sizeOptions, setSizeOptions] = useState([]);
+  const [sizeDisplayMap, setSizeDisplayMap] = useState({});
   const [fabricOptions, setFabricOptions] = useState([]);
   const [priceBounds, setPriceBounds] = useState({ min: 0, max: 25000 });
 
@@ -102,24 +103,58 @@ export default function useShopFilters() {
 
   useEffect(() => {
     async function fetchOptions() {
-      const [cats, variants, fabrics, priceRange] = await Promise.all([
+      const [cats, variants, fabrics, priceRange, distinctSizes, sizeDefs] = await Promise.all([
         supabase.from("categories").select("categoryid, name").order("name"),
-        supabase.from("productsizecolors").select("color, size").limit(50000),
+        supabase.from("productsizecolors").select("color").limit(50000),
         supabase.from("products").select("fabric").not("fabric", "is", null).limit(10000),
         supabase
           .from("products")
           .select("retailprice")
           .order("retailprice", { ascending: false })
           .limit(1),
+        supabase.rpc("get_distinct_sizes"),
+        supabase.from("sizes").select("code, label, size_type, numeric_in, sort_order"),
       ]);
 
       setCategoryOptions(cats.data || []);
 
       if (variants.data) {
         const colors = [...new Set(variants.data.map((r) => r.color).filter(Boolean))].sort();
-        const sizes = [...new Set(variants.data.map((r) => r.size).filter(Boolean))].sort();
         setColorOptions(colors);
-        setSizeOptions(sizes);
+      }
+
+      if (sizeDefs.data) {
+        // Build letter↔numeric cross-reference for display
+        const letterByNumeric = {};
+        const numericByLetter = {};
+        sizeDefs.data.forEach((s) => {
+          if (s.size_type === "letter" && s.numeric_in) {
+            letterByNumeric[s.numeric_in] = s.code;
+            numericByLetter[s.code] = s.numeric_in;
+          }
+        });
+
+        // Build display label map
+        const displayMap = {};
+        sizeDefs.data.forEach((s) => {
+          if (s.size_type === "letter" && numericByLetter[s.code]) {
+            displayMap[s.code] = `${s.code} / ${numericByLetter[s.code]}`;
+          } else if ((s.size_type === "chest" || s.size_type === "waist") && letterByNumeric[s.numeric_in]) {
+            displayMap[s.code] = `${s.code} / ${letterByNumeric[s.numeric_in]}`;
+          } else {
+            displayMap[s.code] = s.label;
+          }
+        });
+        setSizeDisplayMap(displayMap);
+
+        // Use RPC distinct sizes; sort by reference table order, unknowns last
+        const rawSizes = (distinctSizes.data || []).map((r) => r.size).filter(Boolean);
+        const orderMap = Object.fromEntries(sizeDefs.data.map((s) => [s.code, s.sort_order]));
+        setSizeOptions(rawSizes.sort((a, b) => (orderMap[a] ?? 9999) - (orderMap[b] ?? 9999)));
+      } else {
+        // Fallback if sizes table unavailable
+        const rawSizes = (distinctSizes.data || []).map((r) => r.size).filter(Boolean);
+        setSizeOptions(rawSizes.sort());
       }
 
       if (fabrics.data) {
@@ -285,6 +320,7 @@ export default function useShopFilters() {
     categoryOptions,
     colorOptions,
     sizeOptions,
+    sizeDisplayMap,
     fabricOptions,
     priceBounds,
     availableOptions,

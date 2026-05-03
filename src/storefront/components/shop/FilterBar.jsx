@@ -23,6 +23,7 @@ export default function FilterBar({
   categoryOptions,
   colorOptions,
   sizeOptions,
+  sizeDisplayMap = {},
   fabricOptions,
   availableOptions,
 }) {
@@ -110,6 +111,7 @@ export default function FilterBar({
                       onSetPrice={onSetPrice}
                       onApply={() => onToggleDropdown(null)}
                       availableSet={getAvailableSet(pill.type)}
+                      sizeDisplayMap={sizeDisplayMap}
                     />
                   )}
                 </div>

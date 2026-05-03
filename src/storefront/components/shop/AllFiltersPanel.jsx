@@ -53,6 +53,7 @@ export default function AllFiltersPanel({
   categoryOptions,
   colorOptions,
   sizeOptions,
+  sizeDisplayMap = {},
   fabricOptions,
   priceBounds,
   onToggle,
@@ -143,7 +144,7 @@ export default function AllFiltersPanel({
                           : "border-storefront-border text-storefront-warm hover:border-storefront-charcoal hover:text-storefront-charcoal"
                       }`}
                     >
-                      {size}
+                      {sizeDisplayMap[size] ?? size}
                     </button>
                   );
                 })}

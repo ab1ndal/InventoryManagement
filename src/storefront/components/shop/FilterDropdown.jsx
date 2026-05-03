@@ -105,6 +105,7 @@ export default function FilterDropdown({
   onSetPrice,
   onApply,
   availableSet,
+  sizeDisplayMap = {},
 }) {
   const selectedCount =
     type === "price"
@@ -174,7 +175,7 @@ export default function FilterDropdown({
                       : "border-storefront-border text-storefront-warm hover:border-storefront-charcoal hover:text-storefront-charcoal"
                   }`}
                 >
-                  {size}
+                  {sizeDisplayMap[size] ?? size}
                 </button>
               );
             })}

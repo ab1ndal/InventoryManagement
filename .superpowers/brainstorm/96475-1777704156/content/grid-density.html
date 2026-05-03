@@ -1,0 +1,146 @@
+<h2>Product Grid Density</h2>
+<p class="subtitle">Minimal light aesthetic (cream/charcoal/gold). Multi-select filters always visible. Pick the grid that feels right.</p>
+
+<div class="cards">
+
+  <!-- Option A: 2-col editorial -->
+  <div class="card" data-choice="2col" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#FAFAF9;padding:14px;font-family:'Helvetica Neue',sans-serif;min-height:240px;border-bottom:1px solid #D6D3D1;">
+      <!-- Category row -->
+      <div style="display:flex;gap:4px;margin-bottom:8px;overflow:hidden;">
+        <div style="background:#1C1917;padding:3px 10px;font-size:7px;color:#FAFAF9;font-weight:700;letter-spacing:1px;text-transform:uppercase;">All</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;">Sarees</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;">Lehengas</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#A16207;letter-spacing:1px;text-transform:uppercase;">+28</div>
+      </div>
+      <!-- Sub filters -->
+      <div style="display:flex;gap:4px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #D6D3D1;">
+        <div style="border:1px solid #1C1917;padding:2px 8px;font-size:7px;color:#1C1917;font-weight:600;letter-spacing:1px;">COLOR ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">SIZE ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">PRICE ▾</div>
+        <div style="margin-left:auto;font-size:7px;color:#78716C;letter-spacing:1px;display:flex;align-items:center;">32 ITEMS</div>
+      </div>
+      <!-- 2-col grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#e8e3de,#d6d0ca);"></div>
+          <div style="padding:8px;">
+            <div style="background:#D6D3D1;height:6px;border-radius:1px;width:80%;margin-bottom:4px;"></div>
+            <div style="background:#e8e3de;height:5px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#d6d0ca,#c8c2bb);"></div>
+          <div style="padding:8px;">
+            <div style="background:#D6D3D1;height:6px;border-radius:1px;width:80%;margin-bottom:4px;"></div>
+            <div style="background:#e8e3de;height:5px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — 2-Column Editorial</h3>
+      <p>Large images, breathing room. Feels luxury and curated. Slower to browse many products. Best for high-end brand impression.</p>
+    </div>
+  </div>
+
+  <!-- Option B: 3-col balanced -->
+  <div class="card" data-choice="3col" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#FAFAF9;padding:14px;font-family:'Helvetica Neue',sans-serif;min-height:240px;border-bottom:1px solid #D6D3D1;">
+      <div style="display:flex;gap:4px;margin-bottom:8px;overflow:hidden;">
+        <div style="background:#1C1917;padding:3px 10px;font-size:7px;color:#FAFAF9;font-weight:700;letter-spacing:1px;text-transform:uppercase;">All</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;">Sarees</div>
+        <div style="border:1px solid #1C1917;padding:3px 10px;font-size:7px;color:#1C1917;letter-spacing:1px;text-transform:uppercase;font-weight:600;">Lehengas</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#A16207;letter-spacing:1px;text-transform:uppercase;">+28</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #D6D3D1;">
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">COLOR ▾</div>
+        <div style="border:1px solid #1C1917;padding:2px 8px;font-size:7px;color:#1C1917;font-weight:600;letter-spacing:1px;">SIZE ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">PRICE ▾</div>
+        <div style="margin-left:auto;font-size:7px;color:#78716C;letter-spacing:1px;display:flex;align-items:center;">18 ITEMS</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#e8e3de,#d6d0ca);"></div>
+          <div style="padding:6px;">
+            <div style="background:#D6D3D1;height:5px;border-radius:1px;width:80%;margin-bottom:3px;"></div>
+            <div style="background:#e8e3de;height:4px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#d6d0ca,#c8c2bb);"></div>
+          <div style="padding:6px;">
+            <div style="background:#D6D3D1;height:5px;border-radius:1px;width:80%;margin-bottom:3px;"></div>
+            <div style="background:#e8e3de;height:4px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#c8c2bb,#e8e3de);"></div>
+          <div style="padding:6px;">
+            <div style="background:#D6D3D1;height:5px;border-radius:1px;width:80%;margin-bottom:3px;"></div>
+            <div style="background:#e8e3de;height:4px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — 3-Column Balanced</h3>
+      <p>Sweet spot between image size and density. Good for browsing. Works on both desktop and tablet. Most e-commerce brands land here.</p>
+    </div>
+  </div>
+
+  <!-- Option C: 4-col dense -->
+  <div class="card" data-choice="4col" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#FAFAF9;padding:14px;font-family:'Helvetica Neue',sans-serif;min-height:240px;border-bottom:1px solid #D6D3D1;">
+      <div style="display:flex;gap:4px;margin-bottom:8px;overflow:hidden;">
+        <div style="background:#1C1917;padding:3px 10px;font-size:7px;color:#FAFAF9;font-weight:700;letter-spacing:1px;text-transform:uppercase;">All</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;">Sarees</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;">Suits</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#78716C;letter-spacing:1px;text-transform:uppercase;">Kurtis</div>
+        <div style="border:1px solid #D6D3D1;padding:3px 10px;font-size:7px;color:#A16207;letter-spacing:1px;text-transform:uppercase;">+27</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #D6D3D1;">
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">COLOR ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">SIZE ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">PRICE ▾</div>
+        <div style="border:1px solid #D6D3D1;padding:2px 8px;font-size:7px;color:#78716C;letter-spacing:1px;">FABRIC ▾</div>
+        <div style="margin-left:auto;font-size:7px;color:#78716C;letter-spacing:1px;display:flex;align-items:center;">142 ITEMS</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;">
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#e8e3de,#d6d0ca);"></div>
+          <div style="padding:5px;">
+            <div style="background:#D6D3D1;height:4px;border-radius:1px;width:80%;margin-bottom:2px;"></div>
+            <div style="background:#e8e3de;height:3px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#d6d0ca,#c8c2bb);"></div>
+          <div style="padding:5px;">
+            <div style="background:#D6D3D1;height:4px;border-radius:1px;width:80%;margin-bottom:2px;"></div>
+            <div style="background:#e8e3de;height:3px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#c8c2bb,#e8e3de);"></div>
+          <div style="padding:5px;">
+            <div style="background:#D6D3D1;height:4px;border-radius:1px;width:80%;margin-bottom:2px;"></div>
+            <div style="background:#e8e3de;height:3px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #D6D3D1;">
+          <div style="aspect-ratio:3/4;background:linear-gradient(160deg,#e8e3de,#c8c2bb);"></div>
+          <div style="padding:5px;">
+            <div style="background:#D6D3D1;height:4px;border-radius:1px;width:80%;margin-bottom:2px;"></div>
+            <div style="background:#e8e3de;height:3px;border-radius:1px;width:40%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — 4-Column Dense</h3>
+      <p>Max products visible at once. Efficient browsing. Cards feel smaller — works if product images are strong. More catalogue-like.</p>
+    </div>
+  </div>
+
+</div>
