@@ -18,9 +18,9 @@ const MOCK_PRODUCT = {
 };
 
 const MOCK_VARIANTS = [
-  { id: "v1", size: "S", color: "Red", stock: 2 },
-  { id: "v2", size: "S", color: "Blue", stock: 0 },
-  { id: "v3", size: "M", color: "Red", stock: 1 },
+  { variantid: "v1", size: "S", color: "Red", stock: 2 },
+  { variantid: "v2", size: "S", color: "Blue", stock: 0 },
+  { variantid: "v3", size: "M", color: "Red", stock: 1 },
 ];
 
 function mockSuccess() {

@@ -25,7 +25,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange }) {
   const fetchLedger = async () => {
     setLoading(true);
 
-    const [{ data: txns, error: txnErr }, { data: bills, error: billErr }] =
+    const [{ data: txns, error: txnErr }, { data: bills }] =
       await Promise.all([
         supabase
           .from("supplier_transactions")

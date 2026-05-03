@@ -46,6 +46,7 @@ export default function ProductDetailPage() {
   const { productid } = useParams();
   const { product, variants, loading, error } = useProduct(productid);
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [quantity, setQuantity] = useState(1);
 
   if (loading) {
     return (
@@ -72,13 +73,19 @@ export default function ProductDetailPage() {
   }
 
   const categoryName = product.categories?.name;
-  const canAddToCart = selectedVariant !== null;
+  const maxQty = selectedVariant?.stock ?? 0;
+  const canAddToCart = selectedVariant !== null && maxQty > 0;
   const stockLabel =
     selectedVariant && selectedVariant.stock <= 3
       ? `Only ${selectedVariant.stock} left`
       : selectedVariant
       ? "In stock"
       : null;
+
+  function handleVariantSelect(variant) {
+    setSelectedVariant(variant);
+    setQuantity(1);
+  }
 
   return (
     <>
@@ -115,8 +122,14 @@ export default function ProductDetailPage() {
             </p>
 
             {product.fabric && (
-              <p className="text-xs text-storefront-muted font-montserrat tracking-wide mb-6">
+              <p className="text-xs text-storefront-muted font-montserrat tracking-wide mb-3">
                 {product.fabric}
+              </p>
+            )}
+
+            {product.description && (
+              <p className="text-sm text-storefront-charcoal font-montserrat leading-relaxed mb-6">
+                {product.description}
               </p>
             )}
 
@@ -124,7 +137,7 @@ export default function ProductDetailPage() {
               {variants.length > 0 ? (
                 <VariantPicker
                   variants={variants}
-                  onVariantSelect={setSelectedVariant}
+                  onVariantSelect={handleVariantSelect}
                 />
               ) : (
                 <p className="text-xs text-storefront-muted font-montserrat">
@@ -132,6 +145,34 @@ export default function ProductDetailPage() {
                 </p>
               )}
             </div>
+
+            {/* Quantity selector */}
+            {canAddToCart && (
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal font-montserrat">
+                  Qty
+                </span>
+                <div className="flex items-center border border-storefront-border">
+                  <button
+                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    disabled={quantity <= 1}
+                    className="w-8 h-8 flex items-center justify-center text-storefront-charcoal hover:bg-storefront-cream disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    −
+                  </button>
+                  <span className="w-10 text-center text-sm font-montserrat tabular-nums">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
+                    disabled={quantity >= maxQty}
+                    className="w-8 h-8 flex items-center justify-center text-storefront-charcoal hover:bg-storefront-cream disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Desktop Add to Cart */}
             <div className="hidden md:block">

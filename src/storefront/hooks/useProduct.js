@@ -24,7 +24,7 @@ export function useProduct(productId) {
           .single(),
         supabase
           .from("productsizecolors")
-          .select("id, size, color, stock")
+          .select("variantid, size, color, stock")
           .eq("productid", productId)
           .order("size")
           .order("color"),

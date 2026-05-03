@@ -3,11 +3,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import VariantPicker from "../components/product/VariantPicker";
 
 const VARIANTS = [
-  { id: "v1", size: "S", color: "Red", stock: 2 },
-  { id: "v2", size: "S", color: "Blue", stock: 0 },
-  { id: "v3", size: "M", color: "Red", stock: 1 },
-  { id: "v4", size: "M", color: "Blue", stock: 3 },
-  { id: "v5", size: "L", color: "Red", stock: 0 },
+  { variantid: "v1", size: "S", color: "Red", stock: 2 },
+  { variantid: "v2", size: "S", color: "Blue", stock: 0 },
+  { variantid: "v3", size: "M", color: "Red", stock: 1 },
+  { variantid: "v4", size: "M", color: "Blue", stock: 3 },
+  { variantid: "v5", size: "L", color: "Red", stock: 0 },
 ];
 
 // L has only stock=0 — all colours unavailable, so size L is unavailable overall.
@@ -81,7 +81,7 @@ describe("VariantPicker — onVariantSelect callback", () => {
     render(<VariantPicker variants={VARIANTS} onVariantSelect={onSelect} />);
     fireEvent.click(screen.getByRole("button", { name: "S" }));
     fireEvent.click(screen.getByRole("button", { name: "Red" }));
-    expect(onSelect).toHaveBeenLastCalledWith(VARIANTS[0]); // { id: "v1", size: "S", color: "Red", stock: 2 }
+    expect(onSelect).toHaveBeenLastCalledWith(VARIANTS[0]); // { variantid: "v1", size: "S", color: "Red", stock: 2 }
   });
 
   it("calls onVariantSelect(null) when size changes after a colour was selected", () => {

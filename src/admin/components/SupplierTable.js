@@ -21,7 +21,7 @@ export default function SupplierTable({
   const fetchData = async () => {
     setLoading(true);
 
-    const [{ data: supplierData, error: supErr }, { data: txnData, error: txnErr }] =
+    const [{ data: supplierData, error: supErr }, { data: txnData }] =
       await Promise.all([
         supabase.from("suppliers").select("*").order("name"),
         supabase.from("supplier_transactions").select("supplier_id, type, amount"),

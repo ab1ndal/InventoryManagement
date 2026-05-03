@@ -19,7 +19,7 @@ export default function VariantPicker({ variants, onVariantSelect }) {
     if (!selectedSize) return [];
     return variants
       .filter((v) => v.size === selectedSize)
-      .map((v) => ({ id: v.id, color: v.color, available: v.stock > 0 }));
+      .map((v) => ({ id: v.variantid, color: v.color, available: v.stock > 0 }));
   }, [variants, selectedSize]);
 
   function handleSizeClick(size, available) {
