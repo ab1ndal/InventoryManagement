@@ -17,6 +17,7 @@ End-to-end e-commerce checkout for Bindal's Creations storefront. Covers 6 seque
 | 3 | Payments (Razorpay) | Phase 2 |
 | 4 | Shipping (Shiprocket) | Phase 3 |
 | 5 | Orders & Admin Panel | Phase 4 |
+| 6 | Abandoned Cart Recovery | Phase 5 |
 
 ---
 
@@ -325,10 +326,52 @@ pending → confirmed → processing → shipped → delivered
 
 ---
 
+## Phase 6 — Abandoned Cart Recovery
+
+**Prerequisite:** Phase 5 (notifications infrastructure must be live)
+
+**Trigger:** Logged-in user has items in `cart_items` with `added_at` older than 7 days and has not placed an order or cleared their cart.
+
+**Mechanism:** Supabase pg_cron job runs daily at 10:00 IST. Queries users meeting the trigger condition. Sends SMS + email nudge. Randomises next nudge interval to 5–7 days to avoid robotic feel. Stops after 3 nudges or when cart is cleared/converted.
+
+**New table:**
+```sql
+CREATE TABLE cart_nudges (
+  user_id      uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  last_sent_at timestamptz NOT NULL,
+  nudge_count  int NOT NULL DEFAULT 0
+);
+```
+
+**Nudge logic (pg_cron, daily):**
+```sql
+-- Find users eligible for nudge
+SELECT ci.user_id FROM cart_items ci
+JOIN cart_nudges cn ON cn.user_id = ci.user_id  -- already nudged before
+WHERE ci.added_at < now() - interval '7 days'
+  AND cn.nudge_count < 3
+  AND cn.last_sent_at < now() - interval '5 days'
+
+UNION
+
+SELECT ci.user_id FROM cart_items ci
+LEFT JOIN cart_nudges cn ON cn.user_id = ci.user_id
+WHERE ci.added_at < now() - interval '7 days'
+  AND cn.user_id IS NULL;  -- never nudged
+```
+
+**Message:** "You left something in your cart at Bindal's Creations. Your items are waiting — complete your order before they sell out." + link to `/checkout`
+
+**Guests:** Not nudgeable — no contact info until checkout. In-browser nudge (banner on homepage/shop) shown if localStorage cart is >7 days old: "You have items in your cart — complete your purchase."
+
+**Privacy:** Nudges stop automatically on cart clear, order placement, or account deletion.
+
+---
+
 ## Out of Scope (this design)
 
 - International shipping / multi-currency
-- COD (cash on delivery)
+- COD (cash on delivery) — deferred, design notes captured separately
 - Wishlist (icon exists in header, functionality deferred)
 - Product reviews
 - Low-stock threshold alerts
