@@ -13,7 +13,8 @@ export const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [items, setItems] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) ?? [];
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -26,6 +27,7 @@ export function CartProvider({ children }) {
 
   const addItem = useCallback(
     ({ variant_id, product_id, quantity, name, size, color, price, image_url }) => {
+      if (!quantity || quantity <= 0) return;
       setItems((prev) => {
         const existing = prev.find((i) => i.variant_id === variant_id);
         if (existing) {
@@ -60,6 +62,9 @@ export function CartProvider({ children }) {
 
   const clearCart = useCallback(() => setItems([]), []);
 
+  const openCart = useCallback(() => setIsOpen(true), []);
+  const closeCart = useCallback(() => setIsOpen(false), []);
+
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
@@ -68,8 +73,8 @@ export function CartProvider({ children }) {
         items,
         itemCount,
         isOpen,
-        openCart: () => setIsOpen(true),
-        closeCart: () => setIsOpen(false),
+        openCart,
+        closeCart,
         addItem,
         removeItem,
         updateQty,
