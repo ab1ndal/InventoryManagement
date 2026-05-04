@@ -1,0 +1,67 @@
+<h2>Section 1 — System Architecture</h2>
+<p class="subtitle">How all pieces connect. Confirm before moving to data model.</p>
+
+<div style="font-family:monospace;font-size:13px;line-height:1.8;background:#1a1a1a;color:#e8e8e8;padding:28px 32px;border-radius:4px;overflow-x:auto;">
+<pre style="margin:0;white-space:pre;">
+┌─────────────────────────────────────────────────────────────┐
+│                    BROWSER (React SPA)                      │
+│                                                             │
+│  StorefrontHeader  ─── CartDrawer (Context + localStorage)  │
+│  ProductDetailPage ─── VariantPicker + AddToCart            │
+│  ShopPage (exists) ─── ProductGrid                          │
+│  CheckoutPage      ─── Address · Auth Gate · Order Review   │
+│  PaymentPage       ─── razorpay-js SDK  ◄── Razorpay CDN   │
+│  OrderConfirmation ─── order details + tracking stub        │
+│                                                             │
+│          │ supabase-js                │ razorpay-js         │
+└──────────┼────────────────────────────┼─────────────────────┘
+           │                            │
+           ▼                            ▼
+┌──────────────────────┐    ┌───────────────────────────┐
+│   SUPABASE (existing)│    │   RAZORPAY  (external)    │
+│                      │    │                           │
+│  auth.users          │    │  Payment Modal (browser)  │
+│  profiles            │    │  Orders API               │
+│  customers ──────────┼────┼─► webhook ─►┐             │
+│  products            │    └─────────────┼─────────────┘
+│  productsizecolors   │                  │
+│  discounts           │                  │
+│  bills (admin only)  │    ┌─────────────▼─────────────┐
+│                      │    │  SUPABASE EDGE FUNCTIONS   │
+│  [NEW TABLES]        │    │                           │
+│  cart_items          │    │  payment-verify           │
+│  orders              │◄───┼─   • verify signature     │
+│  order_items         │    │    • create order row     │
+│                      │    │    • deduct stock         │
+│                      │    │                           │
+│                      │    │  razorpay-webhook         │
+│                      │    │    • handle async events  │
+│                      │    │    • update order status  │
+│                      │    │                           │
+│                      │◄───┤  shiprocket-rates         │
+│                      │    │    • proxy to Shiprocket  │
+│                      │    │    • return rate options  │
+└──────────────────────┘    └───────────────────────────┘
+                                          │
+                             ┌────────────▼──────────────┐
+                             │  SHIPROCKET API (external) │
+                             │  Origin: 201001 Ghaziabad  │
+                             │  Aggregates: Delhivery,    │
+                             │  BlueDart, FedEx India...  │
+                             └───────────────────────────┘
+</pre>
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Key Trust & Security Guarantees</h3>
+  <ul style="line-height:2;font-size:14px;">
+    <li>Razorpay API key (secret) <strong>never in browser</strong> — only Key ID (public) in client</li>
+    <li>Payment signature verified server-side in Edge Function before order is created</li>
+    <li>Stock deducted atomically only after successful payment verification</li>
+    <li>Shiprocket credentials in <strong>Supabase Vault</strong> — proxied, never client-exposed</li>
+    <li>All Edge Functions require valid Supabase JWT — no unauthenticated calls to sensitive ops</li>
+    <li>Guest checkout: order tied to email/phone, no auth required for payment</li>
+  </ul>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Does this architecture look right? Respond in terminal.</p>

@@ -1,0 +1,11 @@
+{"type":"server-started","port":56787,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:56787","screen_dir":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content","state_dir":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/state"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/scope-phases.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/waiting-1.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/architecture.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/stock-reservation.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/data-model.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/auth-flow.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/checkout-payment.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/shipping.html"}
+{"type":"screen-added","file":"/Users/abindal/dev/BindalsCreation/retail-inventory/.superpowers/brainstorm/62444-1777835447/content/orders-admin.html"}
+{"type":"server-stopped","reason":"idle timeout"}

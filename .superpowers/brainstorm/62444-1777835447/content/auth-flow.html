@@ -1,0 +1,89 @@
+<h2>Section 3 — Auth & Checkout Identity Flow</h2>
+<p class="subtitle">Phone OTP primary · Google OAuth · Email fallback · Guest option. Respond in terminal.</p>
+
+<div class="section">
+  <h3>Customer Login Methods</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px;border-radius:4px;text-align:center;font-size:13px;">
+      <div style="font-size:28px;margin-bottom:8px;">📱</div>
+      <strong>Phone OTP</strong><br>
+      <span style="color:#666;">Primary method<br>SMS via MSG91/Twilio<br>Supabase phone auth</span>
+    </div>
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px;border-radius:4px;text-align:center;font-size:13px;">
+      <div style="font-size:28px;margin-bottom:8px;">🔵</div>
+      <strong>Google OAuth</strong><br>
+      <span style="color:#666;">One-tap login<br>No OTP needed<br>Supabase Google provider</span>
+    </div>
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px;border-radius:4px;text-align:center;font-size:13px;">
+      <div style="font-size:28px;margin-bottom:8px;">✉️</div>
+      <strong>Email Magic Link</strong><br>
+      <span style="color:#666;">Fallback only<br>Passwordless link<br>Supabase magic link</span>
+    </div>
+  </div>
+  <p style="font-size:12px;color:#888;margin-top:8px;">No passwords stored anywhere. All methods are passwordless — high security, low friction.</p>
+</div>
+
+<div class="section">
+  <h3>Identity Decision at Checkout</h3>
+  <div style="font-family:monospace;font-size:12px;line-height:2;background:#1a1a1a;color:#e8e8e8;padding:24px 28px;border-radius:4px;">
+<pre style="margin:0;white-space:pre;">
+Customer clicks "Checkout"
+        │
+        ▼
+Already logged in?
+  YES ─────────────────────────────────────────► Proceed to address step
+  NO
+        │
+        ▼
+  ┌─────────────────────────────────────────┐
+  │  Who are you?                           │
+  │                                         │
+  │  [📱 Continue with Phone]               │
+  │  [🔵 Continue with Google]              │
+  │  [✉️  Continue with Email]              │
+  │                                         │
+  │  ─────── or ──────                      │
+  │                                         │
+  │  [Continue as Guest →]                  │
+  │   (requires email + phone for delivery) │
+  └─────────────────────────────────────────┘
+        │                    │
+        │ Login              │ Guest
+        ▼                    ▼
+  auth.users created    no account created
+  customers row linked  guest_email/phone
+  or created            stored on order only
+  localStorage cart ──► merged into cart_items
+        │                    │
+        └──────────┬─────────┘
+                   ▼
+           Address step →
+           Shipping rates →
+           Payment →
+           Order confirmed
+</pre>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Guest → Account Upgrade</h3>
+  <div style="background:#fff8e8;border:1px solid #c9a84c;padding:16px 20px;border-radius:4px;font-size:13px;line-height:1.8;">
+    After order confirmation, guest sees:<br><br>
+    <strong>"Save your details for faster checkout next time?"</strong><br>
+    [Create account with your phone number]<br><br>
+    If they sign up → <code>customers.auth_user_id</code> is set → past order linked to new account automatically via matching email/phone.
+  </div>
+</div>
+
+<div class="section">
+  <h3>Security Principles</h3>
+  <ul style="font-size:13px;line-height:2;color:#444;">
+    <li>OTP valid for <strong>60 seconds only</strong>, max 3 attempts before cooldown</li>
+    <li>Google OAuth uses Supabase's built-in provider — no custom token handling</li>
+    <li>Supabase RLS policies on <code>cart_items</code> and <code>orders</code> — users can only read/write their own rows</li>
+    <li>Guest session token is a cryptographically random UUID stored in localStorage — not guessable</li>
+    <li>No PII stored in localStorage — only session token + cart variant IDs + quantities</li>
+  </ul>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Does this auth flow look right? Respond in terminal.</p>

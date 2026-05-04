@@ -1,0 +1,73 @@
+<h2>Section 4 — Checkout & Payment Flow</h2>
+<p class="subtitle">Step-by-step checkout with Razorpay. Respond in terminal.</p>
+
+<div class="section">
+  <h3>Checkout Steps (linear, no back-and-forth)</h3>
+  <div style="display:flex;gap:0;margin-bottom:24px;">
+    <div style="flex:1;background:#1a1a1a;color:#c9a84c;padding:12px 8px;text-align:center;font-size:12px;font-weight:700;border-right:1px solid #333;">1<br><span style="color:#fff;font-weight:400;">Identity</span></div>
+    <div style="flex:1;background:#1a1a1a;color:#c9a84c;padding:12px 8px;text-align:center;font-size:12px;font-weight:700;border-right:1px solid #333;">2<br><span style="color:#fff;font-weight:400;">Address</span></div>
+    <div style="flex:1;background:#1a1a1a;color:#c9a84c;padding:12px 8px;text-align:center;font-size:12px;font-weight:700;border-right:1px solid #333;">3<br><span style="color:#fff;font-weight:400;">Shipping</span></div>
+    <div style="flex:1;background:#1a1a1a;color:#c9a84c;padding:12px 8px;text-align:center;font-size:12px;font-weight:700;border-right:1px solid #333;">4<br><span style="color:#fff;font-weight:400;">Review</span></div>
+    <div style="flex:1;background:#c9a84c;color:#1a1a1a;padding:12px 8px;text-align:center;font-size:12px;font-weight:700;">5<br>Payment</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">
+    <div style="padding:14px 18px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <strong>Step 1 — Identity:</strong> Login gate (phone OTP / Google / email / guest). Cart already in state.
+    </div>
+    <div style="padding:14px 18px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <strong>Step 2 — Address:</strong> Name · Phone · Address line 1+2 · City · State · Pincode. Logged-in users see saved addresses, can add new. Pincode validated for Shiprocket serviceability before proceeding.
+    </div>
+    <div style="padding:14px 18px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <strong>Step 3 — Shipping:</strong> <code>shiprocket-rates</code> Edge Function called with origin 201001 + destination pincode + parcel weight/dims. Shows courier options with price + estimated days. Customer picks one.
+    </div>
+    <div style="padding:14px 18px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <strong>Step 4 — Review:</strong> Order summary — items, subtotal, shipping, discount code field (1 code, storefront_redeemable only), total. Final stock check displayed. "Confirm & Pay" button.
+    </div>
+    <div style="padding:14px 18px;background:#fff8e8;border-left:3px solid #c9a84c;">
+      <strong>Step 5 — Payment:</strong> "Confirm & Pay" calls <code>initiate-payment</code> Edge Function → reserves stock → creates Razorpay order → opens Razorpay modal. Customer pays via UPI / PayTM / RuPay / card / netbanking. On success → <code>payment-verify</code> → order created.
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Razorpay Integration Detail</h3>
+  <div style="font-family:monospace;font-size:12px;line-height:2;background:#1a1a1a;color:#e8e8e8;padding:20px 24px;border-radius:4px;">
+<pre style="margin:0;white-space:pre;">
+BROWSER                          EDGE: initiate-payment      RAZORPAY
+   │                                       │                      │
+   │── POST {cart, address, courier} ─────►│                      │
+   │                                       │── Create Order ─────►│
+   │                                       │◄─ {order_id, amount}─│
+   │                                       │── INSERT reservation  │
+   │◄─ {razorpay_key_id, order_id} ───────│                      │
+   │                                       │                      │
+   │── open Razorpay modal ────────────────────────────────────── │
+   │   (UPI / PayTM / RuPay / card)        │                      │
+   │◄─ {payment_id, signature} ────────────────────────────────── │
+   │                                       │                      │
+   │── POST {payment_id, order_id,         │                      │
+   │         signature} ─────────────────►EDGE: payment-verify    │
+   │                                       │── HMAC verify        │
+   │                                       │── deduct stock       │
+   │                                       │── INSERT order       │
+   │                                       │── DELETE reservation │
+   │◄─ {order_id, status: confirmed} ─────│                      │
+   │                                       │                      │
+   │── redirect to /order/{id}/confirmation│
+</pre>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Webhook (Async Safety Net)</h3>
+  <div style="background:#f0faf0;border:1px solid #4caf7d;padding:14px 18px;border-radius:4px;font-size:13px;line-height:1.8;">
+    <code>razorpay-webhook</code> Edge Function receives async events from Razorpay (payment.captured, payment.failed, refund.processed).<br><br>
+    • <strong>payment.captured</strong> — idempotent order confirm (handles cases where browser closed mid-payment)<br>
+    • <strong>payment.failed</strong> — mark order failed, release reservation immediately<br>
+    • <strong>refund.processed</strong> — update order status to refunded<br><br>
+    Webhook endpoint registered in Razorpay dashboard. Signature verified with webhook secret (separate from API secret).
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Does this checkout + payment flow look right? Respond in terminal.</p>

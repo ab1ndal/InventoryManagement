@@ -1,0 +1,40 @@
+<h2>Cart & Checkout — Phased Design</h2>
+<p class="subtitle">Large feature → broken into 5 phases. Each gets its own spec and implementation cycle.</p>
+
+<div class="section">
+  <h3>Proposed Phase Breakdown</h3>
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:12px;">
+    <div style="display:flex;gap:16px;align-items:flex-start;padding:16px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <div style="font-weight:700;font-size:1.2em;min-width:32px;color:#c9a84c;">1</div>
+      <div>
+        <strong>Cart</strong> — persistent cart drawer, add/remove/qty, localStorage + Supabase sync, badge count on header icon
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:flex-start;padding:16px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <div style="font-weight:700;font-size:1.2em;min-width:32px;color:#c9a84c;">2</div>
+      <div>
+        <strong>Checkout Flow</strong> — address, guest vs. login decision gate, order summary, coupon/discount
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:flex-start;padding:16px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <div style="font-weight:700;font-size:1.2em;min-width:32px;color:#c9a84c;">3</div>
+      <div>
+        <strong>Payments</strong> — Razorpay integration (UPI, PayTM, RuPay, cards, netbanking), webhook order confirmation, receipt email
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:flex-start;padding:16px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <div style="font-weight:700;font-size:1.2em;min-width:32px;color:#c9a84c;">4</div>
+      <div>
+        <strong>Shipping</strong> — Shiprocket/Delhivery aggregator, pincode-based rate calc, estimated delivery, serviceability check
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:flex-start;padding:16px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <div style="font-weight:700;font-size:1.2em;min-width:32px;color:#c9a84c;">5</div>
+      <div>
+        <strong>Orders</strong> — order table in DB, customer order history, admin order management, tracking integration
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:24px;">Brainstorming Phase 1 (Cart) first — respond in terminal to proceed.</p>

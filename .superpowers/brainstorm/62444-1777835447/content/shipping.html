@@ -1,0 +1,106 @@
+<h2>Section 5 — Shipping Flow (Shiprocket)</h2>
+<p class="subtitle">Rate calculation at checkout · Manual dispatch trigger · Tracking. Respond in terminal.</p>
+
+<div class="section">
+  <h3>Two-Phase Shiprocket Usage</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px 18px;border-radius:4px;font-size:13px;line-height:1.8;">
+      <strong style="color:#1a6b3a;">Phase A — Rate Fetch (Checkout Step 3)</strong><br><br>
+      Customer enters pincode →<br>
+      <code>shiprocket-rates</code> Edge Function →<br>
+      Shiprocket Rate Calculator API →<br>
+      Returns courier options + ETA + price →<br>
+      Customer picks courier →<br>
+      Selected rate stored on order
+    </div>
+    <div style="background:#fff8e8;border:1px solid #c9a84c;padding:16px 18px;border-radius:4px;font-size:13px;line-height:1.8;">
+      <strong style="color:#7a5c00;">Phase B — Shipment Creation (Admin dispatch)</strong><br><br>
+      Admin clicks "Process & Ship" →<br>
+      <code>create-shipment</code> Edge Function →<br>
+      Shiprocket Create Order API →<br>
+      AWB assigned + pickup scheduled →<br>
+      Tracking ID stored on order →<br>
+      Customer notified via SMS/email
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Shiprocket Rate Fetch — Detail</h3>
+  <div style="font-family:monospace;font-size:12px;line-height:2;background:#1a1a1a;color:#e8e8e8;padding:20px 24px;border-radius:4px;">
+<pre style="margin:0;white-space:pre;">
+BROWSER                    EDGE: shiprocket-rates       SHIPROCKET
+   │                                  │                      │
+   │── POST {                         │                      │
+   │     pickup_postcode: 201001,      │                      │
+   │     delivery_postcode: XXXXXX,    │                      │
+   │     weight_kg: 0.5,              │                      │
+   │     cod: false                   │                      │
+   │   } ───────────────────────────►│                      │
+   │                                  │── Rate Calculator ──►│
+   │                                  │◄─ courier options ───│
+   │                                  │   [                  │
+   │                                  │     {name, rate,     │
+   │                                  │      etd, courier_id}│
+   │                                  │   ]                  │
+   │◄─ filtered + sorted options ────│                      │
+   │   (cheapest first, ETA shown)    │
+   │                                  │
+   │  Customer picks courier          │
+   │  → stored as {courier_id,        │
+   │     courier_name, rate}          │
+   │    on checkout state             │
+</pre>
+  </div>
+  <p style="font-size:12px;color:#888;margin-top:8px;">Weight/dimensions per product stored as fields on <code>products</code> table (new columns: weight_kg, length_cm, width_cm, height_cm). Cart total weight = sum of variant weights.</p>
+</div>
+
+<div class="section">
+  <h3>Admin Dispatch — Detail</h3>
+  <div style="font-family:monospace;font-size:12px;line-height:2;background:#1a1a1a;color:#e8e8e8;padding:20px 24px;border-radius:4px;">
+<pre style="margin:0;white-space:pre;">
+ADMIN PANEL                EDGE: create-shipment        SHIPROCKET
+   │                                  │                      │
+   │── POST { order_id } ───────────►│                      │
+   │                                  │── Create Order ─────►│
+   │                                  │   (items, address,   │
+   │                                  │    courier_id,       │
+   │                                  │    pickup: 201001)   │
+   │                                  │◄─ {awb, shipment_id}─│
+   │                                  │── Schedule Pickup ──►│
+   │                                  │◄─ confirmed ─────────│
+   │                                  │                      │
+   │                                  │── UPDATE orders      │
+   │                                  │   tracking_id = awb  │
+   │                                  │   status = processing│
+   │◄─ { awb, tracking_url } ────────│                      │
+   │                                  │
+   │  Admin sees AWB + tracking URL   │
+   │  Customer gets SMS/email with    │
+   │  tracking link                   │
+</pre>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Products Table — New Shipping Columns</h3>
+  <div style="background:#fffbe6;border:1px solid #c9a84c;padding:16px 20px;border-radius:4px;font-family:monospace;font-size:13px;">
+    <strong style="color:#7a5c00;">products</strong> — add columns<br>
+    + weight_kg    numeric(5,3)  DEFAULT 0.500<br>
+    + length_cm    numeric(5,1)  DEFAULT 30<br>
+    + width_cm     numeric(5,1)  DEFAULT 25<br>
+    + height_cm    numeric(5,1)  DEFAULT 5<br>
+    <span style="color:#999;font-size:11px;margin-top:8px;display:block;">Admin sets these per product. Used in rate calculation. Defaults cover typical garment packaging.</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Free Shipping Threshold</h3>
+  <div style="background:#f8f5f0;border:1px solid #ccc;padding:14px 18px;border-radius:4px;font-size:13px;line-height:1.8;">
+    Header already says "Free shipping on orders above ₹5,000".<br>
+    At checkout Step 3: if subtotal ≥ ₹5,000 → shipping_amount = 0, all courier options show as "FREE".<br>
+    Threshold stored as a config value (Supabase table or env var) so admin can change it without code deploy.
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Does this shipping design look right? Respond in terminal.</p>

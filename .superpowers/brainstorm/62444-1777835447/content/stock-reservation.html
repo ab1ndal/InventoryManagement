@@ -1,0 +1,86 @@
+<h2>Stock Reservation — 15-Minute Hold</h2>
+<p class="subtitle">Industry-standard pattern. How it works end-to-end.</p>
+
+<div class="section">
+  <h3>Flow</h3>
+  <div style="font-family:monospace;font-size:13px;line-height:2;background:#1a1a1a;color:#e8e8e8;padding:24px 28px;border-radius:4px;">
+<pre style="margin:0;white-space:pre;">
+Customer clicks "Proceed to Pay"
+        │
+        ▼
+Edge Function: initiate-payment
+  1. Check stock availability
+     available = stock - SUM(active reservations WHERE expires_at > now())
+  2. If available ≥ requested qty:
+       INSERT INTO stock_reservations (variant_id, qty, expires_at = now()+15min)
+       CREATE Razorpay order → return order_id + key_id to browser
+  3. If NOT available → return error "Item out of stock"
+        │
+        ▼
+Browser: Razorpay payment modal opens
+  • 15-minute countdown timer shown to customer
+  • If timer expires → modal closed, reservation auto-expires
+        │
+        ▼
+Customer completes payment
+        │
+        ▼
+Edge Function: payment-verify
+  1. Verify Razorpay signature (HMAC-SHA256)
+  2. If valid:
+       UPDATE stock in productsizecolors (deduct qty)
+       INSERT INTO orders + order_items
+       DELETE FROM stock_reservations (cleanup)
+  3. If invalid → reject, reservation expires naturally in 15min
+        │
+        ▼
+Order confirmed ✓
+</pre>
+  </div>
+</div>
+
+<div class="section">
+  <h3>New Table: stock_reservations</h3>
+  <div style="font-family:monospace;font-size:13px;background:#f0ede8;padding:20px 24px;border-radius:4px;">
+<pre style="margin:0;">
+stock_reservations
+├── id            uuid PK
+├── variant_id    uuid → productsizecolors.id
+├── quantity      int
+├── session_token text   (guest session or auth user_id)
+├── razorpay_order_id text  (ties reservation to payment attempt)
+├── expires_at    timestamptz  DEFAULT now() + '15 minutes'
+└── created_at    timestamptz
+</pre>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Available Stock Query (everywhere)</h3>
+  <div style="font-family:monospace;font-size:13px;background:#f0ede8;padding:20px 24px;border-radius:4px;">
+<pre style="margin:0;">
+available_stock =
+  productsizecolors.stock
+  - COALESCE(
+      SUM(stock_reservations.quantity)
+      WHERE variant_id = $id
+        AND expires_at > now()
+    , 0)
+</pre>
+  </div>
+  <p style="font-size:13px;margin-top:12px;color:#666;">
+    No cleanup job needed — expired rows are simply invisible to queries.
+    Optionally add a pg_cron job to purge rows older than 1 hour for table hygiene.
+  </p>
+</div>
+
+<div class="section">
+  <h3>UI: Countdown Timer</h3>
+  <div style="background:#fff8e8;border:1px solid #c9a84c;padding:16px 20px;border-radius:4px;font-size:13px;">
+    <strong style="color:#c9a84c;">⏱ 14:32 remaining to complete your purchase</strong><br>
+    <span style="color:#666;margin-top:4px;display:block;">Your items are reserved. Complete payment before the timer expires.</span>
+  </div>
+  <p style="font-size:13px;margin-top:12px;color:#666;">On expiry: timer turns red, modal closes, customer sees "Session expired — items returned to cart."</p>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Does this reservation design look right? Respond in terminal.</p>

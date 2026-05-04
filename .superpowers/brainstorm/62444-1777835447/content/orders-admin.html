@@ -1,0 +1,117 @@
+<h2>Section 6 — Orders & Admin Panel</h2>
+<p class="subtitle">Customer order history · Admin order management · Dispatch flow. Respond in terminal.</p>
+
+<div class="section">
+  <h3>Customer-Facing: Order Views</h3>
+  <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">
+    <div style="padding:14px 18px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <strong>/order/:id/confirmation</strong> — shown immediately after payment. Order summary, items, total, expected delivery window. "Create account" nudge for guests.
+    </div>
+    <div style="padding:14px 18px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <strong>/account/orders</strong> — logged-in customer order history. List of past orders with status badge. Requires auth.
+    </div>
+    <div style="padding:14px 18px;background:#f8f5f0;border-left:3px solid #c9a84c;">
+      <strong>/account/orders/:id</strong> — single order detail. Items, address, payment method, status timeline, Shiprocket tracking link when dispatched.
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Order Status Lifecycle</h3>
+  <div style="font-family:monospace;font-size:13px;background:#1a1a1a;color:#e8e8e8;padding:20px 24px;border-radius:4px;">
+<pre style="margin:0;white-space:pre;">
+pending ──► confirmed ──► processing ──► shipped ──► delivered
+                │                │
+                │ payment failed  │ admin cancels
+                ▼                ▼
+            failed           cancelled
+                │
+                ▼ (webhook: refund.processed)
+            refunded
+</pre>
+  </div>
+  <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px;">
+    <div style="background:#f0ede8;padding:10px 12px;border-radius:3px;"><strong>pending</strong><br>Razorpay order created, payment not yet captured</div>
+    <div style="background:#f0faf0;padding:10px 12px;border-radius:3px;"><strong>confirmed</strong><br>Payment verified. Awaiting admin review.</div>
+    <div style="background:#fff8e8;padding:10px 12px;border-radius:3px;"><strong>processing</strong><br>Admin approved. AWB created. Pickup scheduled.</div>
+    <div style="background:#e8f4ff;padding:10px 12px;border-radius:3px;"><strong>shipped</strong><br>In transit. Tracking ID active.</div>
+    <div style="background:#f0faf0;padding:10px 12px;border-radius:3px;"><strong>delivered</strong><br>Shiprocket webhook confirms delivery.</div>
+    <div style="background:#fff0f0;padding:10px 12px;border-radius:3px;"><strong>cancelled / refunded</strong><br>Admin action or failed payment.</div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Admin: New Orders Page (/admin/orders)</h3>
+  <div style="background:#f8f5f0;border:1px solid #ddd;border-radius:4px;overflow:hidden;font-size:13px;">
+    <div style="background:#1a1a1a;color:#c9a84c;padding:10px 16px;font-weight:700;letter-spacing:0.05em;">ADMIN — Orders</div>
+    <div style="padding:16px;">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <span style="background:#f0faf0;border:1px solid #4caf7d;padding:4px 12px;border-radius:3px;font-size:12px;">Confirmed (3)</span>
+        <span style="background:#fff8e8;border:1px solid #c9a84c;padding:4px 12px;border-radius:3px;font-size:12px;">Processing (1)</span>
+        <span style="background:#e8f4ff;border:1px solid #4c8aaf;padding:4px 12px;border-radius:3px;font-size:12px;">Shipped (5)</span>
+        <span style="background:#f0ede8;border:1px solid #aaa;padding:4px 12px;border-radius:3px;font-size:12px;">All (12)</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="border-bottom:2px solid #ddd;">
+          <th style="text-align:left;padding:8px 6px;">Order ID</th>
+          <th style="text-align:left;padding:8px 6px;">Customer</th>
+          <th style="text-align:left;padding:8px 6px;">Items</th>
+          <th style="text-align:left;padding:8px 6px;">Total</th>
+          <th style="text-align:left;padding:8px 6px;">Status</th>
+          <th style="text-align:left;padding:8px 6px;">Action</th>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:10px 6px;">#ORD-0042</td>
+            <td style="padding:10px 6px;">Priya S.</td>
+            <td style="padding:10px 6px;">2 items</td>
+            <td style="padding:10px 6px;">₹3,200</td>
+            <td style="padding:10px 6px;"><span style="background:#f0faf0;border:1px solid #4caf7d;padding:2px 8px;border-radius:3px;font-size:11px;">Confirmed</span></td>
+            <td style="padding:10px 6px;"><button style="background:#1a1a1a;color:#c9a84c;border:none;padding:5px 12px;font-size:11px;cursor:pointer;border-radius:2px;">Process & Ship →</button></td>
+          </tr>
+          <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:10px 6px;">#ORD-0041</td>
+            <td style="padding:10px 6px;">Guest (rahul@…)</td>
+            <td style="padding:10px 6px;">1 item</td>
+            <td style="padding:10px 6px;">₹1,800</td>
+            <td style="padding:10px 6px;"><span style="background:#f0faf0;border:1px solid #4caf7d;padding:2px 8px;border-radius:3px;font-size:11px;">Confirmed</span></td>
+            <td style="padding:10px 6px;"><button style="background:#1a1a1a;color:#c9a84c;border:none;padding:5px 12px;font-size:11px;cursor:pointer;border-radius:2px;">Process & Ship →</button></td>
+          </tr>
+          <tr>
+            <td style="padding:10px 6px;">#ORD-0039</td>
+            <td style="padding:10px 6px;">Ankita M.</td>
+            <td style="padding:10px 6px;">3 items</td>
+            <td style="padding:10px 6px;">₹6,400</td>
+            <td style="padding:10px 6px;"><span style="background:#e8f4ff;border:1px solid #4c8aaf;padding:2px 8px;border-radius:3px;font-size:11px;">Shipped</span></td>
+            <td style="padding:10px 6px;"><a style="color:#0066cc;font-size:11px;" href="#">Track →</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>"Process & Ship" Action Flow</h3>
+  <div style="background:#f8f5f0;border:1px solid #ddd;padding:14px 18px;border-radius:4px;font-size:13px;line-height:1.8;">
+    Admin clicks "Process & Ship" →<br>
+    Confirmation dialog: "Ship #ORD-0042 via [courier name] to [city, pincode]? This will book a pickup."<br>
+    Admin confirms →<br>
+    <code>create-shipment</code> Edge Function → AWB assigned →<br>
+    Order status: <strong>processing</strong> →<br>
+    Customer SMS: "Your order #ORD-0042 is being packed and will be picked up shortly."<br>
+    Once Shiprocket pickup scanned → status: <strong>shipped</strong> (via webhook) →<br>
+    Customer SMS: "Your order is on its way! Track: [link]"
+  </div>
+</div>
+
+<div class="section">
+  <h3>Notifications (SMS via Shiprocket built-in)</h3>
+  <p style="font-size:13px;color:#444;line-height:1.8;">
+    Shiprocket sends automatic SMS notifications for: order picked up, in transit, out for delivery, delivered.<br>
+    Platform sends: order confirmed (after payment-verify), order dispatched (after create-shipment).<br>
+    Email via Resend for: order confirmation (with invoice PDF), dispatch notification.
+  </p>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Does this orders design look right? Respond in terminal.</p>

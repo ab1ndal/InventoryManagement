@@ -1,0 +1,98 @@
+<h2>Section 2 — Data Model</h2>
+<p class="subtitle">New tables (green) + changes to existing tables (yellow). Respond in terminal.</p>
+
+<div class="section">
+  <h3>Existing Tables — Changes Only</h3>
+  <div style="display:flex;flex-direction:column;gap:12px;">
+
+    <div style="background:#fffbe6;border:1px solid #c9a84c;padding:16px 20px;border-radius:4px;font-family:monospace;font-size:13px;">
+      <strong style="color:#7a5c00;">customers</strong> — add column<br>
+      <span style="color:#555;">+ auth_user_id  uuid  REFERENCES auth.users(id)  UNIQUE NULLABLE</span><br>
+      <span style="color:#999;font-size:11px;">NULL for admin-created records. Set when storefront user registers/links account.</span>
+    </div>
+
+    <div style="background:#fffbe6;border:1px solid #c9a84c;padding:16px 20px;border-radius:4px;font-family:monospace;font-size:13px;">
+      <strong style="color:#7a5c00;">discounts</strong> — add column<br>
+      <span style="color:#555;">+ storefront_redeemable  boolean  DEFAULT false</span><br>
+      <span style="color:#999;font-size:11px;">Only codes with this flag = true can be entered by customers at checkout.</span>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>New Tables</h3>
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px 20px;border-radius:4px;font-family:monospace;font-size:13px;">
+      <strong style="color:#1a6b3a;">cart_items</strong><br><br>
+      id               uuid PK<br>
+      user_id          uuid → auth.users(id)<br>
+      variant_id       uuid → productsizecolors(id)<br>
+      product_id       text → products(productid)<br>
+      quantity         int  CHECK > 0<br>
+      added_at         timestamptz DEFAULT now()<br>
+      updated_at       timestamptz<br><br>
+      <span style="color:#999;font-size:11px;">UNIQUE (user_id, variant_id) — prevents duplicate rows, uses upsert on add.</span><br>
+      <span style="color:#999;font-size:11px;">Guest cart lives in localStorage; merged into this table on login.</span>
+    </div>
+
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px 20px;border-radius:4px;font-family:monospace;font-size:13px;">
+      <strong style="color:#1a6b3a;">stock_reservations</strong><br><br>
+      id                  uuid PK<br>
+      variant_id          uuid → productsizecolors(id)<br>
+      quantity            int<br>
+      session_token       text   (user_id or guest token)<br>
+      razorpay_order_id   text   UNIQUE<br>
+      expires_at          timestamptz DEFAULT now() + '15 min'<br>
+      created_at          timestamptz DEFAULT now()
+    </div>
+
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px 20px;border-radius:4px;font-family:monospace;font-size:13px;">
+      <strong style="color:#1a6b3a;">orders</strong><br><br>
+      id                  uuid PK DEFAULT gen_random_uuid()<br>
+      customer_id         uuid → customers(id) NULLABLE  (null = guest)<br>
+      guest_email         text NULLABLE<br>
+      guest_phone         text NULLABLE<br>
+      status              text  ('pending'|'confirmed'|'shipped'|'delivered'|'cancelled')<br>
+      razorpay_order_id   text  UNIQUE<br>
+      razorpay_payment_id text<br>
+      subtotal            numeric(10,2)<br>
+      discount_amount     numeric(10,2) DEFAULT 0<br>
+      shipping_amount     numeric(10,2)<br>
+      total               numeric(10,2)<br>
+      discount_code       text NULLABLE<br>
+      shipping_address    jsonb  (name, line1, line2, city, state, pincode, phone)<br>
+      shiprocket_order_id text NULLABLE<br>
+      tracking_id         text NULLABLE<br>
+      created_at          timestamptz DEFAULT now()<br>
+      updated_at          timestamptz
+    </div>
+
+    <div style="background:#f0faf0;border:1px solid #4caf7d;padding:16px 20px;border-radius:4px;font-family:monospace;font-size:13px;">
+      <strong style="color:#1a6b3a;">order_items</strong><br><br>
+      id           uuid PK<br>
+      order_id     uuid → orders(id) ON DELETE CASCADE<br>
+      variant_id   uuid → productsizecolors(id)<br>
+      product_id   text → products(productid)<br>
+      product_name text   (snapshot at time of order)<br>
+      size         text   (snapshot)<br>
+      color        text   (snapshot)<br>
+      quantity     int<br>
+      unit_price   numeric(10,2)  (snapshot)<br>
+      total_price  numeric(10,2)
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>Why snapshot product fields in order_items?</h3>
+  <p style="font-size:13px;color:#444;line-height:1.8;">
+    Product names, prices, sizes can change after an order is placed.
+    Snapshotting at order time ensures order history always shows what the customer actually bought and paid — even if the product is later edited or deleted.
+    This is standard e-commerce practice.
+  </p>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Does this data model look right? Respond in terminal.</p>
