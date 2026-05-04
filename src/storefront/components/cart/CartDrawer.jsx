@@ -35,7 +35,7 @@ function CartItem({ item }) {
           <div className="flex items-center border border-storefront-border">
             <button
               aria-label="Decrease quantity"
-              onClick={() => updateQty(item.variant_id, item.quantity - 1)}
+              onClick={() => updateQty(item.variant_id, Math.max(1, item.quantity - 1))}
               disabled={item.quantity <= 1}
               className="w-6 h-6 flex items-center justify-center text-storefront-charcoal hover:bg-storefront-cream disabled:opacity-30 disabled:cursor-not-allowed text-xs"
             >
@@ -78,7 +78,7 @@ export default function CartDrawer() {
       {isOpen && (
         <div
           data-testid="cart-backdrop"
-          className="fixed inset-0 bg-storefront-charcoal/40 z-50"
+          className="fixed inset-0 bg-storefront-charcoal/40 z-40"
           onClick={closeCart}
           aria-hidden="true"
         />
@@ -87,6 +87,9 @@ export default function CartDrawer() {
       <div
         role="dialog"
         aria-label="Shopping cart"
+        aria-modal={isOpen}
+        aria-hidden={!isOpen}
+        {...(!isOpen && { inert: "" })}
         className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 flex flex-col shadow-xl transition-transform duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
