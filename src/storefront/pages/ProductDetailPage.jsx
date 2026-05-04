@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, ShoppingBag } from "lucide-react";
+import { toast } from "sonner";
 import { useProduct } from "../hooks/useProduct";
 import VariantPicker from "../components/product/VariantPicker";
+import { useCart } from "../context/CartContext";
 
 function ProductImage({ product }) {
   const [failed, setFailed] = useState(false);
@@ -47,6 +49,7 @@ export default function ProductDetailPage() {
   const { product, variants, loading, error } = useProduct(productid);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const { addItem, openCart } = useCart();
 
   if (loading) {
     return (
@@ -85,6 +88,29 @@ export default function ProductDetailPage() {
   function handleVariantSelect(variant) {
     setSelectedVariant(variant);
     setQuantity(1);
+  }
+
+  function handleAddToCart() {
+    if (!canAddToCart) return;
+    const imageUrl =
+      product.image_url ||
+      (product.producturl ? `${product.producturl}/display/image.jpg` : null);
+    addItem({
+      variant_id: selectedVariant.variantid,
+      product_id: productid,
+      quantity,
+      name: product.name,
+      size: selectedVariant.size,
+      color: selectedVariant.color,
+      price: Number(product.retailprice),
+      image_url: imageUrl,
+    });
+    toast.success("Added to cart", {
+      action: {
+        label: "View cart",
+        onClick: openCart,
+      },
+    });
   }
 
   return (
@@ -178,7 +204,7 @@ export default function ProductDetailPage() {
             <div className="hidden md:block">
               <button
                 disabled={!canAddToCart}
-                onClick={() => {}} /* wired in Phase 1 */
+                onClick={handleAddToCart}
                 className="w-full flex items-center justify-center gap-2 bg-storefront-charcoal text-storefront-cream font-montserrat text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ShoppingBag size={15} />
@@ -198,7 +224,7 @@ export default function ProductDetailPage() {
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-storefront-border px-4 py-3 z-40">
         <button
           disabled={!canAddToCart}
-          onClick={() => {}} /* wired in Phase 1 */
+          onClick={handleAddToCart}
           className="w-full flex items-center justify-center gap-2 bg-storefront-charcoal text-storefront-cream font-montserrat text-xs tracking-widest uppercase py-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ShoppingBag size={15} />
