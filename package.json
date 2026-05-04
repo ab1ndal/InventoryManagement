@@ -66,6 +66,12 @@
       "last 1 safari version"
     ]
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^react-router/dom$": "<rootDir>/node_modules/react-router/dist/development/dom-export.js",
+      "^react-router$": "<rootDir>/node_modules/react-router/dist/development/index.js"
+    }
+  },
   "devDependencies": {
     "@types/react": "^19.1.8",
     "ajv-cli": "^5.0.0",
