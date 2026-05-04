@@ -84,7 +84,8 @@ describe("CartDrawer — with items", () => {
 
   it("renders line total (price × qty)", () => {
     renderDrawer({ items: [ITEM_A], itemCount: 2 }); // 1500 × 2 = 3000
-    expect(screen.getByText("₹3,000")).toBeInTheDocument();
+    // single item → line total equals subtotal; both render ₹3,000
+    expect(screen.getAllByText("₹3,000")).toHaveLength(2);
   });
 
   it("renders subtotal across all items", () => {
