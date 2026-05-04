@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { ShoppingBag, Search, Heart, Menu, X } from "lucide-react";
+import { useCart } from "../context/CartContext";
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
@@ -13,6 +14,7 @@ export default function StorefrontHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
+  const { itemCount, openCart } = useCart();
 
   useEffect(() => {
     setMenuOpen(false);
@@ -87,9 +89,15 @@ export default function StorefrontHeader() {
             </button>
             <button
               aria-label="Cart"
+              onClick={openCart}
               className="relative p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors cursor-pointer"
             >
               <ShoppingBag size={20} />
+              {itemCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-storefront-gold text-storefront-cream text-[9px] font-montserrat font-semibold rounded-full px-1 leading-none">
+                  {itemCount > 99 ? "99+" : itemCount}
+                </span>
+              )}
             </button>
 
             {/* Mobile hamburger */}
