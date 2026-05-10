@@ -11,7 +11,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import ReturnReceiptView from "./billing/ReturnReceiptView";
 import InvoiceView from "./billing/InvoiceView";
 import { generateInvoicePdf } from "./billing/generateInvoicePdf";
-import { generateBillText } from "./billing/generateBillText";
 import { computeBillTotals } from "./billing/billUtils";
 import { backCalcDiscountPct } from "./billing/stockHelpers";
 
@@ -172,20 +171,19 @@ export default function BillTable({ onEdit }) {
       // Delete legacy path and any previous versioned file stored in pdf_url
       const oldPaths = [`bill-${billLabel}.pdf`, `bill-${billId}.pdf`];
       if (bill.pdf_url) {
-        const stored = decodeURIComponent(bill.pdf_url.split('/invoices/')[1]?.split('?')[0] || '');
+        const stored = bill.pdf_url.includes('/invoices/')
+          ? decodeURIComponent(bill.pdf_url.split('/invoices/')[1]?.split('?')[0] || '')
+          : bill.pdf_url;
         if (stored && !oldPaths.includes(stored)) oldPaths.push(stored);
       }
       await supabase.storage.from("invoices").remove(oldPaths);
       const { error: upErr } = await supabase.storage
         .from("invoices").upload(newPath, blob, { contentType: "application/pdf" });
       if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from("invoices").getPublicUrl(newPath);
-      const pdfUrl = urlData?.publicUrl ?? null;
-      if (pdfUrl) {
-        await supabase.from("bills").update({ pdf_url: pdfUrl }).eq("billid", billId);
-        setBills((prev) => prev.map((b) => b.billid === billId ? { ...b, pdf_url: pdfUrl } : b));
-        window.open(pdfUrl, "_blank");
-      }
+      await supabase.from("bills").update({ pdf_url: newPath }).eq("billid", billId);
+      setBills((prev) => prev.map((b) => b.billid === billId ? { ...b, pdf_url: newPath } : b));
+      const { data: signedData } = await supabase.storage.from("invoices").createSignedUrl(newPath, 3600);
+      if (signedData?.signedUrl) window.open(signedData.signedUrl, "_blank");
       toast({ title: `PDF regenerated for Bill #${billId}` });
     } catch (e) {
       toast({ title: "PDF generation failed", description: e.message, variant: "destructive" });
@@ -195,119 +193,64 @@ export default function BillTable({ onEdit }) {
     }
   };
 
-  // TODO: Enable when ready to roll out SMS bill sharing.
-  // Uses the sms: URI scheme — zero cost, no API key, no backend.
-  // Opens the device's native SMS app with the customer's number and bill text pre-filled.
-  // Staff taps Send manually — nothing is transmitted automatically.
-  // NOTE: Only works on mobile/tablet devices where SMS is available.
-  // Desktop browsers will either open a default messaging app or do nothing.
+  const handleViewPdf = async (bill) => {
+    if (!bill.pdf_url) return;
+    const path = bill.pdf_url.includes('/invoices/')
+      ? decodeURIComponent(bill.pdf_url.split('/invoices/')[1]?.split('?')[0] || '')
+      : bill.pdf_url;
+    const { data } = await supabase.storage.from("invoices").createSignedUrl(path, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  };
+
+  const [sendingSms, setSendingSms] = useState(new Set());
+
   const handleSendSms = async (bill) => {
-    const { billid: billId } = bill;
+    const { billid: billId, bill_number, pdf_url, net_amount, payment_amount, customers } = bill;
+    setSendingSms((prev) => new Set(prev).add(billId));
     try {
-      // Fetch bill core
-      const { data: billRow, error: billErr } = await supabase
-        .from("bills")
-        .select("applied_codes, payment_amount, salesmethodid, store_credit_used, orderdate, customerid, bill_number")
-        .eq("billid", billId)
-        .single();
-      if (billErr) throw billErr;
-
-      // Customer name + phone
-      let customerName = "";
+      // Customer phone — fetch only what we need
+      let customerName = customers ? `${customers.first_name} ${customers.last_name || ""}`.trim() : "";
       let customerPhone = "";
-      if (billRow.customerid) {
-        const { data: cust } = await supabase
-          .from("customers")
-          .select("first_name, last_name, phone")
-          .eq("customerid", billRow.customerid)
-          .single();
-        if (cust) {
-          customerName = `${cust.first_name} ${cust.last_name || ""}`.trim();
-          // Normalize to +91XXXXXXXXXX
-          const digits = (cust.phone || "").replace(/\D/g, "");
-          customerPhone = digits.length === 10 ? `+91${digits}` : digits ? `+${digits}` : "";
-        }
+      const { data: cust } = await supabase
+        .from("customers")
+        .select("phone")
+        .eq("customerid", bill.customerid)
+        .single();
+      if (cust?.phone) {
+        const digits = cust.phone.replace(/\D/g, "");
+        customerPhone = digits.length === 10 ? `91${digits}` : digits;
       }
 
-      // Bill items
-      const { data: billItems } = await supabase
-        .from("bill_items")
-        .select("*")
-        .eq("billid", billId);
-
-      const inventoryItems = (billItems || []).filter((bi) => bi.variantid);
-      let variantMap = {};
-      if (inventoryItems.length > 0) {
-        const { data: variants } = await supabase
-          .from("productsizecolors")
-          .select("variantid, size, color")
-          .in("variantid", inventoryItems.map((bi) => bi.variantid));
-        variantMap = Object.fromEntries((variants || []).map((v) => [v.variantid, v]));
+      if (!customerPhone) {
+        toast({ title: "No phone number", description: "Customer has no phone on record.", variant: "destructive" });
+        return;
       }
 
-      const manualItems = (billItems || []).filter((bi) => !bi.variantid && bi.product_code);
-      let manualMap = {};
-      if (manualItems.length > 0) {
-        const { data: manuals } = await supabase
-          .from("manual_items")
-          .select("manual_item_id, size, color")
-          .in("manual_item_id", manualItems.map((bi) => bi.product_code));
-        manualMap = Object.fromEntries((manuals || []).map((m) => [m.manual_item_id, m]));
+      // Generate 7-day signed URL using stored path (handles versioned filenames)
+      let signedUrl = "";
+      if (pdf_url) {
+        const pdfPath = pdf_url.includes('/invoices/')
+          ? decodeURIComponent(pdf_url.split('/invoices/')[1]?.split('?')[0] || '')
+          : pdf_url;
+        const { data: signedData } = await supabase.storage
+          .from("invoices")
+          .createSignedUrl(pdfPath, 7 * 24 * 60 * 60);
+        signedUrl = signedData?.signedUrl ?? "";
       }
 
-      const items = (billItems || []).map((bi) => ({
-        product_name: bi.product_name || "",
-        quantity: bi.quantity,
-        mrp: bi.mrp,
-        alteration_charge: bi.alteration_charge || 0,
-        quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
-        gstRate: bi.gst_rate ?? 18,
-        stitchType: bi.stitch_type || "unstitched",
-        size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
-        color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
-      }));
+      const amount = Math.round(Number(net_amount ?? payment_amount ?? 0));
 
-      const appliedCodes = billRow.applied_codes || [];
-      let allDiscounts = [];
-      if (appliedCodes.length > 0) {
-        const { data: discData } = await supabase
-          .from("discounts")
-          .select("id, code, type, value, max_discount, category, exclusive, auto_apply, min_total, start_date, end_date, active, rules")
-          .in("code", appliedCodes);
-        allDiscounts = discData || [];
-      }
-
-      let paymentMethod = "";
-      if (billRow.salesmethodid) {
-        const { data: meth } = await supabase
-          .from("salesmethods")
-          .select("methodname")
-          .eq("salesmethodid", billRow.salesmethodid)
-          .single();
-        paymentMethod = meth?.methodname || "";
-      }
-
-      const computed = computeBillTotals(items, appliedCodes, allDiscounts);
-
-      const text = generateBillText({
-        billNumber: billRow.bill_number || billId,
-        billDate: new Date(billRow.orderdate),
-        customerName,
-        items,
-        computed,
-        paymentMethod,
-        paymentAmount: billRow.payment_amount ?? 0,
-        appliedStoreCredit: Number(billRow.store_credit_used ?? 0),
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke("send-bill-sms", {
+        body: { phone: customerPhone, customerName, billNumber: bill_number || billId, amount, pdfUrl: signedUrl },
       });
 
-      // sms: URI — body separator is "?" on iOS, "&" on Android; "?" works on both
-      const encoded = encodeURIComponent(text);
-      const uri = customerPhone
-        ? `sms:${customerPhone}?body=${encoded}`
-        : `sms:?body=${encoded}`;
-      window.location.href = uri;
+      if (fnErr || fnData?.error) throw new Error(fnErr?.message || fnData?.error);
+
+      toast({ title: "SMS sent", description: `Bill #${bill_number || billId} sent to ${customerPhone}` });
     } catch (e) {
-      toast({ title: "Failed to prepare SMS", description: e.message, variant: "destructive" });
+      toast({ title: "SMS failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSendingSms((prev) => { const s = new Set(prev); s.delete(billId); return s; });
     }
   };
 
@@ -761,22 +704,21 @@ export default function BillTable({ onEdit }) {
                             ? "View invoice PDF"
                             : "PDF available after finalize"
                         }
-                        onClick={() =>
-                          b.pdf_url && window.open(b.pdf_url, "_blank")
-                        }
+                        onClick={() => handleViewPdf(b)}
                       >
                         <FileText className="h-4 w-4" />
                       </Button>
-                      {/* TODO: Remove `disabled` and `opacity-40` when ready to roll out SMS sending */}
                       <Button
                         size="icon"
                         variant="ghost"
-                        disabled
-                        className="opacity-40 cursor-not-allowed"
-                        title="Send bill via SMS (coming soon)"
+                        disabled={!b.pdf_url || sendingSms.has(b.billid)}
+                        className={!b.pdf_url ? "opacity-40 cursor-not-allowed" : ""}
+                        title={b.pdf_url ? "Send bill via SMS" : "Finalize bill first to send via SMS"}
                         onClick={() => handleSendSms(b)}
                       >
-                        <MessageSquare className="h-4 w-4" />
+                        {sendingSms.has(b.billid)
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <MessageSquare className="h-4 w-4" />}
                       </Button>
                       {b.finalized && (
                         <Button
