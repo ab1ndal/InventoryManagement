@@ -247,8 +247,7 @@ export default function BillTable({ onEdit }) {
 
       if (fnErr || fnData?.error) throw new Error(fnErr?.message || fnData?.error);
 
-      const channel = fnData?.channel === "whatsapp" ? "WhatsApp" : "SMS";
-      toast({ title: `${channel} sent`, description: `Bill #${bill_number || billId} sent to ${customerPhone}` });
+      toast({ title: "WhatsApp sent", description: `Bill #${bill_number || billId} sent to ${customerPhone}` });
     } catch (e) {
       toast({ title: "SMS failed", description: e.message, variant: "destructive" });
     } finally {

@@ -1,121 +1,79 @@
-# Bill Sharing via WhatsApp / SMS — One-Time Setup
+# Bill Sharing via WhatsApp — One-Time Setup
 
-Sends bill to customer via WhatsApp first. If WhatsApp fails, falls back to SMS automatically. Staff sees "WhatsApp sent" or "SMS sent" toast.
-
----
-
-## 1. MSG91 Account
-
-1. Sign up at [msg91.com](https://msg91.com)
-2. Complete KYC (business details)
+Sends bill to customer via WhatsApp when staff clicks the message icon on a finalized bill. If WhatsApp fails, give customer a paper bill.
 
 ---
 
-## 2. DLT Registration — SMS (India mandatory — takes 1–3 days)
+## 1. WhatsApp Setup via Meta Cloud API
 
-DLT (Distributed Ledger Technology) is TRAI-mandated for all commercial SMS in India.
+Free tier: 1,000 conversations/month.
 
-1. Go to **Settings → DLT** inside MSG91, or register directly at your carrier's DLT portal (Airtel / Vodafone / BSNL)
-2. Register your **entity** (business name, GST, address)
-3. Register **Sender ID**: `BNDLCR` (6 chars, alphanumeric)
-4. Submit the following **message template** for approval under the **Transactional** category:
+> **Note:** WhatsApp Business app and API cannot share the same number. Use a dedicated alternate number.
 
+**Step 1 — Create Meta App**
+1. developers.facebook.com → **My Apps → Create App → Business**
+2. Add **WhatsApp** product
+
+**Step 2 — Add Phone Number**
+1. WhatsApp → **API Setup** → add alternate number → verify via OTP
+
+**Step 3 — Create Message Template**
+1. WhatsApp → **Message Templates → Create Template**
+2. Category: **Utility**, Language: **English**
+3. Name: e.g. `bindals_invoice` → this is `WHATSAPP_TEMPLATE_NAME`
+4. Body:
 ```
-Dear {#var#}, your bill no. {#var#} of Rs {#var#} is ready. View invoice: {#var#} -BNDLCR
+Dear {{1}}, your bill no. {{2}} of Rs {{3}} is ready. View invoice: {{4}}
 ```
+5. Submit for Meta approval (~1–24 hours)
 
-Variable order:
+**Step 4 — Get Credentials**
 
-| Position      | Value                                             |
-| ------------- | ------------------------------------------------- |
-| `{#var#}` 1 | Customer name                                     |
-| `{#var#}` 2 | Bill number                                       |
-| `{#var#}` 3 | Amount (Rs)                                       |
-| `{#var#}` 4 | Signed PDF URL (shortened by MSG91, 7-day expiry) |
-
-5. Copy the approved **Template ID** — needed in Step 4
+From Meta app → WhatsApp → API Setup:
+- **Phone Number ID** → `WHATSAPP_PHONE_NUMBER_ID`
+- **Permanent Access Token** → generate via System User in Business Manager → `WHATSAPP_ACCESS_TOKEN`
 
 ---
 
-## 3. MSG91 Flow Setup — SMS
-
-1. In MSG91 dashboard → **SMS** → **Flow**
-2. Create a new flow using the DLT-approved template above
-3. Note the **Flow ID** (this is `MSG91_TEMPLATE_ID`)
-4. Note your **API Key** from MSG91 → Settings → API Keys
-
----
-
-## 4. WhatsApp Setup via MSG91 (optional but recommended)
-
-WhatsApp is attempted first before SMS. If not configured, function sends SMS directly.
-
-1. In MSG91 dashboard → **WhatsApp** → connect your WhatsApp Business number
-2. Create and get approved a WhatsApp message template with the same content as the SMS template above — same 4 variables in the same order (customer name, bill number, amount, PDF URL)
-3. Note the **template name:** bindals_invoice and the **integrated number** (your WhatsApp Business number with country code, e.g. `919810000000`)
-
-Set secrets:
-
-```bash
-supabase secrets set MSG91_WHATSAPP_NUMBER=<integrated_number>
-supabase secrets set MSG91_WHATSAPP_TEMPLATE=<template_name>
-```
-
-Without these secrets, function skips WhatsApp and goes straight to SMS.
-
----
-
-## 5. Supabase Edge Function Deployment
+## 2. Supabase Edge Function Deployment
 
 Install Supabase CLI:
-
 ```bash
 brew install supabase/tap/supabase
 ```
 
-Login and link project:
-
+Login and link:
 ```bash
 supabase login
 supabase link --project-ref epotsxdugwfhyeiudjox
 ```
 
-Deploy the function:
-
+Deploy:
 ```bash
 supabase functions deploy send-bill-sms
 ```
 
-Set required secrets:
-
+Set secrets:
 ```bash
-supabase secrets set MSG91_API_KEY=<your_msg91_api_key>
-supabase secrets set MSG91_TEMPLATE_ID=<your_flow_template_id>
-supabase secrets set MSG91_SENDER_ID=BNDLCR
+supabase secrets set WHATSAPP_PHONE_NUMBER_ID=<phone_number_id>
+supabase secrets set WHATSAPP_ACCESS_TOKEN=<permanent_access_token>
+supabase secrets set WHATSAPP_TEMPLATE_NAME=<template_name>
 ```
 
 Verify:
-
 ```bash
 supabase secrets list
 ```
 
 ---
 
-## 6. Supabase Security Setup ✅ COMPLETED
+## 3. Supabase Security Setup ✅ COMPLETED
 
-These steps have already been applied to the project.
-
-### 6a. Row Level Security on all tables ✅
-
+### 3a. Row Level Security ✅
 RLS enabled on all 22 tables. Only authenticated admins can read/write data. Run `schema/migration_rls_all_tables.sql` if setting up from scratch.
 
-### 6b. Storage bucket — private ✅
-
-- Bucket `invoices` is set to **private**
-- Public read policy removed
-- Admin-only policies applied:
-
+### 3b. Storage bucket — private ✅
+Bucket `invoices` is private. Admin-only policies applied:
 ```sql
 CREATE POLICY "admin_select_invoices" ON storage.objects
   FOR SELECT TO authenticated
@@ -130,10 +88,7 @@ CREATE POLICY "admin_insert_invoices" ON storage.objects
   WITH CHECK (bucket_id = 'invoices' AND is_admin());
 ```
 
-### 6c. Migrate existing pdf_url values ✅
-
-Old `bills.pdf_url` stored full public URLs. Migrated to filename-only paths:
-
+### 3c. Migrate existing pdf_url values ✅
 ```sql
 UPDATE bills
 SET pdf_url = regexp_replace(
@@ -143,8 +98,7 @@ SET pdf_url = regexp_replace(
 )
 WHERE pdf_url LIKE '%/storage/v1/object/public/invoices/%';
 ```
-
-After migration, `pdf_url` stores only the filename (e.g., `bill-FY26-000011.pdf`). Signed URLs are generated on demand.
+`pdf_url` stores filename only. Signed URLs generated on demand.
 
 ---
 
@@ -155,42 +109,36 @@ Staff clicks message icon on finalized bill
   → BillTable fetches customer phone from DB
   → Generates 7-day signed URL from stored pdf_url path
   → Calls Edge Function: send-bill-sms
-  → Edge Function tries WhatsApp (if MSG91_WHATSAPP_* secrets set)
-      → WhatsApp succeeds → done, toast shows "WhatsApp sent"
-      → WhatsApp fails → falls back to SMS
-  → SMS via MSG91 Flow API (short_url: "1" auto-shortens link)
-  → Toast shows "SMS sent"
+  → WhatsApp message sent via Meta Cloud API
+      → Success → toast "WhatsApp sent"
+      → Failure → toast error → give customer paper bill
 ```
 
-**Admin viewing:** FileText icon generates fresh 1-hour signed URL on click — always works.
+**Admin viewing:** FileText icon → fresh 1-hour signed URL on every click.
 
-**Regenerated PDFs:** regen stores versioned filename in `pdf_url` (e.g., `bill-FY26-000011-v1234567890.pdf`). Both admin view and customer link use the stored path.
+**Regenerated PDFs:** versioned filename stored in `pdf_url`. Admin view and customer link always use latest.
 
-**No phone on record:** error toast, nothing sent.
+**No phone on record:** error toast, give paper bill.
 
-**No PDF yet:** button disabled until bill is finalized and PDF uploaded.
+**No PDF yet:** button disabled until bill finalized and PDF uploaded.
 
 ---
 
 ## Cost Estimate
 
-| Item                         | Cost                                               |
-| ---------------------------- | -------------------------------------------------- |
-| Transactional SMS (MSG91)    | ~₹0.18–0.22 per message                          |
-| WhatsApp (MSG91)             | Varies by conversation type — check MSG91 pricing |
-| Sender ID / DLT registration | Free                                               |
+| Item | Cost |
+|------|------|
+| WhatsApp (Meta Cloud API) | Free up to 1,000 conversations/month; ~$0.005–0.02 after |
 
 ---
 
 ## Troubleshooting
 
-| Symptom                       | Check                                                                                     |
-| ----------------------------- | ----------------------------------------------------------------------------------------- |
-| "MSG91 not configured" toast  | Secrets not set — run `supabase secrets list`                                          |
-| "SMS failed" with MSG91 error | Template ID mismatch or DLT not approved yet                                              |
-| WhatsApp not sending          | `MSG91_WHATSAPP_NUMBER` / `MSG91_WHATSAPP_TEMPLATE` not set, or template not approved |
-| Always falls back to SMS      | WhatsApp secrets missing or WhatsApp template name wrong                                  |
-| Signed URL returns 403        | Storage RLS policy missing — re-run Section 6b SQL                                       |
-| Admin can't view PDF          | `pdf_url` may still be old public URL — run Section 6c migration                       |
-| "Bucket not found"            | Bucket name must be exactly `invoices` (lowercase)                                      |
-| Customer has no phone         | Update customer record in admin panel                                                     |
+| Symptom | Check |
+|---------|-------|
+| "WhatsApp not configured" toast | Secrets not set — run `supabase secrets list` |
+| "WhatsApp delivery failed" | Meta template not approved, or wrong template name |
+| Signed URL returns 403 | Storage RLS policy missing — re-run Section 3b SQL |
+| Admin can't view PDF | `pdf_url` still old public URL — run Section 3c migration |
+| "Bucket not found" | Bucket name must be exactly `invoices` (lowercase) |
+| Customer has no phone | Give paper bill |

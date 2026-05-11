@@ -5,95 +5,6 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function sendWhatsApp(
-  apiKey: string,
-  integratedNumber: string,
-  templateName: string,
-  to: string,
-  customerName: string,
-  billNumber: string,
-  amount: string,
-  pdfUrl: string,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch("https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/", {
-      method: "POST",
-      headers: {
-        authkey: apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        integrated_number: integratedNumber,
-        content_type: "template",
-        payload: {
-          to,
-          type: "template",
-          template: {
-            name: templateName,
-            language: { code: "en" },
-            components: [
-              {
-                type: "body",
-                parameters: [
-                  { type: "text", text: customerName },
-                  { type: "text", text: billNumber },
-                  { type: "text", text: amount },
-                  { type: "text", text: pdfUrl },
-                ],
-              },
-            ],
-          },
-        },
-      }),
-    });
-    const result = await res.json();
-    if (!res.ok || result.type === "error") {
-      return { ok: false, error: result.message || "WhatsApp error" };
-    }
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
-}
-
-async function sendSms(
-  apiKey: string,
-  templateId: string,
-  senderId: string,
-  to: string,
-  customerName: string,
-  billNumber: string,
-  amount: string,
-  pdfUrl: string,
-): Promise<{ ok: boolean; requestId?: string; error?: string }> {
-  try {
-    const res = await fetch("https://api.msg91.com/api/v5/flow/", {
-      method: "POST",
-      headers: {
-        authkey: apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        template_id: templateId,
-        sender: senderId,
-        short_url: "1",
-        mobiles: to,
-        VAR1: customerName,
-        VAR2: billNumber,
-        VAR3: amount,
-        VAR4: pdfUrl,
-      }),
-    });
-    const result = await res.json();
-    if (!res.ok || result.type === "error") {
-      return { ok: false, error: result.message || "SMS error" };
-    }
-    return { ok: true, requestId: result.request_id };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -102,43 +13,55 @@ serve(async (req) => {
 
     if (!phone) return new Response(JSON.stringify({ error: "phone required" }), { status: 400, headers: CORS });
 
-    const apiKey = Deno.env.get("MSG91_API_KEY");
-    const templateId = Deno.env.get("MSG91_TEMPLATE_ID");
-    const senderId = Deno.env.get("MSG91_SENDER_ID") ?? "BNDLCR";
-    const waNumber = Deno.env.get("MSG91_WHATSAPP_NUMBER");
-    const waTemplate = Deno.env.get("MSG91_WHATSAPP_TEMPLATE");
+    const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID");
+    const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN");
+    const templateName = Deno.env.get("WHATSAPP_TEMPLATE_NAME");
 
-    if (!apiKey || !templateId) {
-      return new Response(JSON.stringify({ error: "MSG91 not configured" }), { status: 500, headers: CORS });
+    if (!phoneNumberId || !accessToken || !templateName) {
+      return new Response(JSON.stringify({ error: "WhatsApp not configured" }), { status: 500, headers: CORS });
     }
 
-    // Normalize phone: strip non-digits, trust country code from caller
     const normalized = phone.replace(/\D/g, "");
-    const name = customerName || "Customer";
-    const bill = String(billNumber);
-    const amt = String(amount);
-    const url = pdfUrl || "";
 
-    // Try WhatsApp first if configured
-    if (waNumber && waTemplate) {
-      const wa = await sendWhatsApp(apiKey, waNumber, waTemplate, normalized, name, bill, amt, url);
-      if (wa.ok) {
-        return new Response(
-          JSON.stringify({ ok: true, channel: "whatsapp" }),
-          { headers: { ...CORS, "Content-Type": "application/json" } },
-        );
-      }
-      // WhatsApp failed — fall through to SMS
-    }
+    const res = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: normalized,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: "en" },
+          components: [
+            {
+              type: "body",
+              parameters: [
+                { type: "text", text: customerName || "Customer" },
+                { type: "text", text: String(billNumber) },
+                { type: "text", text: String(amount) },
+                { type: "text", text: pdfUrl || "" },
+              ],
+            },
+          ],
+        },
+      }),
+    });
 
-    // SMS (primary or fallback)
-    const sms = await sendSms(apiKey, templateId, senderId, normalized, name, bill, amt, url);
-    if (!sms.ok) {
-      return new Response(JSON.stringify({ error: sms.error }), { status: 502, headers: CORS });
+    const result = await res.json();
+
+    if (!res.ok || result.error) {
+      return new Response(
+        JSON.stringify({ error: result.error?.message || "WhatsApp delivery failed" }),
+        { status: 502, headers: CORS },
+      );
     }
 
     return new Response(
-      JSON.stringify({ ok: true, channel: "sms", requestId: sms.requestId }),
+      JSON.stringify({ ok: true, channel: "whatsapp" }),
       { headers: { ...CORS, "Content-Type": "application/json" } },
     );
   } catch (err) {
