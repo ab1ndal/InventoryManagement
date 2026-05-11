@@ -218,6 +218,7 @@ export default function BillTable({ onEdit }) {
         .single();
       if (cust?.phone) {
         const digits = cust.phone.replace(/\D/g, "");
+        // Bare 10-digit number = Indian mobile, prepend country code
         customerPhone = digits.length === 10 ? `91${digits}` : digits;
       }
 
@@ -246,7 +247,8 @@ export default function BillTable({ onEdit }) {
 
       if (fnErr || fnData?.error) throw new Error(fnErr?.message || fnData?.error);
 
-      toast({ title: "SMS sent", description: `Bill #${bill_number || billId} sent to ${customerPhone}` });
+      const channel = fnData?.channel === "whatsapp" ? "WhatsApp" : "SMS";
+      toast({ title: `${channel} sent`, description: `Bill #${bill_number || billId} sent to ${customerPhone}` });
     } catch (e) {
       toast({ title: "SMS failed", description: e.message, variant: "destructive" });
     } finally {
