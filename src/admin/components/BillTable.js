@@ -13,6 +13,8 @@ import InvoiceView from "./billing/InvoiceView";
 import { generateInvoicePdf } from "./billing/generateInvoicePdf";
 import { computeBillTotals } from "./billing/billUtils";
 import { backCalcDiscountPct } from "./billing/stockHelpers";
+import { formatDate } from "../../utility/dateFormat";
+import { formatINR } from "../../utility/formatCurrency";
 
 const ROWS_PER_PAGE = 50;
 
@@ -514,7 +516,7 @@ export default function BillTable({ onEdit }) {
       }
 
       toast({
-        title: `Bill #${billId} cancelled. ₹${refundAmount.toFixed(2)} store credit added to ${customerName || "customer"}'s account.`,
+        title: `Bill #${billId} cancelled. ${formatINR(refundAmount, 2)} store credit added to ${customerName || "customer"}'s account.`,
       });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -634,24 +636,17 @@ export default function BillTable({ onEdit }) {
                       : "—"}
                   </td>
                   <td className="p-2">
-                    {b.orderdate
-                      ? new Date(b.orderdate).toLocaleDateString("en-IN", {
-                          timeZone: "Asia/Kolkata",
-                        })
-                      : "—"}
+                    {b.orderdate ? formatDate(b.orderdate) : "—"}
                   </td>
                   <td className="p-2 text-right">
-                    ₹
-                    {((b.totalamount || 0) + (b.discount_total || 0)).toFixed(
-                      2,
-                    )}
+                    {formatINR((b.totalamount || 0) + (b.discount_total || 0), 2)}
                   </td>
                   <td className="p-2 text-right">
-                    ₹{(b.gst_total || 0).toFixed(2)}
+                    {formatINR(b.gst_total || 0, 2)}
                   </td>
                   <td className="p-2 text-right">
                     {b.discount_total != null && b.discount_total > 0
-                      ? `₹${Number(b.discount_total).toFixed(2)}`
+                      ? formatINR(b.discount_total, 2)
                       : "—"}
                   </td>
                   <td className="p-2 text-center">
@@ -679,7 +674,7 @@ export default function BillTable({ onEdit }) {
                     </Badge>
                     {b.paymentstatus === "partial" && b.net_amount != null && b.payment_amount != null && (
                       <div className="text-xs text-red-600 mt-0.5 tabular-nums">
-                        Due: ₹{Math.max(0, Number(b.net_amount) - Number(b.payment_amount)).toFixed(2)}
+                        Due: {formatINR(Math.max(0, Number(b.net_amount) - Number(b.payment_amount)), 2)}
                       </div>
                     )}
                   </td>
@@ -837,15 +832,11 @@ export default function BillTable({ onEdit }) {
               </div>
               <div>
                 <span className="font-semibold">Date:</span>{" "}
-                {cancelBill.orderdate
-                  ? new Date(cancelBill.orderdate).toLocaleDateString("en-IN", {
-                      timeZone: "Asia/Kolkata",
-                    })
-                  : "—"}
+                {cancelBill.orderdate ? formatDate(cancelBill.orderdate) : "—"}
               </div>
               <div>
-                <span className="font-semibold">Grand Total:</span> ₹
-                {Number(cancelBill.totalamount ?? 0).toFixed(2)}
+                <span className="font-semibold">Grand Total:</span>{" "}
+                {formatINR(cancelBill.totalamount ?? 0, 2)}
               </div>
               <div>
                 <span className="font-semibold">Status:</span>{" "}
@@ -894,7 +885,7 @@ export default function BillTable({ onEdit }) {
             <DialogTitle>How would you like to resolve this?</DialogTitle>
             <DialogDescription>
               {cancelBill &&
-                `Bill #${cancelBill.billid} (₹${Number(cancelBill.totalamount ?? 0).toFixed(2)}) was finalized. Choose a resolution for the customer.`}
+                `Bill #${cancelBill.billid} (${formatINR(cancelBill.totalamount ?? 0, 2)}) was finalized. Choose a resolution for the customer.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 pt-2">
@@ -919,7 +910,7 @@ export default function BillTable({ onEdit }) {
               <div className="text-left">
                 <div className="font-semibold">Issue store credit</div>
                 <div className="text-xs opacity-90">
-                  ₹{Number(cancelBill?.totalamount ?? 0).toFixed(2)} added to{" "}
+                  {formatINR(cancelBill?.totalamount ?? 0, 2)} added to{" "}
                   {cancelBill?.customers
                     ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
                     : "customer"}

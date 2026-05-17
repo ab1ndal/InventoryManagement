@@ -4,6 +4,8 @@ import ChevronIcon from "./ChevronIcon";
 import ProductEditDialog from "./ProductEditDialog";
 import { EditButton, PrintButton } from "../../components/ActionButtons";
 import printLabel from "../../components/printLabel";
+import { formatINR } from "../../utility/formatCurrency";
+import { formatStock } from "../../utility/formatStock";
 
 const ProductRow = ({ product, variants, onEdit, categories }) => {
   const [expanded, setExpanded] = useState(false);
@@ -16,21 +18,6 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
     (sum, row) => sum + (row.stock || 0),
     0
   );
-
-  const formatStock = (value, unitType = "piece") => {
-    if (isNaN(value)) return unitType === "meter" ? "0 m" : "0 pcs";
-    const num = Number(value);
-    const formatted =
-      unitType === "meter"
-        ? num.toLocaleString("en-IN", { maximumFractionDigits: 3 })
-        : num.toLocaleString("en-IN", { maximumFractionDigits: 0 });
-    return `${formatted} ${unitType === "meter" ? "m" : "pcs"}`;
-  };
-
-  const formatINRCurrency = (value) => {
-    if (isNaN(value)) return "₹0";
-    return `₹${Number(value).toLocaleString("en-IN")}`;
-  };
 
   const purchase = product.purchaseprice || 0;
   const retail = product.retailprice || 0;
@@ -101,16 +88,16 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
         </td>
         <td style={{ textAlign: "center" }}>{product.fabric}</td>
         <td style={{ textAlign: "center" }}>
-          {formatINRCurrency(purchase)}
+          {formatINR(purchase)}
           <br />
           <span className="text-xs text-gray-500">
             ({encodedPriceToCode(purchase)})
           </span>
         </td>
-        <td style={{ textAlign: "center" }}>{formatINRCurrency(retail)}</td>
+        <td style={{ textAlign: "center" }}>{formatINR(retail)}</td>
         <td style={{ textAlign: "center" }}>{markup}%</td>
         <td style={{ textAlign: "center" }}>
-          {formatINRCurrency(getDiscountInfo(purchase, retail).discountedPrice)}
+          {formatINR(getDiscountInfo(purchase, retail).discountedPrice)}
           <br />
           <span className="text-xs text-gray-500">
             ({getDiscountInfo(purchase, retail).discountPct}% Off)

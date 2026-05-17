@@ -2,7 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
-import { formatLivePhoneInput } from "../../utility/formatPhone";
+import { formatPhone } from "../../utility/formatPhone";
+import { formatINR } from "../../utility/formatCurrency";
 
 export default function SupplierTable({
   refreshSignal,
@@ -48,15 +49,6 @@ export default function SupplierTable({
     setLoading(false);
   };
 
-  const formatPhone = (phone) => {
-    if (!phone) return "-";
-    try {
-      return formatLivePhoneInput(phone) || phone;
-    } catch {
-      return phone;
-    }
-  };
-
   const balanceColor = (bal) => {
     if (bal > 0) return "text-red-600 font-medium";
     if (bal < 0) return "text-green-600 font-medium";
@@ -94,7 +86,7 @@ export default function SupplierTable({
                     <td className="p-3 text-gray-600">{formatPhone(s.phone)}</td>
                     <td className="p-3 text-gray-600">{s.email || "-"}</td>
                     <td className={`p-3 text-right tabular-nums ${balanceColor(bal)}`}>
-                      ₹{bal.toFixed(2)}
+                      {formatINR(bal, 2)}
                     </td>
                     <td className="p-3">
                       <div className="flex justify-center gap-2">

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatDate } from "../../utility/dateFormat";
+import { formatINR } from "../../utility/formatCurrency";
 import {
   Dialog,
   DialogContent,
@@ -120,13 +121,13 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange }) {
                         {row.notes || "-"}
                       </td>
                       <td className="p-2 text-right tabular-nums text-red-600">
-                        {row.type === "bill" ? `₹${Number(row.amount).toFixed(2)}` : ""}
+                        {row.type === "bill" ? formatINR(row.amount, 2) : ""}
                       </td>
                       <td className="p-2 text-right tabular-nums text-green-600">
-                        {row.type === "payment" ? `₹${Number(row.amount).toFixed(2)}` : ""}
+                        {row.type === "payment" ? formatINR(row.amount, 2) : ""}
                       </td>
                       <td className={`p-2 text-right tabular-nums ${balanceClass(row.running)}`}>
-                        ₹{row.running.toFixed(2)}
+                        {formatINR(row.running, 2)}
                       </td>
                       <td className="p-2 text-center">
                         {row.imageUrl ? (
@@ -153,7 +154,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange }) {
               <span className="text-sm font-bold">
                 Current Balance:{" "}
                 <span className={balanceClass(finalBalance)}>
-                  ₹{finalBalance.toFixed(2)}
+                  {formatINR(finalBalance, 2)}
                 </span>
                 {finalBalance > 0 && (
                   <span className="ml-1 text-xs text-red-500 font-normal">(owed)</span>

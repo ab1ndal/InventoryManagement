@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { formatINR } from "../../../utility/formatCurrency";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import {
@@ -169,8 +170,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
       {selected && (
         <>
           <div className="text-sm text-muted-foreground">
-            {selected.name} — MRP: ₹
-            {selected.retailprice?.toLocaleString("en-IN")}
+            {selected.name} — MRP: {formatINR(selected.retailprice || 0)}
           </div>
 
           {/* Variant selector */}

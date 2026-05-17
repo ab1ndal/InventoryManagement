@@ -3,6 +3,8 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Pencil, Trash2, Code } from "lucide-react";
+import { formatINR } from "../../utility/formatCurrency";
+import { formatDate } from "../../utility/dateFormat";
 
 export default function DiscountTable({ onEdit, refresh }) {
   const [discounts, setDiscounts] = useState([]);
@@ -36,17 +38,6 @@ export default function DiscountTable({ onEdit, refresh }) {
     buy_x_get_y: "Buy X Get Y",
     flat: "Flat Rate",
     conditional: "Conditional",
-  };
-
-  const formatCurrency = (v) =>
-    Number(v || 0).toLocaleString("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    });
-
-  const formatDates = (date) => {
-    return date ? new Date(date).toLocaleDateString("en-IN") : "—";
   };
 
   // Open a dialog to show/edit the rules for a discount. The rules are stored in the rules column as JSON.
@@ -108,13 +99,13 @@ export default function DiscountTable({ onEdit, refresh }) {
                 {discountTypeLabels[d.type] || d.type}
               </td>
               <td className="px-2 py-1 text-center">
-                {formatCurrency(d.value)}
+                {formatINR(d.value)}
               </td>
               <td className="px-2 py-1 text-center">
-                {formatCurrency(d.min_total)}
+                {formatINR(d.min_total)}
               </td>
               <td className="px-2 py-1 text-center">
-                {formatCurrency(d.max_discount)}
+                {formatINR(d.max_discount)}
               </td>
               <td className="px-2 py-1 text-center">{d.category ? (categoryMap[d.category] || d.category) : "—"}</td>
               <td className="px-2 py-1 text-center">
@@ -127,10 +118,10 @@ export default function DiscountTable({ onEdit, refresh }) {
                 {d.once_per_customer ? "Yes" : "No"}
               </td>
               <td className="px-2 py-1 text-center">
-                {formatDates(d.start_date)}
+                {formatDate(d.start_date)}
               </td>
               <td className="px-2 py-1 text-center">
-                {formatDates(d.end_date)}
+                {formatDate(d.end_date)}
               </td>
               <td className="px-2 py-1 text-center">
                 {d.active ? "Yes" : "No"}

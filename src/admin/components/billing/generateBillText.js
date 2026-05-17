@@ -6,18 +6,11 @@ const STORE = {
   gstin: "09ABVPB4203A1Z4",
 };
 
-function fmt(n) {
-  return `₹${Number(n || 0).toFixed(2)}`;
-}
+import { formatDate } from "../../../utility/dateFormat";
+import { formatINR } from "../../../utility/formatCurrency";
 
-function fmtDate(d) {
-  return new Date(d).toLocaleDateString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+const fmt = (n) => formatINR(n || 0, 2);
+const fmtDate = (d) => formatDate(d);
 
 /**
  * Generates a professional WhatsApp-ready bill summary.

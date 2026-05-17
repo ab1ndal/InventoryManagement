@@ -21,6 +21,7 @@ const ProductTable = forwardRef(
       onProductUpdate,
       filters,
       setFilters,
+      debouncedFilters,
       refreshFlag,
       onProductAdd,
     },
@@ -36,13 +37,6 @@ const ProductTable = forwardRef(
     const [filteredProductIds, setFilteredProductIds] = useState([]);
     const [loading, setLoading] = useState(false);
     const keyCache = useRef(new Map());
-
-    // Debounce filters so keystrokes don't trigger a fetch on every character
-    const [debouncedFilters, setDebouncedFilters] = useState(filters);
-    useEffect(() => {
-      const timer = setTimeout(() => setDebouncedFilters(filters), 300);
-      return () => clearTimeout(timer);
-    }, [filters]);
 
     useImperativeHandle(ref, () => ({
       addProductToTable,

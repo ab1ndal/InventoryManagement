@@ -21,6 +21,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 //import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
+import { formatINR } from "../../utility/formatCurrency";
 
 const variantSchema = z.object({
   variantid: z.string().optional(),
@@ -63,11 +64,6 @@ export default function ProductEditDialog({
       variants: [],
     },
   });
-
-  const formatINR = (value) => {
-    if (isNaN(value)) return "";
-    return `₹${Number(value).toLocaleString("en-IN")}`;
-  };
 
   const originalVariantsRef = React.useRef([]);
 

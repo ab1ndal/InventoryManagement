@@ -6,30 +6,33 @@ import ProductEditDialog from "../components/ProductEditDialog";
 import { Button } from "../../components/ui/button";
 import { Toaster } from "../../components/ui/toaster";
 import { useToast } from "../../components/hooks/use-toast";
+import { useTableFilters } from "../hooks/useTableFilters";
 // import styling
 import "../../App.css";
+
+const INITIAL_FILTERS = {
+  productid: "",
+  category: "",
+  fabric: "",
+  size: "",
+  color: "",
+  description: "",
+  purchaseMin: "",
+  purchaseMax: "",
+  retailMin: "",
+  retailMax: "",
+  discountPriceMin: "",
+  discountPriceMax: "",
+  stockMin: "",
+  stockMax: "",
+};
 
 const InventoryPage = () => {
   const [refreshFlag, setRefreshFlag] = useState(0);
   const [categories, setCategories] = useState([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { toast } = useToast();
-  const [filters, setFilters] = useState({
-    productid: "",
-    category: "",
-    fabric: "",
-    size: "",
-    color: "",
-    description: "",
-    purchaseMin: "",
-    purchaseMax: "",
-    retailMin: "",
-    retailMax: "",
-    discountPriceMin: "",
-    discountPriceMax: "",
-    stockMin: "",
-    stockMax: "",
-  });
+  const { filters, setFilters, debouncedFilters, resetFilters } = useTableFilters(INITIAL_FILTERS);
   const triggerRefresh = () => setRefreshFlag((prev) => prev + 1);
   const tableRef = useRef(null);
 
@@ -121,27 +124,7 @@ const InventoryPage = () => {
     <div>
       <div className="flex justify-between items-center m-4 gap-4">
         <Button onClick={() => setAddDialogOpen(true)}>+ Add Product</Button>
-        <Button
-          variant="secondary"
-          onClick={() =>
-            setFilters({
-              productid: "",
-              category: "",
-              fabric: "",
-              size: "",
-              color: "",
-              description: "",
-              purchaseMin: "",
-              purchaseMax: "",
-              retailMin: "",
-              retailMax: "",
-              discountPriceMin: "",
-              discountPriceMax: "",
-              stockMin: "",
-              stockMax: "",
-            })
-          }
-        >
+        <Button variant="secondary" onClick={resetFilters}>
           Clear Filters
         </Button>
       </div>
@@ -151,6 +134,7 @@ const InventoryPage = () => {
         onProductUpdate={triggerRefresh}
         filters={filters}
         setFilters={setFilters}
+        debouncedFilters={debouncedFilters}
         refreshFlag={refreshFlag}
         onProductAdd={(productid) => {
           console.log("Added product: ", productid);

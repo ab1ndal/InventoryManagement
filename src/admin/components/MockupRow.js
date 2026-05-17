@@ -1,5 +1,6 @@
 // src/admin/components/MockupRow.js
 import React, { useMemo } from "react";
+import { formatDate as formatDateUtil } from "../../utility/dateFormat";
 import { Checkbox } from "../../components/ui/checkbox";
 
 const encodedPriceToCode = (price) => {
@@ -21,20 +22,7 @@ const encodedPriceToCode = (price) => {
   return "Z" + digits.map((d) => map[d] ?? "Z").join("");
 };
 
-function formatDate(dt) {
-  if (!dt) return "";
-  try {
-    const d = new Date(dt);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
-  } catch {
-    return "";
-  }
-}
+const formatDate = (dt) => formatDateUtil(dt) || "";
 
 export default function MockupRow({ row, onToggle, canEdit }) {
   const {

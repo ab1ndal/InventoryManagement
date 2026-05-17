@@ -8,3 +8,13 @@ export function formatLivePhoneInput(value) {
     return value;
   }
 }
+
+export function formatPhone(value) {
+  if (!value) return "-";
+  try {
+    const phone = parsePhoneNumberFromString(value);
+    return phone ? phone.formatInternational() : value;
+  } catch {
+    return value;
+  }
+}

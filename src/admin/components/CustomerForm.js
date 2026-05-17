@@ -15,6 +15,7 @@ import {
   FormLabel,
 } from "../../components/ui/form";
 import { formatLivePhoneInput } from "../../utility/formatPhone";
+import { formatINR } from "../../utility/formatCurrency";
 import { toast } from "sonner";
 import { z } from "zod";
 import "react-datepicker/dist/react-datepicker.css";
@@ -355,17 +356,6 @@ export default function CustomerForm(props) {
                 control={form.control}
                 name="store_credit"
                 render={({ field }) => {
-                  const toINR = (v) => {
-                    const n = Number(v);
-                    if (Number.isNaN(n)) return "";
-                    return new Intl.NumberFormat("en-IN", {
-                      style: "currency",
-                      currency: "INR",
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }).format(n);
-                  };
-
                   const handleChange = (e) => {
                     // keep digits and at most one dot
                     let raw = e.target.value.replace(/[^0-9.]/g, "");
@@ -439,7 +429,7 @@ export default function CustomerForm(props) {
                           />
                           <div className="text-xs text-muted-foreground">
                             {field.value && !String(field.value).endsWith(".")
-                              ? toINR(field.value)
+                              ? formatINR(field.value, 2)
                               : ""}
                           </div>
                         </div>

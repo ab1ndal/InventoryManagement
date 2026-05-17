@@ -5,7 +5,8 @@ import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import CustomerForm from "./CustomerForm";
 import { Badge } from "../../components/ui/badge";
-import { parsePhoneNumber } from "libphonenumber-js";
+import { formatPhone } from "../../utility/formatPhone";
+import { formatINR } from "../../utility/formatCurrency";
 import { Pencil, Trash2 } from "lucide-react"
 import {formatDate} from "../../utility/dateFormat"
 import {
@@ -15,17 +16,20 @@ import {
   TooltipProvider,
 } from "../../components/ui/tooltip";
 import { toast } from "sonner";
+import { useTableFilters } from "../hooks/useTableFilters";
+
+const INITIAL_FILTERS = {
+  first_name: "",
+  last_name: "",
+  phone: "",
+  referred_by: "",
+  email: "",
+  loyalty_tier: "",
+};
 
 export default function CustomerTable({ onEditCustomer, refreshSignal }) {
   const [customers, setCustomers] = useState([]);
-  const [filters, setFilters] = useState({
-    first_name: "",
-    last_name: "",
-    phone: "",
-    referred_by: "",
-    email: "",
-    loyalty_tier: "",
-  });
+  const { filters, setFilter, debouncedFilters } = useTableFilters(INITIAL_FILTERS);
 
   const [page, setPage] = useState(1);
   const rowsPerPage = 15;
@@ -109,16 +113,6 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
       toast.success("Customer deleted successfully");
     }
   };
-  function formatPhoneNumber(phone) {
-    if (!phone) return "-";
-    try {
-      const number = parsePhoneNumber(phone);
-      return number.formatInternational();
-    } catch (error) {
-      return phone;
-    }
-  }
-
   const safe = (v) => (v || "").toString().toLowerCase();
 
   const filteredCustomers = customers.filter((c) => {
@@ -126,12 +120,12 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
       ? `${c.referred_by_data.first_name} ${c.referred_by_data.last_name}`
       : "";
     return (
-      safe(c.first_name).includes(safe(filters.first_name)) &&
-      safe(c.last_name).includes(safe(filters.last_name)) &&
-      safe(c.phone).includes(safe(filters.phone)) &&
-      safe(c.email).includes(safe(filters.email)) &&
-      safe(c.loyalty_tier).includes(safe(filters.loyalty_tier)) &&
-      safe(referredName).includes(safe(filters.referred_by))
+      safe(c.first_name).includes(safe(debouncedFilters.first_name)) &&
+      safe(c.last_name).includes(safe(debouncedFilters.last_name)) &&
+      safe(c.phone).includes(safe(debouncedFilters.phone)) &&
+      safe(c.email).includes(safe(debouncedFilters.email)) &&
+      safe(c.loyalty_tier).includes(safe(debouncedFilters.loyalty_tier)) &&
+      safe(referredName).includes(safe(debouncedFilters.referred_by))
     );
   });
 
@@ -185,10 +179,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                       placeholder="Filter"
                       value={filters[key]}
                       onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          [key]: e.target.value,
-                        }))
+                        setFilter(key, e.target.value)
                       }
                       className="w-full h-6 px-2 py-1 rounded-md text-center bg-gray-50 border border-gray-200 text-gray-600 placeholder:text-gray-300 focus:ring-1 focus:ring-primary"
                     />
@@ -217,7 +208,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                     {customer.last_name}
                   </td>
                   <td className="p-2 text-center w-[180px]">
-                    {formatPhoneNumber(customer.phone)}
+                    {formatPhone(customer.phone)}
                   </td>
                   <td className="p-2 text-center w-[180px]">
                     {customer.referred_by_data
@@ -258,10 +249,10 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                     </Tooltip>
                   </td>
                   <td className="p-2 text-center w-[80px] tabular-nums">
-                    ₹{Number(customer.store_credit || 0).toFixed(2)}
+                    {formatINR(customer.store_credit || 0, 2)}
                   </td>
                   <td className="p-2 text-left w-[50px]">
-                    ₹{(customer.total_spend || 0).toFixed(2)}
+                    {formatINR(customer.total_spend || 0, 2)}
                   </td>
                   <td className="p-2 text-center w-[50px]">
                     {customer.last_purchased_at

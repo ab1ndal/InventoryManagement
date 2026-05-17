@@ -1,6 +1,8 @@
 // src/admin/components/billing/ReturnReceiptView.js
 import React, { forwardRef } from "react";
 import logo from "../../../assets/LOGO-Bill.png";
+import { formatDate } from "../../../utility/dateFormat";
+import { formatINR } from "../../../utility/formatCurrency";
 
 const STORE = {
   name: "BINDAL'S CREATION",
@@ -77,9 +79,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
         </div>
         <div style={{ marginBottom: "2px" }}>
           <strong>Original Date:</strong>{" "}
-          {originalBillDate
-            ? new Date(originalBillDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
-            : "—"}
+          {originalBillDate ? formatDate(originalBillDate) : "—"}
         </div>
         <div style={{ marginBottom: "2px" }}>
           <strong>Customer:</strong> {customerName || "—"}
@@ -157,10 +157,10 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
                   borderBottom: "1px solid #f3f4f6",
                 }}
               >
-                ₹{Number(it.mrp || 0).toFixed(2)}
+                {formatINR(it.mrp || 0, 2)}
               </td>
               {mode === "exchange" && (
-                <td style={{ padding: "4px", textAlign: "right", borderBottom: "1px solid #f3f4f6" }}>₹{Number(it.creditAmount || 0).toFixed(2)}</td>
+                <td style={{ padding: "4px", textAlign: "right", borderBottom: "1px solid #f3f4f6" }}>{formatINR(it.creditAmount || 0, 2)}</td>
               )}
             </tr>
           ))}
@@ -179,7 +179,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
           marginTop: "8px",
         }}
       >
-        Store Credit Issued: ₹{Number(creditAmount || 0).toFixed(2)}
+        Store Credit Issued: {formatINR(creditAmount || 0, 2)}
       </div>
 
       {/* 8. Issue Date */}
@@ -191,9 +191,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
         }}
       >
         Issued:{" "}
-        {issueDate
-          ? new Date(issueDate).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })
-          : new Date().toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
+        {formatDate(issueDate || new Date().toISOString())}
       </div>
 
       {/* 9. Note */}
@@ -206,7 +204,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
         }}
       >
         {mode === "exchange"
-          ? `Store credit of ₹${Number(creditAmount || 0).toFixed(2)} has been added to your account.`
+          ? `Store credit of ${formatINR(creditAmount || 0, 2)} has been added to your account.`
           : "Store credit has been added to your account and will be automatically applied on your next purchase."}
       </div>
     </div>
