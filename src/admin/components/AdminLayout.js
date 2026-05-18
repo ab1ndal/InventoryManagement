@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 
 const navItems = [
-  { label: "Users", path: "/admin/users" },
+  { label: "Admin", path: "/admin/users" },
   { label: "Inventory", path: "/admin/inventory" },
   { label: "Mockups", path: "/admin/mockups" },
   { label: "Bills", path: "/admin/bills" },
