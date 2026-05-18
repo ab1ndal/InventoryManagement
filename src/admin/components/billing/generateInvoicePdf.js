@@ -25,7 +25,6 @@ export async function generateInvoicePdf(node, format = 'a4') {
   const marginTop = 6;    // mm
   const marginBottom = 12; // mm
   const imgWidth = pageWidth - marginX * 2;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
   const contentHeight = pageHeight - marginTop - marginBottom;
 
   const scale = canvas.width / imgWidth; // px per mm
@@ -47,8 +46,9 @@ export async function generateInvoicePdf(node, format = 'a4') {
       break;
     }
     // Last row bottom that fits entirely within this page
+    const curSrcY = srcY;
     const snapped = rowBottomsPx
-      .filter((b) => b > srcY && b <= maxEnd)
+      .filter((b) => b > curSrcY && b <= maxEnd)
       .at(-1);
     const end = snapped != null ? Math.floor(snapped) : maxEnd;
     slices.push({ srcY, end });
