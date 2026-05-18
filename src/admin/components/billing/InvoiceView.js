@@ -355,11 +355,6 @@ const InvoiceView = forwardRef(function InvoiceView(
                         ({[item.size, item.color].filter(Boolean).join("|")})
                       </div>
                     )}
-                    {alteration > 0 && (
-                      <div style={{ color: "#6b7280", fontSize: "10px" }}>
-                        Alt: ₹{alteration.toFixed(2)}
-                      </div>
-                    )}
                   </td>
                   <td style={tdRight}>
                     {item.unit_type === "meter" ? `${qty}m` : qty}
