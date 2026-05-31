@@ -40,7 +40,7 @@ export function monthRangeWithinFy(startYear, fromIdx, toIdx) {
 export function priorYearRange({ start, end }) {
   return {
     start: new Date(start.getFullYear() - 1, start.getMonth(), start.getDate()),
-    end: new Date(end.getFullYear(), end.getMonth(), end.getDate()),
+    end: new Date(end.getFullYear() - 1, end.getMonth(), end.getDate()),
   };
 }
 

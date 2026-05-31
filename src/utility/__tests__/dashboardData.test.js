@@ -53,7 +53,7 @@ describe("priorYearRange", () => {
     const cur = monthRangeWithinFy(2026, 2, 4);
     const prior = priorYearRange(cur);
     expect(prior.start).toEqual(new Date(2025, 5, 1));
-    expect(prior.end).toEqual(new Date(2026, 8, 1));
+    expect(prior.end).toEqual(new Date(2025, 8, 1));
   });
 });
 
