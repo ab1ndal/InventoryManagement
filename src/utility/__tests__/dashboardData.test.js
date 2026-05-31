@@ -8,6 +8,10 @@ import {
   aggregateKpis,
   pctChange,
   badgeFor,
+  aggregateMonthlySeries,
+  aggregateCategories,
+  aggregateSalespersons,
+  aggregateDiscounts,
 } from "../dashboardData";
 
 describe("FY_MONTHS", () => {
@@ -122,5 +126,83 @@ describe("aggregateKpis", () => {
   test("handles empty period without NaN", () => {
     const k = aggregateKpis([], []);
     expect(k).toMatchObject({ revenue: 0, billsCount: 0, aov: 0, grossMargin: 0, profit: 0 });
+  });
+});
+
+describe("aggregateMonthlySeries", () => {
+  const bills = [
+    { billid: 1, orderdate: "2026-04-10T00:00:00Z", net_amount: 100 }, // Apr
+    { billid: 2, orderdate: "2026-04-20T00:00:00Z", net_amount: 50 },  // Apr
+    { billid: 3, orderdate: "2027-01-05T00:00:00Z", net_amount: 300 }, // Jan (same FY)
+  ];
+  const items = [
+    { billid: 1, total: 100, cost_price: 30, quantity: 1 }, // Apr cost 30
+    { billid: 2, total: 50, cost_price: 10, quantity: 2 },  // Apr cost 20
+    { billid: 3, total: 300, cost_price: 90, quantity: 1 }, // Jan cost 90
+  ];
+  test("buckets revenue + cost into Apr..Mar order and computes margin", () => {
+    const series = aggregateMonthlySeries(bills, items, 2026);
+    expect(series).toHaveLength(12);
+    expect(series[0]).toMatchObject({ label: "Apr", revenue: 150, cost: 50 });
+    expect(series[0].margin).toBeCloseTo(((150 - 50) / 150) * 100, 3);
+    expect(series[9]).toMatchObject({ label: "Jan", revenue: 300, cost: 90 });
+    expect(series[1]).toMatchObject({ label: "May", revenue: 0, cost: 0, margin: 0 });
+  });
+});
+
+describe("aggregateCategories", () => {
+  const items = [
+    { category: "Saree", total: 1000, cost_price: 300, quantity: 2 }, // cost 600
+    { category: "Saree", total: 500, cost_price: 100, quantity: 1 },  // cost 100
+    { category: "Kurti", total: 800, cost_price: 200, quantity: 1 },  // cost 200
+    { category: null, total: 200, cost_price: null, quantity: 1 },    // Uncategorized
+  ];
+  test("groups, computes margin, sorts by revenue desc", () => {
+    const rows = aggregateCategories(items);
+    expect(rows.map((r) => r.category)).toEqual(["Saree", "Kurti", "Uncategorized"]);
+    expect(rows[0]).toMatchObject({ category: "Saree", revenue: 1500, cost: 700 });
+    expect(rows[0].margin).toBeCloseTo(((1500 - 700) / 1500) * 100, 3);
+    expect(rows[2]).toMatchObject({ category: "Uncategorized", revenue: 200, cost: 0 });
+  });
+});
+
+describe("aggregateSalespersons", () => {
+  const items = [
+    { billid: 1, salesperson_id: 10, total: 600 },
+    { billid: 1, salesperson_id: 10, total: 400 }, // same bill, same person
+    { billid: 2, salesperson_id: 10, total: 1000 },
+    { billid: 3, salesperson_id: 20, total: 300 },
+    { billid: 4, salesperson_id: null, total: 999 }, // unattributed -> skipped
+  ];
+  const byId = { 10: "Asha", 20: "Bina" };
+  test("sums revenue, counts distinct bills, computes AOV, ranks desc", () => {
+    const rows = aggregateSalespersons(items, byId);
+    expect(rows[0]).toEqual({ rank: 1, salespersonId: 10, name: "Asha", bills: 2, revenue: 2000, aov: 1000 });
+    expect(rows[1]).toEqual({ rank: 2, salespersonId: 20, name: "Bina", bills: 1, revenue: 300, aov: 300 });
+    expect(rows).toHaveLength(2); // null salesperson excluded
+  });
+  test("falls back to #id when name missing", () => {
+    const rows = aggregateSalespersons([{ billid: 9, salesperson_id: 77, total: 5 }], {});
+    expect(rows[0].name).toBe("#77");
+  });
+});
+
+describe("aggregateDiscounts", () => {
+  const bills = [
+    { billid: 1, applied_codes: ["DIWALI10"] }, // code-driven
+    { billid: 2, applied_codes: [] },           // manual
+    { billid: 3, applied_codes: null },         // manual (null treated as none)
+  ];
+  const items = [
+    { billid: 1, discount_total: 100 },
+    { billid: 1, discount_total: 50 },
+    { billid: 2, discount_total: 30 },
+    { billid: 3, discount_total: 20 },
+  ];
+  test("splits total discount into code vs manual with bill counts", () => {
+    const d = aggregateDiscounts(bills, items);
+    expect(d.total).toBe(200);
+    expect(d.code).toEqual({ bills: 1, amount: 150 });
+    expect(d.manual).toEqual({ bills: 2, amount: 50 });
   });
 });

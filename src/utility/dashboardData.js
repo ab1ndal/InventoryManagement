@@ -88,3 +88,92 @@ export function badgeFor(change, { inverse = false } = {}) {
   const good = inverse ? !up : up;
   return { symbol: up ? "↑" : "↓", tone: good ? "good" : "bad" };
 }
+
+export function aggregateMonthlySeries(bills, items, fyStartYear) {
+  const revenue = FY_MONTHS.map(() => 0);
+  const cost = FY_MONTHS.map(() => 0);
+  // Map a calendar month (0-11) to its slot in the Apr..Mar sequence.
+  const slotOf = (m) => (m >= 3 ? m - 3 : m + 9);
+  const billSlot = new Map(); // billid -> slot index
+  for (const b of bills) {
+    const slot = slotOf(new Date(b.orderdate).getMonth());
+    billSlot.set(b.billid, slot);
+    revenue[slot] += num(b.net_amount);
+  }
+  for (const i of items) {
+    const slot = billSlot.get(i.billid);
+    if (slot == null) continue; // item whose bill isn't in this period
+    cost[slot] += num(i.cost_price) * num(i.quantity);
+  }
+  return FY_MONTHS.map((mo, idx) => ({
+    label: mo.label,
+    revenue: revenue[idx],
+    cost: cost[idx],
+    margin: revenue[idx] ? ((revenue[idx] - cost[idx]) / revenue[idx]) * 100 : 0,
+  }));
+}
+
+export function aggregateCategories(items) {
+  const map = new Map();
+  for (const i of items) {
+    const key = i.category && String(i.category).trim() ? i.category : "Uncategorized";
+    const row = map.get(key) || { category: key, revenue: 0, cost: 0 };
+    row.revenue += num(i.total);
+    row.cost += num(i.cost_price) * num(i.quantity);
+    map.set(key, row);
+  }
+  return [...map.values()]
+    .map((r) => ({ ...r, margin: r.revenue ? ((r.revenue - r.cost) / r.revenue) * 100 : 0 }))
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
+export function aggregateSalespersons(items, salespersonsById = {}) {
+  const map = new Map();
+  for (const i of items) {
+    if (i.salesperson_id == null) continue;
+    const id = i.salesperson_id;
+    const row = map.get(id) || { salespersonId: id, revenue: 0, billIds: new Set() };
+    row.revenue += num(i.total);
+    row.billIds.add(i.billid);
+    map.set(id, row);
+  }
+  return [...map.values()]
+    .map((r) => {
+      const bills = r.billIds.size;
+      return {
+        salespersonId: r.salespersonId,
+        name: salespersonsById[r.salespersonId] || `#${r.salespersonId}`,
+        bills,
+        revenue: r.revenue,
+        aov: bills ? r.revenue / bills : 0,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue)
+    .map((r, idx) => ({ rank: idx + 1, ...r }));
+}
+
+export function aggregateDiscounts(bills, items) {
+  const hasCode = new Map(); // billid -> bool
+  for (const b of bills) {
+    hasCode.set(b.billid, Array.isArray(b.applied_codes) && b.applied_codes.length > 0);
+  }
+  let codeAmount = 0;
+  let manualAmount = 0;
+  const codeBills = new Set();
+  const manualBills = new Set();
+  for (const i of items) {
+    const amt = num(i.discount_total);
+    if (hasCode.get(i.billid)) {
+      codeAmount += amt;
+      if (amt > 0) codeBills.add(i.billid);
+    } else {
+      manualAmount += amt;
+      if (amt > 0) manualBills.add(i.billid);
+    }
+  }
+  return {
+    total: codeAmount + manualAmount,
+    code: { bills: codeBills.size, amount: codeAmount },
+    manual: { bills: manualBills.size, amount: manualAmount },
+  };
+}
