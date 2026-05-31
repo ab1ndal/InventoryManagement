@@ -76,6 +76,8 @@ export default function DashboardPage() {
           supabase.from("bills").select("orderdate").eq("finalized", true).order("orderdate", { ascending: false }).limit(1),
           supabase.from("salespersons").select("salesperson_id, name"),
         ]);
+        if (minRes.error) throw minRes.error;
+        if (maxRes.error) throw maxRes.error;
         if (spRes.error) throw spRes.error;
         const map = {};
         (spRes.data || []).forEach((s) => { map[s.salesperson_id] = s.name; });
