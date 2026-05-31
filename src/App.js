@@ -3,6 +3,7 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
+  Navigate,
 } from "react-router-dom";
 import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
@@ -28,6 +29,7 @@ const SignupPage = lazy(() => import("./admin/pages/SignupPage"));
 const ForgetPasswordPage = lazy(() => import("./admin/pages/ForgetPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./admin/pages/ResetPasswordPage"));
 const MockupPage = lazy(() => import("./admin/pages/MockupPage"));
+const DashboardPage = lazy(() => import("./admin/pages/DashboardPage"));
 
 function App() {
   return (
@@ -55,6 +57,8 @@ function App() {
           {/* Protected Admin Routes */}
           <Route path="/admin" element={<RequireAdminAuth />}>
             <Route element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="bills" element={<BillingPage />} />
               <Route path="vouchers" element={<VoucherPage />} />
