@@ -24,3 +24,15 @@ test("renders three traces: prior bars, current bars, margin line", () => {
   );
   expect(screen.getByTestId("plot").getAttribute("data-traces")).toBe("3");
 });
+
+test("renders loading state when loading=true", () => {
+  render(
+    <RevenueChart
+      current={period(1000)}
+      prior={period(800)}
+      range={{ startYear: 2026, fromIdx: 0, toIdx: 11 }}
+      loading={true}
+    />
+  );
+  expect(screen.getByText(/loading/i)).toBeInTheDocument();
+});

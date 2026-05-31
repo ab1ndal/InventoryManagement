@@ -15,14 +15,18 @@ export default function RevenueChart({ current, prior, range, loading }) {
     );
   }
 
+  if (!current || !prior || !range) return null;
+
+  const priorYear = range.startYear - 1;
+
   const curSeries = aggregateMonthlySeries(current.bills, current.items, range.startYear);
-  const priSeries = aggregateMonthlySeries(prior.bills, prior.items, range.startYear - 1);
+  const priSeries = aggregateMonthlySeries(prior.bills, prior.items, priorYear);
   const months = curSeries.map((s) => s.label);
 
   const data = [
     {
       type: "bar",
-      name: fyLabel(range.startYear - 1),
+      name: fyLabel(priorYear),
       x: months,
       y: priSeries.map((s) => toLakhs(s.revenue)),
       marker: { color: "#bfdbfe" },
@@ -55,7 +59,6 @@ export default function RevenueChart({ current, prior, range, loading }) {
       title: "Margin %",
       overlaying: "y",
       side: "right",
-      range: [0, 100],
       showgrid: false,
       ticksuffix: "%",
     },
