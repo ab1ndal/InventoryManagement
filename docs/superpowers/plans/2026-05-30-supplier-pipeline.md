@@ -4,7 +4,9 @@
 
 **Goal:** Enhance the supplier module with richer profiles (GSTIN, PAN, address, opening balance), GST-compliant bill capture, advance transaction type, payment mode tracking, a two-subtab page layout (Suppliers | Transactions), and drill-down ledger rows.
 
-**Architecture:** The existing `supplier_transactions` table is extended with new columns; no data migration needed. A new `supplierBalance.js` utility centralises balance computation so both the ledger dialog and transactions tab share one source of truth. `SuppliersPage` gains a two-tab layout rendered with Shadcn `Tabs` — Tab 1 is the existing supplier management UI, Tab 2 is a new `SupplierTransactionsTab` component.
+**Architecture:** `supplier_transactions`, `supplier_bills`, and `supplier_bill_line_items` are all **new tables** (confirmed against live Supabase — none exist yet). `suppliers` exists with only 5 base columns and needs `ALTER`. A new `supplierBalance.js` utility centralises balance computation so both the ledger dialog and transactions tab share one source of truth. `SuppliersPage` gains a two-tab layout rendered with Shadcn `Tabs` — Tab 1 is the existing supplier management UI, Tab 2 is a new `SupplierTransactionsTab` component.
+
+**Date formatting:** All dates displayed in Indian format (dd/MM/yyyy) using `formatDate` from `src/utility/dateFormat.js`. Never format dates inline.
 
 **Tech Stack:** React 19, Supabase (PostgreSQL), React Hook Form + Zod, Shadcn/ui (Tabs, Dialog, Badge), Sonner toasts, Vitest (existing test runner).
 
@@ -12,56 +14,32 @@
 
 ## File Map
 
-| Action | File |
-|--------|------|
-| Create | `schema/migration_supplier_pipeline.sql` |
-| Create | `src/utility/supplierBalance.js` |
-| Create | `src/utility/__tests__/supplierBalance.test.js` |
-| Modify | `src/admin/components/SupplierForm.js` |
-| Modify | `src/admin/components/SupplierTransactionDialog.js` |
-| Modify | `src/admin/components/SupplierLedgerDialog.js` |
-| Create | `src/admin/components/SupplierTransactionsTab.js` |
-| Modify | `src/admin/pages/SuppliersPage.js` |
+| Action | File | Status |
+|--------|------|--------|
+| ~~Create~~ Done | `schema/migration_supplier_pipeline.sql` | Written — needs running in Supabase |
+| Create | `src/utility/supplierBalance.js` | |
+| Create | `src/utility/__tests__/supplierBalance.test.js` | |
+| Modify | `src/admin/components/SupplierForm.js` | |
+| Modify | `src/admin/components/SupplierTransactionDialog.js` | |
+| Modify | `src/admin/components/SupplierLedgerDialog.js` | |
+| Create | `src/admin/components/SupplierTransactionsTab.js` | |
+| Modify | `src/admin/pages/SuppliersPage.js` | |
 
 ---
 
 ## Task 1: DB Migration
 
 **Files:**
-- Create: `schema/migration_supplier_pipeline.sql`
+- `schema/migration_supplier_pipeline.sql` — **already written**
 
-- [ ] **Step 1: Write migration SQL**
+> File is complete. Skip Step 1 — go straight to Step 2.
 
-```sql
--- Migration: Supplier pipeline enhancement
--- Run in Supabase dashboard SQL editor
-
--- 1. Extend suppliers table
-ALTER TABLE public.suppliers
-  ADD COLUMN IF NOT EXISTS gstin      varchar(15),
-  ADD COLUMN IF NOT EXISTS pan        varchar(10),
-  ADD COLUMN IF NOT EXISTS address    text,
-  ADD COLUMN IF NOT EXISTS opening_balance numeric(12,2) NOT NULL DEFAULT 0;
-
--- 2. Extend supplier_transactions: drop old check, re-add with 'advance'
-ALTER TABLE public.supplier_transactions
-  DROP CONSTRAINT IF EXISTS supplier_transactions_type_check;
-
-ALTER TABLE public.supplier_transactions
-  ADD CONSTRAINT supplier_transactions_type_check
-  CHECK (type IN ('bill', 'payment', 'advance'));
-
--- 3. Add new columns to supplier_transactions
-ALTER TABLE public.supplier_transactions
-  ADD COLUMN IF NOT EXISTS invoice_number  varchar(50),
-  ADD COLUMN IF NOT EXISTS taxable_amount  numeric(12,2),
-  ADD COLUMN IF NOT EXISTS cgst_amount     numeric(12,2),
-  ADD COLUMN IF NOT EXISTS sgst_amount     numeric(12,2),
-  ADD COLUMN IF NOT EXISTS igst_amount     numeric(12,2),
-  ADD COLUMN IF NOT EXISTS payment_mode    varchar(20);
-
--- payment_mode values: cash, upi, bank, cheque (enforced in app, not DB)
-```
+- [x] **Step 1: Migration file written** — `schema/migration_supplier_pipeline.sql` contains:
+  - ALTER `suppliers`: adds `gstin`, `pan`, `address`, `opening_balance`, `opening_balance_date`
+  - CREATE `supplier_transactions`: all columns incl. `advance` type, GST fields, `gross_amount`, `discount_amount`, `payment_mode`
+  - CREATE `supplier_bills`: image storage refs
+  - CREATE `supplier_bill_line_items`: per-line `description`, `hsn_code`, `qty`, `unit`, `unit_price`, `amount`, nullable `product_id`
+  - RLS enabled + `admin_only` policy on all 3 new tables
 
 - [ ] **Step 2: Run in Supabase SQL editor and confirm no errors**
 
@@ -156,11 +134,11 @@ Expected: FAIL — "Cannot find module"
  * @param {Array} txns - rows from supplier_transactions ordered by date asc
  * @param {number} openingBalance - from suppliers.opening_balance
  */
-export function computeRunningLedger(txns, openingBalance) {
+export function computeRunningLedger(txns, openingBalance, openingBalanceDate = null) {
   const rows = [];
   let running = Number(openingBalance) || 0;
 
-  rows.push({ type: "opening", running, transaction_id: "opening" });
+  rows.push({ type: "opening", running, transaction_id: "opening", opening_balance_date: openingBalanceDate });
 
   for (const t of txns) {
     const amt = Number(t.amount);
@@ -250,6 +228,7 @@ const formSchema = z.object({
   opening_balance: z.coerce
     .number({ invalid_type_error: "Must be a number" })
     .default(0),
+  opening_balance_date: z.string().optional().nullable(),
 });
 ```
 
@@ -262,6 +241,7 @@ gstin: defaultValues?.gstin ?? "",
 pan: defaultValues?.pan ?? "",
 address: defaultValues?.address ?? "",
 opening_balance: defaultValues?.opening_balance ?? 0,
+opening_balance_date: defaultValues?.opening_balance_date ?? "",
 ```
 
 - [ ] **Step 3: Update Supabase payload in handleSubmit**
@@ -273,6 +253,7 @@ gstin: values.gstin ?? null,
 pan: values.pan ?? null,
 address: values.address ?? null,
 opening_balance: values.opening_balance,
+opening_balance_date: values.opening_balance_date || null,
 ```
 
 - [ ] **Step 4: Add form fields to JSX**
@@ -323,22 +304,37 @@ After the existing email/phone grid and before the Notes field, add:
   )}
 />
 
-<FormField
-  name="opening_balance"
-  control={form.control}
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Opening Balance (₹)</FormLabel>
-      <FormControl>
-        <Input {...field} type="number" step="0.01" placeholder="0.00" />
-      </FormControl>
-      <p className="text-xs text-muted-foreground">
-        Positive = we owe them. Negative = they owe us.
-      </p>
-      <FormMessage />
-    </FormItem>
-  )}
-/>
+<div className="grid grid-cols-2 gap-4">
+  <FormField
+    name="opening_balance"
+    control={form.control}
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Opening Balance (₹)</FormLabel>
+        <FormControl>
+          <Input {...field} type="number" step="0.01" placeholder="0.00" />
+        </FormControl>
+        <p className="text-xs text-muted-foreground">
+          Positive = we owe them. Negative = they owe us.
+        </p>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+  <FormField
+    name="opening_balance_date"
+    control={form.control}
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Opening Balance Date</FormLabel>
+        <FormControl>
+          <Input {...field} type="date" />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+</div>
 ```
 
 - [ ] **Step 5: Manual verify** — open Add Supplier dialog, confirm new fields render and save correctly to Supabase
@@ -371,6 +367,8 @@ const formSchema = z.object({
   notes: z.string().optional().transform((v) => (v?.trim() === "" ? undefined : v)),
   // Bill-only fields
   invoice_number: z.string().optional().transform((v) => (v?.trim() === "" ? null : v)),
+  gross_amount: z.coerce.number().nonnegative().optional().nullable(),
+  discount_amount: z.coerce.number().nonnegative().optional().nullable(),
   taxable_amount: z.coerce.number().nonnegative().optional().nullable(),
   cgst_amount: z.coerce.number().nonnegative().optional().nullable(),
   sgst_amount: z.coerce.number().nonnegative().optional().nullable(),
@@ -378,6 +376,15 @@ const formSchema = z.object({
   // Payment/advance-only
   payment_mode: z.enum(["cash", "upi", "bank", "cheque"]).optional().nullable(),
   bill_image: z.any().optional(),
+  // Line items (bills only — stored separately in supplier_bill_line_items)
+  line_items: z.array(z.object({
+    description: z.string().min(1),
+    hsn_code: z.string().optional(),
+    qty: z.coerce.number().positive(),
+    unit: z.string().optional(),
+    unit_price: z.coerce.number().nonnegative(),
+    amount: z.coerce.number().nonnegative(),
+  })).optional().default([]),
 });
 ```
 
@@ -390,12 +397,15 @@ defaultValues: {
   transaction_date: today,
   notes: "",
   invoice_number: "",
+  gross_amount: "",
+  discount_amount: "",
   taxable_amount: "",
   cgst_amount: "",
   sgst_amount: "",
   igst_amount: "",
   payment_mode: null,
   bill_image: null,
+  line_items: [],
 },
 ```
 
@@ -416,6 +426,8 @@ const { data: txnData, error: txnError } = await supabase
     transaction_date: values.transaction_date,
     notes: values.notes ?? null,
     invoice_number: isBill ? (values.invoice_number ?? null) : null,
+    gross_amount: isBill ? (values.gross_amount || null) : null,
+    discount_amount: isBill ? (values.discount_amount || null) : null,
     taxable_amount: isBill ? (values.taxable_amount || null) : null,
     cgst_amount: isBill ? (values.cgst_amount || null) : null,
     sgst_amount: isBill ? (values.sgst_amount || null) : null,
@@ -424,6 +436,22 @@ const { data: txnData, error: txnError } = await supabase
   })
   .select("transaction_id")
   .single();
+
+// Insert line items if bill has any
+if (isBill && !txnError && values.line_items?.length > 0) {
+  await supabase.from("supplier_bill_line_items").insert(
+    values.line_items.map((li) => ({
+      transaction_id: txnData.transaction_id,
+      description: li.description,
+      hsn_code: li.hsn_code || null,
+      qty: li.qty,
+      unit: li.unit || null,
+      unit_price: li.unit_price,
+      amount: li.amount,
+      product_id: null, // linked manually later
+    }))
+  );
+}
 ```
 
 - [ ] **Step 4: Update type selector JSX** — add advance option
@@ -456,6 +484,30 @@ After the existing Amount field and before Notes, add (only shown when `txnType 
         </FormItem>
       )}
     />
+    <div className="grid grid-cols-2 gap-3">
+      <FormField
+        name="gross_amount"
+        control={form.control}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Gross Amount (₹)</FormLabel>
+            <FormControl><Input {...field} type="number" step="0.01" placeholder="Pre-discount total" /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        name="discount_amount"
+        control={form.control}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Discount (₹)</FormLabel>
+            <FormControl><Input {...field} type="number" step="0.01" placeholder="Total discount applied" /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
     <div className="border rounded-md p-3 space-y-3 bg-gray-50">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">GST Breakdown (optional)</p>
       <div className="grid grid-cols-2 gap-3">
@@ -509,7 +561,65 @@ After the existing Amount field and before Notes, add (only shown when `txnType 
 )}
 ```
 
-- [ ] **Step 6: Add payment mode field** — shown when type is payment or advance
+- [ ] **Step 6: Add line items UI** — shown when `txnType === "bill"`
+
+Use `useFieldArray` from react-hook-form to manage dynamic rows:
+
+```jsx
+import { useFieldArray } from "react-hook-form";
+
+// Inside component:
+const { fields, append, remove } = useFieldArray({ control: form.control, name: "line_items" });
+
+// JSX — add after GST section, inside the txnType === "bill" block:
+{txnType === "bill" && (
+  <div className="border rounded-md p-3 space-y-2">
+    <div className="flex items-center justify-between">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Line Items</p>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => append({ description: "", hsn_code: "", qty: 1, unit: "Pcs", unit_price: "", amount: "" })}
+      >
+        + Add Row
+      </Button>
+    </div>
+    {fields.length > 0 && (
+      <div className="overflow-auto">
+        <table className="min-w-full text-xs">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="text-left pb-1 pr-2">Description</th>
+              <th className="text-left pb-1 pr-2 w-20">HSN</th>
+              <th className="text-right pb-1 pr-2 w-16">Qty</th>
+              <th className="text-left pb-1 pr-2 w-16">Unit</th>
+              <th className="text-right pb-1 pr-2 w-24">Price (₹)</th>
+              <th className="text-right pb-1 pr-2 w-24">Amount (₹)</th>
+              <th className="w-6"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {fields.map((field, idx) => (
+              <tr key={field.id}>
+                <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.description`)} placeholder="e.g. SHIRTS" /></td>
+                <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.hsn_code`)} placeholder="620590" /></td>
+                <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.qty`)} type="number" step="0.01" className="text-right" /></td>
+                <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.unit`)} placeholder="Pcs" /></td>
+                <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.unit_price`)} type="number" step="0.01" className="text-right" /></td>
+                <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.amount`)} type="number" step="0.01" className="text-right" /></td>
+                <td><button type="button" onClick={() => remove(idx)} className="text-red-400 hover:text-red-600 text-base leading-none">×</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+)}
+```
+
+- [ ] **Step 7: Add payment mode field** — shown when type is payment or advance
 
 ```jsx
 {(txnType === "payment" || txnType === "advance") && (
@@ -539,7 +649,7 @@ After the existing Amount field and before Notes, add (only shown when `txnType 
 )}
 ```
 
-- [ ] **Step 7: Update toast success message** — add advance case
+- [ ] **Step 8: Update toast success message** — add advance case
 
 ```js
 toast.success(
@@ -549,13 +659,13 @@ toast.success(
 );
 ```
 
-- [ ] **Step 8: Manual verify** — record a bill with invoice number + GST fields; record a payment with mode; record an advance. Confirm all save in DB.
+- [ ] **Step 9: Manual verify** — record a bill with invoice number, gross/discount, GST fields, and line items; record a payment with mode; record an advance. Confirm all save in DB including `supplier_bill_line_items` rows.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add src/admin/components/SupplierTransactionDialog.js
-git commit -m "feat: transaction dialog — advance type, GST fields, payment mode"
+git commit -m "feat: transaction dialog — advance type, GST fields, gross/discount, line items, payment mode"
 ```
 
 ---
@@ -591,12 +701,13 @@ const fetchLedger = async () => {
     await Promise.all([
       supabase
         .from("suppliers")
-        .select("opening_balance")
+        .select("opening_balance, opening_balance_date")
         .eq("supplierid", supplier.supplierid)
         .single(),
       supabase
         .from("supplier_transactions")
-        .select("*")
+        // embed line items via Supabase FK join
+        .select("*, supplier_bill_line_items(*)")
         .eq("supplier_id", supplier.supplierid)
         .order("transaction_date", { ascending: true })
         .order("transaction_id", { ascending: true }),
@@ -617,7 +728,8 @@ const fetchLedger = async () => {
   );
 
   const openingBalance = Number(supplierData?.opening_balance) || 0;
-  const computed = computeRunningLedger(txns || [], openingBalance).map((row) => ({
+  const openingBalanceDate = supplierData?.opening_balance_date ?? null;
+  const computed = computeRunningLedger(txns || [], openingBalance, openingBalanceDate).map((row) => ({
     ...row,
     imageUrl: row.transaction_id !== "opening" ? (billsByTxn[row.transaction_id] ?? null) : null,
   }));
@@ -683,7 +795,9 @@ Replace the `<table>` block with:
             onClick={() => setExpandedRow(expandedRow === row.transaction_id ? null : row.transaction_id)}
           >
             <td className="p-2 whitespace-nowrap text-muted-foreground text-xs">
-              {row.type === "opening" ? "—" : formatDate(row.transaction_date)}
+              {row.type === "opening"
+                ? (row.opening_balance_date ? formatDate(row.opening_balance_date) : "—")
+                : formatDate(row.transaction_date)}
             </td>
             <td className="p-2">
               {row.type === "opening" ? (
@@ -722,19 +836,49 @@ Replace the `<table>` block with:
             <tr className="bg-blue-50 border-t border-blue-100">
               <td colSpan={6} className="px-4 py-3">
                 {row.type === "bill" ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                    {row.invoice_number && <div><span className="font-medium">Invoice:</span> {row.invoice_number}</div>}
-                    {row.taxable_amount && <div><span className="font-medium">Taxable:</span> {formatINR(row.taxable_amount, 2)}</div>}
-                    {row.cgst_amount && <div><span className="font-medium">CGST:</span> {formatINR(row.cgst_amount, 2)}</div>}
-                    {row.sgst_amount && <div><span className="font-medium">SGST:</span> {formatINR(row.sgst_amount, 2)}</div>}
-                    {row.igst_amount && <div><span className="font-medium">IGST:</span> {formatINR(row.igst_amount, 2)}</div>}
-                    {row.notes && <div className="col-span-2"><span className="font-medium">Notes:</span> {row.notes}</div>}
-                    {row.imageUrl && (
-                      <div>
-                        <a href={row.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
-                          View Bill Image ↗
-                        </a>
-                      </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {row.invoice_number && <div><span className="font-medium">Invoice:</span> {row.invoice_number}</div>}
+                      {row.gross_amount && <div><span className="font-medium">Gross:</span> {formatINR(row.gross_amount, 2)}</div>}
+                      {row.discount_amount && <div><span className="font-medium">Discount:</span> {formatINR(row.discount_amount, 2)}</div>}
+                      {row.taxable_amount && <div><span className="font-medium">Taxable:</span> {formatINR(row.taxable_amount, 2)}</div>}
+                      {row.cgst_amount && <div><span className="font-medium">CGST:</span> {formatINR(row.cgst_amount, 2)}</div>}
+                      {row.sgst_amount && <div><span className="font-medium">SGST:</span> {formatINR(row.sgst_amount, 2)}</div>}
+                      {row.igst_amount && <div><span className="font-medium">IGST:</span> {formatINR(row.igst_amount, 2)}</div>}
+                      {row.notes && <div className="col-span-2"><span className="font-medium">Notes:</span> {row.notes}</div>}
+                      {row.imageUrl && (
+                        <div>
+                          <a href={row.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
+                            View Bill Image ↗
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                    {row.supplier_bill_line_items?.length > 0 && (
+                      <table className="min-w-full border rounded text-xs mt-1">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="p-1 text-left">Description</th>
+                            <th className="p-1 text-left">HSN</th>
+                            <th className="p-1 text-right">Qty</th>
+                            <th className="p-1 text-left">Unit</th>
+                            <th className="p-1 text-right">Price</th>
+                            <th className="p-1 text-right">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {row.supplier_bill_line_items.map((li) => (
+                            <tr key={li.line_item_id} className="border-t">
+                              <td className="p-1">{li.description}</td>
+                              <td className="p-1 text-muted-foreground">{li.hsn_code || "—"}</td>
+                              <td className="p-1 text-right">{li.qty}</td>
+                              <td className="p-1">{li.unit || "—"}</td>
+                              <td className="p-1 text-right">{formatINR(li.unit_price, 2)}</td>
+                              <td className="p-1 text-right font-medium">{formatINR(li.amount, 2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     )}
                   </div>
                 ) : (

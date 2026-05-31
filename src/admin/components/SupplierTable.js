@@ -82,7 +82,12 @@ export default function SupplierTable({
                 const bal = balances[s.supplierid] ?? 0;
                 return (
                   <tr key={s.supplierid} className="border-t hover:bg-gray-50">
-                    <td className="p-3 font-medium">{s.name}</td>
+                    <td
+                      className="p-3 font-medium text-blue-600 hover:underline cursor-pointer"
+                      onClick={() => onViewLedger?.(s)}
+                    >
+                      {s.name}
+                    </td>
                     <td className="p-3 text-gray-600">{formatPhone(s.phone)}</td>
                     <td className="p-3 text-gray-600">{s.email || "-"}</td>
                     <td className={`p-3 text-right tabular-nums ${balanceColor(bal)}`}>

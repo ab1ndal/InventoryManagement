@@ -10,6 +10,82 @@
 
 ---
 
+## Category Reference: HSN Codes + Default Weights
+
+HSN codes follow India GST Chapter 61 (knitted) and 62 (woven). Weights are shipping estimates in grams — override per product as needed.
+
+| Category ID | Name | HSN Code | Default Weight (g) | Notes |
+|-------------|------|----------|--------------------|-------|
+| C-S3P | 3 Pc Suit (Child) | 62034900 | 500 | Boys' woven 3-pc |
+| C-S5P | 5 Pc Suit (Child) | 62034900 | 700 | Boys' woven 5-pc |
+| ACC | Accessories/Others | 62179090 | 150 | Safa, Mala, misc |
+| BLZ | Blazer | 62031900 | 600 | Men's woven jacket |
+| CRD | Cord Sets | 62114290 | 350 | Women's coord set |
+| DRS | Dress | 62044900 | 400 | Women's dress |
+| DPT | Dupatta | 62149090 | 150 | Scarf/long drape |
+| FAB-R | Fabric - Raymond | 52111190 | 1000 | Per piece; weight varies |
+| FAB-S | Fabric - Siyaram | 52111190 | 1000 | Per piece; weight varies |
+| FAB-V | Fabric - Vimal | 52111190 | 1000 | Per piece; weight varies |
+| FRMP | Formal Pant | 62034100 | 400 | Men's woven trousers |
+| GD | Gents Dhoti | 62114290 | 300 | Traditional lower |
+| GMala | Gents Mala | 62179090 | 100 | Wedding neckwear |
+| GSFa | Gents Safa | 62179090 | 200 | Turban/headgear |
+| GWN | Gown | 62044900 | 600 | Women's long formal |
+| IH | Indo Harem | 62114290 | 300 | Drop-crotch fusion |
+| IP | Indo Pant | 62114290 | 300 | Fusion pants |
+| IW | Indo-Western | 62114290 | 700 | Full fusion set |
+| C-IW | Indo-Western (Child) | 62034900 | 500 | Boys' fusion set |
+| JNS | Jeans | 62034200 | 500 | Denim trousers |
+| JDA | Joda | 62114290 | 800 | Pant+shirt/suit length |
+| KP | Kurta Pajama | 62114290 | 500 | Men's traditional set |
+| C-KP | Kurta-Pajama (Child) | 62114290 | 350 | Boys' traditional set |
+| KUR | Kurti | 62114290 | 300 | Women's tunic |
+| LCH | Lachha | 62044900 | 600 | Layered wedding dress |
+| LG | Legging | 61130090 | 200 | Knitted stretch pants |
+| LE | Lehenga | 62044900 | 800 | Skirt + blouse + dupatta |
+| NHJ | Nehru Jacket | 62031900 | 500 | Mandarin collar jacket |
+| PNT | Pant | 62034100 | 400 | Generic western trouser |
+| J-PS | Pant-Shirt Joda | 62114290 | 700 | Matching pant+shirt set |
+| PL | Plazo | 62044900 | 300 | Wide-leg women's trousers |
+| RMS | Readymade Suits | 62114290 | 600 | Women's salwar suit set |
+| J-SF | Safari Joda | 62114290 | 700 | Safari-style 2-pc |
+| SA | Saree | 62114290 | 600 | Draped traditional |
+| SHR | Sharara | 62044900 | 400 | Wide-leg with kurta |
+| SHWL | Shawl | 62141090 | 400 | Woolen/silk wrap |
+| SW | Sherwani | 62031900 | 1000 | Men's long coat |
+| C-SW | Sherwani (Child) | 62034900 | 700 | Boys' long coat |
+| SHT | Shirt | 62052090 | 300 | Men's cotton shirt |
+| SK | Short Kurta | 62114290 | 250 | Short tunic |
+| SKT-TOP | Skirt-Crop Top | 62114290 | 350 | Indo-Western fusion |
+| S2P | Suit (2 Pc) | 62031900 | 800 | Men's 2-pc formal |
+| S3P | Suit (3 Pc) | 62031900 | 1000 | Men's 3-pc with vest |
+| S5P | Suit (5 Pc) | 62031900 | 1200 | Men's 5-pc with shirt+tie |
+| SJ-2P | Suit (Jodhpuri) - 2Pc | 62031900 | 900 | Jodhpuri embroidered 2-pc |
+| SJ-3P | Suit (Jodhpuri) - 3Pc | 62031900 | 1100 | Jodhpuri embroidered 3-pc |
+| J-S | Suit Joda | 52111190 | 600 | Fabric set for tailoring |
+| ST | Suits | 62114290 | 700 | General kurta+bottom set |
+| SWT-SHT | Sweatshirt | 61102090 | 400 | Knitted pullover |
+| T-SHT | T-Shirt | 61091090 | 200 | Knitted crew/v-neck |
+| TOP | Tops | 62064090 | 250 | Women's casual upper |
+| TRS | Trousers | 62034100 | 400 | Formal/semi-formal pants |
+
+**HSN Chapter Reference:**
+- `6109` — T-shirts, knitted/crocheted
+- `6110` — Jerseys/sweatshirts, knitted
+- `6113` — Knitted/crocheted garments (leggings etc.)
+- `6203` — Men's woven suits/jackets/trousers
+- `6204` — Women's woven suits/dresses/skirts
+- `6205` — Men's woven shirts
+- `6206` — Women's woven blouses
+- `6211` — Other woven garments (kurtas, indo-western, sarees)
+- `6214` — Shawls, scarves, dupattas
+- `6217` — Other clothing accessories (mala, safa)
+- `5211` — Woven cotton fabric (for fabric categories)
+
+**Weights to verify with supplier bills** — fabric categories especially variable. Child sizes ~30% lighter than adult equivalent.
+
+---
+
 ## File Map
 
 | Action | File |

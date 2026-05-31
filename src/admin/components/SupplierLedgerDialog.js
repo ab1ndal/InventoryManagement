@@ -1,6 +1,7 @@
 // src/admin/components/SupplierLedgerDialog.js
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { toast } from "sonner";
 import { formatDate } from "../../utility/dateFormat";
 import { computeRunningLedger, computeSummary } from "../../utility/supplierBalance";
 import {
@@ -13,6 +14,56 @@ import {
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+
+function LineItemProductLink({ lineItem, onLinked }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(lineItem.product_id ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    const productId = value.trim() || null;
+    const { error } = await supabase
+      .from("supplier_bill_line_items")
+      .update({ product_id: productId })
+      .eq("line_item_id", lineItem.line_item_id);
+    setSaving(false);
+    if (error) {
+      toast.error("Failed to link product", { description: error.message });
+    } else {
+      toast.success(productId ? `Linked ${productId}` : "Product unlinked");
+      setEditing(false);
+      onLinked?.({ ...lineItem, product_id: productId });
+    }
+  };
+
+  if (!editing) {
+    return (
+      <span
+        className="text-blue-600 hover:underline cursor-pointer text-xs"
+        onClick={() => setEditing(true)}
+      >
+        {lineItem.product_id ?? "Link product"}
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value.toUpperCase())}
+        placeholder="BC25001"
+        className="h-6 text-xs w-24 uppercase"
+        autoFocus
+        onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+      />
+      <button onClick={save} disabled={saving} className="text-green-600 hover:text-green-800 text-xs font-medium">✓</button>
+      <button onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+    </span>
+  );
+}
 
 const formatINR = (val, decimals = 0) =>
   val == null ? "—" : "₹" + Number(val).toLocaleString("en-IN", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -25,6 +76,21 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState(null);
   const [openingBalance, setOpeningBalance] = useState(0);
+
+  const handleLineItemLinked = (txnId, updatedItem) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.transaction_id === txnId
+          ? {
+              ...r,
+              supplier_bill_line_items: r.supplier_bill_line_items?.map((li) =>
+                li.line_item_id === updatedItem.line_item_id ? updatedItem : li
+              ),
+            }
+          : r
+      )
+    );
+  };
 
   useEffect(() => {
     if (open && supplier) {
@@ -191,6 +257,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                         <th className="p-1 text-left">Unit</th>
                                         <th className="p-1 text-right">Price</th>
                                         <th className="p-1 text-right">Amount</th>
+                                        <th className="p-1 text-left">Product</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -202,6 +269,12 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                           <td className="p-1">{li.unit || "—"}</td>
                                           <td className="p-1 text-right">{formatINR(li.unit_price, 2)}</td>
                                           <td className="p-1 text-right font-medium">{formatINR(li.amount, 2)}</td>
+                                          <td className="p-1">
+                                            <LineItemProductLink
+                                              lineItem={li}
+                                              onLinked={(updated) => handleLineItemLinked(row.transaction_id, updated)}
+                                            />
+                                          </td>
                                         </tr>
                                       ))}
                                     </tbody>

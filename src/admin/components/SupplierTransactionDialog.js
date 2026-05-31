@@ -52,6 +52,57 @@ const formSchema = z.object({
   })).optional().default([]),
 });
 
+function SupplierPicker({ locked, onSelect }) {
+  const [query, setQuery] = React.useState("");
+  const [results, setResults] = React.useState([]);
+  const [open, setOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (locked) return;
+    if (query.trim().length < 1) { setResults([]); setOpen(false); return; }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("suppliers")
+        .select("supplierid, name, gstin, phone")
+        .ilike("name", `%${query}%`)
+        .order("name")
+        .limit(8);
+      setResults(data || []);
+      setOpen(true);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query, locked]);
+
+  if (locked) return null;
+
+  return (
+    <div className="relative">
+      <Input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search supplier name…"
+        autoFocus
+      />
+      {open && results.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-52 overflow-y-auto">
+          {results.map((s) => (
+            <button
+              key={s.supplierid}
+              type="button"
+              className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
+              onClick={() => { onSelect(s); setQuery(s.name); setOpen(false); }}
+            >
+              <span className="font-medium">{s.name}</span>
+              {s.gstin && <span className="ml-2 text-xs text-muted-foreground">{s.gstin}</span>}
+              {s.phone && <span className="ml-2 text-xs text-muted-foreground">{s.phone}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SupplierTransactionDialog({
   supplier,
   open,
@@ -60,6 +111,11 @@ export default function SupplierTransactionDialog({
   defaultType = "bill",
 }) {
   const [submitting, setSubmitting] = React.useState(false);
+  const [selectedSupplier, setSelectedSupplier] = React.useState(supplier ?? null);
+
+  React.useEffect(() => {
+    setSelectedSupplier(supplier ?? null);
+  }, [supplier, open]);
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -108,6 +164,10 @@ export default function SupplierTransactionDialog({
   }, [open, form, defaultType]);
 
   const handleSubmit = async (values) => {
+    if (!selectedSupplier) {
+      toast.error("Select a supplier first");
+      return;
+    }
     setSubmitting(true);
     try {
       const isBill = values.type === "bill";
@@ -117,7 +177,7 @@ export default function SupplierTransactionDialog({
       const { data: txnData, error: txnError } = await supabase
         .from("supplier_transactions")
         .insert({
-          supplier_id: supplier.supplierid,
+          supplier_id: selectedSupplier.supplierid,
           type: values.type,
           amount: values.amount,
           transaction_date: values.transaction_date,
@@ -157,7 +217,7 @@ export default function SupplierTransactionDialog({
       // 3. If type === bill and image provided, upload to storage
       const file = values.bill_image?.[0];
       if (isBill && file) {
-        const storagePath = `${supplier.supplierid}/${transaction_id}-${Date.now()}-${file.name}`;
+        const storagePath = `${selectedSupplier.supplierid}/${transaction_id}-${Date.now()}-${file.name}`;
 
         const { error: uploadError } = await supabase.storage
           .from("supplier-bills")
@@ -173,7 +233,7 @@ export default function SupplierTransactionDialog({
           .from("supplier_bills")
           .insert({
             transaction_id,
-            supplier_id: supplier.supplierid,
+            supplier_id: selectedSupplier.supplierid,
             image_url: urlData.publicUrl,
             storage_path: storagePath,
           });
@@ -198,11 +258,32 @@ export default function SupplierTransactionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md bg-white rounded-lg shadow-xl p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Transaction — {supplier?.name}</DialogTitle>
+          <DialogTitle>
+            Add Transaction{selectedSupplier ? ` — ${selectedSupplier.name}` : ""}
+          </DialogTitle>
           <DialogDescription>
-            Record a bill received from or a payment made to this supplier.
+            Record a bill received from or a payment made to a supplier.
           </DialogDescription>
         </DialogHeader>
+
+        {!supplier && (
+          <div className="space-y-1">
+            {selectedSupplier ? (
+              <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm bg-blue-50">
+                <span className="font-medium">{selectedSupplier.name}</span>
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:underline"
+                  onClick={() => setSelectedSupplier(null)}
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <SupplierPicker locked={false} onSelect={setSelectedSupplier} />
+            )}
+          </div>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">

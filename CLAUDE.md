@@ -80,6 +80,22 @@ No global store. Each page/component manages its own state with `useState`/`useE
 - Utility functions: `src/utility/` (`dateFormat.js`, `formatPhone.js`)
 - Mix of `.js`, `.jsx`, and `.ts`/`.tsx` extensions — all are valid React components
 
+## Database Schema (Live)
+
+Before writing any migration or DB query, fetch live schema from Supabase:
+
+```bash
+source .env && curl -s \
+  -H "apikey: $REACT_APP_SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $REACT_APP_SUPABASE_SERVICE_ROLE_KEY" \
+  "$REACT_APP_SUPABASE_URL/rest/v1/rpc/get_schema_info" | \
+  node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const rows=JSON.parse(d); const tables={}; rows.forEach(r=>{if(!tables[r.table_name])tables[r.table_name]=[]; tables[r.table_name].push(r.column_name+' '+r.udt_name+(r.is_nullable==='NO'?' NOT NULL':'')+(r.column_default?' DEFAULT '+r.column_default:'')); }); Object.entries(tables).forEach(([t,cols])=>console.log(t+':\n  '+cols.join('\n  ')));"
+```
+
+Use the output (not `schema/*.sql` files) as ground truth for current column names and types. If the RPC is missing, apply `schema/util_get_schema_info.sql` once in the Supabase SQL editor first.
+
+New migrations go in `schema/migration_*.sql`. Never edit existing `schema/*.sql` table files.
+
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
