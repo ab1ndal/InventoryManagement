@@ -90,12 +90,14 @@ export function badgeFor(change, { inverse = false } = {}) {
 }
 
 export function aggregateMonthlySeries(bills, items, fyStartYear) {
+  // bills must be pre-filtered to fyStartYear's period; fyStartYear documents intent only
   const revenue = FY_MONTHS.map(() => 0);
   const cost = FY_MONTHS.map(() => 0);
   // Map a calendar month (0-11) to its slot in the Apr..Mar sequence.
   const slotOf = (m) => (m >= 3 ? m - 3 : m + 9);
   const billSlot = new Map(); // billid -> slot index
   for (const b of bills) {
+    if (!b.orderdate) continue;
     const slot = slotOf(new Date(b.orderdate).getMonth());
     billSlot.set(b.billid, slot);
     revenue[slot] += num(b.net_amount);
@@ -116,7 +118,7 @@ export function aggregateMonthlySeries(bills, items, fyStartYear) {
 export function aggregateCategories(items) {
   const map = new Map();
   for (const i of items) {
-    const key = i.category && String(i.category).trim() ? i.category : "Uncategorized";
+    const key = i.category && String(i.category).trim() ? String(i.category).trim() : "Uncategorized";
     const row = map.get(key) || { category: key, revenue: 0, cost: 0 };
     row.revenue += num(i.total);
     row.cost += num(i.cost_price) * num(i.quantity);
@@ -163,6 +165,7 @@ export function aggregateDiscounts(bills, items) {
   const manualBills = new Set();
   for (const i of items) {
     const amt = num(i.discount_total);
+    if (!hasCode.has(i.billid)) continue;
     if (hasCode.get(i.billid)) {
       codeAmount += amt;
       if (amt > 0) codeBills.add(i.billid);
