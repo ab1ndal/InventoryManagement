@@ -39,7 +39,28 @@ const formSchema = z.object({
       (v) => v === null || v === undefined || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
       "Invalid email"
     ),
-  notes: z.string().optional().transform((v) => v?.trim() === "" ? null : v),
+  notes: z.string().optional().transform((v) => (v?.trim() === "" ? null : v)),
+  gstin: z
+    .string()
+    .optional()
+    .transform((v) => (v?.trim() === "" ? null : v?.toUpperCase() ?? null))
+    .refine(
+      (v) => v === null || v === undefined || /^[0-9A-Z]{15}$/.test(v),
+      "GSTIN must be 15 alphanumeric characters"
+    ),
+  pan: z
+    .string()
+    .optional()
+    .transform((v) => (v?.trim() === "" ? null : v?.toUpperCase() ?? null))
+    .refine(
+      (v) => v === null || v === undefined || /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(v),
+      "Invalid PAN format (e.g. ABCDE1234F)"
+    ),
+  address: z.string().optional().transform((v) => (v?.trim() === "" ? null : v)),
+  opening_balance: z.coerce
+    .number({ invalid_type_error: "Must be a number" })
+    .default(0),
+  opening_balance_date: z.string().optional().nullable(),
 });
 
 export default function SupplierForm({
@@ -58,6 +79,11 @@ export default function SupplierForm({
       phone: defaultValues?.phone ?? "",
       email: defaultValues?.email ?? "",
       notes: defaultValues?.notes ?? "",
+      gstin: defaultValues?.gstin ?? "",
+      pan: defaultValues?.pan ?? "",
+      address: defaultValues?.address ?? "",
+      opening_balance: defaultValues?.opening_balance ?? 0,
+      opening_balance_date: defaultValues?.opening_balance_date ?? "",
     },
   });
 
@@ -68,6 +94,11 @@ export default function SupplierForm({
       phone: defaultValues?.phone ?? "",
       email: defaultValues?.email ?? "",
       notes: defaultValues?.notes ?? "",
+      gstin: defaultValues?.gstin ?? "",
+      pan: defaultValues?.pan ?? "",
+      address: defaultValues?.address ?? "",
+      opening_balance: defaultValues?.opening_balance ?? 0,
+      opening_balance_date: defaultValues?.opening_balance_date ?? "",
     });
   }, [defaultValues, form]);
 
@@ -78,6 +109,11 @@ export default function SupplierForm({
         phone: values.phone ?? null,
         email: values.email ?? null,
         notes: values.notes ?? null,
+        gstin: values.gstin ?? null,
+        pan: values.pan ?? null,
+        address: values.address ?? null,
+        opening_balance: values.opening_balance,
+        opening_balance_date: values.opening_balance_date || null,
       };
 
       let error;
@@ -154,6 +190,81 @@ export default function SupplierForm({
                     <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input {...field} type="email" placeholder="email@example.com" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                name="gstin"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>GSTIN</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="09ABCDE1234F1Z5" className="uppercase" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                name="pan"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PAN</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="ABCDE1234F" className="uppercase" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              name="address"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address</FormLabel>
+                  <FormControl>
+                    <Textarea {...field} rows={2} placeholder="Supplier address…" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                name="opening_balance"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opening Balance (₹)</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="number" step="0.01" placeholder="0.00" />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Positive = we owe them. Negative = they owe us.
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                name="opening_balance_date"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Opening Balance Date</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
