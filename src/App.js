@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,30 +8,32 @@ import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
-import AdminLayout from "./admin/components/AdminLayout";
-import InventoryPage from "./admin/pages/InventoryPage";
-import BillingPage from "./admin/pages/BillingPage";
-import VoucherPage from "./admin/pages/VoucherPage";
-import DiscountPage from "./admin/pages/DiscountPage";
-import ExchangePage from "./admin/pages/ExchangePage";
-import CustomersPage from "./admin/pages/CustomersPage";
-import SuppliersPage from "./admin/pages/SuppliersPage";
-import LoginPage from "./admin/pages/LoginPage";
-import RequireAdminAuth from "./admin/components/RequireAdminAuth";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
-import UserManagement from "./admin/pages/UserManagement";
-import SignupPage from "./admin/pages/SignupPage";
-import ForgetPasswordPage from "./admin/pages/ForgetPasswordPage";
-import ResetPasswordPage from "./admin/pages/ResetPasswordPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
 import { TooltipProvider } from "components/ui/tooltip";
-import MockupPage from "./admin/pages/MockupPage";
+
+const AdminLayout = lazy(() => import("./admin/components/AdminLayout"));
+const InventoryPage = lazy(() => import("./admin/pages/InventoryPage"));
+const BillingPage = lazy(() => import("./admin/pages/BillingPage"));
+const VoucherPage = lazy(() => import("./admin/pages/VoucherPage"));
+const DiscountPage = lazy(() => import("./admin/pages/DiscountPage"));
+const ExchangePage = lazy(() => import("./admin/pages/ExchangePage"));
+const CustomersPage = lazy(() => import("./admin/pages/CustomersPage"));
+const SuppliersPage = lazy(() => import("./admin/pages/SuppliersPage"));
+const LoginPage = lazy(() => import("./admin/pages/LoginPage"));
+const RequireAdminAuth = lazy(() => import("./admin/components/RequireAdminAuth"));
+const UserManagement = lazy(() => import("./admin/pages/UserManagement"));
+const SignupPage = lazy(() => import("./admin/pages/SignupPage"));
+const ForgetPasswordPage = lazy(() => import("./admin/pages/ForgetPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./admin/pages/ResetPasswordPage"));
+const MockupPage = lazy(() => import("./admin/pages/MockupPage"));
 
 function App() {
   return (
     <TooltipProvider>
       <Router>
+        <Suspense fallback={null}>
         <Routes>
           {/* Storefront */}
           <Route path="/" element={<StorefrontLayout />}>
@@ -65,6 +67,7 @@ function App() {
             </Route>
           </Route>
         </Routes>
+        </Suspense>
       </Router>
       <Toaster position="bottom-right" richColors closeButton duration={2000} />
     </TooltipProvider>

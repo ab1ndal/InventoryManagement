@@ -202,7 +202,7 @@ function MonthlySales() {
   );
 }
 
-function UsersTab() {
+function UsersTab({ isSuperAdmin }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -220,7 +220,7 @@ function UsersTab() {
       setError(null);
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, email, role")
+        .select("id, email, role, is_active")
         .order("email");
       if (error) throw error;
       setUsers(data);
@@ -242,12 +242,29 @@ function UsersTab() {
         .eq("id", userId);
       if (error) throw error;
       setUsers((prev) =>
-        prev.map((user) => (user.id === userId ? { ...user, role: newRole } : user))
+        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
       );
-      toast({ title: "Success", description: "User role updated successfully" });
+      toast({ title: "Success", description: "Role updated." });
     } catch (error) {
       console.error("Error updating role:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to update user role" });
+      toast({ variant: "destructive", title: "Error", description: "Failed to update role." });
+    }
+  };
+
+  const toggleActive = async (userId, currentActive) => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_active: !currentActive })
+        .eq("id", userId);
+      if (error) throw error;
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, is_active: !currentActive } : u))
+      );
+      toast({ title: "Success", description: currentActive ? "User deactivated." : "User reactivated." });
+    } catch (error) {
+      console.error("Error toggling active:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to update user status." });
     }
   };
 
@@ -269,40 +286,69 @@ function UsersTab() {
         <TableHeader>
           <TableRow>
             <TableHead>Email</TableHead>
-            <TableHead>Current Role</TableHead>
-            <TableHead>New Role</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Status</TableHead>
+            {isSuperAdmin && <TableHead>Change Role</TableHead>}
+            {isSuperAdmin && <TableHead></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>{user.role}</TableCell>
-              <TableCell>
-                <Select
-                  value={user.role}
-                  onValueChange={(newRole) => {
-                    if (newRole !== user.role) updateRole(user.id, newRole);
-                  }}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border border-gray-200 shadow-md rounded-md">
-                    {ROLES.map((role) => (
-                      <SelectItem
-                        key={role.value}
-                        value={role.value}
-                        className="bg-white border border-gray-200 shadow-md rounded-md"
+          {users.map((user) => {
+            const inactive = user.is_active === false;
+            const isSuperAdminRow = user.role === "superadmin";
+            return (
+              <TableRow key={user.id} className={inactive ? "opacity-40" : ""}>
+                <TableCell>{user.email}</TableCell>
+                <TableCell className="capitalize">{user.role === "superadmin" ? "Super Admin" : user.role}</TableCell>
+                <TableCell>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${inactive ? "bg-gray-100 text-gray-500" : "bg-green-100 text-green-700"}`}>
+                    {inactive ? "Inactive" : "Active"}
+                  </span>
+                </TableCell>
+                {isSuperAdmin && (
+                  <TableCell>
+                    <Select
+                      value={user.role}
+                      onValueChange={(newRole) => {
+                        if (newRole !== user.role) updateRole(user.id, newRole);
+                      }}
+                    >
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 shadow-md rounded-md">
+                        {ROLES.map((role) => (
+                          <SelectItem
+                            key={role.value}
+                            value={role.value}
+                            className="bg-white border border-gray-200 shadow-md rounded-md"
+                          >
+                            {role.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                )}
+                {isSuperAdmin && (
+                  <TableCell>
+                    {!isSuperAdminRow && (
+                      <button
+                        onClick={() => toggleActive(user.id, user.is_active !== false)}
+                        className={`text-xs px-3 py-1 rounded border font-medium transition ${
+                          inactive
+                            ? "border-green-500 text-green-600 hover:bg-green-50"
+                            : "border-red-400 text-red-500 hover:bg-red-50"
+                        }`}
                       >
-                        {role.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TableCell>
-            </TableRow>
-          ))}
+                        {inactive ? "Reactivate" : "Deactivate"}
+                      </button>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -336,7 +382,7 @@ export default function AdminPage() {
           )}
         </TabsList>
         <TabsContent value="users">
-          <UsersTab />
+          <UsersTab isSuperAdmin={isSuperAdmin} />
         </TabsContent>
         {isSuperAdmin && (
           <TabsContent value="monthly-sales">

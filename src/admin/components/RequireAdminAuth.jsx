@@ -19,11 +19,11 @@ export default function RequireAdminAuth() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, is_active")
         .eq("id", session.user.id)
         .single();
 
-        if (!error && ["admin", "superadmin"].includes(data?.role)) {
+        if (!error && ["admin", "superadmin"].includes(data?.role) && data?.is_active !== false) {
           setIsAuthorized(true);
         } else {
           setRedirectReason("unauthorized");
