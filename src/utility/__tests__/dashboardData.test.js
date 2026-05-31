@@ -5,6 +5,9 @@ import {
   priorYearRange,
   buildFyList,
   fyLabel,
+  aggregateKpis,
+  pctChange,
+  badgeFor,
 } from "../dashboardData";
 
 describe("FY_MONTHS", () => {
@@ -65,8 +68,6 @@ describe("buildFyList", () => {
     expect(list[2].fyStart).toEqual(new Date(2023, 3, 1));
   });
 });
-
-import { aggregateKpis, pctChange, badgeFor } from "../dashboardData";
 
 describe("pctChange", () => {
   test("returns null when prior is 0 (no baseline)", () => {

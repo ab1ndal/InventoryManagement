@@ -83,7 +83,7 @@ export function pctChange(curr, prior) {
 }
 
 export function badgeFor(change, { inverse = false } = {}) {
-  if (change === null || Math.abs(change) < 2) return { symbol: "—", tone: "neutral" };
+  if (change == null || !Number.isFinite(change) || Math.abs(change) < 2) return { symbol: "—", tone: "neutral" };
   const up = change > 0;
   const good = inverse ? !up : up;
   return { symbol: up ? "↑" : "↓", tone: good ? "good" : "bad" };
