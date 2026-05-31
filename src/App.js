@@ -23,7 +23,7 @@ const CustomersPage = lazy(() => import("./admin/pages/CustomersPage"));
 const SuppliersPage = lazy(() => import("./admin/pages/SuppliersPage"));
 const LoginPage = lazy(() => import("./admin/pages/LoginPage"));
 const RequireAdminAuth = lazy(() => import("./admin/components/RequireAdminAuth"));
-const UserManagement = lazy(() => import("./admin/pages/UserManagement"));
+const AdminPage = lazy(() => import("./admin/pages/AdminPage"));
 const SignupPage = lazy(() => import("./admin/pages/SignupPage"));
 const ForgetPasswordPage = lazy(() => import("./admin/pages/ForgetPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./admin/pages/ResetPasswordPage"));
@@ -63,7 +63,7 @@ function App() {
               <Route path="mockups" element={<MockupPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="suppliers" element={<SuppliersPage />} />
-              <Route path="users" element={<UserManagement />} />
+              <Route path="admin-hub" element={<AdminPage />} />
             </Route>
           </Route>
         </Routes>
