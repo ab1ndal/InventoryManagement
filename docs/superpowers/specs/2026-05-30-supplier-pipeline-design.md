@@ -3,7 +3,7 @@
 
 ## Goal
 
-Strengthen the existing supplier ledger system with: richer supplier profile (GSTIN, PAN, address, opening balance), full GST-compliant bill capture (invoice number, tax breakdown), payment mode tracking, advance transaction type, and a drill-down ledger UI inside an inline accordion on the suppliers table.
+Strengthen the existing supplier ledger system with: richer supplier profile (GSTIN, PAN, address, opening balance), full GST-compliant bill capture (invoice number, tax breakdown), payment mode tracking, advance transaction type, and a two-subtab layout on the Suppliers page separating supplier management from transaction management.
 
 ---
 
@@ -67,32 +67,54 @@ running_balance = opening_balance
 
 ## UI Changes
 
+### Page Layout — Two Subtabs
+
+`SuppliersPage` renders two subtabs:
+
+```
+[ Suppliers ]  [ Transactions ]
+```
+
+---
+
+### Tab 1: Suppliers
+
+Existing `SupplierTable` + `SupplierForm`. Clicking a supplier row opens `SupplierLedgerDialog` (modal) showing that supplier's full ledger.
+
+Ledger modal layout:
+```
+Supplier Name
+Total Billed: ₹X   Total Paid: ₹Y   Net Balance: ₹Z (owed / credit)
+[Add Bill]  [Add Payment]
+
+Date | Type    | Invoice No | Debit | Credit | Balance
+     | Opening |            |       |        | ₹X
+date | Bill    | 033/26-27  | ₹X    |        | ₹X   ← click → bill detail panel
+date | Payment |            |       | ₹X     | ₹X   ← click → payment detail
+date | Advance |            |       | ₹X     | ₹X
+```
+
+- Click bill row → expand inline detail: invoice no, taxable, CGST, SGST, IGST, bill image link
+- Click payment/advance row → expand inline detail: payment mode, notes
+
 ### SupplierForm (add/edit supplier)
-Add fields: GSTIN, PAN, address (textarea), opening balance (number, signed).
-Opening balance only editable on first save (or superadmin override — keep simple for now, just allow editing).
+Add fields: GSTIN, PAN, address (textarea), opening balance (signed number — positive = we owe them, negative = they owe us).
 
-### SupplierTable — Inline Accordion
+---
 
-Remove "View Ledger" dialog. Clicking a supplier row expands an inline accordion below it.
+### Tab 2: Transactions
 
-Accordion header (summary bar):
+All transactions across all suppliers in a single table, newest first.
+
 ```
-Total Billed: ₹X    Total Paid: ₹Y    Net Balance: ₹Z (owed / credit)
-```
-
-Accordion body — ledger table:
-```
-Date | Type      | Invoice No | Debit (Bill) | Credit (Paid) | Balance
------|-----------|------------|--------------|---------------|--------
-     | Opening   |            |              |               | ₹X
-date | Bill      | 033/26-27  | ₹6,545       |               | ₹X
-date | Payment   |            |              | ₹3,000        | ₹X
-date | Advance   |            |              | ₹2,000        | ₹X
+Date | Supplier | Type    | Invoice No | Debit | Credit | Mode | Notes | Image
 ```
 
-- Click a **bill row** → inline expansion shows: invoice no, taxable amount, CGST, SGST, IGST, bill image link
-- Click a **payment/advance row** → inline expansion shows: payment mode, notes
-- [Add Bill] and [Add Payment] buttons at top of accordion
+- Filter by supplier (dropdown)
+- Filter by type (bill / payment / advance)
+- [Add Transaction] button — opens `SupplierTransactionDialog` with supplier selector
+
+---
 
 ### SupplierTransactionDialog — updated forms
 
