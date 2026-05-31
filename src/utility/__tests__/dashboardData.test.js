@@ -65,3 +65,61 @@ describe("buildFyList", () => {
     expect(list[2].fyStart).toEqual(new Date(2023, 3, 1));
   });
 });
+
+import { aggregateKpis, pctChange, badgeFor } from "../dashboardData";
+
+describe("pctChange", () => {
+  test("returns null when prior is 0 (no baseline)", () => {
+    expect(pctChange(100, 0)).toBeNull();
+  });
+  test("computes percentage change", () => {
+    expect(pctChange(150, 100)).toBe(50);
+    expect(pctChange(80, 100)).toBe(-20);
+  });
+});
+
+describe("badgeFor", () => {
+  test("null change -> neutral dash", () => {
+    expect(badgeFor(null)).toEqual({ symbol: "—", tone: "neutral" });
+  });
+  test("under 2% magnitude -> neutral", () => {
+    expect(badgeFor(1.5)).toEqual({ symbol: "—", tone: "neutral" });
+  });
+  test("positive -> green up by default", () => {
+    expect(badgeFor(10)).toEqual({ symbol: "↑", tone: "good" });
+  });
+  test("negative -> red down by default", () => {
+    expect(badgeFor(-10)).toEqual({ symbol: "↓", tone: "bad" });
+  });
+  test("inverse metric (discount): increase is bad", () => {
+    expect(badgeFor(10, { inverse: true })).toEqual({ symbol: "↑", tone: "bad" });
+    expect(badgeFor(-10, { inverse: true })).toEqual({ symbol: "↓", tone: "good" });
+  });
+});
+
+describe("aggregateKpis", () => {
+  const bills = [
+    { billid: 1, net_amount: 1000 },
+    { billid: 2, net_amount: 500 },
+  ];
+  const items = [
+    { billid: 1, total: 600, cost_price: 200, quantity: 2, discount_total: 50 },
+    { billid: 1, total: 400, cost_price: 100, quantity: 1, discount_total: 0 },
+    { billid: 2, total: 500, cost_price: null, quantity: 3, discount_total: 25 },
+  ];
+  test("computes revenue/cost/profit/aov/margin/discount", () => {
+    const k = aggregateKpis(bills, items);
+    expect(k.revenue).toBe(1500);
+    expect(k.billsCount).toBe(2);
+    expect(k.cost).toBe(500); // 200*2 + 100*1 + 0 (null)*3
+    expect(k.profit).toBe(1000);
+    expect(k.aov).toBe(750);
+    expect(k.grossMargin).toBeCloseTo(66.6667, 3); // (1500-500)/1500*100
+    expect(k.discountGiven).toBe(75);
+    expect(k.discountPctOfGross).toBeCloseTo((75 / 1575) * 100, 3);
+  });
+  test("handles empty period without NaN", () => {
+    const k = aggregateKpis([], []);
+    expect(k).toMatchObject({ revenue: 0, billsCount: 0, aov: 0, grossMargin: 0, profit: 0 });
+  });
+});

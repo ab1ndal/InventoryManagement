@@ -58,3 +58,33 @@ export function buildFyList(minDate, maxDate) {
   }
   return list;
 }
+
+const num = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
+export function aggregateKpis(bills, items) {
+  const revenue = bills.reduce((s, b) => s + num(b.net_amount), 0);
+  const billsCount = bills.length;
+  const cost = items.reduce((s, i) => s + num(i.cost_price) * num(i.quantity), 0);
+  const discountGiven = items.reduce((s, i) => s + num(i.discount_total), 0);
+  const profit = revenue - cost;
+  const aov = billsCount ? revenue / billsCount : 0;
+  const grossMargin = revenue ? ((revenue - cost) / revenue) * 100 : 0;
+  const gross = revenue + discountGiven; // gross sales before discount
+  const discountPctOfGross = gross ? (discountGiven / gross) * 100 : 0;
+  return { revenue, billsCount, cost, profit, aov, grossMargin, discountGiven, discountPctOfGross };
+}
+
+export function pctChange(curr, prior) {
+  if (!prior) return null; // no baseline -> caller shows neutral
+  return ((curr - prior) / prior) * 100;
+}
+
+export function badgeFor(change, { inverse = false } = {}) {
+  if (change === null || Math.abs(change) < 2) return { symbol: "—", tone: "neutral" };
+  const up = change > 0;
+  const good = inverse ? !up : up;
+  return { symbol: up ? "↑" : "↓", tone: good ? "good" : "bad" };
+}
