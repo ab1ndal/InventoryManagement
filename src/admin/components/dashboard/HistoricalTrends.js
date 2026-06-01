@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui
 import { supabase } from "../../../lib/supabaseClient";
 import { toast } from "sonner";
 import {
+  BILLS_START_YEAR,
   buildFyTotals,
   buildSeasonalSeries,
   buildVsHistoryComparison,
@@ -55,9 +56,10 @@ export default function HistoricalTrends() {
   const [histRows, setHistRows] = useState([]);
   const [liveBills, setLiveBills] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredFy, setHoveredFy] = useState(null);
 
   useEffect(() => {
-    const fyStart = `${CURRENT_FY_YEAR}-04-01T00:00:00`;
+    const billsStart = `${BILLS_START_YEAR}-04-01T00:00:00`;
     (async () => {
       try {
         const [histRes, billsData] = await Promise.all([
@@ -65,9 +67,9 @@ export default function HistoricalTrends() {
           fetchAllRows(() =>
             supabase
               .from("bills")
-              .select("net_amount, orderdate")
+              .select("net_amount, payment_amount, orderdate")
               .eq("finalized", true)
-              .gte("orderdate", fyStart)
+              .gte("orderdate", billsStart)
           ),
         ]);
         if (histRes.error) throw histRes.error;
@@ -107,25 +109,36 @@ export default function HistoricalTrends() {
   const histFys = fyTotals.filter((f) => !f.isLive);
   const liveFy = fyTotals.filter((f) => f.isLive);
 
+  const fmtL = (v) => (v !== null ? `${toLakhs(v).toFixed(2)}L` : "");
   const trendData = [
     {
       type: "bar",
       name: "Historical FYs",
       x: histFys.map((f) => f.label),
       y: histFys.map((f) => (f.total !== null ? toLakhs(f.total) : null)),
+      text: histFys.map((f) => fmtL(f.total)),
+      textposition: "outside",
       marker: { color: "#93c5fd" },
     },
     {
       type: "bar",
-      name: "FY 26-27 (YTD)",
+      name: `${fyLabel(CURRENT_FY_YEAR)} (YTD)`,
       x: liveFy.map((f) => f.label),
       y: liveFy.map((f) => (f.total !== null ? toLakhs(f.total) : null)),
+      text: liveFy.map((f) => fmtL(f.total)),
+      textposition: "outside",
       marker: { color: "#0066cc", opacity: 0.75 },
     },
   ];
 
   const seasonalData = seasonalSeries.map((s) => {
     const isCurrentFy = s.label === fyLabel(CURRENT_FY_YEAR);
+    const isHovered = hoveredFy === s.label && !isCurrentFy;
+    const dimmed = hoveredFy !== null && !isHovered && !isCurrentFy;
+    const color = isCurrentFy ? "#0066cc" : isHovered ? "#f59e0b" : "#d1d5db";
+    const width = isCurrentFy ? 2.5 : isHovered ? 3 : 1;
+    const size = isCurrentFy ? 5 : isHovered ? 6 : 3;
+    const opacity = dimmed ? 0.15 : 1;
     return {
       type: "scatter",
       mode: "lines+markers",
@@ -133,16 +146,16 @@ export default function HistoricalTrends() {
       x: MONTH_LABELS,
       y: s.values.map((v) => (v !== null ? toLakhs(v) : null)),
       connectgaps: false,
-      line: { color: isCurrentFy ? "#0066cc" : "#d1d5db", width: isCurrentFy ? 2.5 : 1 },
-      marker: { color: isCurrentFy ? "#0066cc" : "#d1d5db", size: isCurrentFy ? 5 : 3 },
-      opacity: isCurrentFy ? 1 : 0.6,
+      line: { color, width },
+      marker: { color, size },
+      opacity,
     };
   });
 
   const vsData = [
     {
       type: "bar",
-      name: "FY26 Actual",
+      name: `${fyLabel(CURRENT_FY_YEAR)} Actual`,
       x: MONTH_LABELS,
       y: vsHistory.currentFy.map((v) => (v !== null ? toLakhs(v) : null)),
       marker: { color: "#0066cc" },
@@ -177,9 +190,11 @@ export default function HistoricalTrends() {
         <TabsContent value="seasonal">
           <Plot
             data={seasonalData}
-            layout={BASE_LAYOUT}
+            layout={{ ...BASE_LAYOUT, yaxis: { ...BASE_LAYOUT.yaxis, autorange: false, range: [0, 10] } }}
             config={{ displayModeBar: false, responsive: true }}
             style={{ width: "100%" }}
+            onHover={(e) => setHoveredFy(e.points[0]?.data?.name ?? null)}
+            onUnhover={() => setHoveredFy(null)}
           />
         </TabsContent>
         <TabsContent value="vs-history">

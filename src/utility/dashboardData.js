@@ -1,5 +1,24 @@
 // Pure helpers for the admin sales dashboard. No React, no Supabase imports.
 
+// FY 26-27 onwards is sourced from actual bills; earlier FYs from monthly_sales_history.
+export const BILLS_START_YEAR = 2026;
+
+function groupBillsByFy(bills, billsStartYear) {
+  const byFy = {};
+  for (const { net_amount, payment_amount, orderdate } of bills) {
+    const amount = net_amount ?? payment_amount;
+    if (!orderdate || amount === null) continue;
+    const d = new Date(orderdate);
+    const m = d.getMonth();
+    const fyYear = m >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+    if (fyYear < billsStartYear) continue;
+    if (!byFy[fyYear]) byFy[fyYear] = new Array(12).fill(null);
+    const idx = (m - 3 + 12) % 12;
+    byFy[fyYear][idx] = (byFy[fyYear][idx] ?? 0) + amount;
+  }
+  return byFy;
+}
+
 // FY runs Apr(3) -> Mar(2). `off` is the calendar-year offset from the FY start year.
 export const FY_MONTHS = [
   { label: "Apr", m: 3, off: 0 },
@@ -182,8 +201,8 @@ export function aggregateDiscounts(bills, items) {
   };
 }
 
-export function buildSeasonalSeries(histRows, liveBills, currentFyYear) {
-  const filteredRows = histRows.filter((r) => r.fy_start_year < currentFyYear);
+export function buildSeasonalSeries(histRows, liveBills, currentFyYear, billsStartYear = BILLS_START_YEAR) {
+  const filteredRows = histRows.filter((r) => r.fy_start_year < billsStartYear);
   const byFy = {};
   for (const { fy_start_year, month_idx, net_amount } of filteredRows) {
     if (!byFy[fy_start_year]) byFy[fy_start_year] = new Array(12).fill(null);
@@ -194,21 +213,19 @@ export function buildSeasonalSeries(histRows, liveBills, currentFyYear) {
     .map(([fy, values]) => ({ label: fyLabel(Number(fy)), values, _fy: Number(fy) }))
     .sort((a, b) => a._fy - b._fy);
 
-  const liveValues = new Array(12).fill(null);
-  for (const { net_amount, orderdate } of liveBills) {
-    if (net_amount === null) continue;
-    const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
-    liveValues[idx] = (liveValues[idx] ?? 0) + net_amount;
+  const billsByFy = groupBillsByFy(liveBills, billsStartYear);
+  for (const [fyStr, values] of Object.entries(billsByFy)) {
+    result.push({ label: fyLabel(Number(fyStr)), values, _fy: Number(fyStr) });
   }
-  result.push({ label: fyLabel(currentFyYear), values: liveValues, _fy: currentFyYear });
 
+  result.sort((a, b) => a._fy - b._fy);
   return result.map(({ _fy, ...rest }) => rest);
 }
 
-export function buildVsHistoryComparison(histRows, liveBills, currentFyYear) {
+export function buildVsHistoryComparison(histRows, liveBills, currentFyYear, billsStartYear = BILLS_START_YEAR) {
   const months = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 
-  const filteredRows = histRows.filter((r) => r.fy_start_year < currentFyYear);
+  const filteredRows = histRows.filter((r) => r.fy_start_year < billsStartYear);
   const buckets = Array.from({ length: 12 }, () => []);
   for (const { month_idx, net_amount } of filteredRows) {
     if (net_amount !== null) buckets[month_idx].push(net_amount);
@@ -217,18 +234,14 @@ export function buildVsHistoryComparison(histRows, liveBills, currentFyYear) {
     vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null
   );
 
-  const currentFy = new Array(12).fill(null);
-  for (const { net_amount, orderdate } of liveBills) {
-    if (net_amount === null) continue;
-    const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
-    currentFy[idx] = (currentFy[idx] ?? 0) + net_amount;
-  }
+  const billsByFy = groupBillsByFy(liveBills, billsStartYear);
+  const currentFy = billsByFy[currentFyYear] ?? new Array(12).fill(null);
 
   return { months, currentFy, historicalAvg };
 }
 
-export function buildFyTotals(histRows, liveBills, currentFyYear) {
-  const filteredRows = histRows.filter((r) => r.fy_start_year < currentFyYear);
+export function buildFyTotals(histRows, liveBills, currentFyYear, billsStartYear = BILLS_START_YEAR) {
+  const filteredRows = histRows.filter((r) => r.fy_start_year < billsStartYear);
   const byFy = {};
   for (const { fy_start_year, net_amount } of filteredRows) {
     if (!byFy[fy_start_year]) byFy[fy_start_year] = [];
@@ -246,9 +259,17 @@ export function buildFyTotals(histRows, liveBills, currentFyYear) {
     };
   });
 
-  const validBills = liveBills.filter((b) => b.net_amount !== null);
-  const liveTotal = validBills.length === 0 ? null : validBills.reduce((s, b) => s + b.net_amount, 0);
-  result.push({ label: fyLabel(currentFyYear), total: liveTotal, isLive: true, _fy: currentFyYear });
+  const billsByFy = groupBillsByFy(liveBills, billsStartYear);
+  for (const [fyStr, monthlyVals] of Object.entries(billsByFy)) {
+    const fyNum = Number(fyStr);
+    const valid = monthlyVals.filter((v) => v !== null);
+    result.push({
+      label: fyLabel(fyNum),
+      total: valid.length > 0 ? valid.reduce((s, v) => s + v, 0) : null,
+      isLive: fyNum === currentFyYear,
+      _fy: fyNum,
+    });
+  }
 
   result.sort((a, b) => a._fy - b._fy);
   result.forEach((r) => delete r._fy);
