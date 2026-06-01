@@ -117,5 +117,4 @@ VALUES
    (2025, 9, 303225),
    (2025, 10, 398225),
    (2025, 11, NULL)
-)
 ON CONFLICT (fy_start_year, month_idx) DO UPDATE SET net_amount = EXCLUDED.net_amount;
