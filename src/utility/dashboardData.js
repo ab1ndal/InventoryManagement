@@ -203,6 +203,27 @@ export function buildSeasonalSeries(histRows, fy2026Bills) {
   return result.map(({ _fy, ...rest }) => rest);
 }
 
+export function buildVsHistoryComparison(histRows, fy2026Bills) {
+  const months = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+
+  const filteredRows = histRows.filter((r) => r.fy_start_year !== 2026);
+  const buckets = Array.from({ length: 12 }, () => []);
+  for (const { month_idx, net_amount } of filteredRows) {
+    if (net_amount !== null) buckets[month_idx].push(net_amount);
+  }
+  const historicalAvg = buckets.map((vals) =>
+    vals.length > 0 ? vals.reduce((s, v) => s + v, 0) / vals.length : null
+  );
+
+  const currentFy = new Array(12).fill(null);
+  for (const { net_amount, orderdate } of fy2026Bills) {
+    const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
+    currentFy[idx] = (currentFy[idx] ?? 0) + net_amount;
+  }
+
+  return { months, currentFy, historicalAvg };
+}
+
 export function buildFyTotals(histRows, fy2026Bills) {
   const filteredRows = histRows.filter((r) => r.fy_start_year !== 2026);
   const byFy = {};

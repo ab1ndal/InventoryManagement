@@ -14,6 +14,7 @@ import {
   aggregateDiscounts,
   buildFyTotals,
   buildSeasonalSeries,
+  buildVsHistoryComparison,
 } from "../dashboardData";
 
 describe("FY_MONTHS", () => {
@@ -287,5 +288,39 @@ describe("buildFyTotals", () => {
     const labels = result.map((r) => r.label);
     expect(labels[0]).toBe(fyLabel(2022));
     expect(labels[labels.length - 1]).toBe(fyLabel(2026));
+  });
+});
+
+describe("buildVsHistoryComparison", () => {
+  it("returns months, currentFy, historicalAvg each with length 12", () => {
+    const result = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    expect(result.months).toHaveLength(12);
+    expect(result.currentFy).toHaveLength(12);
+    expect(result.historicalAvg).toHaveLength(12);
+  });
+
+  it("months[0] is Apr, months[11] is Mar", () => {
+    const { months } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    expect(months[0]).toBe("Apr");
+    expect(months[11]).toBe("Mar");
+  });
+
+  it("historicalAvg averages non-NULL values across FYs per month_idx", () => {
+    // month_idx 0: FY2022=100000, FY2023=150000 → avg 125000
+    const { historicalAvg } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    expect(historicalAvg[0]).toBe(125000);
+  });
+
+  it("historicalAvg is null when all values for that month are NULL", () => {
+    // month_idx 2: only FY2022 row present, net_amount=null → no valid values
+    const { historicalAvg } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    expect(historicalAvg[2]).toBeNull();
+  });
+
+  it("currentFy has FY2026 actuals from bills, null for months with no bills", () => {
+    const { currentFy } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    expect(currentFy[0]).toBe(300000); // Apr 2026
+    expect(currentFy[1]).toBe(250000); // May 2026
+    expect(currentFy[2]).toBeNull();   // Jun — no bills
   });
 });
