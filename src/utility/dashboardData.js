@@ -118,10 +118,11 @@ export function aggregateMonthlySeries(bills, items, fyStartYear) {
 export function aggregateCategories(items) {
   const map = new Map();
   for (const i of items) {
-    const key = i.category && String(i.category).trim() ? String(i.category).trim() : "Uncategorized";
-    const row = map.get(key) || { category: key, revenue: 0, cost: 0 };
+    const key = i.category && String(i.category).trim() ? String(i.category).trim() : "Others";
+    const row = map.get(key) || { category: key, revenue: 0, cost: 0, count: 0 };
     row.revenue += num(i.total);
     row.cost += num(i.cost_price) * num(i.quantity);
+    row.count += num(i.quantity);
     map.set(key, row);
   }
   return [...map.values()]

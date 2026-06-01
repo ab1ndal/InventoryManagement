@@ -36,28 +36,64 @@ async function fetchAllRows(makeQuery) {
 const iso = (d) => d.toISOString();
 
 async function fetchPeriod({ start, end }) {
-  const [bills, items] = await Promise.all([
-    fetchAllRows(() =>
-      supabase
-        .from("bills")
-        .select("billid, net_amount, orderdate, applied_codes")
-        .gte("orderdate", iso(start))
-        .lt("orderdate", iso(end))
-        .eq("finalized", true)
-    ),
-    // bill_items has no date column -> filter via embedded inner join on bills.
-    fetchAllRows(() =>
-      supabase
-        .from("bill_items")
-        .select(
-          "billid, category, total, cost_price, quantity, discount_total, salesperson_id, bills!inner(orderdate, finalized)"
-        )
-        .gte("bills.orderdate", iso(start))
-        .lt("bills.orderdate", iso(end))
-        .eq("bills.finalized", true)
-    ),
+  const bills = await fetchAllRows(() =>
+    supabase
+      .from("bills")
+      .select("billid, net_amount, payment_amount, orderdate, applied_codes")
+      .gte("orderdate", iso(start))
+      .lt("orderdate", iso(end))
+  );
+
+  if (bills.length === 0) return { bills: [], items: [] };
+
+  const billIds = bills.map((b) => b.billid);
+
+  const rawItems = await fetchAllRows(() =>
+    supabase
+      .from("bill_items")
+      .select("billid, product_code, variantid, quantity, total, discount_total, salesperson_id, category")
+      .in("billid", billIds)
+  );
+
+  const manualCodes = [...new Set(
+    rawItems.filter((i) => i.product_code?.startsWith("BCX")).map((i) => i.product_code)
+  )];
+  const variantIds = [...new Set(
+    rawItems.filter((i) => !i.product_code?.startsWith("BCX") && i.variantid).map((i) => i.variantid)
+  )];
+
+  const [manualRes, variantRes] = await Promise.all([
+    manualCodes.length > 0
+      ? supabase.from("manual_items").select("manual_item_id, purchase_price").in("manual_item_id", manualCodes)
+      : { data: [], error: null },
+    variantIds.length > 0
+      ? supabase.from("productsizecolors").select("variantid, products(purchaseprice)").in("variantid", variantIds)
+      : { data: [], error: null },
   ]);
-  return { bills, items };
+  if (manualRes.error) throw manualRes.error;
+  if (variantRes.error) throw variantRes.error;
+
+  const manualPriceMap = Object.fromEntries(
+    (manualRes.data || []).map((r) => [r.manual_item_id, r.purchase_price || 0])
+  );
+  const variantPriceMap = Object.fromEntries(
+    (variantRes.data || []).map((r) => [r.variantid, r.products?.purchaseprice || 0])
+  );
+
+  const items = rawItems.map((i) => {
+    const isManual = i.product_code?.startsWith("BCX");
+    const cost_price = isManual
+      ? (manualPriceMap[i.product_code] || 0)
+      : (variantPriceMap[i.variantid] || 0);
+    return { ...i, cost_price };
+  });
+
+  const normalizedBills = bills.map((b) => ({
+    ...b,
+    net_amount: b.net_amount != null ? b.net_amount : (b.payment_amount || 0),
+  }));
+
+  return { bills: normalizedBills, items };
 }
 
 export default function DashboardPage() {

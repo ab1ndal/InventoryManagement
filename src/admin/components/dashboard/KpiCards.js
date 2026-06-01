@@ -37,15 +37,17 @@ export default function KpiCards({ current, prior, loading }) {
   }
   const cur = aggregateKpis(current.bills, current.items);
   const pri = aggregateKpis(prior.bills, prior.items);
+  const hasPrior = pri.billsCount > 0;
+  const chg = (c, p) => (hasPrior ? pctChange(c, p) : null);
 
   return (
     <div className="grid grid-cols-6 gap-3">
       <Card title="Revenue" value={formatINR(cur.revenue)} subtitle="vs prior FY">
-        <Badge change={pctChange(cur.revenue, pri.revenue)} />
+        <Badge change={chg(cur.revenue, pri.revenue)} />
       </Card>
       <Card title="Gross Margin %" value={`${cur.grossMargin.toFixed(1)}%`} subtitle="target 50–65%" />
       <Card title="Bills" value={cur.billsCount.toLocaleString("en-IN")} subtitle="vs prior FY">
-        <Badge change={pctChange(cur.billsCount, pri.billsCount)} />
+        <Badge change={chg(cur.billsCount, pri.billsCount)} />
       </Card>
       <Card title="Avg Order Value" value={formatINR(cur.aov)} subtitle="revenue / bills" />
       <Card
@@ -53,10 +55,10 @@ export default function KpiCards({ current, prior, loading }) {
         value={formatINR(cur.discountGiven)}
         subtitle={`${cur.discountPctOfGross.toFixed(1)}% of gross`}
       >
-        <Badge change={pctChange(cur.discountGiven, pri.discountGiven)} inverse />
+        <Badge change={chg(cur.discountGiven, pri.discountGiven)} inverse />
       </Card>
       <Card title="Profit" value={formatINR(cur.profit)} subtitle="vs prior FY">
-        <Badge change={pctChange(cur.profit, pri.profit)} />
+        <Badge change={chg(cur.profit, pri.profit)} />
       </Card>
     </div>
   );
