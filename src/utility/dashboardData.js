@@ -181,6 +181,28 @@ export function aggregateDiscounts(bills, items) {
   };
 }
 
+export function buildSeasonalSeries(histRows, fy2026Bills) {
+  const filteredRows = histRows.filter((r) => r.fy_start_year !== 2026);
+  const byFy = {};
+  for (const { fy_start_year, month_idx, net_amount } of filteredRows) {
+    if (!byFy[fy_start_year]) byFy[fy_start_year] = new Array(12).fill(null);
+    byFy[fy_start_year][month_idx] = net_amount; // null stays null
+  }
+
+  const result = Object.entries(byFy)
+    .map(([fy, values]) => ({ label: fyLabel(Number(fy)), values, _fy: Number(fy) }))
+    .sort((a, b) => a._fy - b._fy);
+
+  const fy2026Values = new Array(12).fill(null);
+  for (const { net_amount, orderdate } of fy2026Bills) {
+    const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
+    fy2026Values[idx] = (fy2026Values[idx] ?? 0) + net_amount;
+  }
+  result.push({ label: fyLabel(2026), values: fy2026Values, _fy: 2026 });
+
+  return result.map(({ _fy, ...rest }) => rest);
+}
+
 export function buildFyTotals(histRows, fy2026Bills) {
   const filteredRows = histRows.filter((r) => r.fy_start_year !== 2026);
   const byFy = {};

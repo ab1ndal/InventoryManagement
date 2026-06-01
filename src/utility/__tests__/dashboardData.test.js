@@ -13,6 +13,7 @@ import {
   aggregateSalespersons,
   aggregateDiscounts,
   buildFyTotals,
+  buildSeasonalSeries,
 } from "../dashboardData";
 
 describe("FY_MONTHS", () => {
@@ -219,6 +220,43 @@ const FY2026_BILLS = [
   { net_amount: 300000, orderdate: "2026-04-15T10:00:00" }, // month_idx 0
   { net_amount: 250000, orderdate: "2026-05-20T10:00:00" }, // month_idx 1
 ];
+
+describe("buildSeasonalSeries", () => {
+  it("returns one entry per FY with 12-slot values array", () => {
+    const result = buildSeasonalSeries(HIST_ROWS, FY2026_BILLS);
+    const fy22 = result.find((r) => r.label === fyLabel(2022));
+    expect(fy22.values).toHaveLength(12);
+    expect(fy22.values[0]).toBe(100000);  // month_idx 0
+    expect(fy22.values[1]).toBe(200000);  // month_idx 1
+    expect(fy22.values[2]).toBeNull();    // explicit NULL
+    expect(fy22.values[3]).toBeNull();    // no row → null
+  });
+
+  it("places FY2026 bills in correct month_idx slots", () => {
+    const result = buildSeasonalSeries(HIST_ROWS, FY2026_BILLS);
+    const fy26 = result.find((r) => r.label === fyLabel(2026));
+    expect(fy26.values[0]).toBe(300000); // Apr 2026
+    expect(fy26.values[1]).toBe(250000); // May 2026
+    expect(fy26.values[2]).toBeNull();   // Jun — no bills
+  });
+
+  it("aggregates multiple bills in same month", () => {
+    const bills = [
+      { net_amount: 100000, orderdate: "2026-04-01T00:00:00" },
+      { net_amount: 50000,  orderdate: "2026-04-28T00:00:00" },
+    ];
+    const result = buildSeasonalSeries([], bills);
+    const fy26 = result.find((r) => r.label === fyLabel(2026));
+    expect(fy26.values[0]).toBe(150000);
+  });
+
+  it("sorts results by FY ascending, FY2026 last", () => {
+    const result = buildSeasonalSeries(HIST_ROWS, FY2026_BILLS);
+    const labels = result.map((r) => r.label);
+    expect(labels[0]).toBe(fyLabel(2022));
+    expect(labels[labels.length - 1]).toBe(fyLabel(2026));
+  });
+});
 
 describe("buildFyTotals", () => {
   it("sums net_amount per FY, skips NULLs in sum", () => {
