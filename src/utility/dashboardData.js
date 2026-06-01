@@ -195,6 +195,7 @@ export function buildSeasonalSeries(histRows, fy2026Bills) {
 
   const fy2026Values = new Array(12).fill(null);
   for (const { net_amount, orderdate } of fy2026Bills) {
+    if (net_amount === null) continue;
     const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
     fy2026Values[idx] = (fy2026Values[idx] ?? 0) + net_amount;
   }
@@ -217,6 +218,7 @@ export function buildVsHistoryComparison(histRows, fy2026Bills) {
 
   const currentFy = new Array(12).fill(null);
   for (const { net_amount, orderdate } of fy2026Bills) {
+    if (net_amount === null) continue;
     const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
     currentFy[idx] = (currentFy[idx] ?? 0) + net_amount;
   }
@@ -243,7 +245,8 @@ export function buildFyTotals(histRows, fy2026Bills) {
     };
   });
 
-  const fy2026Total = fy2026Bills.length === 0 ? null : fy2026Bills.reduce((s, b) => s + (b.net_amount ?? 0), 0);
+  const validBills = fy2026Bills.filter((b) => b.net_amount !== null);
+  const fy2026Total = validBills.length === 0 ? null : validBills.reduce((s, b) => s + b.net_amount, 0);
   result.push({ label: fyLabel(2026), total: fy2026Total, isLive: true, _fy: 2026 });
 
   result.sort((a, b) => a._fy - b._fy);
