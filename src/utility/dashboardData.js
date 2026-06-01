@@ -180,3 +180,29 @@ export function aggregateDiscounts(bills, items) {
     manual: { bills: manualBills.size, amount: manualAmount },
   };
 }
+
+export function buildFyTotals(histRows, fy2026Bills) {
+  const byFy = {};
+  for (const { fy_start_year, net_amount } of histRows) {
+    if (!byFy[fy_start_year]) byFy[fy_start_year] = [];
+    byFy[fy_start_year].push(net_amount);
+  }
+
+  const result = Object.entries(byFy).map(([fy, amounts]) => {
+    const fyNum = Number(fy);
+    const valid = amounts.filter((a) => a !== null);
+    return {
+      label: fyLabel(fyNum),
+      total: valid.length > 0 ? valid.reduce((s, a) => s + a, 0) : null,
+      isLive: false,
+      _fy: fyNum,
+    };
+  });
+
+  const fy2026Total = fy2026Bills.reduce((s, b) => s + (b.net_amount ?? 0), 0);
+  result.push({ label: fyLabel(2026), total: fy2026Total, isLive: true, _fy: 2026 });
+
+  result.sort((a, b) => a._fy - b._fy);
+  result.forEach((r) => delete r._fy);
+  return result;
+}

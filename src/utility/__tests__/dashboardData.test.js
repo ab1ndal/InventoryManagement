@@ -12,6 +12,7 @@ import {
   aggregateCategories,
   aggregateSalespersons,
   aggregateDiscounts,
+  buildFyTotals,
 } from "../dashboardData";
 
 describe("FY_MONTHS", () => {
@@ -204,5 +205,49 @@ describe("aggregateDiscounts", () => {
     expect(d.total).toBe(200);
     expect(d.code).toEqual({ bills: 1, amount: 150 });
     expect(d.manual).toEqual({ bills: 2, amount: 50 });
+  });
+});
+
+// ── shared fixtures for history aggregator tests ──────────────────────────────
+const HIST_ROWS = [
+  { fy_start_year: 2022, month_idx: 0, net_amount: 100000 },
+  { fy_start_year: 2022, month_idx: 1, net_amount: 200000 },
+  { fy_start_year: 2022, month_idx: 2, net_amount: null },   // NULL month
+  { fy_start_year: 2023, month_idx: 0, net_amount: 150000 },
+];
+const FY2026_BILLS = [
+  { net_amount: 300000, orderdate: "2026-04-15T10:00:00" }, // month_idx 0
+  { net_amount: 250000, orderdate: "2026-05-20T10:00:00" }, // month_idx 1
+];
+
+describe("buildFyTotals", () => {
+  it("sums net_amount per FY, skips NULLs in sum", () => {
+    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS);
+    const fy22 = result.find((r) => r.label === fyLabel(2022));
+    expect(fy22.total).toBe(300000); // 100k + 200k (null skipped)
+    expect(fy22.isLive).toBe(false);
+  });
+
+  it("returns null total when every month in FY is NULL", () => {
+    const rows = [
+      { fy_start_year: 2020, month_idx: 0, net_amount: null },
+      { fy_start_year: 2020, month_idx: 1, net_amount: null },
+    ];
+    const result = buildFyTotals(rows, []);
+    expect(result.find((r) => r.label === fyLabel(2020)).total).toBeNull();
+  });
+
+  it("includes FY2026 from bills marked isLive", () => {
+    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS);
+    const fy26 = result.find((r) => r.label === fyLabel(2026));
+    expect(fy26.total).toBe(550000); // 300k + 250k
+    expect(fy26.isLive).toBe(true);
+  });
+
+  it("returns results sorted by FY ascending", () => {
+    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS);
+    const labels = result.map((r) => r.label);
+    expect(labels[0]).toBe(fyLabel(2022));
+    expect(labels[labels.length - 1]).toBe(fyLabel(2026));
   });
 });
