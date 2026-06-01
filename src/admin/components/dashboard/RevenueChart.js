@@ -6,7 +6,7 @@ import { aggregateMonthlySeries, fyLabel } from "../../../utility/dashboardData"
 const Plot = createPlotlyComponent(Plotly);
 const toLakhs = (v) => v / 100000;
 
-export default function RevenueChart({ current, prior, range, loading }) {
+export default function RevenueChart({ current, prior, range, loading, showComparison }) {
   if (loading) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-5 text-sm text-gray-400">
@@ -15,22 +15,21 @@ export default function RevenueChart({ current, prior, range, loading }) {
     );
   }
 
-  if (!current || !prior || !range) return null;
+  if (!current || !range) return null;
 
   const priorYear = range.startYear - 1;
-
   const curSeries = aggregateMonthlySeries(current.bills, current.items, range.startYear);
-  const priSeries = aggregateMonthlySeries(prior.bills, prior.items, priorYear);
+  const priSeries = showComparison ? aggregateMonthlySeries((prior || { bills: [], items: [] }).bills, (prior || { bills: [], items: [] }).items, priorYear) : [];
   const months = curSeries.map((s) => s.label);
 
   const data = [
-    {
+    ...(showComparison ? [{
       type: "bar",
       name: fyLabel(priorYear),
       x: months,
       y: priSeries.map((s) => toLakhs(s.revenue)),
       marker: { color: "#bfdbfe" },
-    },
+    }] : []),
     {
       type: "bar",
       name: fyLabel(range.startYear),

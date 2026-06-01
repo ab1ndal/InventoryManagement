@@ -33,7 +33,10 @@ async function fetchAllRows(makeQuery) {
   return out;
 }
 
-const iso = (d) => d.toISOString();
+const iso = (d) => {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 async function fetchPeriod({ start, end }) {
   const bills = await fetchAllRows(() =>
@@ -101,6 +104,7 @@ export default function DashboardPage() {
   const [filter, setFilter] = useState(null); // { startYear, fromIdx, toIdx }
   const [current, setCurrent] = useState(EMPTY);
   const [prior, setPrior] = useState(EMPTY);
+  const [showComparison, setShowComparison] = useState(false);
   const [salespersonsById, setSalespersonsById] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -151,7 +155,10 @@ export default function DashboardPage() {
     (async () => {
       setLoading(true);
       try {
-        const [cur, pri] = await Promise.all([fetchPeriod(ranges.cur), fetchPeriod(ranges.prior)]);
+        const [cur, pri] = await Promise.all([
+          fetchPeriod(ranges.cur),
+          showComparison ? fetchPeriod(ranges.prior) : Promise.resolve(EMPTY),
+        ]);
         if (cancelled) return;
         setCurrent(cur);
         setPrior(pri);
@@ -163,19 +170,27 @@ export default function DashboardPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [ranges]);
+  }, [ranges, showComparison]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-gray-900">Sales Dashboard</h1>
-        {filter && <DashboardFilters fyList={fyList} value={filter} onChange={setFilter} />}
+        {filter && (
+          <DashboardFilters
+            fyList={fyList.filter((f) => f.startYear >= filter.startYear)}
+            value={filter}
+            onChange={setFilter}
+            showComparison={showComparison}
+            onToggleComparison={() => setShowComparison((v) => !v)}
+          />
+        )}
       </div>
 
-      <KpiCards current={current} prior={prior} loading={loading} />
+      <KpiCards current={current} prior={prior} loading={loading} showComparison={showComparison} />
 
       <div className="grid grid-cols-[2fr_1fr] gap-4">
-        <RevenueChart current={current} prior={prior} range={filter ?? { startYear: 0, fromIdx: 0, toIdx: 11 }} loading={loading} />
+        <RevenueChart current={current} prior={prior} range={filter ?? { startYear: 0, fromIdx: 0, toIdx: 11 }} loading={loading} showComparison={showComparison} />
         <CategoryBreakdown current={current} loading={loading} />
       </div>
 

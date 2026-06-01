@@ -31,13 +31,13 @@ function Card({ title, value, subtitle, children }) {
   );
 }
 
-export default function KpiCards({ current, prior, loading }) {
+export default function KpiCards({ current, prior, loading, showComparison }) {
   if (loading) {
     return <div className="bg-white rounded-xl border border-gray-200 p-5 text-sm text-gray-400">Loading KPIs…</div>;
   }
   const cur = aggregateKpis(current.bills, current.items);
   const pri = aggregateKpis(prior.bills, prior.items);
-  const hasPrior = pri.billsCount > 0;
+  const hasPrior = showComparison && pri.billsCount > 0;
   const chg = (c, p) => (hasPrior ? pctChange(c, p) : null);
 
   return (

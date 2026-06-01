@@ -3,9 +3,9 @@ import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../../../components/ui/select";
-import { FY_MONTHS } from "../../../utility/dashboardData";
+import { FY_MONTHS, fyLabel } from "../../../utility/dashboardData";
 
-export default function DashboardFilters({ fyList, value, onChange }) {
+export default function DashboardFilters({ fyList, value, onChange, showComparison, onToggleComparison }) {
   const { startYear, fromIdx, toIdx } = value;
 
   const setFy = (sy) => {
@@ -32,6 +32,18 @@ export default function DashboardFilters({ fyList, value, onChange }) {
           ))}
         </TabsList>
       </Tabs>
+
+      <button
+        onClick={onToggleComparison}
+        className={`text-xs px-3 py-1.5 rounded-md border font-medium transition-colors flex items-center gap-1.5 ${
+          showComparison
+            ? "bg-blue-600 text-white border-blue-600"
+            : "bg-white text-gray-600 border-gray-300 hover:border-gray-400"
+        }`}
+      >
+        {showComparison && <span>✓</span>}
+        Add {fyLabel(startYear - 1)}
+      </button>
 
       <div className="flex items-center gap-2">
         <Select value={String(fromIdx)} onValueChange={setFrom}>
