@@ -22,6 +22,15 @@ export default function RevenueChart({ current, prior, range, loading, showCompa
   const priSeries = showComparison ? aggregateMonthlySeries((prior || { bills: [], items: [] }).bills, (prior || { bills: [], items: [] }).items, priorYear) : [];
   const months = curSeries.map((s) => s.label);
 
+  const REV_DTICK = 0.5;
+  const MAR_DTICK = 5;
+  const allRevenues = [
+    ...curSeries.map((s) => toLakhs(s.revenue)),
+    ...(showComparison ? priSeries.map((s) => toLakhs(s.revenue)) : []),
+  ];
+  const revMax = Math.ceil(Math.max(...allRevenues, 0) / REV_DTICK) * REV_DTICK;
+  const marMax = Math.ceil(Math.max(...curSeries.map((s) => s.margin), 0) / MAR_DTICK) * MAR_DTICK;
+
   const data = [
     ...(showComparison ? [{
       type: "bar",
@@ -53,13 +62,28 @@ export default function RevenueChart({ current, prior, range, loading, showCompa
     barmode: "group",
     height: 240,
     margin: { t: 10, r: 44, b: 30, l: 40 },
-    yaxis: { title: "₹ (lakhs)", zeroline: true },
+    yaxis: {
+      title: { text: "₹ (lakhs)", standoff: 4 },
+      zeroline: true,
+      zerolinecolor: "#e5e7eb",
+      range: [0, revMax],
+      dtick: REV_DTICK,
+      tickmode: "linear",
+      tickfont: { size: 11 },
+    },
     yaxis2: {
-      title: "Margin %",
+      title: "",
       overlaying: "y",
       side: "right",
       showgrid: false,
+      zeroline: true,
+      zerolinecolor: "#e5e7eb",
+      range: [0, marMax],
+      dtick: MAR_DTICK,
+      tickmode: "linear",
       ticksuffix: "%",
+      tickfont: { size: 11 },
+      anchor: "x",
     },
     xaxis: { fixedrange: true },
     legend: { orientation: "h", y: 1.15 },

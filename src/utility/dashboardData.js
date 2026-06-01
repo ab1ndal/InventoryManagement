@@ -182,33 +182,33 @@ export function aggregateDiscounts(bills, items) {
   };
 }
 
-export function buildSeasonalSeries(histRows, fy2026Bills) {
-  const filteredRows = histRows.filter((r) => r.fy_start_year !== 2026);
+export function buildSeasonalSeries(histRows, liveBills, currentFyYear) {
+  const filteredRows = histRows.filter((r) => r.fy_start_year < currentFyYear);
   const byFy = {};
   for (const { fy_start_year, month_idx, net_amount } of filteredRows) {
     if (!byFy[fy_start_year]) byFy[fy_start_year] = new Array(12).fill(null);
-    byFy[fy_start_year][month_idx] = net_amount; // null stays null
+    byFy[fy_start_year][month_idx] = net_amount;
   }
 
   const result = Object.entries(byFy)
     .map(([fy, values]) => ({ label: fyLabel(Number(fy)), values, _fy: Number(fy) }))
     .sort((a, b) => a._fy - b._fy);
 
-  const fy2026Values = new Array(12).fill(null);
-  for (const { net_amount, orderdate } of fy2026Bills) {
+  const liveValues = new Array(12).fill(null);
+  for (const { net_amount, orderdate } of liveBills) {
     if (net_amount === null) continue;
     const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
-    fy2026Values[idx] = (fy2026Values[idx] ?? 0) + net_amount;
+    liveValues[idx] = (liveValues[idx] ?? 0) + net_amount;
   }
-  result.push({ label: fyLabel(2026), values: fy2026Values, _fy: 2026 });
+  result.push({ label: fyLabel(currentFyYear), values: liveValues, _fy: currentFyYear });
 
   return result.map(({ _fy, ...rest }) => rest);
 }
 
-export function buildVsHistoryComparison(histRows, fy2026Bills) {
+export function buildVsHistoryComparison(histRows, liveBills, currentFyYear) {
   const months = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 
-  const filteredRows = histRows.filter((r) => r.fy_start_year !== 2026);
+  const filteredRows = histRows.filter((r) => r.fy_start_year < currentFyYear);
   const buckets = Array.from({ length: 12 }, () => []);
   for (const { month_idx, net_amount } of filteredRows) {
     if (net_amount !== null) buckets[month_idx].push(net_amount);
@@ -218,7 +218,7 @@ export function buildVsHistoryComparison(histRows, fy2026Bills) {
   );
 
   const currentFy = new Array(12).fill(null);
-  for (const { net_amount, orderdate } of fy2026Bills) {
+  for (const { net_amount, orderdate } of liveBills) {
     if (net_amount === null) continue;
     const idx = (new Date(orderdate).getMonth() - 3 + 12) % 12;
     currentFy[idx] = (currentFy[idx] ?? 0) + net_amount;
@@ -227,8 +227,8 @@ export function buildVsHistoryComparison(histRows, fy2026Bills) {
   return { months, currentFy, historicalAvg };
 }
 
-export function buildFyTotals(histRows, fy2026Bills) {
-  const filteredRows = histRows.filter((r) => r.fy_start_year !== 2026);
+export function buildFyTotals(histRows, liveBills, currentFyYear) {
+  const filteredRows = histRows.filter((r) => r.fy_start_year < currentFyYear);
   const byFy = {};
   for (const { fy_start_year, net_amount } of filteredRows) {
     if (!byFy[fy_start_year]) byFy[fy_start_year] = [];
@@ -246,9 +246,9 @@ export function buildFyTotals(histRows, fy2026Bills) {
     };
   });
 
-  const validBills = fy2026Bills.filter((b) => b.net_amount !== null);
-  const fy2026Total = validBills.length === 0 ? null : validBills.reduce((s, b) => s + b.net_amount, 0);
-  result.push({ label: fyLabel(2026), total: fy2026Total, isLive: true, _fy: 2026 });
+  const validBills = liveBills.filter((b) => b.net_amount !== null);
+  const liveTotal = validBills.length === 0 ? null : validBills.reduce((s, b) => s + b.net_amount, 0);
+  result.push({ label: fyLabel(currentFyYear), total: liveTotal, isLive: true, _fy: currentFyYear });
 
   result.sort((a, b) => a._fy - b._fy);
   result.forEach((r) => delete r._fy);

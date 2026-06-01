@@ -5,7 +5,7 @@ import { supabase } from "../../lib/supabaseClient";
 //import { useToast } from "../../components/hooks/use-toast";
 import UserRegistration from "./UserRegistration";
 
-export default function RequireAdminAuth() {
+export default function RequireAdminAuth({ allowedRoles = ["admin", "superadmin"] }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -23,7 +23,7 @@ export default function RequireAdminAuth() {
         .eq("id", session.user.id)
         .single();
 
-        if (!error && ["admin", "superadmin"].includes(data?.role) && data?.is_active !== false) {
+        if (!error && allowedRoles.includes(data?.role) && data?.is_active !== false) {
           setIsAuthorized(true);
         } else {
           setRedirectReason("unauthorized");

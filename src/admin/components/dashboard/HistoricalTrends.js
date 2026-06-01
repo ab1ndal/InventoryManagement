@@ -9,12 +9,14 @@ import {
   buildSeasonalSeries,
   buildVsHistoryComparison,
   fyLabel,
+  getFinancialYearStart,
 } from "../../../utility/dashboardData";
 
 const Plot = createPlotlyComponent(Plotly);
 const toLakhs = (v) => v / 100000;
 const PAGE = 1000;
 const MONTH_LABELS = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+const CURRENT_FY_YEAR = getFinancialYearStart(new Date());
 
 async function fetchAllRows(makeQuery) {
   let from = 0;
@@ -31,10 +33,19 @@ async function fetchAllRows(makeQuery) {
 
 const BASE_LAYOUT = {
   height: 260,
-  margin: { t: 10, r: 20, b: 30, l: 44 },
-  yaxis: { title: "₹ (lakhs)", zeroline: true },
+  margin: { t: 10, r: 20, b: 30, l: 56 },
+  yaxis: {
+    title: { text: "₹ Lakhs", standoff: 8 },
+    zeroline: true,
+    zerolinecolor: "#e5e7eb",
+    tickformat: ".2~f",
+    ticksuffix: "L",
+    autorange: true,
+    rangemode: "tozero",
+    tickfont: { size: 11 },
+  },
   xaxis: { fixedrange: true },
-  legend: { orientation: "h", y: 1.15 },
+  legend: { orientation: "h", y: 1.18 },
   paper_bgcolor: "white",
   plot_bgcolor: "white",
 };
@@ -42,10 +53,11 @@ const BASE_LAYOUT = {
 export default function HistoricalTrends() {
   const [tab, setTab] = useState("trend");
   const [histRows, setHistRows] = useState([]);
-  const [fy2026Bills, setFy2026Bills] = useState([]);
+  const [liveBills, setLiveBills] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fyStart = `${CURRENT_FY_YEAR}-04-01T00:00:00`;
     (async () => {
       try {
         const [histRes, billsData] = await Promise.all([
@@ -55,12 +67,12 @@ export default function HistoricalTrends() {
               .from("bills")
               .select("net_amount, orderdate")
               .eq("finalized", true)
-              .gte("orderdate", "2026-04-01T00:00:00")
+              .gte("orderdate", fyStart)
           ),
         ]);
         if (histRes.error) throw histRes.error;
         setHistRows(histRes.data || []);
-        setFy2026Bills(billsData);
+        setLiveBills(billsData);
       } catch (e) {
         console.error(e);
         toast.error("Failed to load historical data");
@@ -71,16 +83,16 @@ export default function HistoricalTrends() {
   }, []);
 
   const fyTotals = useMemo(
-    () => buildFyTotals(histRows, fy2026Bills),
-    [histRows, fy2026Bills]
+    () => buildFyTotals(histRows, liveBills, CURRENT_FY_YEAR),
+    [histRows, liveBills]
   );
   const seasonalSeries = useMemo(
-    () => buildSeasonalSeries(histRows, fy2026Bills),
-    [histRows, fy2026Bills]
+    () => buildSeasonalSeries(histRows, liveBills, CURRENT_FY_YEAR),
+    [histRows, liveBills]
   );
   const vsHistory = useMemo(
-    () => buildVsHistoryComparison(histRows, fy2026Bills),
-    [histRows, fy2026Bills]
+    () => buildVsHistoryComparison(histRows, liveBills, CURRENT_FY_YEAR),
+    [histRows, liveBills]
   );
 
   if (loading) {
@@ -91,6 +103,7 @@ export default function HistoricalTrends() {
     );
   }
 
+  const hasHistData = histRows.length > 0;
   const histFys = fyTotals.filter((f) => !f.isLive);
   const liveFy = fyTotals.filter((f) => f.isLive);
 
@@ -112,7 +125,7 @@ export default function HistoricalTrends() {
   ];
 
   const seasonalData = seasonalSeries.map((s) => {
-    const isCurrentFy = s.label === fyLabel(2026);
+    const isCurrentFy = s.label === fyLabel(CURRENT_FY_YEAR);
     return {
       type: "scatter",
       mode: "lines+markers",
@@ -170,6 +183,11 @@ export default function HistoricalTrends() {
           />
         </TabsContent>
         <TabsContent value="vs-history">
+          {!hasHistData && (
+            <p className="text-xs text-gray-400 mb-2">
+              No prior-year data in <code>monthly_sales_history</code> — historical average unavailable.
+            </p>
+          )}
           <Plot
             data={vsData}
             layout={BASE_LAYOUT}

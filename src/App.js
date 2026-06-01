@@ -57,8 +57,10 @@ function App() {
           {/* Protected Admin Routes */}
           <Route path="/admin" element={<RequireAdminAuth />}>
             <Route element={<AdminLayout />}>
-              <Route index element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
+              <Route index element={<Navigate to="/admin/inventory" replace />} />
+              <Route element={<RequireAdminAuth allowedRoles={["superadmin"]} />}>
+                <Route path="dashboard" element={<DashboardPage />} />
+              </Route>
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="bills" element={<BillingPage />} />
               <Route path="vouchers" element={<VoucherPage />} />
