@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import createPlotlyComponent from "react-plotly.js/factory";
 import Plotly from "plotly.js-basic-dist-min";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
 import { supabase } from "../../../lib/supabaseClient";
 import { toast } from "sonner";
 import {
