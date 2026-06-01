@@ -1,0 +1,183 @@
+import React, { useEffect, useMemo, useState } from "react";
+import createPlotlyComponent from "react-plotly.js/factory";
+import Plotly from "plotly.js-basic-dist-min";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
+import { supabase } from "../../../lib/supabaseClient";
+import { toast } from "sonner";
+import {
+  buildFyTotals,
+  buildSeasonalSeries,
+  buildVsHistoryComparison,
+  fyLabel,
+} from "../../../utility/dashboardData";
+
+const Plot = createPlotlyComponent(Plotly);
+const toLakhs = (v) => v / 100000;
+const PAGE = 1000;
+const MONTH_LABELS = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+
+async function fetchAllRows(makeQuery) {
+  let from = 0;
+  const out = [];
+  for (;;) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) throw error;
+    out.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
+const BASE_LAYOUT = {
+  height: 260,
+  margin: { t: 10, r: 20, b: 30, l: 44 },
+  yaxis: { title: "₹ (lakhs)", zeroline: true },
+  xaxis: { fixedrange: true },
+  legend: { orientation: "h", y: 1.15 },
+  paper_bgcolor: "white",
+  plot_bgcolor: "white",
+};
+
+export default function HistoricalTrends() {
+  const [tab, setTab] = useState("trend");
+  const [histRows, setHistRows] = useState([]);
+  const [fy2026Bills, setFy2026Bills] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [histRes, billsData] = await Promise.all([
+          supabase.from("monthly_sales_history").select("fy_start_year, month_idx, net_amount"),
+          fetchAllRows(() =>
+            supabase
+              .from("bills")
+              .select("net_amount, orderdate")
+              .eq("finalized", true)
+              .gte("orderdate", "2026-04-01T00:00:00")
+          ),
+        ]);
+        if (histRes.error) throw histRes.error;
+        setHistRows(histRes.data || []);
+        setFy2026Bills(billsData);
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to load historical data");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const fyTotals = useMemo(
+    () => buildFyTotals(histRows, fy2026Bills),
+    [histRows, fy2026Bills]
+  );
+  const seasonalSeries = useMemo(
+    () => buildSeasonalSeries(histRows, fy2026Bills),
+    [histRows, fy2026Bills]
+  );
+  const vsHistory = useMemo(
+    () => buildVsHistoryComparison(histRows, fy2026Bills),
+    [histRows, fy2026Bills]
+  );
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-5 text-sm text-gray-400">
+        Loading historical trends…
+      </div>
+    );
+  }
+
+  const histFys = fyTotals.filter((f) => !f.isLive);
+  const liveFy = fyTotals.filter((f) => f.isLive);
+
+  const trendData = [
+    {
+      type: "bar",
+      name: "Historical FYs",
+      x: histFys.map((f) => f.label),
+      y: histFys.map((f) => (f.total !== null ? toLakhs(f.total) : null)),
+      marker: { color: "#93c5fd" },
+    },
+    {
+      type: "bar",
+      name: "FY 26-27 (YTD)",
+      x: liveFy.map((f) => f.label),
+      y: liveFy.map((f) => (f.total !== null ? toLakhs(f.total) : null)),
+      marker: { color: "#0066cc", opacity: 0.75 },
+    },
+  ];
+
+  const seasonalData = seasonalSeries.map((s) => {
+    const isCurrentFy = s.label === fyLabel(2026);
+    return {
+      type: "scatter",
+      mode: "lines+markers",
+      name: s.label,
+      x: MONTH_LABELS,
+      y: s.values.map((v) => (v !== null ? toLakhs(v) : null)),
+      connectgaps: false,
+      line: { color: isCurrentFy ? "#0066cc" : "#d1d5db", width: isCurrentFy ? 2.5 : 1 },
+      marker: { color: isCurrentFy ? "#0066cc" : "#d1d5db", size: isCurrentFy ? 5 : 3 },
+      opacity: isCurrentFy ? 1 : 0.6,
+    };
+  });
+
+  const vsData = [
+    {
+      type: "bar",
+      name: "FY26 Actual",
+      x: MONTH_LABELS,
+      y: vsHistory.currentFy.map((v) => (v !== null ? toLakhs(v) : null)),
+      marker: { color: "#0066cc" },
+    },
+    {
+      type: "scatter",
+      mode: "lines",
+      name: "Historical Avg",
+      x: MONTH_LABELS,
+      y: vsHistory.historicalAvg.map((v) => (v !== null ? toLakhs(v) : null)),
+      line: { color: "#f59e0b", dash: "dash", width: 2 },
+    },
+  ];
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">Historical Trends</h3>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="trend">FY Trend</TabsTrigger>
+          <TabsTrigger value="seasonal">Seasonality</TabsTrigger>
+          <TabsTrigger value="vs-history">vs History</TabsTrigger>
+        </TabsList>
+        <TabsContent value="trend">
+          <Plot
+            data={trendData}
+            layout={{ ...BASE_LAYOUT, barmode: "overlay" }}
+            config={{ displayModeBar: false, responsive: true }}
+            style={{ width: "100%" }}
+          />
+        </TabsContent>
+        <TabsContent value="seasonal">
+          <Plot
+            data={seasonalData}
+            layout={BASE_LAYOUT}
+            config={{ displayModeBar: false, responsive: true }}
+            style={{ width: "100%" }}
+          />
+        </TabsContent>
+        <TabsContent value="vs-history">
+          <Plot
+            data={vsData}
+            layout={BASE_LAYOUT}
+            config={{ displayModeBar: false, responsive: true }}
+            style={{ width: "100%" }}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
