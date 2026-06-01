@@ -14,6 +14,7 @@ import RevenueChart from "../components/dashboard/RevenueChart";
 import CategoryBreakdown from "../components/dashboard/CategoryBreakdown";
 import SalespersonTable from "../components/dashboard/SalespersonTable";
 import DiscountTable from "../components/dashboard/DiscountTable";
+import HistoricalTrends from "../components/dashboard/HistoricalTrends";
 
 const PAGE = 1000;
 const EMPTY = { bills: [], items: [] };
@@ -146,6 +147,8 @@ export default function DashboardPage() {
         <SalespersonTable current={current} salespersonsById={salespersonsById} loading={loading} />
         <DiscountTable current={current} loading={loading} />
       </div>
+
+      <HistoricalTrends />
     </div>
   );
 }
