@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 const navItems = [
   { label: "Dashboard", path: "/admin/dashboard", superadminOnly: true },
+  { label: "History", path: "/admin/history", superadminOnly: true },
   { label: "Admin", path: "/admin/admin-hub" },
   { label: "Inventory", path: "/admin/inventory" },
   { label: "Mockups", path: "/admin/mockups" },
