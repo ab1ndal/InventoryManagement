@@ -4,6 +4,8 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
+import { diffFields } from "../../utility/activitySummary";
 
 export default function SalespersonTable({ refresh }) {
   const [salespersons, setSalespersons] = useState([]);
@@ -56,6 +58,9 @@ export default function SalespersonTable({ refresh }) {
     if (error) {
       toast.error("Failed to save", { description: error.message });
     } else {
+      const old = salespersons.find((s) => s.salesperson_id === salesperson_id);
+      const changed = diffFields(old || {}, editValues, ["name", "date_hired", "active"]);
+      logActivity({ action: "update", entityType: "salesperson", entityId: salesperson_id, summary: `Edited salesperson ${editValues.name || old?.name || salesperson_id}${changed ? ` — ${changed}` : ""}` });
       toast.success("Salesperson updated");
       setEditingId(null);
       fetchSalespersons();

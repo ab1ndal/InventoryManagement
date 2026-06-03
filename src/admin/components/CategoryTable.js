@@ -4,6 +4,8 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
+import { diffFields } from "../../utility/activitySummary";
 
 export default function CategoryTable({ refresh }) {
   const [categories, setCategories] = useState([]);
@@ -48,6 +50,9 @@ export default function CategoryTable({ refresh }) {
     if (error) {
       toast.error("Failed to save", { description: error.message });
     } else {
+      const old = categories.find((c) => c.categoryid === categoryid);
+      const changed = diffFields(old || {}, editValues, ["name", "description"]);
+      logActivity({ action: "update", entityType: "category", entityId: categoryid, summary: `Edited category ${editValues.name || old?.name || categoryid}${changed ? ` — ${changed}` : ""}` });
       toast.success("Category updated");
       setEditingId(null);
       fetchCategories();
