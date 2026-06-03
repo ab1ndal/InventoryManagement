@@ -370,7 +370,7 @@ export default function BillTable({ onEdit }) {
         .update({ paymentstatus: "cancelled" })
         .eq("billid", billId);
       if (error) throw error;
-      logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Cancelled draft bill #${bill.bill_number || bill.billid} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
+      logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Cancelled draft bill #${bill.bill_number || "(no number)"} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
       toast({ title: `Bill #${billId} cancelled. Stock restored.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -412,7 +412,7 @@ export default function BillTable({ onEdit }) {
         .update({ paymentstatus: "cancelled" })
         .eq("billid", billId);
       if (error) throw error;
-      logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Voided bill #${bill.bill_number || bill.billid} — ${money(bill.totalamount)}` });
+      logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Voided bill #${bill.bill_number || "(no number)"} — ${money(bill.totalamount)}` });
       toast({ title: `Bill #${billId} cancelled. Stock restored. No customer on record.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -440,7 +440,7 @@ export default function BillTable({ onEdit }) {
         .update({ paymentstatus: "cancelled" })
         .eq("billid", billId);
       if (error) throw error;
-      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || cancelBill.billid} for ${customerName(cancelBill.customers)} (cash refund) — ${money(cancelBill.totalamount)}` });
+      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || "(no number)"} for ${customerName(cancelBill.customers)} (cash refund) — ${money(cancelBill.totalamount)}` });
       toast({ title: `Bill #${billId} cancelled. Stock restored.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -520,7 +520,7 @@ export default function BillTable({ onEdit }) {
         });
       }
 
-      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || cancelBill.billid} for ${customerName(cancelBill.customers)} (store credit ${money(refundAmount)})` });
+      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || "(no number)"} for ${customerName(cancelBill.customers)} (store credit ${money(refundAmount)})` });
       toast({
         title: `Bill #${billId} cancelled. ${formatINR(refundAmount, 2)} store credit added to ${customerDisplayName || "customer"}'s account.`,
       });
@@ -578,7 +578,7 @@ export default function BillTable({ onEdit }) {
       const { error } = await supabase.from("bills").delete().eq("billid", billId);
       if (error) throw error;
 
-      logActivity({ action: "delete", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Deleted bill #${bill.bill_number || bill.billid} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
+      logActivity({ action: "delete", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Deleted bill #${bill.bill_number || "(no number)"} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
       toast({ title: `Bill #${billId} deleted` });
     } catch (e) {
       // Revert optimistic removal

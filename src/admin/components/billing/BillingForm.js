@@ -862,7 +862,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const custName = selectedCustomerId
           ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
           : null;
-        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Edited draft bill #${effectiveBillNumber || billId} for ${activityCustomerName(custName)} — ${money(totalsToUse.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Edited draft bill #${effectiveBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(totalsToUse.grandTotal)}, ${items.length} items` });
         onOpenChange?.(false);
         onSubmit?.();
         return;
@@ -977,7 +977,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
 
       // Step F - Success
-      toast.success(`Draft saved — Bill #${bill.bill_number || bill.billid}`);
+      toast.success(`Draft saved — Bill #${bill.bill_number || "(no number)"}`);
       if (newDraftStockFailures.length > 0) {
         toast.error("Stock sync warning", {
           description: `Stock could not be updated for ${newDraftStockFailures.length} variant(s). Please recheck inventory.`,
@@ -986,7 +986,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       const custName = selectedCustomerId
         ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
         : null;
-      logActivity({ action: "create", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Created draft bill #${bill.bill_number || bill.billid} for ${activityCustomerName(custName)} — ${money(computed.grandTotal)}, ${items.length} items` });
+      logActivity({ action: "create", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Created draft bill #${bill.bill_number || "(no number)"} for ${activityCustomerName(custName)} — ${money(computed.grandTotal)}, ${items.length} items` });
       onOpenChange?.(false);
       onSubmit?.();
     } catch (e) {
@@ -1467,9 +1467,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
         : null;
       if (billId) {
-        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Re-finalized bill #${effectiveBillNumber || billId} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Re-finalized bill #${effectiveBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
       } else {
-        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill #${pdfBillNumber || activeBillId} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill #${pdfBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
       }
       setConfirmOpen(false);
       onOpenChange?.(false);
@@ -1773,9 +1773,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
         : null;
       if (isNewBill) {
-        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill (partial) #${pdfBillNumber || activeBillId} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill (partial) #${pdfBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
       } else {
-        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Finalized bill (partial) #${effectiveBillNumber || billId} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Finalized bill (partial) #${effectiveBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
       }
       setPartialConfirmOpen(false);
       onOpenChange?.(false);
@@ -1856,7 +1856,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         );
       }
       const bill_status_now = totalPaid >= netAmount ? "finalized" : "partial";
-      logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Recorded payment of ${money(amt)} on bill #${effectiveBillNumber || billId}${bill_status_now === "finalized" ? " (now fully paid)" : ""}` });
+      logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Recorded payment of ${money(amt)} on bill #${effectiveBillNumber || "(no number)"}${bill_status_now === "finalized" ? " (now fully paid)" : ""}` });
     } catch (e) {
       toast.error(e.message);
     } finally {

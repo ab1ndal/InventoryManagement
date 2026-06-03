@@ -249,7 +249,7 @@ function UsersTab({ isSuperAdmin }) {
         action: "update",
         entityType: "user",
         entityId: userId,
-        summary: `Changed role of user ${target?.email || userId}: ${target?.role || "?"} → ${newRole}`,
+        summary: `Changed role of user ${target?.email || "(unknown user)"}: ${target?.role || "?"} → ${newRole}`,
       });
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
@@ -273,7 +273,7 @@ function UsersTab({ isSuperAdmin }) {
         action: "update",
         entityType: "user",
         entityId: userId,
-        summary: `${currentActive ? "Deactivated" : "Activated"} user ${target?.email || userId}`,
+        summary: `${currentActive ? "Deactivated" : "Activated"} user ${target?.email || "(unknown user)"}`,
       });
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, is_active: !currentActive } : u))
