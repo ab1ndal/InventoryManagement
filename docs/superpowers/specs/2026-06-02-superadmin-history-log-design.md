@@ -16,12 +16,13 @@ action performed through the app. Each entry must clearly answer **who** did
 Log meaningful mutations across:
 
 - **Inventory** — product create / edit / delete; variant add / delete; stock increase / decrease
-- **Bills** — bill create; bill void + delete
+- **Bills** — bill create; bill void + delete; bill edit
 - **Customers** — add / edit / delete
-- **Suppliers** — add / edit / delete
+- **Suppliers** — Supplier - add / edit / delete, Supplier Bill - Add/edit/delete
 - **Discounts** — add / edit / delete
 - **Categories** — add / edit / delete
 - **Users** — role change / active-status change
+- Salesperson - Add/edit/delete
 
 ### Out of scope (v1)
 
@@ -48,15 +49,18 @@ log as defense-in-depth.
 New table `activity_log` (new migration `schema/migration_activity_log.sql`).
 
 | Column | Type | Notes |
-|--------|------|-------|
+| --- | --- | --- |
 | `id` | `bigint` generated always as identity, PK | |
-| `created_at` | `timestamptz NOT NULL DEFAULT now()` | event time |
-| `actor_id` | `uuid` | auth user id; FK → `profiles(id)` |
-| `actor_email` | `text` | denormalized; survives profile/email changes |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | event time; stored UTC, **always displayed in IST (Asia/Kolkata)** in the UI |
+| `actor_id` | `uuid` | auth user id; FK → `profiles(id)`. Email is **not** denormalized — derived by joining `profiles` on `actor_id` at read time |
 | `action` | `text NOT NULL` | `create` \| `update` \| `delete` |
-| `entity_type` | `text NOT NULL` | `product` \| `variant` \| `stock` \| `bill` \| `customer` \| `supplier` \| `discount` \| `category` \| `user` |
+| `entity_type` | `text NOT NULL` | `product` \| `variant` \| `stock` \| `bill` \| `customer` \| `supplier` \| `supplier_bill` \| `discount` \| `category` \| `user` \| `salesperson`. Free text — extensible for future entity kinds |
 | `entity_id` | `text` | primary key of affected row (variant id, productid, billid, …); text because IDs are mixed types |
 | `summary` | `text NOT NULL` | human-readable description of the exact change |
+
+No `actor_email` column — the email is joined from `profiles` via `actor_id` for
+display. (Trade-off: if a profile row is ever hard-deleted the email is lost; the
+FK + soft-delete (`is_active`) pattern in use makes this acceptable.)
 
 Index: `(created_at desc)`; secondary indexes on `actor_id`, `entity_type`, `action`
 to support filters.
@@ -81,7 +85,7 @@ logActivity({ action, entityType, entityId, summary })
 Behavior:
 
 - Resolves current user from the active Supabase session
-  (`supabase.auth.getUser()`), sets `actor_id` + `actor_email`.
+  (`supabase.auth.getUser()`), sets `actor_id` only (email derived at read time).
 - Inserts one row into `activity_log`.
 - **Fire-and-forget, never blocks**: wrapped in try/catch; on failure logs to
   `console.error` only. Never throws, never surfaces a toast, never affects the
@@ -112,11 +116,14 @@ One log entry per *meaningful* change, **not** per DB statement.
 - `Edited product BC25001 — name "Kurta"→"Cotton Kurta", retailprice 1200→1400`
 - `Deleted product BC25001 — Cotton Kurta`
 - `Created bill #1042 for customer Ravi Kumar — ₹3,200, 4 items`
+- `Edited bill #1042 — total ₹3,200→₹2,900, items 4→3`
 - `Voided & deleted bill #1042`
 - `Added customer Ravi Kumar (+91…)` / `Edited customer …` / `Deleted customer …`
 - `Added supplier …` / `Edited supplier …` / `Deleted supplier …`
+- `Added supplier bill #SB-77 for supplier Acme — ₹12,000` / `Edited supplier bill …` / `Deleted supplier bill …`
 - `Added discount code SAVE20 (20%)` / `Edited …` / `Deleted …`
 - `Added category Sarees` / `Edited category …` / `Deleted category …`
+- `Added salesperson Priya` / `Edited salesperson …` / `Deleted salesperson …`
 - `Changed role of user a@b.com: admin → superadmin`
 - `Deactivated user a@b.com` / `Activated user a@b.com`
 
@@ -130,16 +137,20 @@ these existing components (identified by current `insert`/`update`/`delete` usag
 
 - Inventory / products / variants / stock: `src/admin/pages/InventoryPage.js`,
   `src/admin/components/ProductTable.js`
-- Bills: `src/admin/components/billing/BillingForm.js`,
-  `src/admin/components/BillTable.js`
+- Bills (create / edit / void+delete): `src/admin/components/billing/BillingForm.js`,
+  `src/admin/components/billing/ManualItemForm.js`, `src/admin/components/BillTable.js`
 - Customers: `src/admin/components/CustomerForm.js`,
   `src/admin/components/CustomerTable.js`
 - Suppliers: `src/admin/components/SupplierForm.js`,
   `src/admin/components/SupplierTable.js`
+- Supplier bills: `src/admin/components/SupplierTransactionDialog.js`,
+  `src/admin/components/SupplierLedgerDialog.js`
 - Discounts: `src/admin/components/DiscountForm.js`,
   `src/admin/components/DiscountTable.js`
 - Categories: `src/admin/components/CategoryForm.js`,
   `src/admin/components/CategoryTable.js`
+- Salespersons: `src/admin/components/SalespersonForm.js`,
+  `src/admin/components/SalespersonTable.js`
 - Users: `src/admin/pages/AdminPage.jsx`, `src/admin/components/UserRegistration.jsx`
 
 Exact placement and the data available to build each summary (old values for diffs,
@@ -161,8 +172,10 @@ update call where not already in scope.
 
 Page contents:
 
-- Paginated table, **newest first**. Columns: time (`created_at`, formatted via
-  `src/utility/dateFormat.js`), user (`actor_email`), action, entity type, summary.
+- Paginated table, **newest first**. Columns: time (`created_at`, formatted in IST
+  via `src/utility/dateFormat.js`), user (email joined from `profiles` on
+  `actor_id`), action, entity type, summary. Query selects the embedded profile,
+  e.g. `select('*, profiles(email)')`.
 - Filters: by user, action type, entity type, date range, and free-text search on
   `summary`. Filtering done server-side via Supabase query params with range
   pagination (`.range()`), or client-side if result volume is small — decided in
