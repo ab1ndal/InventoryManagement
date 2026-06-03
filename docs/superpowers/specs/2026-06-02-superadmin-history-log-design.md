@@ -16,6 +16,7 @@ action performed through the app. Each entry must clearly answer **who** did
 Log meaningful mutations across:
 
 - **Inventory** — product create / edit / delete; variant add / delete; stock increase / decrease
+- **Mockups** — add / edit / delete
 - **Bills** — bill create; bill void + delete; bill edit
 - **Customers** — add / edit / delete
 - **Suppliers** — Supplier - add / edit / delete, Supplier Bill - Add/edit/delete
@@ -54,7 +55,7 @@ New table `activity_log` (new migration `schema/migration_activity_log.sql`).
 | `created_at` | `timestamptz NOT NULL DEFAULT now()` | event time; stored UTC, **always displayed in IST (Asia/Kolkata)** in the UI |
 | `actor_id` | `uuid` | auth user id; FK → `profiles(id)`. Email is **not** denormalized — derived by joining `profiles` on `actor_id` at read time |
 | `action` | `text NOT NULL` | `create` \| `update` \| `delete` |
-| `entity_type` | `text NOT NULL` | `product` \| `variant` \| `stock` \| `bill` \| `customer` \| `supplier` \| `supplier_bill` \| `discount` \| `category` \| `user` \| `salesperson`. Free text — extensible for future entity kinds |
+| `entity_type` | `text NOT NULL` | `product` \| `variant` \| `stock` \| `mockup` \| `bill` \| `customer` \| `supplier` \| `supplier_bill` \| `discount` \| `category` \| `user` \| `salesperson`. Free text — extensible for future entity kinds |
 | `entity_id` | `text` | primary key of affected row (variant id, productid, billid, …); text because IDs are mixed types |
 | `summary` | `text NOT NULL` | human-readable description of the exact change |
 
@@ -101,8 +102,10 @@ One log entry per *meaningful* change, **not** per DB statement.
 - An action that changes multiple distinct things the superadmin cares about emits
   **multiple** entries — e.g. a product save that adds one variant and changes
   stock on another → one `variant`/create entry + one `stock`/update entry.
-- A product edit changing several scalar fields at once → **one** entry listing the
-  changed fields.
+- An edit changing several scalar fields at once → **one** entry listing the
+  changed fields. Applies to **bills, products, customers, and mockups** (and any
+  other record-edit): summary lists only fields that actually changed, each as
+  `field old→new`.
 - Trivial intermediate writes (join/link rows, refetch, denormalization updates)
   are not logged.
 
@@ -122,6 +125,7 @@ category name, user email. The raw machine id of the affected row goes in the
 - `Created product BC25001 — Cotton Kurta`
 - `Edited product BC25001 — name "Kurta"→"Cotton Kurta", retailprice 1200→1400`
 - `Deleted product BC25001 — Cotton Kurta`
+- `Added mockup "Summer Tee" for product BC25001` / `Edited mockup "Summer Tee" — status Pending→Approved` / `Deleted mockup "Summer Tee"`
 - `Created bill #1042 for customer Ravi Kumar — ₹3,200, 4 items`
 - `Edited bill #1042 — total ₹3,200→₹2,900, items 4→3`
 - `Voided & deleted bill #1042`
@@ -134,8 +138,8 @@ category name, user email. The raw machine id of the affected row goes in the
 - `Changed role of user a@b.com: admin → superadmin`
 - `Deactivated user a@b.com` / `Activated user a@b.com`
 
-For product scalar edits, the summary lists only fields that actually changed,
-each as `field old→new`.
+For scalar edits to bills, products, customers, and mockups, the summary lists only
+fields that actually changed, each as `field old→new`.
 
 Building these summaries means each call site must have the human labels in scope
 before/after the mutation (variant size/color, product name, customer/supplier
@@ -149,6 +153,7 @@ these existing components (identified by current `insert`/`update`/`delete` usag
 
 - Inventory / products / variants / stock: `src/admin/pages/InventoryPage.js`,
   `src/admin/components/ProductTable.js`
+- Mockups: `src/admin/components/MockupTable.js`, `src/admin/pages/MockupPage.js`
 - Bills (create / edit / void+delete): `src/admin/components/billing/BillingForm.js`,
   `src/admin/components/billing/ManualItemForm.js`, `src/admin/components/BillTable.js`
 - Customers: `src/admin/components/CustomerForm.js`,
