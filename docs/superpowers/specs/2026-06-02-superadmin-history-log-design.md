@@ -106,29 +106,41 @@ One log entry per *meaningful* change, **not** per DB statement.
 - Trivial intermediate writes (join/link rows, refetch, denormalization updates)
   are not logged.
 
+**Human-readable rule:** the `summary` must always be plain English a person can
+read at a glance. **Never put UUIDs (or other opaque machine ids) in the summary.**
+Refer to entities by human labels: product code (`BC25001`) + name, variant
+size/color, customer/supplier/salesperson name, bill number, discount code,
+category name, user email. The raw machine id of the affected row goes in the
+`entity_id` column only — never in `summary`.
+
 ### Summary templates
 
-- `Added variant Red/M (V123) to product BC25001 — Cotton Kurta`
-- `Deleted variant Red/M (V123) from product BC25001`
-- `Decreased stock of variant Red/M (V123), product BC25001: 10 → 7 (-3)`
-- `Increased stock of variant Red/M (V123), product BC25001: 7 → 12 (+5)`
+- `Added variant Red / M to product BC25001 — Cotton Kurta`
+- `Deleted variant Red / M from product BC25001 — Cotton Kurta`
+- `Decreased stock of Red / M, product BC25001 — Cotton Kurta: 10 → 7 (-3)`
+- `Increased stock of Red / M, product BC25001 — Cotton Kurta: 7 → 12 (+5)`
 - `Created product BC25001 — Cotton Kurta`
 - `Edited product BC25001 — name "Kurta"→"Cotton Kurta", retailprice 1200→1400`
 - `Deleted product BC25001 — Cotton Kurta`
 - `Created bill #1042 for customer Ravi Kumar — ₹3,200, 4 items`
 - `Edited bill #1042 — total ₹3,200→₹2,900, items 4→3`
 - `Voided & deleted bill #1042`
-- `Added customer Ravi Kumar (+91…)` / `Edited customer …` / `Deleted customer …`
-- `Added supplier …` / `Edited supplier …` / `Deleted supplier …`
-- `Added supplier bill #SB-77 for supplier Acme — ₹12,000` / `Edited supplier bill …` / `Deleted supplier bill …`
-- `Added discount code SAVE20 (20%)` / `Edited …` / `Deleted …`
-- `Added category Sarees` / `Edited category …` / `Deleted category …`
-- `Added salesperson Priya` / `Edited salesperson …` / `Deleted salesperson …`
+- `Added customer Ravi Kumar (+91…)` / `Edited customer Ravi Kumar …` / `Deleted customer Ravi Kumar`
+- `Added supplier Acme Textiles` / `Edited supplier Acme Textiles …` / `Deleted supplier Acme Textiles`
+- `Added supplier bill #SB-77 for supplier Acme Textiles — ₹12,000` / `Edited supplier bill #SB-77 …` / `Deleted supplier bill #SB-77`
+- `Added discount code SAVE20 (20%)` / `Edited discount code SAVE20 …` / `Deleted discount code SAVE20`
+- `Added category Sarees` / `Edited category Sarees …` / `Deleted category Sarees`
+- `Added salesperson Priya` / `Edited salesperson Priya …` / `Deleted salesperson Priya`
 - `Changed role of user a@b.com: admin → superadmin`
 - `Deactivated user a@b.com` / `Activated user a@b.com`
 
 For product scalar edits, the summary lists only fields that actually changed,
 each as `field old→new`.
+
+Building these summaries means each call site must have the human labels in scope
+before/after the mutation (variant size/color, product name, customer/supplier
+name, etc.). Where a name is not already loaded, the call site fetches or reuses it
+to avoid an id-only summary.
 
 ## Call Sites
 
