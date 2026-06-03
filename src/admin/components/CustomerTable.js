@@ -17,6 +17,8 @@ import {
 } from "../../components/ui/tooltip";
 import { toast } from "sonner";
 import { useTableFilters } from "../hooks/useTableFilters";
+import { logActivity } from "../../lib/activityLog";
+import { customerName } from "../../utility/activitySummary";
 
 const INITIAL_FILTERS = {
   first_name: "",
@@ -109,6 +111,13 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     if (error) {
       toast.error("Error deleting customer", { description: error.message });
     } else {
+      const deleted = customers.find((c) => c.customer_ulid === customer_ulid);
+      logActivity({
+        action: "delete",
+        entityType: "customer",
+        entityId: deleted?.customerid ?? customer_ulid,
+        summary: `Deleted customer ${customerName(deleted)}${deleted?.phone ? ` (${deleted.phone})` : ""}`,
+      });
       fetchCustomers(); // Refresh table
       toast.success("Customer deleted successfully");
     }
