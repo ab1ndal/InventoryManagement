@@ -10,7 +10,8 @@ import React, {
 import ProductRow from "./ProductRow";
 import { supabase } from "../../lib/supabaseClient";
 import { logActivity } from "../../lib/activityLog";
-import { variantLabel, diffFields } from "../../utility/activitySummary";
+import { variantLabel, productEditSummary } from "../../utility/activitySummary";
+import { variantChanges } from "../../utility/variantDiff";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
@@ -269,17 +270,7 @@ const ProductTable = forwardRef(
 
         if (productError) throw new Error(productError.message);
 
-        const productFields = [
-          "name",
-          "categoryid",
-          "fabric",
-          "purchaseprice",
-          "retailprice",
-          "description",
-          "producturl",
-          "unit_type",
-        ];
-        const changed = diffFields(oldProduct || {}, productData, productFields);
+        const changed = productEditSummary(oldProduct, productData, categories);
         if (changed) {
           logActivity({
             action: "update",
@@ -314,15 +305,26 @@ const ProductTable = forwardRef(
               entityId: productData.productid,
               summary: `Added variant ${variantLabel(u.size, u.color)} to product ${productData.productid} — ${productData.name} (stock ${Number(u.stock) || 0})`,
             });
-          } else if (Number(old.stock) !== Number(u.stock)) {
-            const delta = Number(u.stock) - Number(old.stock);
-            const dir = delta >= 0 ? "Increased" : "Decreased";
-            logActivity({
-              action: "update",
-              entityType: "stock",
-              entityId: productData.productid,
-              summary: `${dir} stock of ${variantLabel(u.size, u.color)}, product ${productData.productid} — ${productData.name}: ${Number(old.stock)} → ${Number(u.stock)} (${delta >= 0 ? "+" : ""}${delta})`,
-            });
+          } else {
+            const { sizeOrColorChanged, stockChanged, stockDelta } =
+              variantChanges(old, u);
+            if (sizeOrColorChanged) {
+              logActivity({
+                action: "update",
+                entityType: "variant",
+                entityId: productData.productid,
+                summary: `Edited variant of product ${productData.productid} — ${productData.name}: ${variantLabel(old.size, old.color)} → ${variantLabel(u.size, u.color)}`,
+              });
+            }
+            if (stockChanged) {
+              const dir = stockDelta >= 0 ? "Increased" : "Decreased";
+              logActivity({
+                action: "update",
+                entityType: "stock",
+                entityId: productData.productid,
+                summary: `${dir} stock of ${variantLabel(u.size, u.color)}, product ${productData.productid} — ${productData.name}: ${Number(old.stock)} → ${Number(u.stock)} (${stockDelta >= 0 ? "+" : ""}${stockDelta})`,
+              });
+            }
           }
         });
 

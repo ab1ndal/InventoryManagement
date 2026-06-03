@@ -3,6 +3,7 @@ import {
   variantLabel,
   customerName,
   diffFields,
+  productEditSummary,
 } from "../activitySummary";
 
 describe("money", () => {
@@ -53,5 +54,54 @@ describe("diffFields", () => {
   });
   test("ignores fields not in the list", () => {
     expect(diffFields(oldObj, newObj, ["fabric"])).toBe("");
+  });
+});
+
+describe("productEditSummary", () => {
+  const cats = [
+    { categoryid: "SA", name: "Saree" },
+    { categoryid: "LE", name: "Lehenga" },
+  ];
+
+  test("resolves categoryid code to category name", () => {
+    const out = productEditSummary(
+      { name: "X", categoryid: "SA" },
+      { name: "X", categoryid: "LE" },
+      cats
+    );
+    expect(out).toBe('category "Saree"→"Lehenga"');
+    expect(out).not.toMatch(/\bSA\b|\bLE\b/);
+  });
+
+  test("combines scalar diffs with the category diff", () => {
+    const out = productEditSummary(
+      { name: "X", categoryid: "SA", retailprice: 100 },
+      { name: "Y", categoryid: "LE", retailprice: 100 },
+      cats
+    );
+    expect(out).toBe('name "X"→"Y", category "Saree"→"Lehenga"');
+  });
+
+  test("does not mention category when unchanged", () => {
+    const out = productEditSummary(
+      { name: "X", categoryid: "SA" },
+      { name: "Y", categoryid: "SA" },
+      cats
+    );
+    expect(out).toBe('name "X"→"Y"');
+  });
+
+  test("unknown category code falls back to 'none'", () => {
+    const out = productEditSummary(
+      { name: "X", categoryid: "SA" },
+      { name: "X", categoryid: "ZZ" },
+      cats
+    );
+    expect(out).toBe('category "Saree"→"none"');
+  });
+
+  test("empty when nothing changed", () => {
+    const p = { name: "X", categoryid: "SA", fabric: "Silk" };
+    expect(productEditSummary(p, { ...p }, cats)).toBe("");
   });
 });

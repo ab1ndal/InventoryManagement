@@ -22,6 +22,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 //import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
 import { formatINR } from "../../utility/formatCurrency";
+import {
+  composeProductName,
+  shouldRecomposeName,
+} from "../../utility/productName";
 
 const variantSchema = z.object({
   variantid: z.string().optional(),
@@ -66,6 +70,7 @@ export default function ProductEditDialog({
   });
 
   const originalVariantsRef = React.useRef([]);
+  const originalNamePartsRef = React.useRef({ fabric: "", categoryid: "" });
 
   useEffect(() => {
     if (product) {
@@ -82,8 +87,29 @@ export default function ProductEditDialog({
         variants: mappedVariants,
       });
       originalVariantsRef.current = mappedVariants;
+      originalNamePartsRef.current = {
+        fabric: product.fabric || "",
+        categoryid: product.categoryid || "",
+      };
     }
   }, [form, product, variants]);
+
+  // Recompose the (hidden) name field from fabric + category, but only when it
+  // should change — for an existing product that means fabric/category were
+  // actually edited. Prevents a stray blur from silently renaming the product.
+  const maybeComposeName = () => {
+    const fabric = form.getValues("fabric") || "";
+    const categoryid = form.getValues("categoryid") || "";
+    const recompose = shouldRecomposeName({
+      isNewProduct: !product?.productid,
+      fabricChanged: fabric !== originalNamePartsRef.current.fabric,
+      categoryChanged: categoryid !== originalNamePartsRef.current.categoryid,
+    });
+    if (!recompose) return;
+    const categoryName =
+      categories.find((c) => c.categoryid === categoryid)?.name || "";
+    form.setValue("name", composeProductName(fabric, categoryName));
+  };
 
   const handleSubmit = async (values) => {
     const updatedVariants = values.variants ?? [];
@@ -171,18 +197,7 @@ export default function ProductEditDialog({
                         onChange={field.onChange}
                         onBlur={(e) => {
                           field.onBlur?.(e); // preserve default blur behavior
-                          const categoryName =
-                            categories.find(
-                              (c) =>
-                                c.categoryid === form.getValues("categoryid")
-                            )?.name || "";
-                          const composedName = [
-                            form.getValues("fabric"),
-                            categoryName,
-                          ]
-                            .filter(Boolean)
-                            .join(" - ");
-                          form.setValue("name", composedName);
+                          maybeComposeName();
                         }}
                         options={[...categories]
                           .sort((a, b) => a.name.localeCompare(b.name))
@@ -209,18 +224,7 @@ export default function ProductEditDialog({
                         {...field}
                         onBlur={(e) => {
                           field.onBlur?.(e); // preserve default blur behavior
-                          const categoryName =
-                            categories.find(
-                              (c) =>
-                                c.categoryid === form.getValues("categoryid")
-                            )?.name || "";
-                          const composedName = [
-                            form.getValues("fabric"),
-                            categoryName,
-                          ]
-                            .filter(Boolean)
-                            .join(" - ");
-                          form.setValue("name", composedName);
+                          maybeComposeName();
                         }}
                       />
                     </FormControl>
