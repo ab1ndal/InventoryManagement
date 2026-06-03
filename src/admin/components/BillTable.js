@@ -15,6 +15,8 @@ import { computeBillTotals } from "./billing/billUtils";
 import { backCalcDiscountPct } from "./billing/stockHelpers";
 import { formatDate } from "../../utility/dateFormat";
 import { formatINR } from "../../utility/formatCurrency";
+import { logActivity } from "../../lib/activityLog";
+import { money, customerName } from "../../utility/activitySummary";
 
 const ROWS_PER_PAGE = 50;
 
@@ -368,6 +370,7 @@ export default function BillTable({ onEdit }) {
         .update({ paymentstatus: "cancelled" })
         .eq("billid", billId);
       if (error) throw error;
+      logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Cancelled draft bill #${bill.bill_number || bill.billid} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
       toast({ title: `Bill #${billId} cancelled. Stock restored.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -409,6 +412,7 @@ export default function BillTable({ onEdit }) {
         .update({ paymentstatus: "cancelled" })
         .eq("billid", billId);
       if (error) throw error;
+      logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Voided bill #${bill.bill_number || bill.billid} — ${money(bill.totalamount)}` });
       toast({ title: `Bill #${billId} cancelled. Stock restored. No customer on record.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -436,6 +440,7 @@ export default function BillTable({ onEdit }) {
         .update({ paymentstatus: "cancelled" })
         .eq("billid", billId);
       if (error) throw error;
+      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || cancelBill.billid} for ${customerName(cancelBill.customers)} (cash refund) — ${money(cancelBill.totalamount)}` });
       toast({ title: `Bill #${billId} cancelled. Stock restored.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -452,7 +457,7 @@ export default function BillTable({ onEdit }) {
   const handleResolveIssueStoreCredit = async () => {
     if (!cancelBill) return;
     const { billid: billId, customerid, totalamount, orderdate } = cancelBill;
-    const customerName = cancelBill.customers
+    const customerDisplayName = cancelBill.customers
       ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
       : "";
     setCancelSaving(true);
@@ -495,7 +500,7 @@ export default function BillTable({ onEdit }) {
         setReceiptBill({
           billId,
           originalBillDate: orderdate,
-          customerName,
+          customerName: customerDisplayName,
           items: receiptItems || [],
           creditAmount: refundAmount,
           issueDate: new Date().toISOString(),
@@ -515,8 +520,9 @@ export default function BillTable({ onEdit }) {
         });
       }
 
+      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || cancelBill.billid} for ${customerName(cancelBill.customers)} (store credit ${money(refundAmount)})` });
       toast({
-        title: `Bill #${billId} cancelled. ${formatINR(refundAmount, 2)} store credit added to ${customerName || "customer"}'s account.`,
+        title: `Bill #${billId} cancelled. ${formatINR(refundAmount, 2)} store credit added to ${customerDisplayName || "customer"}'s account.`,
       });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -572,6 +578,7 @@ export default function BillTable({ onEdit }) {
       const { error } = await supabase.from("bills").delete().eq("billid", billId);
       if (error) throw error;
 
+      logActivity({ action: "delete", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Deleted bill #${bill.bill_number || bill.billid} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
       toast({ title: `Bill #${billId} deleted` });
     } catch (e) {
       // Revert optimistic removal

@@ -22,6 +22,8 @@ import { Label } from "../../../components/ui/label";
 //import { Textarea } from "../../../components/ui/textarea";
 import { supabase } from "../../../lib/supabaseClient";
 import { toast } from "sonner";
+import { logActivity } from "../../../lib/activityLog";
+import { money, customerName as activityCustomerName } from "../../../utility/activitySummary";
 
 import CustomerSelector from "./CustomerSelector";
 import ItemTable from "./ItemTable";
@@ -857,6 +859,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
           });
         }
+        const custName = selectedCustomerId
+          ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
+          : null;
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Edited draft bill #${effectiveBillNumber || billId} for ${activityCustomerName(custName)} — ${money(totalsToUse.grandTotal)}, ${items.length} items` });
         onOpenChange?.(false);
         onSubmit?.();
         return;
@@ -977,6 +983,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           description: `Stock could not be updated for ${newDraftStockFailures.length} variant(s). Please recheck inventory.`,
         });
       }
+      const custName = selectedCustomerId
+        ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
+        : null;
+      logActivity({ action: "create", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Created draft bill #${bill.bill_number || bill.billid} for ${activityCustomerName(custName)} — ${money(computed.grandTotal)}, ${items.length} items` });
       onOpenChange?.(false);
       onSubmit?.();
     } catch (e) {
@@ -1453,6 +1463,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
       // Steps 9-10: success toast + close
       toast.success(`Bill #${activeBillId} finalized`);
+      const custName = selectedCustomerId
+        ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
+        : null;
+      if (billId) {
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Re-finalized bill #${effectiveBillNumber || billId} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
+      } else {
+        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill #${pdfBillNumber || activeBillId} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
+      }
       setConfirmOpen(false);
       onOpenChange?.(false);
       onSubmit?.();
@@ -1751,6 +1769,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       toast.success(
         `Bill #${activeBillId} saved — ₹${balanceDue.toFixed(2)} balance due`
       );
+      const custName = selectedCustomerId
+        ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
+        : null;
+      if (isNewBill) {
+        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill (partial) #${pdfBillNumber || activeBillId} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
+      } else {
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Finalized bill (partial) #${effectiveBillNumber || billId} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
+      }
       setPartialConfirmOpen(false);
       onOpenChange?.(false);
       onSubmit?.();
@@ -1829,6 +1855,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           `₹${amt.toFixed(2)} recorded. Balance remaining: ₹${remaining.toFixed(2)}`
         );
       }
+      const bill_status_now = totalPaid >= netAmount ? "finalized" : "partial";
+      logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Recorded payment of ${money(amt)} on bill #${effectiveBillNumber || billId}${bill_status_now === "finalized" ? " (now fully paid)" : ""}` });
     } catch (e) {
       toast.error(e.message);
     } finally {
