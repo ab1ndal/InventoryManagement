@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
 import { formatDate } from "../../utility/dateFormat";
 import { computeRunningLedger, computeSummary } from "../../utility/supplierBalance";
 import {
@@ -32,6 +33,14 @@ function LineItemProductLink({ lineItem, onLinked }) {
     if (error) {
       toast.error("Failed to link product", { description: error.message });
     } else {
+      logActivity({
+        action: "update",
+        entityType: "supplier_bill",
+        entityId: lineItem.transaction_id,
+        summary: productId
+          ? `Linked product ${productId} to supplier bill line item "${lineItem.description || lineItem.line_item_id}"`
+          : `Unlinked product from supplier bill line item "${lineItem.description || lineItem.line_item_id}"`,
+      });
       toast.success(productId ? `Linked ${productId}` : "Product unlinked");
       setEditing(false);
       onLinked?.({ ...lineItem, product_id: productId });
