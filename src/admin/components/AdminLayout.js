@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 
 const navItems = [
-  { label: "Dashboard", path: "/admin/dashboard" },
+  { label: "Dashboard", path: "/admin/dashboard", superadminOnly: true },
   { label: "Admin", path: "/admin/admin-hub" },
   { label: "Inventory", path: "/admin/inventory" },
   { label: "Mockups", path: "/admin/mockups" },
@@ -19,15 +19,28 @@ const navItems = [
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = useState("");
+  const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
     (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (user) setUserEmail(user.email);
+      if (user) {
+        setUserEmail(user.email);
+        const { data } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        setUserRole(data?.role ?? null);
+      }
     })();
   }, []);
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.superadminOnly || userRole === "superadmin"
+  );
 
   useEffect(() => {
     const toastData = JSON.parse(sessionStorage.getItem("toastData"));
@@ -58,7 +71,7 @@ export default function AdminLayout() {
       {/* Top Navigation Bar */}
       <nav className="sticky top-0 z-[60] bg-white border-b shadow px-6 py-4 flex items-center justify-between">
         <div className="flex space-x-6">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
