@@ -92,7 +92,7 @@ export default function MockupPage() {
         <TabsList>
           <TabsTrigger value="table">Table</TabsTrigger>
           <TabsTrigger value="graphs">Graphs</TabsTrigger>
-          <TabsTrigger value="value">Total Value</TabsTrigger>
+          {canEdit && <TabsTrigger value="value">Total Value</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="table">
@@ -104,9 +104,11 @@ export default function MockupPage() {
             <MockupGraphsPage />
           </Suspense>
         </TabsContent>
-        <TabsContent value="value">
-          <TotalValuePage />
-        </TabsContent>
+        {canEdit && (
+          <TabsContent value="value">
+            <TotalValuePage />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

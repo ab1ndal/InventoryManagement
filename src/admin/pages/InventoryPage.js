@@ -7,6 +7,8 @@ import { Button } from "../../components/ui/button";
 import { Toaster } from "../../components/ui/toaster";
 import { useToast } from "../../components/hooks/use-toast";
 import { useTableFilters } from "../hooks/useTableFilters";
+import { logActivity } from "../../lib/activityLog";
+import { variantLabel } from "../../utility/activitySummary";
 // import styling
 import "../../App.css";
 
@@ -101,6 +103,23 @@ const InventoryPage = () => {
 
         if (varErr) throw new Error("Variants insert failed");
       }
+
+      logActivity({
+        action: "create",
+        entityType: "product",
+        entityId: fullProduct.productid,
+        summary: `Created product ${fullProduct.productid} — ${fullProduct.name}`,
+      });
+      variants
+        .filter((v) => v.size || v.color)
+        .forEach((v) =>
+          logActivity({
+            action: "create",
+            entityType: "variant",
+            entityId: fullProduct.productid,
+            summary: `Added variant ${variantLabel(v.size, v.color)} to product ${fullProduct.productid} — ${fullProduct.name} (stock ${Number(v.stock) || 0})`,
+          })
+        );
 
       if (tableRef.current?.addProductToTable) {
         tableRef.current.addProductToTable(fullProduct, variantData);

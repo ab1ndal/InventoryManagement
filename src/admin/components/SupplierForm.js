@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
+import { diffFields } from "../../utility/activitySummary";
 import { formatLivePhoneInput } from "../../utility/formatPhone";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
@@ -117,16 +119,39 @@ export default function SupplierForm({
       };
 
       let error;
+      let insertedSupplier = null;
       if (isEditing) {
         ({ error } = await supabase
           .from("suppliers")
           .update(payload)
           .eq("supplierid", defaultValues.supplierid));
       } else {
-        ({ error } = await supabase.from("suppliers").insert(payload));
+        ({ data: insertedSupplier, error } = await supabase
+          .from("suppliers")
+          .insert(payload)
+          .select("supplierid")
+          .single());
       }
 
       if (error) throw error;
+
+      if (isEditing) {
+        const fields = ["name", "phone", "email", "gstin", "pan", "address", "opening_balance", "opening_balance_date", "notes"];
+        const changed = diffFields(defaultValues, values, fields);
+        logActivity({
+          action: "update",
+          entityType: "supplier",
+          entityId: defaultValues.supplierid,
+          summary: `Edited supplier ${values.name}${changed ? ` — ${changed}` : ""}`,
+        });
+      } else {
+        logActivity({
+          action: "create",
+          entityType: "supplier",
+          entityId: insertedSupplier?.supplierid,
+          summary: `Added supplier ${values.name}`,
+        });
+      }
 
       toast.success(`Supplier ${isEditing ? "updated" : "added"} successfully`);
       onSubmit?.();

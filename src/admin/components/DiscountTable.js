@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/button";
 import { Pencil, Trash2, Code } from "lucide-react";
 import { formatINR } from "../../utility/formatCurrency";
 import { formatDate } from "../../utility/dateFormat";
+import { logActivity } from "../../lib/activityLog";
 
 export default function DiscountTable({ onEdit, refresh }) {
   const [discounts, setDiscounts] = useState([]);
@@ -26,6 +27,8 @@ export default function DiscountTable({ onEdit, refresh }) {
   const handleDelete = async (id) => {
     const { error } = await supabase.from("discounts").delete().eq("id", id);
     if (!error) {
+      const old = discounts.find((d) => d.id === id);
+      logActivity({ action: "delete", entityType: "discount", entityId: id, summary: `Deleted discount code ${old?.code || id}` });
       fetchDiscounts();
     } else {
       console.error("Error deleting discount:", error.message);

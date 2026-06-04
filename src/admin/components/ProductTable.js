@@ -9,6 +9,9 @@ import React, {
 } from "react";
 import ProductRow from "./ProductRow";
 import { supabase } from "../../lib/supabaseClient";
+import { logActivity } from "../../lib/activityLog";
+import { variantLabel, productEditSummary } from "../../utility/activitySummary";
+import { variantChanges } from "../../utility/variantDiff";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
@@ -247,6 +250,10 @@ const ProductTable = forwardRef(
         const { variants: updatedVariants = [], ...productData } =
           updatedProduct;
 
+        const oldProduct = products.find(
+          (p) => p.productid === productData.productid
+        );
+
         const { error: productError } = await supabase
           .from("products")
           .update({
@@ -262,6 +269,16 @@ const ProductTable = forwardRef(
           .eq("productid", productData.productid);
 
         if (productError) throw new Error(productError.message);
+
+        const changed = productEditSummary(oldProduct, productData, categories);
+        if (changed) {
+          logActivity({
+            action: "update",
+            entityType: "product",
+            entityId: productData.productid,
+            summary: `Edited product ${productData.productid} — ${changed}`,
+          });
+        }
 
         const upserts = updatedVariants
           .filter((v) => v.size && v.color)
@@ -279,6 +296,38 @@ const ProductTable = forwardRef(
 
         if (upsertError) throw new Error(upsertError.message);
 
+        upserts.forEach((u) => {
+          const old = variants.find((v) => v.variantid === u.variantid);
+          if (!u.variantid || !old) {
+            logActivity({
+              action: "create",
+              entityType: "variant",
+              entityId: productData.productid,
+              summary: `Added variant ${variantLabel(u.size, u.color)} to product ${productData.productid} — ${productData.name} (stock ${Number(u.stock) || 0})`,
+            });
+          } else {
+            const { sizeOrColorChanged, stockChanged, stockDelta } =
+              variantChanges(old, u);
+            if (sizeOrColorChanged) {
+              logActivity({
+                action: "update",
+                entityType: "variant",
+                entityId: productData.productid,
+                summary: `Edited variant of product ${productData.productid} — ${productData.name}: ${variantLabel(old.size, old.color)} → ${variantLabel(u.size, u.color)}`,
+              });
+            }
+            if (stockChanged) {
+              const dir = stockDelta >= 0 ? "Increased" : "Decreased";
+              logActivity({
+                action: "update",
+                entityType: "stock",
+                entityId: productData.productid,
+                summary: `${dir} stock of ${variantLabel(u.size, u.color)}, product ${productData.productid} — ${productData.name}: ${Number(old.stock)} → ${Number(u.stock)} (${stockDelta >= 0 ? "+" : ""}${stockDelta})`,
+              });
+            }
+          }
+        });
+
         await Promise.all(
           deletedVariants.map(async ({ variantid }) => {
             if (!variantid) return;
@@ -289,6 +338,18 @@ const ProductTable = forwardRef(
             if (deleteError) throw new Error(deleteError.message);
           })
         );
+
+        deletedVariants
+          .filter((d) => d.variantid)
+          .forEach((d) => {
+            const old = variants.find((v) => v.variantid === d.variantid);
+            logActivity({
+              action: "delete",
+              entityType: "variant",
+              entityId: productData.productid,
+              summary: `Deleted variant ${variantLabel(old?.size, old?.color)} from product ${productData.productid} — ${productData.name}`,
+            });
+          });
 
         updateProductInTable(productData, upserts, deletedVariants);
 

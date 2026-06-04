@@ -16,6 +16,8 @@ import {
 } from "../../components/ui/select";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
+import { diffFields } from "../../utility/activitySummary";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -358,19 +360,30 @@ export default function DiscountForm({ defaultValues, onSuccess, onCancel }) {
     };
 
     let error;
+    let insertedDiscount;
     if (defaultValues?.id) {
       ({ error } = await supabase
         .from("discounts")
         .update(payload)
         .eq("id", defaultValues.id));
     } else {
-      ({ error } = await supabase.from("discounts").insert(payload));
+      ({ data: insertedDiscount, error } = await supabase
+        .from("discounts")
+        .insert(payload)
+        .select("id")
+        .single());
     }
 
     setSaving(false);
     if (error) {
       toast.error("Failed to save discount", { description: error.message });
     } else {
+      if (defaultValues?.id) {
+        const changed = diffFields(defaultValues, data, ["code", "type", "value", "active"]);
+        logActivity({ action: "update", entityType: "discount", entityId: defaultValues.id, summary: `Edited discount code ${data.code || "(none)"}${changed ? ` — ${changed}` : ""}` });
+      } else {
+        logActivity({ action: "create", entityType: "discount", entityId: insertedDiscount?.id, summary: `Added discount code ${data.code || "(none)"} (${data.type} ${data.value})` });
+      }
       toast.success(
         defaultValues?.id ? "Discount updated" : "Discount created",
       );

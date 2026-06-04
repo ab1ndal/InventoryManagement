@@ -5,6 +5,7 @@ import MockupRow from "./MockupRow";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Loader2 } from "lucide-react";
+import { logActivity } from "../../lib/activityLog";
 //import { useToast } from "../../components/hooks/use-toast";
 
 const ROWS_PER_PAGE = 100;
@@ -194,6 +195,13 @@ const onToggle = async (productid, field, value) => {
       .update(patch)
       .eq("productid", productid);
     if (error) throw new Error(error.message);
+
+    logActivity({
+      action: "update",
+      entityType: "mockup",
+      entityId: productid,
+      summary: `Edited mockup for product ${productid} — ${field} ${!value}→${value}`,
+    });
 
     setRows((prev) =>
       prev.map((r) => (r.productid === productid ? { ...r, ...patch } : r))

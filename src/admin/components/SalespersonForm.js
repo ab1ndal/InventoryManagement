@@ -7,6 +7,8 @@ import { Label } from "../../components/ui/label";
 import { Button } from "../../components/ui/button";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
+import { diffFields } from "../../utility/activitySummary";
 
 const salespersonSchema = z.object({
   name: z.string().min(1, "Required").max(100, "Max 100 characters"),
@@ -53,19 +55,30 @@ export default function SalespersonForm({ defaultValues, onSuccess, onCancel }) 
     };
 
     let error;
+    let insertedSalesperson;
     if (isEdit) {
       ({ error } = await supabase
         .from("salespersons")
         .update(payload)
         .eq("salesperson_id", defaultValues.salesperson_id));
     } else {
-      ({ error } = await supabase.from("salespersons").insert(payload));
+      ({ data: insertedSalesperson, error } = await supabase
+        .from("salespersons")
+        .insert(payload)
+        .select("salesperson_id")
+        .single());
     }
 
     setSaving(false);
     if (error) {
       toast.error("Failed to save salesperson", { description: error.message });
     } else {
+      if (defaultValues?.salesperson_id) {
+        const changed = diffFields(defaultValues, data, ["name", "date_hired", "active"]);
+        logActivity({ action: "update", entityType: "salesperson", entityId: defaultValues.salesperson_id, summary: `Edited salesperson ${data.name}${changed ? ` — ${changed}` : ""}` });
+      } else {
+        logActivity({ action: "create", entityType: "salesperson", entityId: insertedSalesperson?.salesperson_id, summary: `Added salesperson ${data.name}` });
+      }
       toast.success(isEdit ? "Salesperson updated" : "Salesperson added");
       onSuccess();
     }

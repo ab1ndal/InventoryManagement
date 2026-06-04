@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
+import { money } from "../../utility/activitySummary";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
@@ -240,6 +242,14 @@ export default function SupplierTransactionDialog({
 
         if (billError) throw billError;
       }
+
+      const typeLabel = { bill: "supplier bill", payment: "supplier payment", advance: "supplier advance" }[values.type] || "supplier transaction";
+      logActivity({
+        action: "create",
+        entityType: values.type === "bill" ? "supplier_bill" : "supplier",
+        entityId: transaction_id,
+        summary: `Added ${typeLabel} for supplier ${selectedSupplier.name} — ${money(values.amount)}`,
+      });
 
       toast.success(
         values.type === "bill" ? "Bill recorded"

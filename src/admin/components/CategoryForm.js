@@ -7,6 +7,8 @@ import { Label } from "../../components/ui/label";
 import { Button } from "../../components/ui/button";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
+import { diffFields } from "../../utility/activitySummary";
 
 const categorySchema = z.object({
   categoryid: z
@@ -83,6 +85,12 @@ export default function CategoryForm({ defaultValues, onSuccess, onCancel }) {
     if (error) {
       toast.error("Failed to save category", { description: error.message });
     } else {
+      if (isEdit) {
+        const changed = diffFields(defaultValues, data, ["name", "description"]);
+        logActivity({ action: "update", entityType: "category", entityId: data.categoryid, summary: `Edited category ${data.name}${changed ? ` — ${changed}` : ""}` });
+      } else {
+        logActivity({ action: "create", entityType: "category", entityId: data.categoryid, summary: `Added category ${data.name}` });
+      }
       toast.success(isEdit ? "Category updated" : "Category created");
       onSuccess();
     }

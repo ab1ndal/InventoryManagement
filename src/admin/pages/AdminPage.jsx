@@ -25,6 +25,7 @@ import {
 } from "../../components/ui/tabs";
 import { toast } from "../../components/hooks/use-toast";
 import { formatINR } from "../../utility/formatCurrency";
+import { logActivity } from "../../lib/activityLog";
 
 const ROLES = [
   { value: "user", label: "User" },
@@ -243,6 +244,13 @@ function UsersTab({ isSuperAdmin }) {
         .update({ role: newRole })
         .eq("id", userId);
       if (error) throw error;
+      const target = users.find((u) => u.id === userId);
+      logActivity({
+        action: "update",
+        entityType: "user",
+        entityId: userId,
+        summary: `Changed role of user ${target?.email || "(unknown user)"}: ${target?.role || "?"} → ${newRole}`,
+      });
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
       );
@@ -260,6 +268,13 @@ function UsersTab({ isSuperAdmin }) {
         .update({ is_active: !currentActive })
         .eq("id", userId);
       if (error) throw error;
+      const target = users.find((u) => u.id === userId);
+      logActivity({
+        action: "update",
+        entityType: "user",
+        entityId: userId,
+        summary: `${currentActive ? "Deactivated" : "Activated"} user ${target?.email || "(unknown user)"}`,
+      });
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, is_active: !currentActive } : u))
       );

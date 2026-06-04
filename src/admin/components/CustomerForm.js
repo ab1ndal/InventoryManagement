@@ -28,6 +28,8 @@ import {
   DialogTitle,
 } from "../../components/ui/dialog";
 import CustomDropdown from "../../components/CustomDropdown";
+import { logActivity } from "../../lib/activityLog";
+import { customerName, diffFields } from "../../utility/activitySummary";
 
 const formSchema = z.object({
   referred_by: z.coerce.number().optional(),
@@ -174,6 +176,36 @@ export default function CustomerForm(props) {
         .select();
 
       if (error) throw error;
+
+      const isEdit = Boolean(stableDefaults?.customer_ulid);
+      const saved = data[0];
+      if (isEdit) {
+        const fields = [
+          "first_name",
+          "last_name",
+          "phone",
+          "email",
+          "gender",
+          "store_credit",
+          "address",
+          "loyalty_tier",
+          "customer_notes",
+        ];
+        const changed = diffFields(stableDefaults, values, fields);
+        logActivity({
+          action: "update",
+          entityType: "customer",
+          entityId: saved.customerid,
+          summary: `Edited customer ${customerName(saved)}${changed ? ` — ${changed}` : ""}`,
+        });
+      } else {
+        logActivity({
+          action: "create",
+          entityType: "customer",
+          entityId: saved.customerid,
+          summary: `Added customer ${customerName(saved)} (${saved.phone || "no phone"})`,
+        });
+      }
 
       toast.success(
         `Customer ${

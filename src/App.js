@@ -30,6 +30,7 @@ const ForgetPasswordPage = lazy(() => import("./admin/pages/ForgetPasswordPage")
 const ResetPasswordPage = lazy(() => import("./admin/pages/ResetPasswordPage"));
 const MockupPage = lazy(() => import("./admin/pages/MockupPage"));
 const DashboardPage = lazy(() => import("./admin/pages/DashboardPage"));
+const HistoryPage = lazy(() => import("./admin/pages/HistoryPage"));
 
 function App() {
   return (
@@ -60,6 +61,7 @@ function App() {
               <Route index element={<Navigate to="/admin/inventory" replace />} />
               <Route element={<RequireAdminAuth allowedRoles={["superadmin"]} />}>
                 <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="history" element={<HistoryPage />} />
               </Route>
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="bills" element={<BillingPage />} />
