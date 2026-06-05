@@ -59,7 +59,8 @@ export default function ExchangePage() {
         .from("exchanges")
         .select(`
           exchangeid, returndate, quantity, credit_amount, new_billid, reason,
-          bill_items!inner(product_name, product_code, variantid, productsizecolors(size, color), bills!inner(bill_number)),
+          product_name, product_code,
+          bill_items(product_name, product_code, variantid, productsizecolors(size, color), bills(bill_number)),
           customers(first_name, last_name),
           new_bill:bills!exchanges_new_billid_fkey(bill_number)
         `, { count: "exact" })
@@ -309,6 +310,10 @@ export default function ExchangePage() {
         customerid: loadedBill.customerid || null,
         credit_amount: ri.creditAmount,
         voucher_id: null,
+        // Snapshot so the record survives a later edit of the source bill,
+        // which deletes + reinserts bill_items and nulls original_bill_item_id.
+        product_name: ri.product_name || null,
+        product_code: ri.product_code || null,
       }));
       const { data: insertedExchanges, error: exErr } = await supabase
         .from("exchanges")
@@ -668,7 +673,7 @@ export default function ExchangePage() {
                             {origBill ? `#${origBill}` : "—"}
                           </td>
                           <td className="py-2 pr-3">
-                            <div>{bi?.product_name || "—"}</div>
+                            <div>{bi?.product_name || ex.product_name || "—"}</div>
                             {(bi?._sizeColor?.size || bi?._sizeColor?.color) && (
                               <div className="text-xs text-muted-foreground">
                                 {[bi._sizeColor.size, bi._sizeColor.color].filter(Boolean).join(" / ")}

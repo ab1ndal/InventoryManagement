@@ -268,7 +268,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const { data: bill, error: billErr } = await supabase
           .from("bills")
           .select(
-            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount",
+            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, exchange_credit_used, exchange_source_bill",
           )
           .eq("billid", billId)
           .single();
@@ -311,6 +311,30 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .select("salesperson_id")
           .eq("billid", billId);
         setSelectedSalespersonIds((spData || []).map((r) => r.salesperson_id));
+
+        // Rehydrate applied exchange credit so it shows when editing an existing bill.
+        // Authoritative amount/source live on the bills row; the per-item breakdown
+        // lives in `exchanges` (linked via new_billid) but may be absent if the source
+        // bill was later edited — its bill_items delete cascades the exchange rows.
+        const exAmount = Number(bill.exchange_credit_used ?? 0);
+        if (exAmount > 0) {
+          const { data: linkedEx } = await supabase
+            .from("exchanges")
+            .select("exchangeid, credit_amount, quantity, product_name, bill_items(product_name)")
+            .eq("new_billid", billId);
+          const items = (linkedEx || []).map((e) => ({
+            product_name: e.bill_items?.product_name || e.product_name || "Item",
+            returnQty: Number(e.quantity || 0),
+            creditAmount: Number(e.credit_amount || 0),
+          }));
+          setExchangeCredit({
+            amount: exAmount,
+            label: `Exchange Credit${bill.exchange_source_bill ? ` — Bill #${bill.exchange_source_bill}` : ""}`,
+            sourceBillNumber: bill.exchange_source_bill || null,
+            exchangeIds: (linkedEx || []).map((e) => e.exchangeid),
+            items,
+          });
+        }
 
         // Set form state from bill
         setSelectedCustomerId(bill.customerid || null);
@@ -468,7 +492,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     }
     supabase
       .from("exchanges")
-      .select("exchangeid, credit_amount, quantity, bill_items!inner(product_name, bills!inner(bill_number))")
+      .select("exchangeid, credit_amount, quantity, product_name, bill_items(product_name, bills(bill_number))")
       .eq("customerid", selectedCustomerId)
       .is("new_billid", null)
       .then(({ data }) => {
@@ -478,7 +502,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const bills = [...new Set(data.map((e) => e.bill_items?.bills?.bill_number).filter(Boolean))];
         const label = `Exchange Credit${bills.length ? ` — Bill${bills.length > 1 ? "s" : ""} #${bills.join(", #")}` : ""}`;
         const items = data.map((e) => ({
-          product_name: e.bill_items?.product_name || "Unknown",
+          product_name: e.bill_items?.product_name || e.product_name || "Unknown",
           returnQty: Number(e.quantity || 0),
           creditAmount: Number(e.credit_amount || 0),
         }));
