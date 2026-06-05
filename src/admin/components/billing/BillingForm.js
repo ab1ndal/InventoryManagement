@@ -688,29 +688,35 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     if (!invoiceRef.current) throw new Error("InvoiceView ref missing");
 
     const blob = await generateInvoicePdf(invoiceRef.current);
-    const path = `bill-${pdfBillNumber || activeBillId}.pdf`;
+    const billLabel = pdfBillNumber || activeBillId;
+    // Versioned filename so each regen yields a fresh URL (no CDN/browser cache)
+    const newPath = `bill-${billLabel}-v${Date.now()}.pdf`;
+    // Remove legacy/previous versions (bucket is private; stale files just waste space)
+    await supabase.storage
+      .from("invoices")
+      .remove([`bill-${billLabel}.pdf`, `bill-${activeBillId}.pdf`]);
 
     const { error: upErr } = await supabase.storage
       .from("invoices")
-      .upload(path, blob, { contentType: "application/pdf", upsert: true });
+      .upload(newPath, blob, { contentType: "application/pdf", upsert: true });
 
     if (upErr) throw upErr;
 
-    const { data: urlData } = supabase.storage
+    // Store the bare path (not a public URL) — bucket is private, so callers
+    // must mint a signed URL. BillTable.handleViewPdf/SMS extract this path.
+    const { error: urlErr } = await supabase
+      .from("bills")
+      .update({ pdf_url: newPath })
+      .eq("billid", activeBillId);
+
+    if (urlErr) throw urlErr;
+
+    // Signed URL for the immediate "open in new tab" after finalize
+    const { data: signedData } = await supabase.storage
       .from("invoices")
-      .getPublicUrl(path);
-    const pdfUrl = urlData?.publicUrl ?? null;
+      .createSignedUrl(newPath, 3600);
 
-    if (pdfUrl) {
-      const { error: urlErr } = await supabase
-        .from("bills")
-        .update({ pdf_url: pdfUrl })
-        .eq("billid", activeBillId);
-
-      if (urlErr) throw urlErr;
-    }
-
-    return pdfUrl;
+    return signedData?.signedUrl ?? null;
   };
 
   // BILL-01 + STOCK-01: New draft save | BILL-02 + STOCK-02: Draft update (Plan 03)
