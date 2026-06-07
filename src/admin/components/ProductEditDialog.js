@@ -22,6 +22,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 //import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
 import { formatINR } from "../../utility/formatCurrency";
+import { sortVariantsBySizeColor } from "../../utility/sortVariants";
 import {
   composeProductName,
   shouldRecomposeName,
@@ -75,7 +76,7 @@ export default function ProductEditDialog({
   useEffect(() => {
     if (product) {
       hasEditedNameRef.current = false; // Reset manual edit tracking
-      const mappedVariants = variants.map((variant) => ({
+      const mappedVariants = sortVariantsBySizeColor(variants).map((variant) => ({
         variantid: variant.variantid || undefined,
         size: variant.size || "",
         color: variant.color || "",

@@ -6,13 +6,14 @@ import { EditButton, PrintButton } from "../../components/ActionButtons";
 import printLabel from "../../components/printLabel";
 import { formatINR } from "../../utility/formatCurrency";
 import { formatStock } from "../../utility/formatStock";
+import { sortVariantsBySizeColor } from "../../utility/sortVariants";
 
 const ProductRow = ({ product, variants, onEdit, categories }) => {
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(false);
 
-  const sizeColorRows = variants.filter(
-    (v) => v.productid === product.productid
+  const sizeColorRows = sortVariantsBySizeColor(
+    variants.filter((v) => v.productid === product.productid)
   );
   const totalStock = sizeColorRows.reduce(
     (sum, row) => sum + (row.stock || 0),

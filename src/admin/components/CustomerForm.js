@@ -69,10 +69,22 @@ export default function CustomerForm(props) {
     () => JSON.stringify(defaultValues),
     [defaultValues]
   );
-  const stableDefaults = React.useMemo(
-    () => JSON.parse(defaultsSig),
-    [defaultsSig]
-  );
+  const stableDefaults = React.useMemo(() => {
+    const parsed = JSON.parse(defaultsSig);
+    const textFields = [
+      "first_name",
+      "last_name",
+      "phone",
+      "email",
+      "address",
+      "gender",
+      "customer_notes",
+    ];
+    textFields.forEach((f) => {
+      if (parsed[f] === null) parsed[f] = "";
+    });
+    return parsed;
+  }, [defaultsSig]);
 
   const [open, setOpen] = React.useState(false);
   const [customers, setCustomers] = React.useState([]);
@@ -233,7 +245,7 @@ export default function CustomerForm(props) {
           <Button onClick={() => setOpen(true)}>{triggerLabel}</Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-xl bg-white rounded-lg shadow-xl p-6">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto bg-white rounded-lg shadow-xl p-6">
         <DialogHeader>
           <DialogTitle>
             {stableDefaults.customer_ulid ? "Edit Customer" : "Add Customer"}

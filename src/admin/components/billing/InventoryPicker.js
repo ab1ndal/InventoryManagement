@@ -12,6 +12,7 @@ import {
 import { Button } from "../../../components/ui/button";
 import { supabase } from "../../../lib/supabaseClient";
 import { v4 as uuidv4 } from "uuid";
+import { sortVariantsBySizeColor } from "../../../utility/sortVariants";
 
 export default function InventoryPicker({ onPicked, initialVal, isBackdated, salespersons = [] }) {
   const isEditing = !!initialVal;
@@ -71,7 +72,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
       .from("productsizecolors")
       .select("variantid, productid, size, color, stock")
       .eq("productid", selected.productid)
-      .then(({ data }) => setVariants(data || []));
+      .then(({ data }) => setVariants(sortVariantsBySizeColor(data || [])));
   }, [selected]);
 
   // When editing, the original variant's stock is effectively higher by the original quantity
