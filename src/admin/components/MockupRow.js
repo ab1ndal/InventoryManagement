@@ -2,25 +2,7 @@
 import React, { useMemo } from "react";
 import { formatDate as formatDateUtil } from "../../utility/dateFormat";
 import { Checkbox } from "../../components/ui/checkbox";
-
-const encodedPriceToCode = (price) => {
-  const map = {
-    1: "A",
-    2: "B",
-    3: "C",
-    4: "D",
-    5: "E",
-    6: "F",
-    7: "G",
-    8: "H",
-    9: "I",
-    0: "Z",
-  };
-  const digits = Number(price || 0)
-    .toString()
-    .split("");
-  return "Z" + digits.map((d) => map[d] ?? "Z").join("");
-};
+import { encodePriceToZCode } from "../../utility/zCode";
 
 const formatDate = (dt) => formatDateUtil(dt) || "";
 
@@ -43,7 +25,7 @@ export default function MockupRow({ row, onToggle, canEdit }) {
   } = row;
 
   const zCode = useMemo(
-    () => encodedPriceToCode(purchaseprice),
+    () => encodePriceToZCode(purchaseprice),
     [purchaseprice]
   );
 

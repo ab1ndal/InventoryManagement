@@ -23,7 +23,12 @@ export function encodePriceToZCode(price) {
 }
 
 export function decodeZCodeToPrice(code) {
-  const letters = (code || "").toUpperCase().replace(/^Z/, "").split("");
-  const digits = letters.map((l) => LETTER_TO_DIGIT[l] ?? "").join("");
-  return Number(digits || 0);
+  const s = String(code || "").toUpperCase().trim();
+  if (!s.startsWith("Z") || s.length < 2) return Number(s) || 0;
+  const digits = s
+    .slice(1)
+    .split("")
+    .map((l) => LETTER_TO_DIGIT[l] ?? "0")
+    .join("");
+  return Number(digits) || 0;
 }

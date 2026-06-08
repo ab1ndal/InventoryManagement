@@ -7,6 +7,7 @@ import printLabel from "../../components/printLabel";
 import { formatINR } from "../../utility/formatCurrency";
 import { formatStock } from "../../utility/formatStock";
 import { sortVariantsBySizeColor } from "../../utility/sortVariants";
+import { encodePriceToZCode } from "../../utility/zCode";
 
 const ProductRow = ({ product, variants, onEdit, categories, isSuperAdmin }) => {
   const [expanded, setExpanded] = useState(false);
@@ -41,29 +42,6 @@ const ProductRow = ({ product, variants, onEdit, categories, isSuperAdmin }) => 
     setOpen(false); // 🔐 Close dialog after saving
   };
 
-  const encodedPriceToCode = (price) => {
-    const map = {
-      1: "A",
-      2: "B",
-      3: "C",
-      4: "D",
-      5: "E",
-      6: "F",
-      7: "G",
-      8: "H",
-      9: "I",
-      0: "Z",
-    };
-    return (
-      "Z" +
-      price
-        .toString()
-        .split("")
-        .map((d) => map[d])
-        .join("")
-    );
-  };
-
   const getDiscountInfo = (purchasePrice, retailPrice) => {
     const discountedPrice = +(purchasePrice * 1.3).toFixed(2);
     const discountPct = retailPrice
@@ -89,7 +67,7 @@ const ProductRow = ({ product, variants, onEdit, categories, isSuperAdmin }) => 
         </td>
         <td style={{ textAlign: "center" }}>{product.fabric}</td>
         <td style={{ textAlign: "center" }}>
-          {encodedPriceToCode(purchase)}
+          {encodePriceToZCode(purchase)}
         </td>
         <td style={{ textAlign: "center" }}>{formatINR(retail)}</td>
         {isSuperAdmin && <td style={{ textAlign: "center" }}>{markup}%</td>}

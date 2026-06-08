@@ -12,21 +12,7 @@ import {
 import { supabase } from "../../../lib/supabaseClient";
 import { useToast } from "../../../components/hooks/use-toast";
 import { v4 as uuidv4 } from "uuid";
-
-// Encode numeric cost price to Z-code: 1234 → "ZABCD"
-function encodePriceToZCode(price) {
-  const map = { 1: "A", 2: "B", 3: "C", 4: "D", 5: "E", 6: "F", 7: "G", 8: "H", 9: "I", 0: "Z" };
-  const digits = Number(price || 0).toString().split("");
-  return "Z" + digits.map((d) => map[d] ?? "Z").join("");
-}
-
-// Decode Z-code to numeric cost price: "ZABCD" → 1234
-function decodeZCode(str) {
-  const s = String(str || "").toUpperCase().trim();
-  if (!s.startsWith("Z") || s.length < 2) return Number(s) || 0;
-  const rev = { A: "1", B: "2", C: "3", D: "4", E: "5", F: "6", G: "7", H: "8", I: "9", Z: "0" };
-  return Number(s.slice(1).split("").map((ch) => rev[ch] ?? "0").join("")) || 0;
-}
+import { encodePriceToZCode, decodeZCodeToPrice } from "../../../utility/zCode";
 
 function getBCXPrefix(date = new Date()) {
   const yy = String(date.getFullYear()).slice(-2);
@@ -101,7 +87,7 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const purchasePrice = decodeZCode(zCode);
+      const purchasePrice = decodeZCodeToPrice(zCode);
       let manualItemId;
       if (isEditing) {
         manualItemId = initialVal.productid || initialVal.manual_code || null;
