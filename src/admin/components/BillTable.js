@@ -20,6 +20,17 @@ import { money, customerName } from "../../utility/activitySummary";
 
 const ROWS_PER_PAGE = 50;
 
+const DEFAULT_SORT = { key: "bill_number", dir: "desc" };
+
+const SORTABLE_COLUMNS = {
+  bill_number: "bill_number",
+  orderdate: "orderdate",
+  totalamount: "totalamount",
+  gst_total: "gst_total",
+  discount_total: "discount_total",
+  paymentstatus: "paymentstatus",
+};
+
 export default function BillTable({ onEdit }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -27,6 +38,7 @@ export default function BillTable({ onEdit }) {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "" });
+  const [sort, setSort] = useState({ key: "bill_number", dir: "desc" });
   const [cancelBill, setCancelBill] = useState(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -267,7 +279,10 @@ export default function BillTable({ onEdit }) {
         .select(
           "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, paymentstatus, finalized, pdf_url"
         )
-        .order("bill_number", { ascending: false, nullsFirst: false })
+        .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
+          ascending: sort.dir === "asc",
+          nullsFirst: false,
+        })
         .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE); // fetch 51 to detect next page
 
       if (filters.search) {
@@ -290,7 +305,20 @@ export default function BillTable({ onEdit }) {
     };
 
     loadBills();
-  }, [page, filters, toast]);
+  }, [page, filters, sort, toast]);
+
+  // Cycle a column header through ascending → descending → no-sort (back to default: Bill Number desc).
+  const handleSortClick = (key) => {
+    setPage(1);
+    setSort((prev) => {
+      if (prev.key !== key) return { key, dir: "asc" };
+      if (prev.dir === "asc") return { key, dir: "desc" };
+      return { ...DEFAULT_SORT };
+    });
+  };
+
+  const sortIndicator = (key) =>
+    sort.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "";
 
   const openCancelFlow = (bill) => {
     setCancelBill(bill);
@@ -616,13 +644,43 @@ export default function BillTable({ onEdit }) {
           <table className="w-full text-sm">
             <thead className="bg-muted">
               <tr>
-                <th className="p-2 text-left">Bill ID</th>
+                <th
+                  className="p-2 text-left cursor-pointer select-none hover:bg-muted-foreground/10"
+                  onClick={() => handleSortClick("bill_number")}
+                >
+                  Bill ID{sortIndicator("bill_number")}
+                </th>
                 <th className="p-2 text-left">Customer</th>
-                <th className="p-2 text-left">Date</th>
-                <th className="p-2 text-right">Total</th>
-                <th className="p-2 text-right">GST</th>
-                <th className="p-2 text-right">Discount</th>
-                <th className="p-2 text-center">Status</th>
+                <th
+                  className="p-2 text-left cursor-pointer select-none hover:bg-muted-foreground/10"
+                  onClick={() => handleSortClick("orderdate")}
+                >
+                  Date{sortIndicator("orderdate")}
+                </th>
+                <th
+                  className="p-2 text-right cursor-pointer select-none hover:bg-muted-foreground/10"
+                  onClick={() => handleSortClick("totalamount")}
+                >
+                  Total{sortIndicator("totalamount")}
+                </th>
+                <th
+                  className="p-2 text-right cursor-pointer select-none hover:bg-muted-foreground/10"
+                  onClick={() => handleSortClick("gst_total")}
+                >
+                  GST{sortIndicator("gst_total")}
+                </th>
+                <th
+                  className="p-2 text-right cursor-pointer select-none hover:bg-muted-foreground/10"
+                  onClick={() => handleSortClick("discount_total")}
+                >
+                  Discount{sortIndicator("discount_total")}
+                </th>
+                <th
+                  className="p-2 text-center cursor-pointer select-none hover:bg-muted-foreground/10"
+                  onClick={() => handleSortClick("paymentstatus")}
+                >
+                  Status{sortIndicator("paymentstatus")}
+                </th>
                 <th className="p-2 text-center">Actions</th>
               </tr>
             </thead>
