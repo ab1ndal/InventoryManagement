@@ -511,7 +511,7 @@ const ProductTable = forwardRef(
                 </div>
               </th>
 
-              <th></th>
+              {isSuperAdmin && <th></th>}
               <th>
                 <div className="flex flex-col gap-1">
                   <Input
