@@ -1,5 +1,5 @@
 // src/admin/components/MockupTable.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import MockupRow from "./MockupRow";
 import { Input } from "../../components/ui/input";
@@ -18,6 +18,28 @@ export default function MockupTable({ canEdit }) {
   const [currentPage, setCurrentPage] = useState(0);
   const [inputPage, setInputPage] = useState("1");
   const [stats, setStats] = useState(null);
+
+  // header rows are stacked sticky — measure actual heights so the rows
+  // below don't overlap when content (and thus row height) changes
+  const headerRowRef = useRef(null);
+  const statsRowRef = useRef(null);
+  const [stickyOffsets, setStickyOffsets] = useState({ statsTop: 0, filterTop: 0 });
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      const headerHeight = headerRowRef.current?.offsetHeight || 0;
+      const statsHeight = statsRowRef.current?.offsetHeight || 0;
+      setStickyOffsets({
+        statsTop: headerHeight,
+        filterTop: headerHeight + statsHeight,
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (headerRowRef.current) ro.observe(headerRowRef.current);
+    if (statsRowRef.current) ro.observe(statsRowRef.current);
+    return () => ro.disconnect();
+  }, [stats, rows]);
 
   const [filters, setFilters] = useState({
     productid: "",
@@ -249,7 +271,7 @@ const onToggle = async (productid, field, value) => {
       <div className="overflow-y-auto max-h-[80vh]">
         <table className="product-table w-full border-collapse">
           <thead className="bg-gray-100">
-            <tr>
+            <tr ref={headerRowRef}>
               <th className="sticky top-0 z-30 bg-gray-100 w-32 text-center">
                 Product ID
               </th>
@@ -261,12 +283,6 @@ const onToggle = async (productid, field, value) => {
               </th>
               <th className="sticky top-0 z-30 bg-gray-100 w-32 text-center">
                 Fabric
-              </th>
-              <th className="sticky top-0 z-30 bg-gray-100 w-40 text-center">
-                Sizes
-              </th>
-              <th className="sticky top-0 z-30 bg-gray-100 w-40 text-center">
-                Colors
               </th>
               <th className="sticky top-0 z-30 bg-gray-100 w-24 text-center">
                 Redo
@@ -300,44 +316,42 @@ const onToggle = async (productid, field, value) => {
               </th>
             </tr>
             {stats && (
-              <tr className="text-xs text-gray-600">
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+              <tr ref={statsRowRef} className="text-xs text-gray-600">
+                <th className="sticky z-20 bg-gray-100" style={{ top: stickyOffsets.statsTop }}></th>
+                <th className="sticky z-20 bg-gray-100" style={{ top: stickyOffsets.statsTop }}></th>
+                <th className="sticky z-20 bg-gray-100" style={{ top: stickyOffsets.statsTop }}></th>
+                <th className="sticky z-20 bg-gray-100" style={{ top: stickyOffsets.statsTop }}></th>
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.redo_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.base_mockup_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.file_mockup_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.mockup_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.video_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.ig_post_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.ig_reel_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100 text-center">
+                <th className="sticky z-20 bg-gray-100 text-center" style={{ top: stickyOffsets.statsTop }}>
                   {stats.whatsapp_true}/{stats.total_count}
                 </th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
-                <th className="sticky top-20 z-20 bg-gray-100"></th>
+                <th className="sticky z-20 bg-gray-100" style={{ top: stickyOffsets.statsTop }}></th>
+                <th className="sticky z-20 bg-gray-100" style={{ top: stickyOffsets.statsTop }}></th>
               </tr>
             )}
             {/* filter row */}
             <tr>
-              <th className="sticky top-28 z-10 bg-gray-100">
+              <th className="sticky z-10 bg-gray-100" style={{ top: stickyOffsets.filterTop }}>
                 <Input
                   className={filterInputClass}
                   placeholder="Product ID"
@@ -347,8 +361,8 @@ const onToggle = async (productid, field, value) => {
                   }
                 />
               </th>
-              <th className="sticky top-28 z-10 bg-gray-100"></th>
-              <th className="sticky top-28 z-10 bg-gray-100">
+              <th className="sticky z-10 bg-gray-100" style={{ top: stickyOffsets.filterTop }}></th>
+              <th className="sticky z-10 bg-gray-100" style={{ top: stickyOffsets.filterTop }}>
                 <Input
                   className={filterInputClass}
                   placeholder="Category"
@@ -358,33 +372,13 @@ const onToggle = async (productid, field, value) => {
                   }
                 />
               </th>
-              <th className="sticky top-28 z-10 bg-gray-100">
+              <th className="sticky z-10 bg-gray-100" style={{ top: stickyOffsets.filterTop }}>
                 <Input
                   className={filterInputClass}
                   placeholder="Fabric"
                   value={filters.fabric}
                   onChange={(e) =>
                     setFilters({ ...filters, fabric: e.target.value })
-                  }
-                />
-              </th>
-              <th className="sticky top-28 z-10 bg-gray-100">
-                <Input
-                  className={filterInputClass}
-                  placeholder="Size"
-                  value={filters.size}
-                  onChange={(e) =>
-                    setFilters({ ...filters, size: e.target.value })
-                  }
-                />
-              </th>
-              <th className="sticky top-28 z-10 bg-gray-100">
-                <Input
-                  className={filterInputClass}
-                  placeholder="Color"
-                  value={filters.color}
-                  onChange={(e) =>
-                    setFilters({ ...filters, color: e.target.value })
                   }
                 />
               </th>
@@ -398,7 +392,7 @@ const onToggle = async (productid, field, value) => {
                 "ig_reel",
                 "whatsapp",
               ].map((f) => (
-                <th key={f} className="sticky top-28 z-10 bg-gray-100">
+                <th key={f} className="sticky z-10 bg-gray-100" style={{ top: stickyOffsets.filterTop }}>
                   <select
                     className="sticky top-10 h-7 text-xs border-gray-300 bg-muted text-gray-800 text-center"
                     value={filters[f]}
@@ -412,14 +406,14 @@ const onToggle = async (productid, field, value) => {
                   </select>
                 </th>
               ))}
-              <th className="sticky top-28 z-10 bg-gray-100"></th>
-              <th className="sticky top-28 z-10 bg-gray-100"></th>
+              <th className="sticky z-10 bg-gray-100" style={{ top: stickyOffsets.filterTop }}></th>
+              <th className="sticky z-10 bg-gray-100" style={{ top: stickyOffsets.filterTop }}></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={16} className="text-center py-6">
+                <td colSpan={14} className="text-center py-6">
                   <Loader2 className="h-5 w-5 mx-auto animate-spin text-muted-foreground" />
                 </td>
               </tr>

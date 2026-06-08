@@ -467,7 +467,7 @@ export default function ExchangePage() {
                     <div className="col-span-4">
                       <div className="font-medium">{bi.product_name || "—"}</div>
                       <div className="text-xs text-muted-foreground">
-                        {[bi.size, bi.color, bi.variantid ? null : "manual"]
+                        {[bi.product_code, bi.size, bi.color, bi.variantid ? null : "manual"]
                           .filter(Boolean)
                           .join(" / ")}
                         {bi.isExchanged && (
@@ -674,9 +674,11 @@ export default function ExchangePage() {
                           </td>
                           <td className="py-2 pr-3">
                             <div>{bi?.product_name || ex.product_name || "—"}</div>
-                            {(bi?._sizeColor?.size || bi?._sizeColor?.color) && (
+                            {(bi?.product_code || ex.product_code || bi?._sizeColor?.size || bi?._sizeColor?.color) && (
                               <div className="text-xs text-muted-foreground">
-                                {[bi._sizeColor.size, bi._sizeColor.color].filter(Boolean).join(" / ")}
+                                {[bi?.product_code || ex.product_code, bi?._sizeColor?.size, bi?._sizeColor?.color]
+                                  .filter(Boolean)
+                                  .join(" / ")}
                               </div>
                             )}
                           </td>

@@ -30,8 +30,6 @@ export default function MockupRow({ row, onToggle, canEdit }) {
     fabric,
     category,
     purchaseprice,
-    sizes,
-    colors,
     redo,
     base_mockup,
     file_mockup,
@@ -71,8 +69,6 @@ export default function MockupRow({ row, onToggle, canEdit }) {
       <td className="text-center">{zCode}</td>
       <td className="text-center">{category || ""}</td>
       <td className="text-center">{fabric || ""}</td>
-      <td>{sizes}</td>
-      <td>{colors}</td>
 
       <ToggleCell field="redo" checked={redo} />
       <ToggleCell field="base_mockup" checked={base_mockup} />
