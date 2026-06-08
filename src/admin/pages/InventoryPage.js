@@ -33,6 +33,7 @@ const InventoryPage = () => {
   const [refreshFlag, setRefreshFlag] = useState(0);
   const [categories, setCategories] = useState([]);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [role, setRole] = useState(null);
   const { toast } = useToast();
   const { filters, setFilters, debouncedFilters, resetFilters } = useTableFilters(INITIAL_FILTERS);
   const triggerRefresh = () => setRefreshFlag((prev) => prev + 1);
@@ -40,7 +41,20 @@ const InventoryPage = () => {
 
   useEffect(() => {
     fetchCategories();
+    fetchRole();
   }, []);
+
+  async function fetchRole() {
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth?.user?.id;
+    if (!uid) return;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", uid)
+      .single();
+    setRole(profile?.role || null);
+  }
 
   async function fetchCategories() {
     const { data, error } = await supabase.from("categories").select("*");
@@ -149,6 +163,7 @@ const InventoryPage = () => {
       </div>
       <ProductTable
         ref={tableRef}
+        isSuperAdmin={role === "superadmin"}
         categories={categories}
         onProductUpdate={triggerRefresh}
         filters={filters}

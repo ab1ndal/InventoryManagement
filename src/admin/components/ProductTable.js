@@ -27,6 +27,7 @@ const ProductTable = forwardRef(
       debouncedFilters,
       refreshFlag,
       onProductAdd,
+      isSuperAdmin,
     },
     ref
   ) => {
@@ -419,9 +420,9 @@ const ProductTable = forwardRef(
               <th className="w-32 text-center">Product ID</th>
               <th className="w-40 text-center">Category</th>
               <th className="w-32 text-center">Fabric</th>
-              <th className="w-24 text-center">Purchase Price</th>
+              <th className="w-24 text-center">Z Code</th>
               <th className="w-24 text-center">Retail Price</th>
-              <th className="w-24 text-center">Markup (%)</th>
+              {isSuperAdmin && <th className="w-24 text-center">Markup (%)</th>}
               <th className="w-24 text-center">Max Discount Price</th>
               <th className="w-32 text-center">Sizes</th>
               <th className="w-32 text-center">Colors</th>
@@ -623,6 +624,7 @@ const ProductTable = forwardRef(
                   categories={categories}
                   variants={variantsByProduct.get(product.productid) || []}
                   onEdit={handleProductSave}
+                  isSuperAdmin={isSuperAdmin}
                 />
               ))
             )}

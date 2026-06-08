@@ -8,7 +8,7 @@ import { formatINR } from "../../utility/formatCurrency";
 import { formatStock } from "../../utility/formatStock";
 import { sortVariantsBySizeColor } from "../../utility/sortVariants";
 
-const ProductRow = ({ product, variants, onEdit, categories }) => {
+const ProductRow = ({ product, variants, onEdit, categories, isSuperAdmin }) => {
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -89,14 +89,10 @@ const ProductRow = ({ product, variants, onEdit, categories }) => {
         </td>
         <td style={{ textAlign: "center" }}>{product.fabric}</td>
         <td style={{ textAlign: "center" }}>
-          {formatINR(purchase)}
-          <br />
-          <span className="text-xs text-gray-500">
-            ({encodedPriceToCode(purchase)})
-          </span>
+          {encodedPriceToCode(purchase)}
         </td>
         <td style={{ textAlign: "center" }}>{formatINR(retail)}</td>
-        <td style={{ textAlign: "center" }}>{markup}%</td>
+        {isSuperAdmin && <td style={{ textAlign: "center" }}>{markup}%</td>}
         <td style={{ textAlign: "center" }}>
           {formatINR(getDiscountInfo(purchase, retail).discountedPrice)}
           <br />
