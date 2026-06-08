@@ -42,6 +42,23 @@ export default function ExchangePage() {
   const [receiptReadyItems, setReceiptReadyItems] = useState([]);
   const [receiptReadyCredit, setReceiptReadyCredit] = useState(0);
   const [pendingCredit, setPendingCredit] = useState(null); // { amount, exchangeIds, customerId, sourceBillNumber, items[] }
+  const [role, setRole] = useState(null);
+  const isSuperAdmin = role === "superadmin";
+
+  useEffect(() => {
+    const loadRole = async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth?.user?.id;
+      if (!uid) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", uid)
+        .single();
+      setRole(profile?.role || null);
+    };
+    loadRole();
+  }, []);
 
   // history
   const [history, setHistory] = useState([]);
@@ -155,12 +172,18 @@ export default function ExchangePage() {
 
   // --- load bill ---
   async function handleLoadBill(bill) {
-    if (!isWithinExchangeWindow(bill.orderdate)) {
+    if (!isSuperAdmin && !isWithinExchangeWindow(bill.orderdate)) {
       const days = daysSinceBill(bill.orderdate);
       toast.error("Exchange window closed", {
         description: `Bill #${bill.bill_number || bill.billid} is ${days} days old. Exchanges accepted within ${EXCHANGE_WINDOW_DAYS} days of purchase only.`,
       });
       return;
+    }
+    if (isSuperAdmin && !isWithinExchangeWindow(bill.orderdate)) {
+      const days = daysSinceBill(bill.orderdate);
+      toast.warning("Exchange window override", {
+        description: `Bill #${bill.bill_number || bill.billid} is ${days} days old (window: ${EXCHANGE_WINDOW_DAYS} days). Proceeding as superadmin.`,
+      });
     }
 
     try {
