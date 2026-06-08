@@ -66,6 +66,10 @@
   color: #333;
 }
 
+.variant-row.depleted td {
+  color: #9ca3af;
+}
+
 .App {
   text-align: center;
 }

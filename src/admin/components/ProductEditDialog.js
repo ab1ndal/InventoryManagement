@@ -428,10 +428,13 @@ export default function ProductEditDialog({
 
             <div className="space-y-2">
               <Label className="text-md">Variants</Label>
-              {fields.map((field, index) => (
+              {fields.map((field, index) => {
+                const stockValue = form.watch(`variants.${index}.stock`);
+                const isDepleted = (Number(stockValue) || 0) === 0;
+                return (
                 <div
                   key={field.id}
-                  className="grid grid-cols-4 gap-2 items-end"
+                  className={`grid grid-cols-4 gap-2 items-end${isDepleted ? " opacity-50" : ""}`}
                 >
                   <input
                     type="hidden"
@@ -481,7 +484,8 @@ export default function ProductEditDialog({
                     Delete
                   </Button>
                 </div>
-              ))}
+                );
+              })}
               <Button
                 type="button"
                 variant="outline"

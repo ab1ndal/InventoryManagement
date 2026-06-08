@@ -1,8 +1,9 @@
 import { formatStock } from "../../utility/formatStock";
 
 const VariantRow = ({ row, colSpan, unitType = "piece" }) => {
+  const isDepleted = (row.stock || 0) === 0;
   return (
-    <tr className="variant-row">
+    <tr className={`variant-row${isDepleted ? " depleted" : ""}`}>
       <td colSpan={colSpan}>
         <div className="variant-line">
           <div className="variant-part">
