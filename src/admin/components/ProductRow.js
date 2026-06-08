@@ -130,6 +130,7 @@ const ProductRow = ({ product, variants, onEdit, categories, isSuperAdmin }) => 
         }))}
         categories={categories}
         onSave={handleSave}
+        isSuperAdmin={isSuperAdmin}
       />
     </>
   );

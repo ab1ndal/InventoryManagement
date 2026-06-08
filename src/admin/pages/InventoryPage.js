@@ -182,6 +182,7 @@ const InventoryPage = () => {
         variants={[]}
         categories={categories}
         onSave={handleAddProduct}
+        isSuperAdmin={role === "superadmin"}
       />
     </div>
   );

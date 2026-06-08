@@ -22,6 +22,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 //import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
 import { formatINR } from "../../utility/formatCurrency";
+import { encodePriceToZCode, decodeZCodeToPrice } from "../../utility/zCode";
 import { sortVariantsBySizeColor } from "../../utility/sortVariants";
 import {
   composeProductName,
@@ -54,6 +55,7 @@ export default function ProductEditDialog({
   categories = [],
   variants = [],
   onSave,
+  isSuperAdmin = false,
 }) {
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -263,26 +265,48 @@ export default function ProductEditDialog({
               <FormField
                 control={form.control}
                 name="purchaseprice"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center justify-between">
-                      <FormLabel>Purchase Price</FormLabel>
-                      {/* Empty space to align with Auto button */}
-                      <span className="text-xs text-transparent">Auto</span>
-                    </div>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        value={formatINR(field.value)}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(/[^0-9]/g, "");
-                          field.onChange(Number(raw));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) =>
+                  isSuperAdmin ? (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Purchase Price</FormLabel>
+                        {/* Empty space to align with Auto button */}
+                        <span className="text-xs text-transparent">Auto</span>
+                      </div>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          value={formatINR(field.value)}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/[^0-9]/g, "");
+                            field.onChange(Number(raw));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  ) : (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Product Z Code</FormLabel>
+                        <span className="text-xs text-transparent">Auto</span>
+                      </div>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          value={encodePriceToZCode(field.value)}
+                          onChange={(e) => {
+                            const raw = e.target.value
+                              .toUpperCase()
+                              .replace(/[^A-IZ]/g, "");
+                            field.onChange(decodeZCodeToPrice(raw));
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )
+                }
               />
               <FormField
                 control={form.control}
