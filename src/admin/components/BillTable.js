@@ -285,8 +285,34 @@ export default function BillTable({ onEdit }) {
         })
         .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE); // fetch 51 to detect next page
 
-      if (filters.search) {
-        query = query.eq("billid", filters.search);
+      const term = filters.search.trim();
+      if (term) {
+        // Strip chars that would break PostgREST .or() filter syntax
+        const safeTerm = term.replace(/[,()]/g, "");
+
+        // Find customers matching name or phone
+        const customerIds = new Set();
+        const { data: nameOrPhoneMatches } = await supabase
+          .from("customers")
+          .select("customerid")
+          .or(`first_name.ilike.%${safeTerm}%,last_name.ilike.%${safeTerm}%,phone.ilike.%${safeTerm}%`);
+        for (const c of nameOrPhoneMatches || []) customerIds.add(c.customerid);
+
+        // "First Last" full-name search: match first word against first_name, last word against last_name
+        const words = safeTerm.split(/\s+/).filter(Boolean);
+        if (words.length >= 2) {
+          const { data: fullNameMatches } = await supabase
+            .from("customers")
+            .select("customerid")
+            .ilike("first_name", `%${words[0]}%`)
+            .ilike("last_name", `%${words[words.length - 1]}%`);
+          for (const c of fullNameMatches || []) customerIds.add(c.customerid);
+        }
+
+        const orParts = [`bill_number.ilike.%${safeTerm}%`];
+        if (/^\d+$/.test(safeTerm)) orParts.push(`billid.eq.${safeTerm}`);
+        if (customerIds.size > 0) orParts.push(`customerid.in.(${[...customerIds].join(",")})`);
+        query = query.or(orParts.join(","));
       }
 
       const { data, error } = await query;
@@ -624,7 +650,7 @@ export default function BillTable({ onEdit }) {
       {/* Filters */}
       <div className="flex gap-2 items-center">
         <Input
-          placeholder="Search by Bill ID"
+          placeholder="Search by bill #, customer name, or phone"
           value={filters.search}
           onChange={(e) => setFilters({ ...filters, search: e.target.value })}
           className="max-w-xs"
