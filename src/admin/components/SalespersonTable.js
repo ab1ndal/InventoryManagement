@@ -6,6 +6,7 @@ import { Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { logActivity } from "../../lib/activityLog";
 import { diffFields } from "../../utility/activitySummary";
+import { formatDate } from "../../utility/dateFormat";
 
 export default function SalespersonTable({ refresh }) {
   const [salespersons, setSalespersons] = useState([]);
@@ -109,7 +110,7 @@ export default function SalespersonTable({ refresh }) {
                     />
                   ) : (
                     <span className="text-muted-foreground">
-                      {s.date_hired || "—"}
+                      {s.date_hired ? formatDate(s.date_hired) : "—"}
                     </span>
                   )}
                 </td>

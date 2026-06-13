@@ -1,5 +1,6 @@
 import { Checkbox } from "../../../components/ui/checkbox";
 import { Badge } from "../../../components/ui/badge";
+import { formatDate } from "../../../utility/dateFormat";
 
 function resolveCatNames(ids, categoryMap) {
   if (!ids || ids.length === 0) return null;
@@ -73,9 +74,9 @@ function DiscountRow({ d, selectedCodes, onToggle, isAuto, categoryMap }) {
         </p>
         {(d.start_date || d.end_date) && (
           <p className="text-xs text-muted-foreground mt-0.5">
-            {d.start_date && `From ${d.start_date}`}
+            {d.start_date && `From ${formatDate(d.start_date)}`}
             {d.start_date && d.end_date ? " · " : ""}
-            {d.end_date && `Until ${d.end_date}`}
+            {d.end_date && `Until ${formatDate(d.end_date)}`}
           </p>
         )}
       </div>
