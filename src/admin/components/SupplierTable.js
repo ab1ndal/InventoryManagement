@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { formatPhone } from "../../utility/formatPhone";
 import { formatINR } from "../../utility/formatCurrency";
+import { formatDate } from "../../utility/dateFormat";
 
 export default function SupplierTable({
   refreshSignal,
@@ -13,6 +14,8 @@ export default function SupplierTable({
 }) {
   const [suppliers, setSuppliers] = useState([]);
   const [balances, setBalances] = useState({});
+  const [lastTransactions, setLastTransactions] = useState({});
+  const [totalPurchases, setTotalPurchases] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,7 +28,9 @@ export default function SupplierTable({
     const [{ data: supplierData, error: supErr }, { data: txnData }] =
       await Promise.all([
         supabase.from("suppliers").select("*").order("name"),
-        supabase.from("supplier_transactions").select("supplier_id, type, amount"),
+        supabase
+          .from("supplier_transactions")
+          .select("supplier_id, type, amount, transaction_date"),
       ]);
 
     if (supErr) {
@@ -36,16 +41,30 @@ export default function SupplierTable({
 
     // Compute balance per supplier: sum(bills) - sum(payments)
     const computed = {};
+    const lastTxn = {};
+    const purchases = {};
     for (const txn of txnData || []) {
       const prev = computed[txn.supplier_id] ?? 0;
       computed[txn.supplier_id] =
         txn.type === "bill"
           ? prev + Number(txn.amount)
           : prev - Number(txn.amount);
+
+      if (txn.type === "bill") {
+        purchases[txn.supplier_id] =
+          (purchases[txn.supplier_id] ?? 0) + Number(txn.amount);
+      }
+
+      const existing = lastTxn[txn.supplier_id];
+      if (!existing || new Date(txn.transaction_date) > new Date(existing)) {
+        lastTxn[txn.supplier_id] = txn.transaction_date;
+      }
     }
 
     setSuppliers(supplierData || []);
     setBalances(computed);
+    setLastTransactions(lastTxn);
+    setTotalPurchases(purchases);
     setLoading(false);
   };
 
@@ -65,7 +84,8 @@ export default function SupplierTable({
             <tr>
               <th className="p-3 font-semibold">Name</th>
               <th className="p-3 font-semibold">Phone</th>
-              <th className="p-3 font-semibold">Email</th>
+              <th className="p-3 font-semibold">Last Transaction</th>
+              <th className="p-3 font-semibold text-right">Total Purchases</th>
               <th className="p-3 font-semibold text-right">Balance</th>
               <th className="p-3 font-semibold text-center">Actions</th>
             </tr>
@@ -73,13 +93,15 @@ export default function SupplierTable({
           <tbody>
             {suppliers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-gray-400">
+                <td colSpan={6} className="p-6 text-center text-gray-400">
                   No suppliers yet
                 </td>
               </tr>
             ) : (
               suppliers.map((s) => {
                 const bal = balances[s.supplierid] ?? 0;
+                const lastTxn = lastTransactions[s.supplierid];
+                const purchases = totalPurchases[s.supplierid] ?? 0;
                 return (
                   <tr key={s.supplierid} className="border-t hover:bg-gray-50">
                     <td
@@ -89,7 +111,12 @@ export default function SupplierTable({
                       {s.name}
                     </td>
                     <td className="p-3 text-gray-600">{formatPhone(s.phone)}</td>
-                    <td className="p-3 text-gray-600">{s.email || "-"}</td>
+                    <td className="p-3 text-gray-600">
+                      {lastTxn ? formatDate(lastTxn) : "-"}
+                    </td>
+                    <td className="p-3 text-right tabular-nums text-gray-600">
+                      {formatINR(purchases, 2)}
+                    </td>
                     <td className={`p-3 text-right tabular-nums ${balanceColor(bal)}`}>
                       {formatINR(bal, 2)}
                     </td>

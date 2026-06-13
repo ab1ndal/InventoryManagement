@@ -1,6 +1,6 @@
 // src/admin/components/SupplierForm.js
 import React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "../../lib/supabaseClient";
@@ -11,6 +11,7 @@ import { formatLivePhoneInput } from "../../utility/formatPhone";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
+import { Plus, X as XIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +30,19 @@ import {
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  contact_person: z.string().optional().transform((v) => (v?.trim() === "" ? null : v)),
   phone: z
     .string()
     .optional()
     .transform((v) => (v?.trim() === "" ? null : v?.replace(/\s/g, "") ?? null)),
+  additional_phones: z
+    .array(z.object({ value: z.string() }))
+    .optional()
+    .transform((arr) =>
+      (arr || [])
+        .map((p) => p.value?.replace(/\s/g, ""))
+        .filter((v) => v && v.trim() !== "")
+    ),
   email: z
     .string()
     .optional()
@@ -78,7 +88,9 @@ export default function SupplierForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: defaultValues?.name ?? "",
+      contact_person: defaultValues?.contact_person ?? "",
       phone: defaultValues?.phone ?? "",
+      additional_phones: (defaultValues?.additional_phones ?? []).map((v) => ({ value: v })),
       email: defaultValues?.email ?? "",
       notes: defaultValues?.notes ?? "",
       gstin: defaultValues?.gstin ?? "",
@@ -89,11 +101,18 @@ export default function SupplierForm({
     },
   });
 
+  const additionalPhones = useFieldArray({
+    control: form.control,
+    name: "additional_phones",
+  });
+
   // Reset form when defaultValues change (e.g. switching between add/edit)
   React.useEffect(() => {
     form.reset({
       name: defaultValues?.name ?? "",
+      contact_person: defaultValues?.contact_person ?? "",
       phone: defaultValues?.phone ?? "",
+      additional_phones: (defaultValues?.additional_phones ?? []).map((v) => ({ value: v })),
       email: defaultValues?.email ?? "",
       notes: defaultValues?.notes ?? "",
       gstin: defaultValues?.gstin ?? "",
@@ -108,7 +127,9 @@ export default function SupplierForm({
     try {
       const payload = {
         name: values.name,
+        contact_person: values.contact_person ?? null,
         phone: values.phone ?? null,
+        additional_phones: values.additional_phones ?? [],
         email: values.email ?? null,
         notes: values.notes ?? null,
         gstin: values.gstin ?? null,
@@ -136,7 +157,7 @@ export default function SupplierForm({
       if (error) throw error;
 
       if (isEditing) {
-        const fields = ["name", "phone", "email", "gstin", "pan", "address", "opening_balance", "opening_balance_date", "notes"];
+        const fields = ["name", "contact_person", "phone", "email", "gstin", "pan", "address", "opening_balance", "opening_balance_date", "notes"];
         const changed = diffFields(defaultValues, values, fields);
         logActivity({
           action: "update",
@@ -162,7 +183,7 @@ export default function SupplierForm({
 
   return (
     <Dialog open={openExternally} onOpenChange={setOpenExternally}>
-      <DialogContent className="max-w-lg bg-white rounded-lg shadow-xl p-6">
+      <DialogContent className="max-w-lg bg-white rounded-lg shadow-xl p-6 max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Supplier" : "Add Supplier"}</DialogTitle>
           <DialogDescription>
@@ -188,19 +209,13 @@ export default function SupplierForm({
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
-                name="phone"
+                name="contact_person"
                 control={form.control}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone</FormLabel>
+                    <FormLabel>Contact Person</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(formatLivePhoneInput(e.target.value))
-                        }
-                        placeholder="+91XXXXXXXXXX"
-                      />
+                      <Input {...field} placeholder="Contact person name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -220,6 +235,68 @@ export default function SupplierForm({
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="space-y-2">
+              <FormField
+                name="phone"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(formatLivePhoneInput(e.target.value))
+                        }
+                        placeholder="+91XXXXXXXXXX"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {additionalPhones.fields.map((field, index) => (
+                <div key={field.id} className="flex items-center gap-2">
+                  <FormField
+                    name={`additional_phones.${index}.value`}
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem className="flex-1">
+                        <FormControl>
+                          <Input
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(formatLivePhoneInput(e.target.value))
+                            }
+                            placeholder="Landline / additional number"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => additionalPhones.remove(index)}
+                    className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    aria-label="Remove number"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => additionalPhones.append({ value: "" })}
+                className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                Add number
+              </button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
