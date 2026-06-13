@@ -70,14 +70,14 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Top Navigation Bar */}
-      <nav className="sticky top-0 z-[60] bg-white border-b shadow px-6 py-4 flex items-center justify-between">
-        <div className="flex space-x-6">
+      <nav className="sticky top-0 z-[60] bg-white border-b shadow px-6 py-4 flex items-center gap-6">
+        <div className="flex space-x-6 overflow-x-auto whitespace-nowrap flex-1 min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `text-sm font-medium ${
+                `text-sm font-medium shrink-0 ${
                   isActive
                     ? "text-blue-600 border-b-2 border-blue-600 pb-1"
                     : "text-gray-600 hover:text-black"
@@ -90,7 +90,7 @@ export default function AdminLayout() {
         </div>
 
         {/* User Info and Logout */}
-        <div className="flex items-center space-x-4 text-sm text-gray-600">
+        <div className="flex items-center space-x-4 text-sm text-gray-600 shrink-0">
           {userEmail && <span className="hidden sm:inline">{userEmail}</span>}
           <button
             onClick={handleLogout}
