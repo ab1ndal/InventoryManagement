@@ -247,6 +247,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                   {row.cgst_amount && <div><span className="font-medium">CGST:</span> {formatINR(row.cgst_amount, 2)}</div>}
                                   {row.sgst_amount && <div><span className="font-medium">SGST:</span> {formatINR(row.sgst_amount, 2)}</div>}
                                   {row.igst_amount && <div><span className="font-medium">IGST:</span> {formatINR(row.igst_amount, 2)}</div>}
+                                  {row.round_off_amount != null && Number(row.round_off_amount) !== 0 && <div><span className="font-medium">Round Off:</span> {formatINR(row.round_off_amount, 2)}</div>}
                                   {row.notes && <div className="col-span-2"><span className="font-medium">Notes:</span> {row.notes}</div>}
                                   {row.imageUrl && (
                                     <div>
@@ -264,6 +265,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                         <th className="p-1 text-left">HSN</th>
                                         <th className="p-1 text-right">Qty</th>
                                         <th className="p-1 text-left">Unit</th>
+                                        <th className="p-1 text-right">Disc %</th>
                                         <th className="p-1 text-right">Price</th>
                                         <th className="p-1 text-right">Amount</th>
                                         <th className="p-1 text-left">Product</th>
@@ -276,6 +278,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                           <td className="p-1 text-muted-foreground">{li.hsn_code || "—"}</td>
                                           <td className="p-1 text-right">{li.qty}</td>
                                           <td className="p-1">{li.unit || "—"}</td>
+                                          <td className="p-1 text-right">{li.discount_pct ? `${li.discount_pct}%` : "—"}</td>
                                           <td className="p-1 text-right">{formatINR(li.unit_price, 2)}</td>
                                           <td className="p-1 text-right font-medium">{formatINR(li.amount, 2)}</td>
                                           <td className="p-1">
