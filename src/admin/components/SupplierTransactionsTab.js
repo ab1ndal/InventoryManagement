@@ -15,6 +15,8 @@ export default function SupplierTransactionsTab() {
   const [txnDialogOpen, setTxnDialogOpen] = useState(false);
   const [txnSupplier, setTxnSupplier] = useState(null);
   const [refreshSignal, setRefreshSignal] = useState(0);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editTransaction, setEditTransaction] = useState(null);
 
   useEffect(() => {
     fetchAll();
@@ -35,6 +37,21 @@ export default function SupplierTransactionsTab() {
       setTransactions(txnData || []);
     }
     setLoading(false);
+  };
+
+  const handleEditClick = async (t) => {
+    let line_items = [];
+    let bill = null;
+    if (t.type === "bill") {
+      const [{ data: liData }, { data: billData }] = await Promise.all([
+        supabase.from("supplier_bill_line_items").select("*").eq("transaction_id", t.transaction_id),
+        supabase.from("supplier_bills").select("*").eq("transaction_id", t.transaction_id).maybeSingle(),
+      ]);
+      line_items = liData || [];
+      bill = billData || null;
+    }
+    setEditTransaction({ ...t, line_items, bill });
+    setEditDialogOpen(true);
   };
 
   const filtered = transactions.filter((t) => {
@@ -100,12 +117,13 @@ export default function SupplierTransactionsTab() {
                 <th className="p-3 font-semibold text-right">Credit</th>
                 <th className="p-3 font-semibold">Mode</th>
                 <th className="p-3 font-semibold">Notes</th>
+                <th className="p-3 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-gray-400">No transactions found</td>
+                  <td colSpan={9} className="p-6 text-center text-gray-400">No transactions found</td>
                 </tr>
               ) : (
                 filtered.map((t) => (
@@ -126,6 +144,11 @@ export default function SupplierTransactionsTab() {
                     </td>
                     <td className="p-3 text-xs text-muted-foreground capitalize">{t.payment_mode || "—"}</td>
                     <td className="p-3 text-xs text-muted-foreground max-w-[160px] truncate">{t.notes || "—"}</td>
+                    <td className="p-3">
+                      <Button size="sm" variant="outline" onClick={() => handleEditClick(t)}>
+                        Edit
+                      </Button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -163,6 +186,21 @@ export default function SupplierTransactionsTab() {
             <Button variant="ghost" className="w-full" onClick={() => setTxnDialogOpen(false)}>Cancel</Button>
           </div>
         </div>
+      )}
+
+      {editDialogOpen && editTransaction && (
+        <SupplierTransactionDialog
+          mode="edit"
+          transaction={editTransaction}
+          supplier={{ supplierid: editTransaction.supplier_id, name: editTransaction.suppliers?.name }}
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onSuccess={() => {
+            setEditDialogOpen(false);
+            setEditTransaction(null);
+            setRefreshSignal((p) => p + 1);
+          }}
+        />
       )}
     </div>
   );
