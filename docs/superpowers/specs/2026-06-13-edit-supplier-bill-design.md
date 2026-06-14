@@ -1,0 +1,143 @@
+# Edit Supplier Transactions + Currency Display Polish
+
+## Problem
+
+`SupplierTransactionDialog.js` only supports creating new supplier
+transactions (bill/payment/advance). Once a bill is recorded — including its
+line items and uploaded image — there's no way to fix a typo, correct an
+amount, or re-link the bill document. `SupplierTransactionsTab.js` shows
+transactions read-only.
+
+Additionally, the dialog (`max-w-md`) is too narrow for the line-items table
+(7 columns), and numeric amount inputs show raw numbers with no INR
+formatting feedback.
+
+## Goals
+
+1. Edit any existing `supplier_transactions` row (bill, payment, or advance)
+   — amount, date, notes, payment mode, and for bills: invoice number, GST
+   breakdown, line items, and bill image/PDF.
+2. Widen the dialog so the line-items table and GST grid have room.
+3. Show a live INR-formatted preview next to amount-type number inputs.
+
+## Non-goals
+
+- Changing `type` after creation (bill ↔ payment ↔ advance). Locked in edit
+  mode — switching types would orphan line items / bill image records, and
+  is out of scope for "simple edit/save".
+- Deleting transactions.
+- Diffing/patching individual line items — edit replaces the full set.
+
+## UI Changes
+
+### `SupplierTransactionsTab.js`
+
+- New "Actions" column, last in the table. Every row gets an **Edit** button
+  (icon button, pencil).
+- `handleEditClick(t)`:
+  1. If `t.type === "bill"`, fetch `supplier_bill_line_items` where
+     `transaction_id = t.transaction_id`, and `supplier_bills` row (for
+     `bill_id`, `image_url`, `storage_path`) for the same transaction.
+  2. Set `editTransaction = { ...t, line_items, bill }`, open dialog with
+     `mode="edit"`.
+
+### `SupplierTransactionDialog.js`
+
+New props: `mode` (`"create"` default | `"edit"`), `transaction` (existing
+row + `line_items` + `bill`, only in edit mode).
+
+**Dialog width**: `max-w-md` → `max-w-3xl`.
+
+**Prefill (edit mode)**:
+- `supplier` prop passed as `{ supplierid: transaction.supplier_id, name: transaction.suppliers?.name }`
+  — `SupplierPicker` stays hidden (same as current locked-supplier path).
+- `form.reset()` with all scalar fields from `transaction` on dialog open.
+- `line_items` field array populated from `transaction.line_items` (mapped
+  to the same shape used by `append`).
+- If `transaction.bill` exists, show its `image_url` as a "Current file:
+  [View ↗]" link above the file input. New file selection is optional —
+  if left empty, existing bill record/file is untouched.
+
+**Type field**: rendered as a disabled `<select>` in edit mode, showing the
+current value, not submitted as part of the diff (value is read from
+`transaction.type` server-side, never changed).
+
+**Dialog title / submit label**:
+- Title: `Edit Transaction — {supplier.name}` (edit) vs current `Add
+  Transaction — ...` (create).
+- Submit button: `"Save Changes"` (edit) vs current type-dependent label.
+
+### Currency preview (both modes)
+
+For each amount-type `<Input type="number">` — main `amount`, and for bills:
+`gross_amount`, `discount_amount`, `taxable_amount`, `cgst_amount`,
+`sgst_amount`, `igst_amount`, plus each line item's `unit_price` and
+`amount` — render a small `text-xs text-muted-foreground` line below showing
+`formatINR(value, 2)` (reuse `src/utility/formatCurrency.js`), updating live
+via `form.watch`. Empty/zero values show nothing (avoid `₹0.00` clutter).
+
+## Data Flow — Save (edit mode)
+
+```
+handleSubmit(values):
+  if mode === "edit":
+    1. UPDATE supplier_transactions
+       SET amount, transaction_date, notes, invoice_number, gross_amount,
+           discount_amount, taxable_amount, cgst_amount, sgst_amount,
+           igst_amount, payment_mode
+       WHERE transaction_id = transaction.transaction_id
+       (type NOT included — stays as-is)
+
+    2. if transaction.type === "bill":
+       a. DELETE FROM supplier_bill_line_items WHERE transaction_id = ...
+       b. INSERT new rows from values.line_items (if any), same mapping as
+          create path (product_id always null — re-linking happens via
+          SupplierLedgerDialog's existing LineItemProductLink flow, which
+          is unaffected since it's a separate update keyed on
+          line_item_id... NOTE: re-insert generates new line_item_ids, so
+          any existing product_id links on those line items are lost on
+          edit. See "Known limitation" below.)
+
+       c. if new file selected:
+          - build filename via buildBillFilename (existing util)
+          - upload to storage at `${supplier_id}/${filename}`, upsert: true
+          - if transaction.bill exists: UPDATE supplier_bills SET
+            image_url, storage_path, uploaded_at = now() WHERE
+            bill_id = transaction.bill.bill_id
+          - else: INSERT new supplier_bills row
+
+    3. logActivity({ action: "update", entityType: "supplier_bill" |
+       "supplier", entityId: transaction_id, summary: "Edited <type> for
+       supplier <name> — <amount>" })
+
+    4. toast.success("Transaction updated"), onSuccess?.()
+```
+
+## Known limitation
+
+Step 2b re-inserts line items, generating fresh `line_item_id`s. Any
+`product_id` links made via `SupplierLedgerDialog`'s "Link product" feature
+on the old line items are dropped when the bill is edited. This is accepted
+as part of "simple edit/save" — re-linking after an edit is a minor manual
+step. A future improvement could match old→new rows by position and carry
+`product_id` forward, but that's out of scope here.
+
+## Error handling
+
+Same pattern as create: each Supabase call's `error` is checked and thrown;
+caught in the outer `try/catch`, shown via `toast.error(...,
+{description: err.message})`. No partial-state cleanup beyond what create
+already does (acceptable — same risk profile as existing create path).
+
+## Testing
+
+- Manual: edit a bill's amount/notes/line items/GST fields, save, verify
+  `SupplierTransactionsTab` and `SupplierLedgerDialog` reflect changes.
+- Manual: edit a payment/advance row (amount, date, payment_mode, notes).
+- Manual: replace bill image on an existing bill, verify old storage path is
+  overwritten and `supplier_bills.image_url` still resolves.
+- Manual: edit a bill with linked line-item products, confirm limitation
+  behaves as documented (links dropped, no crash).
+- Unit test (if added): `formatINR` preview renders expected string for a
+  few representative values (covered already by existing `formatCurrency`
+  usage elsewhere — no new util introduced).
