@@ -251,7 +251,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                   {row.imageUrl && (
                                     <div>
                                       <a href={row.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
-                                        View Bill Image ↗
+                                        View Bill ↗
                                       </a>
                                     </div>
                                   )}

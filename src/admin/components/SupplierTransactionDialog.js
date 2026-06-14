@@ -7,6 +7,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 import { logActivity } from "../../lib/activityLog";
 import { money } from "../../utility/activitySummary";
+import { buildBillFilename } from "../../utility/billFilename";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
@@ -219,11 +220,19 @@ export default function SupplierTransactionDialog({
       // 3. If type === bill and image provided, upload to storage
       const file = values.bill_image?.[0];
       if (isBill && file) {
-        const storagePath = `${selectedSupplier.supplierid}/${transaction_id}-${Date.now()}-${file.name}`;
+        const ext = file.name.split(".").pop();
+        const filename = buildBillFilename({
+          date: values.transaction_date,
+          supplierName: selectedSupplier.name,
+          invoiceNumber: values.invoice_number,
+          transactionId: transaction_id,
+          ext,
+        });
+        const storagePath = `${selectedSupplier.supplierid}/${filename}`;
 
         const { error: uploadError } = await supabase.storage
           .from("supplier-bills")
-          .upload(storagePath, file);
+          .upload(storagePath, file, { upsert: true });
 
         if (uploadError) throw uploadError;
 
@@ -507,12 +516,12 @@ export default function SupplierTransactionDialog({
                 control={form.control}
                 render={({ field: { onChange, value, ...rest } }) => (
                   <FormItem>
-                    <FormLabel>Bill Image (optional)</FormLabel>
+                    <FormLabel>Bill Document — image or PDF (optional)</FormLabel>
                     <FormControl>
                       <Input
                         {...rest}
                         type="file"
-                        accept="image/*"
+                        accept="image/*,application/pdf"
                         onChange={(e) => onChange(e.target.files)}
                       />
                     </FormControl>
