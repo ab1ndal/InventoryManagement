@@ -4,6 +4,7 @@ import { formatDate } from "../../utility/dateFormat";
 import { formatINR } from "../../utility/formatCurrency";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
+import { toast } from "sonner";
 import SupplierTransactionDialog from "./SupplierTransactionDialog";
 
 export default function SupplierTransactionsTab() {
@@ -43,10 +44,14 @@ export default function SupplierTransactionsTab() {
     let line_items = [];
     let bill = null;
     if (t.type === "bill") {
-      const [{ data: liData }, { data: billData }] = await Promise.all([
+      const [{ data: liData, error: liError }, { data: billData, error: billError }] = await Promise.all([
         supabase.from("supplier_bill_line_items").select("*").eq("transaction_id", t.transaction_id),
         supabase.from("supplier_bills").select("*").eq("transaction_id", t.transaction_id).maybeSingle(),
       ]);
+      if (liError || billError) {
+        toast.error("Failed to load transaction details", { description: (liError || billError).message });
+        return;
+      }
       line_items = liData || [];
       bill = billData || null;
     }
