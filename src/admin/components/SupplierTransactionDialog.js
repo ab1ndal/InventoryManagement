@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { logActivity } from "../../lib/activityLog";
 import { money } from "../../utility/activitySummary";
 import { buildBillFilename } from "../../utility/billFilename";
+import { formatINR } from "../../utility/formatCurrency";
+import { computeLineAmount, computeTaxableAmount, computeBillTotal } from "../../utility/supplierBillCalc";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
@@ -29,6 +31,12 @@ import {
 
 const today = new Date().toISOString().split("T")[0];
 
+function AmountPreview({ value }) {
+  const num = Number(value);
+  if (value === "" || value == null || isNaN(num) || num === 0) return null;
+  return <p className="text-xs text-muted-foreground mt-0.5">{formatINR(num, 2)}</p>;
+}
+
 const formSchema = z.object({
   type: z.enum(["bill", "payment", "advance"]),
   amount: z.coerce
@@ -43,6 +51,7 @@ const formSchema = z.object({
   cgst_amount: z.coerce.number().nonnegative().optional().nullable(),
   sgst_amount: z.coerce.number().nonnegative().optional().nullable(),
   igst_amount: z.coerce.number().nonnegative().optional().nullable(),
+  round_off_amount: z.coerce.number().optional().nullable(),
   payment_mode: z.enum(["cash", "upi", "bank", "cheque"]).optional().nullable(),
   bill_image: z.any().optional(),
   line_items: z.array(z.object({
@@ -50,6 +59,7 @@ const formSchema = z.object({
     hsn_code: z.string().optional(),
     qty: z.coerce.number().positive(),
     unit: z.string().optional(),
+    discount_pct: z.coerce.number().min(0).max(100).optional(),
     unit_price: z.coerce.number().nonnegative(),
     amount: z.coerce.number().nonnegative(),
   })).optional().default([]),
@@ -112,6 +122,8 @@ export default function SupplierTransactionDialog({
   onOpenChange,
   onSuccess,
   defaultType = "bill",
+  mode = "create",
+  transaction = null,
 }) {
   const [submitting, setSubmitting] = React.useState(false);
   const [selectedSupplier, setSelectedSupplier] = React.useState(supplier ?? null);
@@ -134,6 +146,7 @@ export default function SupplierTransactionDialog({
       cgst_amount: "",
       sgst_amount: "",
       igst_amount: "",
+      round_off_amount: "",
       payment_mode: null,
       bill_image: null,
       line_items: [],
@@ -143,10 +156,43 @@ export default function SupplierTransactionDialog({
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "line_items" });
 
   const txnType = form.watch("type");
+  const watchedLineItems = form.watch("line_items");
+  const watchedTaxable = form.watch("taxable_amount");
+  const watchedCgst = form.watch("cgst_amount");
+  const watchedSgst = form.watch("sgst_amount");
+  const watchedIgst = form.watch("igst_amount");
+  const watchedRoundOff = form.watch("round_off_amount");
 
-  // Reset form on open
+  // Reset form on open — prefill from `transaction` in edit mode, blank in create mode
   React.useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (mode === "edit" && transaction) {
+      form.reset({
+        type: transaction.type,
+        amount: transaction.amount ?? "",
+        transaction_date: transaction.transaction_date,
+        notes: transaction.notes ?? "",
+        invoice_number: transaction.invoice_number ?? "",
+        gross_amount: transaction.gross_amount ?? "",
+        discount_amount: transaction.discount_amount ?? "",
+        taxable_amount: transaction.taxable_amount ?? "",
+        cgst_amount: transaction.cgst_amount ?? "",
+        sgst_amount: transaction.sgst_amount ?? "",
+        igst_amount: transaction.igst_amount ?? "",
+        round_off_amount: transaction.round_off_amount ?? "",
+        payment_mode: transaction.payment_mode ?? null,
+        bill_image: null,
+        line_items: (transaction.line_items || []).map((li) => ({
+          description: li.description,
+          hsn_code: li.hsn_code || "",
+          qty: li.qty,
+          unit: li.unit || "Pcs",
+          discount_pct: li.discount_pct ?? "",
+          unit_price: li.unit_price,
+          amount: li.amount,
+        })),
+      });
+    } else {
       form.reset({
         type: defaultType,
         amount: "",
@@ -159,12 +205,51 @@ export default function SupplierTransactionDialog({
         cgst_amount: "",
         sgst_amount: "",
         igst_amount: "",
+        round_off_amount: "",
         payment_mode: null,
         bill_image: null,
         line_items: [],
       });
     }
-  }, [open, form, defaultType]);
+  }, [open, form, defaultType, mode, transaction]);
+
+  // Recompute each line item's amount from qty / unit_price / discount_pct
+  React.useEffect(() => {
+    if (txnType !== "bill") return;
+    (watchedLineItems || []).forEach((li, idx) => {
+      const computed = computeLineAmount(li);
+      if (Number(li.amount) !== computed) {
+        form.setValue(`line_items.${idx}.amount`, computed, { shouldValidate: false });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txnType, JSON.stringify((watchedLineItems || []).map((li) => [li.qty, li.unit_price, li.discount_pct]))]);
+
+  // Recompute taxable_amount as the sum of line item amounts, when line items exist
+  React.useEffect(() => {
+    if (txnType !== "bill" || (watchedLineItems || []).length === 0) return;
+    const computed = computeTaxableAmount(watchedLineItems);
+    if (Number(form.getValues("taxable_amount")) !== computed) {
+      form.setValue("taxable_amount", computed, { shouldValidate: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txnType, JSON.stringify((watchedLineItems || []).map((li) => li.amount))]);
+
+  // Recompute the top-level amount as taxable + CGST + SGST + IGST + round-off
+  React.useEffect(() => {
+    if (txnType !== "bill") return;
+    const computed = computeBillTotal({
+      taxable_amount: watchedTaxable,
+      cgst_amount: watchedCgst,
+      sgst_amount: watchedSgst,
+      igst_amount: watchedIgst,
+      round_off_amount: watchedRoundOff,
+    });
+    if (Number(form.getValues("amount")) !== computed) {
+      form.setValue("amount", computed, { shouldValidate: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txnType, watchedTaxable, watchedCgst, watchedSgst, watchedIgst, watchedRoundOff]);
 
   const handleSubmit = async (values) => {
     if (!selectedSupplier) {
@@ -173,6 +258,114 @@ export default function SupplierTransactionDialog({
     }
     setSubmitting(true);
     try {
+      if (mode === "edit") {
+        const transaction_id = transaction.transaction_id;
+        const isBill = transaction.type === "bill";
+        const isPaymentOrAdvance = !isBill;
+
+        const { error: updateError } = await supabase
+          .from("supplier_transactions")
+          .update({
+            amount: values.amount,
+            transaction_date: values.transaction_date,
+            notes: values.notes ?? null,
+            invoice_number: isBill ? (values.invoice_number ?? null) : null,
+            gross_amount: isBill ? (values.gross_amount || null) : null,
+            discount_amount: isBill ? (values.discount_amount || null) : null,
+            taxable_amount: isBill ? (values.taxable_amount || null) : null,
+            cgst_amount: isBill ? (values.cgst_amount || null) : null,
+            sgst_amount: isBill ? (values.sgst_amount || null) : null,
+            igst_amount: isBill ? (values.igst_amount || null) : null,
+            round_off_amount: isBill ? (values.round_off_amount ?? null) : null,
+            payment_mode: isPaymentOrAdvance ? (values.payment_mode ?? null) : null,
+          })
+          .eq("transaction_id", transaction_id);
+
+        if (updateError) throw updateError;
+
+        if (isBill) {
+          const { error: deleteError } = await supabase
+            .from("supplier_bill_line_items")
+            .delete()
+            .eq("transaction_id", transaction_id);
+
+          if (deleteError) throw deleteError;
+
+          if (values.line_items?.length > 0) {
+            const { error: lineItemsError } = await supabase.from("supplier_bill_line_items").insert(
+              values.line_items.map((li) => ({
+                transaction_id,
+                description: li.description,
+                hsn_code: li.hsn_code || null,
+                qty: li.qty,
+                unit: li.unit || null,
+                discount_pct: li.discount_pct || null,
+                unit_price: li.unit_price,
+                amount: li.amount,
+                product_id: null,
+              }))
+            );
+            if (lineItemsError) throw lineItemsError;
+          }
+
+          const file = values.bill_image?.[0];
+          if (file) {
+            const ext = file.name.split(".").pop();
+            const filename = buildBillFilename({
+              date: values.transaction_date,
+              supplierName: selectedSupplier.name,
+              invoiceNumber: values.invoice_number,
+              transactionId: transaction_id,
+              ext,
+            });
+            const storagePath = transaction.bill?.storage_path || `${selectedSupplier.supplierid}/${filename}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from("supplier-bills")
+              .upload(storagePath, file, { upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = supabase.storage
+              .from("supplier-bills")
+              .getPublicUrl(storagePath);
+
+            if (transaction.bill) {
+              const { error: billError } = await supabase
+                .from("supplier_bills")
+                .update({
+                  image_url: urlData.publicUrl,
+                  storage_path: storagePath,
+                  uploaded_at: new Date().toISOString(),
+                })
+                .eq("bill_id", transaction.bill.bill_id);
+              if (billError) throw billError;
+            } else {
+              const { error: billError } = await supabase
+                .from("supplier_bills")
+                .insert({
+                  transaction_id,
+                  supplier_id: selectedSupplier.supplierid,
+                  image_url: urlData.publicUrl,
+                  storage_path: storagePath,
+                });
+              if (billError) throw billError;
+            }
+          }
+        }
+
+        logActivity({
+          action: "update",
+          entityType: isBill ? "supplier_bill" : "supplier",
+          entityId: transaction_id,
+          summary: `Edited ${isBill ? "supplier bill" : transaction.type === "advance" ? "supplier advance" : "supplier payment"} for supplier ${selectedSupplier.name} — ${money(values.amount)}`,
+        });
+
+        toast.success("Transaction updated");
+        onSuccess?.();
+        return;
+      }
+
       const isBill = values.type === "bill";
       const isPaymentOrAdvance = values.type === "payment" || values.type === "advance";
 
@@ -192,6 +385,7 @@ export default function SupplierTransactionDialog({
           cgst_amount: isBill ? (values.cgst_amount || null) : null,
           sgst_amount: isBill ? (values.sgst_amount || null) : null,
           igst_amount: isBill ? (values.igst_amount || null) : null,
+          round_off_amount: isBill ? (values.round_off_amount ?? null) : null,
           payment_mode: isPaymentOrAdvance ? (values.payment_mode ?? null) : null,
         })
         .select("transaction_id")
@@ -210,6 +404,7 @@ export default function SupplierTransactionDialog({
             hsn_code: li.hsn_code || null,
             qty: li.qty,
             unit: li.unit || null,
+            discount_pct: li.discount_pct || null,
             unit_price: li.unit_price,
             amount: li.amount,
             product_id: null,
@@ -267,7 +462,7 @@ export default function SupplierTransactionDialog({
       );
       onSuccess?.();
     } catch (err) {
-      toast.error("Error recording transaction", { description: err.message });
+      toast.error(mode === "edit" ? "Error updating transaction" : "Error recording transaction", { description: err.message });
     } finally {
       setSubmitting(false);
     }
@@ -275,13 +470,16 @@ export default function SupplierTransactionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-white rounded-lg shadow-xl p-6 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl bg-white rounded-lg shadow-xl p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Add Transaction{selectedSupplier ? ` — ${selectedSupplier.name}` : ""}
+            {mode === "edit" ? "Edit Transaction" : "Add Transaction"}
+            {selectedSupplier ? ` — ${selectedSupplier.name}` : ""}
           </DialogTitle>
           <DialogDescription>
-            Record a bill received from or a payment made to a supplier.
+            {mode === "edit"
+              ? "Update this transaction's details."
+              : "Record a bill received from or a payment made to a supplier."}
           </DialogDescription>
         </DialogHeader>
 
@@ -316,7 +514,8 @@ export default function SupplierTransactionDialog({
                   <FormControl>
                     <select
                       {...field}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      disabled={mode === "edit"}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 disabled:text-muted-foreground"
                     >
                       <option value="bill">Bill (debit — we owe)</option>
                       <option value="payment">Payment (credit — we paid)</option>
@@ -334,7 +533,7 @@ export default function SupplierTransactionDialog({
               control={form.control}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>₹ Amount</FormLabel>
+                  <FormLabel>₹ Amount{txnType === "bill" ? " (auto-calculated)" : ""}</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
@@ -342,8 +541,10 @@ export default function SupplierTransactionDialog({
                       step="0.01"
                       min="0.01"
                       placeholder="0.00"
+                      disabled={txnType === "bill"}
                     />
                   </FormControl>
+                  <AmountPreview value={field.value} />
                   <FormMessage />
                 </FormItem>
               )}
@@ -373,6 +574,7 @@ export default function SupplierTransactionDialog({
                       <FormItem>
                         <FormLabel>Gross Amount (₹)</FormLabel>
                         <FormControl><Input {...field} type="number" step="0.01" placeholder="Pre-discount total" /></FormControl>
+                        <AmountPreview value={field.value} />
                         <FormMessage />
                       </FormItem>
                     )}
@@ -384,6 +586,7 @@ export default function SupplierTransactionDialog({
                       <FormItem>
                         <FormLabel>Discount (₹)</FormLabel>
                         <FormControl><Input {...field} type="number" step="0.01" placeholder="Total discount applied" /></FormControl>
+                        <AmountPreview value={field.value} />
                         <FormMessage />
                       </FormItem>
                     )}
@@ -393,16 +596,44 @@ export default function SupplierTransactionDialog({
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">GST Breakdown (optional)</p>
                   <div className="grid grid-cols-2 gap-3">
                     <FormField name="taxable_amount" control={form.control} render={({ field }) => (
-                      <FormItem><FormLabel>Taxable (₹)</FormLabel><FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel>Taxable (₹){fields.length > 0 ? " (auto)" : ""}</FormLabel>
+                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" disabled={fields.length > 0} /></FormControl>
+                        <AmountPreview value={field.value} />
+                        <FormMessage />
+                      </FormItem>
                     )} />
                     <FormField name="cgst_amount" control={form.control} render={({ field }) => (
-                      <FormItem><FormLabel>CGST (₹)</FormLabel><FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel>CGST (₹)</FormLabel>
+                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
+                        <AmountPreview value={field.value} />
+                        <FormMessage />
+                      </FormItem>
                     )} />
                     <FormField name="sgst_amount" control={form.control} render={({ field }) => (
-                      <FormItem><FormLabel>SGST (₹)</FormLabel><FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel>SGST (₹)</FormLabel>
+                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
+                        <AmountPreview value={field.value} />
+                        <FormMessage />
+                      </FormItem>
                     )} />
                     <FormField name="igst_amount" control={form.control} render={({ field }) => (
-                      <FormItem><FormLabel>IGST (₹)</FormLabel><FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel>IGST (₹)</FormLabel>
+                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
+                        <AmountPreview value={field.value} />
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField name="round_off_amount" control={form.control} render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Round Off (₹)</FormLabel>
+                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
+                        <AmountPreview value={field.value} />
+                        <FormMessage />
+                      </FormItem>
                     )} />
                   </div>
                 </div>
@@ -413,7 +644,7 @@ export default function SupplierTransactionDialog({
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => append({ description: "", hsn_code: "", qty: 1, unit: "Pcs", unit_price: "", amount: "" })}
+                      onClick={() => append({ description: "", hsn_code: "", qty: 1, unit: "Pcs", discount_pct: "", unit_price: "", amount: 0 })}
                     >
                       + Add Row
                     </Button>
@@ -427,8 +658,9 @@ export default function SupplierTransactionDialog({
                             <th className="text-left pb-1 pr-2 w-20">HSN</th>
                             <th className="text-right pb-1 pr-2 w-16">Qty</th>
                             <th className="text-left pb-1 pr-2 w-16">Unit</th>
+                            <th className="text-right pb-1 pr-2 w-16">Disc %</th>
                             <th className="text-right pb-1 pr-2 w-24">Price (₹)</th>
-                            <th className="text-right pb-1 pr-2 w-24">Amount (₹)</th>
+                            <th className="text-right pb-1 pr-2 w-24">Amount (₹) — auto</th>
                             <th className="w-6"></th>
                           </tr>
                         </thead>
@@ -439,8 +671,15 @@ export default function SupplierTransactionDialog({
                               <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.hsn_code`)} placeholder="620590" /></td>
                               <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.qty`)} type="number" step="0.01" className="text-right" /></td>
                               <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.unit`)} placeholder="Pcs" /></td>
-                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.unit_price`)} type="number" step="0.01" className="text-right" /></td>
-                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.amount`)} type="number" step="0.01" className="text-right" /></td>
+                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.discount_pct`)} type="number" step="0.01" min="0" max="100" className="text-right" placeholder="0" /></td>
+                              <td className="pr-2 pb-1">
+                                <Input {...form.register(`line_items.${idx}.unit_price`)} type="number" step="0.01" className="text-right" />
+                                <AmountPreview value={watchedLineItems?.[idx]?.unit_price} />
+                              </td>
+                              <td className="pr-2 pb-1">
+                                <Input {...form.register(`line_items.${idx}.amount`)} type="number" step="0.01" className="text-right" disabled />
+                                <AmountPreview value={watchedLineItems?.[idx]?.amount} />
+                              </td>
                               <td><button type="button" onClick={() => remove(idx)} className="text-red-400 hover:text-red-600 text-base leading-none">×</button></td>
                             </tr>
                           ))}
@@ -517,6 +756,11 @@ export default function SupplierTransactionDialog({
                 render={({ field: { onChange, value, ...rest } }) => (
                   <FormItem>
                     <FormLabel>Bill Document — image or PDF (optional)</FormLabel>
+                    {mode === "edit" && transaction?.bill?.image_url && (
+                      <p className="text-xs text-muted-foreground">
+                        Current file: <a href={transaction.bill.image_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View ↗</a> — choose a file below to replace it.
+                      </p>
+                    )}
                     <FormControl>
                       <Input
                         {...rest}
@@ -532,7 +776,7 @@ export default function SupplierTransactionDialog({
             )}
 
             <Button type="submit" disabled={submitting} className="w-full">
-              {submitting ? "Saving..." : txnType === "bill" ? "Record Bill" : txnType === "advance" ? "Record Advance" : "Record Payment"}
+              {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : txnType === "bill" ? "Record Bill" : txnType === "advance" ? "Record Advance" : "Record Payment"}
             </Button>
           </form>
         </Form>
