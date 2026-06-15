@@ -51,7 +51,7 @@
       "source_file": "tailwind.config.js",
       "source_location": "L1",
       "id": "tailwind_config_js",
-      "community": 125
+      "community": 126
     },
     {
       "label": "postcss.config.js",
@@ -59,7 +59,7 @@
       "source_file": "postcss.config.js",
       "source_location": "L1",
       "id": "postcss_config_js",
-      "community": 126
+      "community": 127
     },
     {
       "label": "index.ts",
@@ -67,7 +67,7 @@
       "source_file": "supabase/functions/send-bill-sms/index.ts",
       "source_location": "L1",
       "id": "supabase_functions_send_bill_sms_index_ts",
-      "community": 127
+      "community": 128
     },
     {
       "label": "migrate.js",
@@ -75,7 +75,7 @@
       "source_file": "scripts/migrate.js",
       "source_location": "L1",
       "id": "scripts_migrate_js",
-      "community": 24
+      "community": 23
     },
     {
       "label": "loadEnv()",
@@ -83,7 +83,7 @@
       "source_file": "scripts/migrate.js",
       "source_location": "L9",
       "id": "migrate_loadenv",
-      "community": 24
+      "community": 23
     },
     {
       "label": "main()",
@@ -91,7 +91,7 @@
       "source_file": "scripts/migrate.js",
       "source_location": "L23",
       "id": "migrate_main",
-      "community": 24
+      "community": 23
     },
     {
       "label": "reportWebVitals.js",
@@ -115,7 +115,7 @@
       "source_file": "src/index.js",
       "source_location": "L1",
       "id": "src_index_js",
-      "community": 128
+      "community": 129
     },
     {
       "label": "App.test.js",
@@ -123,7 +123,7 @@
       "source_file": "src/App.test.js",
       "source_location": "L1",
       "id": "src_app_test_js",
-      "community": 129
+      "community": 130
     },
     {
       "label": "setupTests.js",
@@ -131,7 +131,7 @@
       "source_file": "src/setupTests.js",
       "source_location": "L1",
       "id": "src_setuptests_js",
-      "community": 130
+      "community": 131
     },
     {
       "label": "App.js",
@@ -155,7 +155,7 @@
       "source_file": "src/storefront/context/CartContext.jsx",
       "source_location": "L1",
       "id": "src_storefront_context_cartcontext_jsx",
-      "community": 25
+      "community": 24
     },
     {
       "label": "CartProvider()",
@@ -163,7 +163,7 @@
       "source_file": "src/storefront/context/CartContext.jsx",
       "source_location": "L13",
       "id": "cartcontext_cartprovider",
-      "community": 25
+      "community": 24
     },
     {
       "label": "useCart()",
@@ -171,7 +171,7 @@
       "source_file": "src/storefront/context/CartContext.jsx",
       "source_location": "L89",
       "id": "cartcontext_usecart",
-      "community": 25
+      "community": 24
     },
     {
       "label": "StorefrontLayout.jsx",
@@ -227,7 +227,7 @@
       "source_file": "src/storefront/components/ProductCard.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_productcard_jsx",
-      "community": 26
+      "community": 25
     },
     {
       "label": "PlaceholderImage()",
@@ -235,7 +235,7 @@
       "source_file": "src/storefront/components/ProductCard.jsx",
       "source_location": "L5",
       "id": "productcard_placeholderimage",
-      "community": 26
+      "community": 25
     },
     {
       "label": "ProductCard()",
@@ -243,7 +243,7 @@
       "source_file": "src/storefront/components/ProductCard.jsx",
       "source_location": "L26",
       "id": "productcard_productcard",
-      "community": 26
+      "community": 25
     },
     {
       "label": "BestsellerGrid.jsx",
@@ -251,7 +251,7 @@
       "source_file": "src/storefront/components/home/BestsellerGrid.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_bestsellergrid_jsx",
-      "community": 27
+      "community": 26
     },
     {
       "label": "GridSkeleton()",
@@ -259,7 +259,7 @@
       "source_file": "src/storefront/components/home/BestsellerGrid.jsx",
       "source_location": "L6",
       "id": "bestsellergrid_gridskeleton",
-      "community": 27
+      "community": 26
     },
     {
       "label": "BestsellerGrid()",
@@ -267,7 +267,7 @@
       "source_file": "src/storefront/components/home/BestsellerGrid.jsx",
       "source_location": "L22",
       "id": "bestsellergrid_bestsellergrid",
-      "community": 27
+      "community": 26
     },
     {
       "label": "NewArrivals.jsx",
@@ -275,7 +275,7 @@
       "source_file": "src/storefront/components/home/NewArrivals.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_newarrivals_jsx",
-      "community": 28
+      "community": 27
     },
     {
       "label": "ProductSkeleton()",
@@ -283,7 +283,7 @@
       "source_file": "src/storefront/components/home/NewArrivals.jsx",
       "source_location": "L7",
       "id": "newarrivals_productskeleton",
-      "community": 28
+      "community": 27
     },
     {
       "label": "NewArrivals()",
@@ -291,7 +291,7 @@
       "source_file": "src/storefront/components/home/NewArrivals.jsx",
       "source_location": "L19",
       "id": "newarrivals_newarrivals",
-      "community": 28
+      "community": 27
     },
     {
       "label": "FeaturedCollection.jsx",
@@ -347,7 +347,7 @@
       "source_file": "src/storefront/components/home/ReviewsSection.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_reviewssection_jsx",
-      "community": 29
+      "community": 28
     },
     {
       "label": "Stars()",
@@ -355,7 +355,7 @@
       "source_file": "src/storefront/components/home/ReviewsSection.jsx",
       "source_location": "L29",
       "id": "reviewssection_stars",
-      "community": 29
+      "community": 28
     },
     {
       "label": "ReviewsSection()",
@@ -363,7 +363,7 @@
       "source_file": "src/storefront/components/home/ReviewsSection.jsx",
       "source_location": "L43",
       "id": "reviewssection_reviewssection",
-      "community": 29
+      "community": 28
     },
     {
       "label": "NewsletterSignup.jsx",
@@ -387,7 +387,7 @@
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_categoryshowcase_jsx",
-      "community": 8
+      "community": 9
     },
     {
       "label": "getImage()",
@@ -395,7 +395,7 @@
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
       "source_location": "L58",
       "id": "categoryshowcase_getimage",
-      "community": 8
+      "community": 9
     },
     {
       "label": "CategoryCard()",
@@ -403,7 +403,7 @@
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
       "source_location": "L70",
       "id": "categoryshowcase_categorycard",
-      "community": 8
+      "community": 9
     },
     {
       "label": "CategorySkeleton()",
@@ -411,7 +411,7 @@
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
       "source_location": "L112",
       "id": "categoryshowcase_categoryskeleton",
-      "community": 8
+      "community": 9
     },
     {
       "label": "CategoryShowcase()",
@@ -419,7 +419,7 @@
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
       "source_location": "L121",
       "id": "categoryshowcase_categoryshowcase",
-      "community": 8
+      "community": 9
     },
     {
       "label": "FilterDropdown.jsx",
@@ -427,7 +427,7 @@
       "source_file": "src/storefront/components/shop/FilterDropdown.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_filterdropdown_jsx",
-      "community": 30
+      "community": 29
     },
     {
       "label": "ColorSwatch()",
@@ -435,7 +435,7 @@
       "source_file": "src/storefront/components/shop/FilterDropdown.jsx",
       "source_location": "L42",
       "id": "filterdropdown_colorswatch",
-      "community": 30
+      "community": 29
     },
     {
       "label": "FilterDropdown()",
@@ -443,7 +443,7 @@
       "source_file": "src/storefront/components/shop/FilterDropdown.jsx",
       "source_location": "L98",
       "id": "filterdropdown_filterdropdown",
-      "community": 30
+      "community": 29
     },
     {
       "label": "PriceInputs.jsx",
@@ -483,7 +483,7 @@
       "source_file": "src/storefront/components/shop/ProductGrid.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_productgrid_jsx",
-      "community": 31
+      "community": 30
     },
     {
       "label": "ProductSkeleton()",
@@ -491,7 +491,7 @@
       "source_file": "src/storefront/components/shop/ProductGrid.jsx",
       "source_location": "L4",
       "id": "productgrid_productskeleton",
-      "community": 31
+      "community": 30
     },
     {
       "label": "ProductGrid()",
@@ -499,7 +499,7 @@
       "source_file": "src/storefront/components/shop/ProductGrid.jsx",
       "source_location": "L16",
       "id": "productgrid_productgrid",
-      "community": 31
+      "community": 30
     },
     {
       "label": "FilterBar.jsx",
@@ -523,7 +523,7 @@
       "source_file": "src/storefront/components/shop/AllFiltersPanel.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_allfilterspanel_jsx",
-      "community": 32
+      "community": 31
     },
     {
       "label": "SectionLabel()",
@@ -531,7 +531,7 @@
       "source_file": "src/storefront/components/shop/AllFiltersPanel.jsx",
       "source_location": "L42",
       "id": "allfilterspanel_sectionlabel",
-      "community": 32
+      "community": 31
     },
     {
       "label": "AllFiltersPanel()",
@@ -539,7 +539,7 @@
       "source_file": "src/storefront/components/shop/AllFiltersPanel.jsx",
       "source_location": "L50",
       "id": "allfilterspanel_allfilterspanel",
-      "community": 32
+      "community": 31
     },
     {
       "label": "VariantPicker.jsx",
@@ -563,7 +563,7 @@
       "source_file": "src/storefront/components/cart/CartDrawer.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_cart_cartdrawer_jsx",
-      "community": 33
+      "community": 32
     },
     {
       "label": "CartItem()",
@@ -571,7 +571,7 @@
       "source_file": "src/storefront/components/cart/CartDrawer.jsx",
       "source_location": "L6",
       "id": "cartdrawer_cartitem",
-      "community": 33
+      "community": 32
     },
     {
       "label": "CartDrawer()",
@@ -579,7 +579,7 @@
       "source_file": "src/storefront/components/cart/CartDrawer.jsx",
       "source_location": "L72",
       "id": "cartdrawer_cartdrawer",
-      "community": 33
+      "community": 32
     },
     {
       "label": "CartContext.test.jsx",
@@ -587,7 +587,7 @@
       "source_file": "src/storefront/__tests__/CartContext.test.jsx",
       "source_location": "L1",
       "id": "src_storefront_tests_cartcontext_test_jsx",
-      "community": 34
+      "community": 33
     },
     {
       "label": "Harness()",
@@ -595,7 +595,7 @@
       "source_file": "src/storefront/__tests__/CartContext.test.jsx",
       "source_location": "L27",
       "id": "cartcontext_test_harness",
-      "community": 34
+      "community": 33
     },
     {
       "label": "renderHarness()",
@@ -603,7 +603,7 @@
       "source_file": "src/storefront/__tests__/CartContext.test.jsx",
       "source_location": "L44",
       "id": "cartcontext_test_renderharness",
-      "community": 34
+      "community": 33
     },
     {
       "label": "VariantPicker.test.jsx",
@@ -611,7 +611,7 @@
       "source_file": "src/storefront/__tests__/VariantPicker.test.jsx",
       "source_location": "L1",
       "id": "src_storefront_tests_variantpicker_test_jsx",
-      "community": 131
+      "community": 132
     },
     {
       "label": "filterUtils.test.js",
@@ -619,7 +619,7 @@
       "source_file": "src/storefront/__tests__/filterUtils.test.js",
       "source_location": "L1",
       "id": "src_storefront_tests_filterutils_test_js",
-      "community": 132
+      "community": 133
     },
     {
       "label": "CartDrawer.test.jsx",
@@ -627,7 +627,7 @@
       "source_file": "src/storefront/__tests__/CartDrawer.test.jsx",
       "source_location": "L1",
       "id": "src_storefront_tests_cartdrawer_test_jsx",
-      "community": 35
+      "community": 34
     },
     {
       "label": "makeCtx()",
@@ -635,7 +635,7 @@
       "source_file": "src/storefront/__tests__/CartDrawer.test.jsx",
       "source_location": "L29",
       "id": "cartdrawer_test_makectx",
-      "community": 35
+      "community": 34
     },
     {
       "label": "renderDrawer()",
@@ -643,7 +643,7 @@
       "source_file": "src/storefront/__tests__/CartDrawer.test.jsx",
       "source_location": "L44",
       "id": "cartdrawer_test_renderdrawer",
-      "community": 35
+      "community": 34
     },
     {
       "label": "useProduct.test.js",
@@ -651,7 +651,7 @@
       "source_file": "src/storefront/__tests__/useProduct.test.js",
       "source_location": "L1",
       "id": "src_storefront_tests_useproduct_test_js",
-      "community": 36
+      "community": 35
     },
     {
       "label": "mockSuccess()",
@@ -659,7 +659,7 @@
       "source_file": "src/storefront/__tests__/useProduct.test.js",
       "source_location": "L26",
       "id": "useproduct_test_mocksuccess",
-      "community": 36
+      "community": 35
     },
     {
       "label": "mockProductError()",
@@ -667,7 +667,7 @@
       "source_file": "src/storefront/__tests__/useProduct.test.js",
       "source_location": "L49",
       "id": "useproduct_test_mockproducterror",
-      "community": 36
+      "community": 35
     },
     {
       "label": "useShopFilters.js",
@@ -675,7 +675,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L1",
       "id": "src_storefront_hooks_useshopfilters_js",
-      "community": 14
+      "community": 15
     },
     {
       "label": "getMatchingPids()",
@@ -683,7 +683,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L17",
       "id": "useshopfilters_getmatchingpids",
-      "community": 14
+      "community": 15
     },
     {
       "label": "fetchAvailableOptionsFromDB()",
@@ -691,7 +691,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L44",
       "id": "useshopfilters_fetchavailableoptionsfromdb",
-      "community": 14
+      "community": 15
     },
     {
       "label": "useShopFilters()",
@@ -699,7 +699,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L85",
       "id": "useshopfilters_useshopfilters",
-      "community": 14
+      "community": 15
     },
     {
       "label": "filterUtils.js",
@@ -707,7 +707,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L1",
       "id": "src_storefront_hooks_filterutils_js",
-      "community": 15
+      "community": 16
     },
     {
       "label": "matchExcluding()",
@@ -715,7 +715,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L1",
       "id": "filterutils_matchexcluding",
-      "community": 15
+      "community": 16
     },
     {
       "label": "computeAvailableOptions()",
@@ -723,7 +723,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L29",
       "id": "filterutils_computeavailableoptions",
-      "community": 15
+      "community": 16
     },
     {
       "label": "sortByAvailability()",
@@ -731,7 +731,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L64",
       "id": "filterutils_sortbyavailability",
-      "community": 15
+      "community": 16
     },
     {
       "label": "useProduct.js",
@@ -771,7 +771,7 @@
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
       "source_location": "L1",
       "id": "src_storefront_pages_productdetailpage_jsx",
-      "community": 37
+      "community": 36
     },
     {
       "label": "ProductImage()",
@@ -779,7 +779,7 @@
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
       "source_location": "L9",
       "id": "productdetailpage_productimage",
-      "community": 37
+      "community": 36
     },
     {
       "label": "ProductDetailPage()",
@@ -787,7 +787,7 @@
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
       "source_location": "L47",
       "id": "productdetailpage_productdetailpage",
-      "community": 37
+      "community": 36
     },
     {
       "label": "ShopPage.jsx",
@@ -795,7 +795,7 @@
       "source_file": "src/storefront/pages/ShopPage.jsx",
       "source_location": "L1",
       "id": "src_storefront_pages_shoppage_jsx",
-      "community": 38
+      "community": 37
     },
     {
       "label": "ActiveChips()",
@@ -803,7 +803,7 @@
       "source_file": "src/storefront/pages/ShopPage.jsx",
       "source_location": "L8",
       "id": "shoppage_activechips",
-      "community": 38
+      "community": 37
     },
     {
       "label": "ShopPage()",
@@ -811,7 +811,7 @@
       "source_file": "src/storefront/pages/ShopPage.jsx",
       "source_location": "L52",
       "id": "shoppage_shoppage",
-      "community": 38
+      "community": 37
     },
     {
       "label": "AdminLayout.js",
@@ -835,7 +835,7 @@
       "source_file": "src/admin/components/createFolder.js",
       "source_location": "L1",
       "id": "src_admin_components_createfolder_js",
-      "community": 39
+      "community": 38
     },
     {
       "label": "findOrCreateFolder()",
@@ -843,7 +843,7 @@
       "source_file": "src/admin/components/createFolder.js",
       "source_location": "L14",
       "id": "createfolder_findorcreatefolder",
-      "community": 39
+      "community": 38
     },
     {
       "label": "createProductFolder()",
@@ -851,7 +851,7 @@
       "source_file": "src/admin/components/createFolder.js",
       "source_location": "L34",
       "id": "createfolder_createproductfolder",
-      "community": 39
+      "community": 38
     },
     {
       "label": "SupplierTransactionsTab.js",
@@ -923,7 +923,7 @@
       "source_file": "src/admin/components/CategoryForm.js",
       "source_location": "L1",
       "id": "src_admin_components_categoryform_js",
-      "community": 40
+      "community": 39
     },
     {
       "label": "Field()",
@@ -931,7 +931,7 @@
       "source_file": "src/admin/components/CategoryForm.js",
       "source_location": "L23",
       "id": "categoryform_field",
-      "community": 40
+      "community": 39
     },
     {
       "label": "CategoryForm()",
@@ -939,7 +939,7 @@
       "source_file": "src/admin/components/CategoryForm.js",
       "source_location": "L35",
       "id": "categoryform_categoryform",
-      "community": 40
+      "community": 39
     },
     {
       "label": "CustomerForm.js",
@@ -963,7 +963,7 @@
       "source_file": "src/admin/components/MockupRow.js",
       "source_location": "L1",
       "id": "src_admin_components_mockuprow_js",
-      "community": 41
+      "community": 40
     },
     {
       "label": "formatDate()",
@@ -971,7 +971,7 @@
       "source_file": "src/admin/components/MockupRow.js",
       "source_location": "L7",
       "id": "mockuprow_formatdate",
-      "community": 41
+      "community": 40
     },
     {
       "label": "MockupRow()",
@@ -979,7 +979,7 @@
       "source_file": "src/admin/components/MockupRow.js",
       "source_location": "L9",
       "id": "mockuprow_mockuprow",
-      "community": 41
+      "community": 40
     },
     {
       "label": "SupplierForm.js",
@@ -1099,7 +1099,7 @@
       "source_file": "src/admin/components/SalespersonForm.js",
       "source_location": "L1",
       "id": "src_admin_components_salespersonform_js",
-      "community": 42
+      "community": 41
     },
     {
       "label": "Field()",
@@ -1107,7 +1107,7 @@
       "source_file": "src/admin/components/SalespersonForm.js",
       "source_location": "L19",
       "id": "salespersonform_field",
-      "community": 42
+      "community": 41
     },
     {
       "label": "SalespersonForm()",
@@ -1115,7 +1115,7 @@
       "source_file": "src/admin/components/SalespersonForm.js",
       "source_location": "L31",
       "id": "salespersonform_salespersonform",
-      "community": 42
+      "community": 41
     },
     {
       "label": "CustomerTable.js",
@@ -1155,7 +1155,7 @@
       "source_file": "src/admin/components/ProductTable.js",
       "source_location": "L1",
       "id": "src_admin_components_producttable_js",
-      "community": 133
+      "community": 134
     },
     {
       "label": "DiscountTable.js",
@@ -1163,7 +1163,7 @@
       "source_file": "src/admin/components/DiscountTable.js",
       "source_location": "L1",
       "id": "src_admin_components_discounttable_js",
-      "community": 43
+      "community": 42
     },
     {
       "label": "DiscountTable()",
@@ -1171,7 +1171,7 @@
       "source_file": "src/admin/components/dashboard/DiscountTable.js",
       "source_location": "L9",
       "id": "discounttable_discounttable",
-      "community": 43
+      "community": 42
     },
     {
       "label": "BillTable.js",
@@ -1211,31 +1211,23 @@
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
       "source_location": "L1",
       "id": "src_admin_components_suppliertransactiondialog_js",
-      "community": 16
-    },
-    {
-      "label": "AmountPreview()",
-      "file_type": "code",
-      "source_file": "src/admin/components/SupplierTransactionDialog.js",
-      "source_location": "L34",
-      "id": "suppliertransactiondialog_amountpreview",
-      "community": 16
+      "community": 43
     },
     {
       "label": "SupplierPicker()",
       "file_type": "code",
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
-      "source_location": "L68",
+      "source_location": "L63",
       "id": "suppliertransactiondialog_supplierpicker",
-      "community": 16
+      "community": 43
     },
     {
       "label": "SupplierTransactionDialog()",
       "file_type": "code",
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
-      "source_location": "L119",
+      "source_location": "L114",
       "id": "suppliertransactiondialog_suppliertransactiondialog",
-      "community": 16
+      "community": 43
     },
     {
       "label": "ProductEditDialog.js",
@@ -1275,7 +1267,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L1",
       "id": "src_admin_components_supplierledgerdialog_js",
-      "community": 9
+      "community": 10
     },
     {
       "label": "LineItemProductLink()",
@@ -1283,7 +1275,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L20",
       "id": "supplierledgerdialog_lineitemproductlink",
-      "community": 9
+      "community": 10
     },
     {
       "label": "formatINR()",
@@ -1291,7 +1283,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L77",
       "id": "supplierledgerdialog_formatinr",
-      "community": 9
+      "community": 10
     },
     {
       "label": "balanceClass()",
@@ -1299,7 +1291,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L80",
       "id": "supplierledgerdialog_balanceclass",
-      "community": 9
+      "community": 10
     },
     {
       "label": "SupplierLedgerDialog()",
@@ -1307,7 +1299,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L83",
       "id": "supplierledgerdialog_supplierledgerdialog",
-      "community": 9
+      "community": 10
     },
     {
       "label": "SalespersonTable.js",
@@ -1619,7 +1611,7 @@
       "source_file": "src/admin/components/dashboard/DiscountTable.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_discounttable_js",
-      "community": 43
+      "community": 42
     },
     {
       "label": "SalespersonTable.js",
@@ -1635,7 +1627,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/KpiCards.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_kpicards_test_js",
-      "community": 134
+      "community": 135
     },
     {
       "label": "SalespersonTable.test.js",
@@ -1643,7 +1635,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/SalespersonTable.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_salespersontable_test_js",
-      "community": 135
+      "community": 136
     },
     {
       "label": "DashboardFilters.test.js",
@@ -1651,7 +1643,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/DashboardFilters.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_dashboardfilters_test_js",
-      "community": 136
+      "community": 137
     },
     {
       "label": "RevenueChart.test.js",
@@ -1675,7 +1667,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/DiscountTable.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_discounttable_test_js",
-      "community": 137
+      "community": 138
     },
     {
       "label": "HistoricalTrends.test.js",
@@ -1699,7 +1691,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/CategoryBreakdown.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_categorybreakdown_test_js",
-      "community": 138
+      "community": 139
     },
     {
       "label": "Notes.js",
@@ -1875,7 +1867,7 @@
       "source_file": "src/admin/components/billing/ReturnReceiptView.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_returnreceiptview_js",
-      "community": 139
+      "community": 140
     },
     {
       "label": "AddItemDialog.js",
@@ -2067,7 +2059,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_discountselector_js",
-      "community": 10
+      "community": 11
     },
     {
       "label": "resolveCatNames()",
@@ -2075,7 +2067,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L5",
       "id": "discountselector_resolvecatnames",
-      "community": 10
+      "community": 11
     },
     {
       "label": "discountLabel()",
@@ -2083,7 +2075,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L11",
       "id": "discountselector_discountlabel",
-      "community": 10
+      "community": 11
     },
     {
       "label": "DiscountRow()",
@@ -2091,7 +2083,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L34",
       "id": "discountselector_discountrow",
-      "community": 10
+      "community": 11
     },
     {
       "label": "DiscountSelector()",
@@ -2099,7 +2091,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L87",
       "id": "discountselector_discountselector",
-      "community": 10
+      "community": 11
     },
     {
       "label": "exchangeHelpers.js",
@@ -2251,7 +2243,7 @@
       "source_file": "src/admin/components/billing/__tests__/stockDelta.test.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_tests_stockdelta_test_js",
-      "community": 140
+      "community": 141
     },
     {
       "label": "billUtils.test.js",
@@ -2259,7 +2251,7 @@
       "source_file": "src/admin/components/billing/__tests__/billUtils.test.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_tests_billutils_test_js",
-      "community": 141
+      "community": 142
     },
     {
       "label": "useTableFilters.js",
@@ -2283,7 +2275,7 @@
       "source_file": "src/admin/hooks/__tests__/useTableFilters.test.js",
       "source_location": "L1",
       "id": "src_admin_hooks_tests_usetablefilters_test_js",
-      "community": 142
+      "community": 143
     },
     {
       "label": "CategoriesPage.js",
@@ -2387,7 +2379,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L1",
       "id": "src_admin_pages_adminpage_jsx",
-      "community": 11
+      "community": 12
     },
     {
       "label": "getFinancialYear()",
@@ -2395,7 +2387,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L41",
       "id": "adminpage_getfinancialyear",
-      "community": 11
+      "community": 12
     },
     {
       "label": "MonthlySales()",
@@ -2403,7 +2395,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L46",
       "id": "adminpage_monthlysales",
-      "community": 11
+      "community": 12
     },
     {
       "label": "UsersTab()",
@@ -2411,7 +2403,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L208",
       "id": "adminpage_userstab",
-      "community": 11
+      "community": 12
     },
     {
       "label": "AdminPage()",
@@ -2419,7 +2411,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L375",
       "id": "adminpage_adminpage",
-      "community": 11
+      "community": 12
     },
     {
       "label": "BillingPage.js",
@@ -2555,7 +2547,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_dashboardpage_js",
-      "community": 12
+      "community": 13
     },
     {
       "label": "fetchAllRows()",
@@ -2563,7 +2555,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L23",
       "id": "dashboardpage_fetchallrows",
-      "community": 12
+      "community": 13
     },
     {
       "label": "iso()",
@@ -2571,7 +2563,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L36",
       "id": "dashboardpage_iso",
-      "community": 12
+      "community": 13
     },
     {
       "label": "fetchPeriod()",
@@ -2579,7 +2571,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L41",
       "id": "dashboardpage_fetchperiod",
-      "community": 12
+      "community": 13
     },
     {
       "label": "DashboardPage()",
@@ -2587,7 +2579,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L102",
       "id": "dashboardpage_dashboardpage",
-      "community": 12
+      "community": 13
     },
     {
       "label": "MockupPage.js",
@@ -2667,7 +2659,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L1",
       "id": "src_components_actionbuttons_jsx",
-      "community": 13
+      "community": 14
     },
     {
       "label": "safeClick()",
@@ -2675,7 +2667,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L11",
       "id": "actionbuttons_safeclick",
-      "community": 13
+      "community": 14
     },
     {
       "label": "EditButton()",
@@ -2683,7 +2675,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L17",
       "id": "actionbuttons_editbutton",
-      "community": 13
+      "community": 14
     },
     {
       "label": "PrintButton()",
@@ -2691,7 +2683,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L34",
       "id": "actionbuttons_printbutton",
-      "community": 13
+      "community": 14
     },
     {
       "label": "DeleteButton()",
@@ -2699,7 +2691,23 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L51",
       "id": "actionbuttons_deletebutton",
-      "community": 13
+      "community": 14
+    },
+    {
+      "label": "currency-input.jsx",
+      "file_type": "code",
+      "source_file": "src/components/ui/currency-input.jsx",
+      "source_location": "L1",
+      "id": "src_components_ui_currency_input_jsx",
+      "community": 116
+    },
+    {
+      "label": "CurrencyInput()",
+      "file_type": "code",
+      "source_file": "src/components/ui/currency-input.jsx",
+      "source_location": "L7",
+      "id": "currency_input_currencyinput",
+      "community": 116
     },
     {
       "label": "tabs.tsx",
@@ -2707,7 +2715,7 @@
       "source_file": "src/components/ui/tabs.tsx",
       "source_location": "L1",
       "id": "src_components_ui_tabs_tsx",
-      "community": 143
+      "community": 144
     },
     {
       "label": "card.tsx",
@@ -2715,7 +2723,7 @@
       "source_file": "src/components/ui/card.tsx",
       "source_location": "L1",
       "id": "src_components_ui_card_tsx",
-      "community": 144
+      "community": 145
     },
     {
       "label": "toaster.tsx",
@@ -2723,7 +2731,7 @@
       "source_file": "src/components/ui/toaster.tsx",
       "source_location": "L1",
       "id": "src_components_ui_toaster_tsx",
-      "community": 145
+      "community": 146
     },
     {
       "label": "scroll-area.tsx",
@@ -2731,7 +2739,7 @@
       "source_file": "src/components/ui/scroll-area.tsx",
       "source_location": "L1",
       "id": "src_components_ui_scroll_area_tsx",
-      "community": 146
+      "community": 147
     },
     {
       "label": "label.tsx",
@@ -2739,7 +2747,7 @@
       "source_file": "src/components/ui/label.tsx",
       "source_location": "L1",
       "id": "src_components_ui_label_tsx",
-      "community": 147
+      "community": 148
     },
     {
       "label": "tooltip.tsx",
@@ -2747,7 +2755,7 @@
       "source_file": "src/components/ui/tooltip.tsx",
       "source_location": "L1",
       "id": "src_components_ui_tooltip_tsx",
-      "community": 148
+      "community": 149
     },
     {
       "label": "dialog.tsx",
@@ -2755,7 +2763,7 @@
       "source_file": "src/components/ui/dialog.tsx",
       "source_location": "L1",
       "id": "src_components_ui_dialog_tsx",
-      "community": 149
+      "community": 150
     },
     {
       "label": "badge.tsx",
@@ -2763,7 +2771,7 @@
       "source_file": "src/components/ui/badge.tsx",
       "source_location": "L1",
       "id": "src_components_ui_badge_tsx",
-      "community": 116
+      "community": 117
     },
     {
       "label": "Badge()",
@@ -2771,7 +2779,7 @@
       "source_file": "src/components/ui/badge.tsx",
       "source_location": "L30",
       "id": "badge_badge",
-      "community": 116
+      "community": 117
     },
     {
       "label": "table.tsx",
@@ -2779,7 +2787,7 @@
       "source_file": "src/components/ui/table.tsx",
       "source_location": "L1",
       "id": "src_components_ui_table_tsx",
-      "community": 150
+      "community": 151
     },
     {
       "label": "button.tsx",
@@ -2787,7 +2795,7 @@
       "source_file": "src/components/ui/button.tsx",
       "source_location": "L1",
       "id": "src_components_ui_button_tsx",
-      "community": 117
+      "community": 118
     },
     {
       "label": "cn()",
@@ -2795,7 +2803,7 @@
       "source_file": "src/components/ui/button.tsx",
       "source_location": "L53",
       "id": "button_cn",
-      "community": 117
+      "community": 118
     },
     {
       "label": "toast.tsx",
@@ -2803,7 +2811,7 @@
       "source_file": "src/components/ui/toast.tsx",
       "source_location": "L1",
       "id": "src_components_ui_toast_tsx",
-      "community": 151
+      "community": 152
     },
     {
       "label": "checkbox.tsx",
@@ -2811,7 +2819,7 @@
       "source_file": "src/components/ui/checkbox.tsx",
       "source_location": "L1",
       "id": "src_components_ui_checkbox_tsx",
-      "community": 152
+      "community": 153
     },
     {
       "label": "select.tsx",
@@ -2819,7 +2827,7 @@
       "source_file": "src/components/ui/select.tsx",
       "source_location": "L1",
       "id": "src_components_ui_select_tsx",
-      "community": 153
+      "community": 154
     },
     {
       "label": "textarea.tsx",
@@ -2827,7 +2835,7 @@
       "source_file": "src/components/ui/textarea.tsx",
       "source_location": "L1",
       "id": "src_components_ui_textarea_tsx",
-      "community": 154
+      "community": 155
     },
     {
       "label": "input.tsx",
@@ -2835,7 +2843,7 @@
       "source_file": "src/components/ui/input.tsx",
       "source_location": "L1",
       "id": "src_components_ui_input_tsx",
-      "community": 155
+      "community": 156
     },
     {
       "label": "form.tsx",
@@ -2843,7 +2851,7 @@
       "source_file": "src/components/ui/form.tsx",
       "source_location": "L1",
       "id": "src_components_ui_form_tsx",
-      "community": 156
+      "community": 157
     },
     {
       "label": "use-toast.ts",
@@ -2907,7 +2915,7 @@
       "source_file": "src/lib/utils.ts",
       "source_location": "L1",
       "id": "src_lib_utils_ts",
-      "community": 118
+      "community": 119
     },
     {
       "label": "cn()",
@@ -2915,7 +2923,7 @@
       "source_file": "src/lib/utils.ts",
       "source_location": "L4",
       "id": "utils_cn",
-      "community": 118
+      "community": 119
     },
     {
       "label": "supabaseClient.js",
@@ -2923,7 +2931,7 @@
       "source_file": "src/lib/supabaseClient.js",
       "source_location": "L1",
       "id": "src_lib_supabaseclient_js",
-      "community": 157
+      "community": 158
     },
     {
       "label": "activityLog.js",
@@ -2931,7 +2939,7 @@
       "source_file": "src/lib/activityLog.js",
       "source_location": "L1",
       "id": "src_lib_activitylog_js",
-      "community": 119
+      "community": 120
     },
     {
       "label": "logActivity()",
@@ -2939,7 +2947,7 @@
       "source_file": "src/lib/activityLog.js",
       "source_location": "L13",
       "id": "activitylog_logactivity",
-      "community": 119
+      "community": 120
     },
     {
       "label": "activityLog.test.js",
@@ -2947,7 +2955,7 @@
       "source_file": "src/lib/__tests__/activityLog.test.js",
       "source_location": "L1",
       "id": "src_lib_tests_activitylog_test_js",
-      "community": 158
+      "community": 159
     },
     {
       "label": "UnauthorizedPage.jsx",
@@ -2955,7 +2963,7 @@
       "source_file": "src/pages/UnauthorizedPage.jsx",
       "source_location": "L1",
       "id": "src_pages_unauthorizedpage_jsx",
-      "community": 120
+      "community": 121
     },
     {
       "label": "UnauthorizedPage()",
@@ -2963,7 +2971,7 @@
       "source_file": "src/pages/UnauthorizedPage.jsx",
       "source_location": "L5",
       "id": "unauthorizedpage_unauthorizedpage",
-      "community": 120
+      "community": 121
     },
     {
       "label": "activitySummary.js",
@@ -3043,7 +3051,7 @@
       "source_file": "src/utility/formatCurrency.js",
       "source_location": "L1",
       "id": "src_utility_formatcurrency_js",
-      "community": 121
+      "community": 122
     },
     {
       "label": "formatINR()",
@@ -3051,7 +3059,7 @@
       "source_file": "src/utility/formatCurrency.js",
       "source_location": "L1",
       "id": "formatcurrency_formatinr",
-      "community": 121
+      "community": 122
     },
     {
       "label": "variantDiff.js",
@@ -3059,7 +3067,7 @@
       "source_file": "src/utility/variantDiff.js",
       "source_location": "L1",
       "id": "src_utility_variantdiff_js",
-      "community": 122
+      "community": 123
     },
     {
       "label": "variantChanges()",
@@ -3067,7 +3075,7 @@
       "source_file": "src/utility/variantDiff.js",
       "source_location": "L4",
       "id": "variantdiff_variantchanges",
-      "community": 122
+      "community": 123
     },
     {
       "label": "billFilename.js",
@@ -3075,7 +3083,7 @@
       "source_file": "src/utility/billFilename.js",
       "source_location": "L1",
       "id": "src_utility_billfilename_js",
-      "community": 123
+      "community": 124
     },
     {
       "label": "buildBillFilename()",
@@ -3083,7 +3091,7 @@
       "source_file": "src/utility/billFilename.js",
       "source_location": "L1",
       "id": "billfilename_buildbillfilename",
-      "community": 123
+      "community": 124
     },
     {
       "label": "productName.js",
@@ -3297,7 +3305,7 @@
       "label": "formatDateTimeIST()",
       "file_type": "code",
       "source_file": "src/utility/dateFormat.js",
-      "source_location": "L12",
+      "source_location": "L17",
       "id": "dateformat_formatdatetimeist",
       "community": 52
     },
@@ -3307,7 +3315,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L1",
       "id": "src_utility_supplierbillcalc_js",
-      "community": 23
+      "community": 8
     },
     {
       "label": "computeLineAmount()",
@@ -3315,7 +3323,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L5",
       "id": "supplierbillcalc_computelineamount",
-      "community": 23
+      "community": 8
     },
     {
       "label": "computeTaxableAmount()",
@@ -3323,15 +3331,31 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L16",
       "id": "supplierbillcalc_computetaxableamount",
-      "community": 23
+      "community": 8
+    },
+    {
+      "label": "computeGrossAmount()",
+      "file_type": "code",
+      "source_file": "src/utility/supplierBillCalc.js",
+      "source_location": "L24",
+      "id": "supplierbillcalc_computegrossamount",
+      "community": 8
+    },
+    {
+      "label": "computeDiscountAmount()",
+      "file_type": "code",
+      "source_file": "src/utility/supplierBillCalc.js",
+      "source_location": "L32",
+      "id": "supplierbillcalc_computediscountamount",
+      "community": 8
     },
     {
       "label": "computeBillTotal()",
       "file_type": "code",
       "source_file": "src/utility/supplierBillCalc.js",
-      "source_location": "L25",
+      "source_location": "L41",
       "id": "supplierbillcalc_computebilltotal",
-      "community": 23
+      "community": 8
     },
     {
       "label": "sortVariants.js",
@@ -3419,7 +3443,7 @@
       "source_file": "src/utility/formatStock.js",
       "source_location": "L1",
       "id": "src_utility_formatstock_js",
-      "community": 124
+      "community": 125
     },
     {
       "label": "formatStock()",
@@ -3427,7 +3451,7 @@
       "source_file": "src/utility/formatStock.js",
       "source_location": "L1",
       "id": "formatstock_formatstock",
-      "community": 124
+      "community": 125
     },
     {
       "label": "formatStock.test.js",
@@ -3435,7 +3459,7 @@
       "source_file": "src/utility/__tests__/formatStock.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_formatstock_test_js",
-      "community": 159
+      "community": 160
     },
     {
       "label": "dashboardData.test.js",
@@ -3443,7 +3467,7 @@
       "source_file": "src/utility/__tests__/dashboardData.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_dashboarddata_test_js",
-      "community": 160
+      "community": 161
     },
     {
       "label": "billFilename.test.js",
@@ -3451,7 +3475,7 @@
       "source_file": "src/utility/__tests__/billFilename.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_billfilename_test_js",
-      "community": 161
+      "community": 162
     },
     {
       "label": "supplierBillCalc.test.js",
@@ -3459,7 +3483,7 @@
       "source_file": "src/utility/__tests__/supplierBillCalc.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_supplierbillcalc_test_js",
-      "community": 162
+      "community": 163
     },
     {
       "label": "activitySummary.test.js",
@@ -3467,7 +3491,7 @@
       "source_file": "src/utility/__tests__/activitySummary.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_activitysummary_test_js",
-      "community": 163
+      "community": 164
     },
     {
       "label": "variantDiff.test.js",
@@ -3475,7 +3499,7 @@
       "source_file": "src/utility/__tests__/variantDiff.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_variantdiff_test_js",
-      "community": 164
+      "community": 165
     },
     {
       "label": "formatCurrency.test.js",
@@ -3483,7 +3507,7 @@
       "source_file": "src/utility/__tests__/formatCurrency.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_formatcurrency_test_js",
-      "community": 165
+      "community": 166
     },
     {
       "label": "supplierBalance.test.js",
@@ -3491,7 +3515,7 @@
       "source_file": "src/utility/__tests__/supplierBalance.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_supplierbalance_test_js",
-      "community": 166
+      "community": 167
     },
     {
       "label": "productName.test.js",
@@ -3499,7 +3523,7 @@
       "source_file": "src/utility/__tests__/productName.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_productname_test_js",
-      "community": 167
+      "community": 168
     },
     {
       "label": "formatPhone.test.js",
@@ -3507,7 +3531,7 @@
       "source_file": "src/utility/__tests__/formatPhone.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_formatphone_test_js",
-      "community": 168
+      "community": 169
     },
     {
       "label": "dateFormat.test.js",
@@ -3515,7 +3539,7 @@
       "source_file": "src/utility/__tests__/dateFormat.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_dateformat_test_js",
-      "community": 169
+      "community": 170
     },
     {
       "label": "Create React App",
@@ -3526,7 +3550,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 170,
+      "community": 171,
       "id": "readme_create_react_app"
     },
     {
@@ -3538,7 +3562,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 171,
+      "community": 172,
       "id": "readme_npm_start"
     },
     {
@@ -3550,7 +3574,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 172,
+      "community": 173,
       "id": "readme_npm_test"
     },
     {
@@ -3562,7 +3586,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 173,
+      "community": 174,
       "id": "readme_npm_build"
     },
     {
@@ -3574,7 +3598,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 174,
+      "community": 175,
       "id": "readme_npm_eject"
     },
     {
@@ -3586,7 +3610,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 175,
+      "community": 176,
       "id": "claudemd_react19_spa"
     },
     {
@@ -3598,7 +3622,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 176,
+      "community": 177,
       "id": "claudemd_supabase"
     },
     {
@@ -3610,7 +3634,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 177,
+      "community": 178,
       "id": "claudemd_supabase_js"
     },
     {
@@ -3622,7 +3646,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 178,
+      "community": 179,
       "id": "claudemd_env_vars"
     },
     {
@@ -3634,7 +3658,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 179,
+      "community": 180,
       "id": "claudemd_table_products"
     },
     {
@@ -3646,7 +3670,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 180,
+      "community": 181,
       "id": "claudemd_table_productsizecolors"
     },
     {
@@ -3658,7 +3682,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 181,
+      "community": 182,
       "id": "claudemd_table_categories"
     },
     {
@@ -3670,7 +3694,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 182,
+      "community": 183,
       "id": "claudemd_table_customers"
     },
     {
@@ -3682,7 +3706,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 183,
+      "community": 184,
       "id": "claudemd_table_suppliers"
     },
     {
@@ -3694,7 +3718,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 184,
+      "community": 185,
       "id": "claudemd_table_profiles"
     },
     {
@@ -3706,7 +3730,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 185,
+      "community": 186,
       "id": "claudemd_table_discounts"
     },
     {
@@ -3718,7 +3742,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 186,
+      "community": 187,
       "id": "claudemd_table_bills"
     },
     {
@@ -3730,7 +3754,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 187,
+      "community": 188,
       "id": "claudemd_table_mockups"
     },
     {
@@ -3742,7 +3766,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 188,
+      "community": 189,
       "id": "claudemd_product_id_format"
     },
     {
@@ -3754,7 +3778,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 189,
+      "community": 190,
       "id": "claudemd_rpc_get_max_product_suffix"
     },
     {
@@ -3766,7 +3790,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 190,
+      "community": 191,
       "id": "claudemd_shadcn_ui"
     },
     {
@@ -3778,7 +3802,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 191,
+      "community": 192,
       "id": "claudemd_radix_ui"
     },
     {
@@ -3790,7 +3814,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 192,
+      "community": 193,
       "id": "claudemd_tailwind_css"
     },
     {
@@ -3802,7 +3826,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 193,
+      "community": 194,
       "id": "claudemd_sonner"
     },
     {
@@ -3814,7 +3838,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 194,
+      "community": 195,
       "id": "claudemd_react_hook_form"
     },
     {
@@ -3826,7 +3850,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 195,
+      "community": 196,
       "id": "claudemd_zod"
     },
     {
@@ -3838,7 +3862,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 196,
+      "community": 197,
       "id": "claudemd_plotly_js"
     },
     {
@@ -3850,7 +3874,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 197,
+      "community": 198,
       "id": "claudemd_path_alias"
     },
     {
@@ -3862,7 +3886,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 198,
+      "community": 199,
       "id": "claudemd_state_management"
     },
     {
@@ -3874,7 +3898,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 199,
+      "community": 200,
       "id": "claudemd_refresh_flag_pattern"
     },
     {
@@ -3886,7 +3910,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 200,
+      "community": 201,
       "id": "claudemd_rationale_no_global_store"
     },
     {
@@ -3898,7 +3922,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 201,
+      "community": 202,
       "id": "claudemd_qz_tray"
     },
     {
@@ -3910,7 +3934,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 202,
+      "community": 203,
       "id": "claudemd_rationale_no_server_side"
     },
     {
@@ -3922,7 +3946,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 203,
+      "community": 204,
       "id": "robots_sitemap"
     },
     {
@@ -3934,7 +3958,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 204,
+      "community": 205,
       "id": "robots_allow_all"
     },
     {
@@ -3946,7 +3970,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 205,
+      "community": 206,
       "id": "logo_bindalscreation"
     },
     {
@@ -3958,7 +3982,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 206,
+      "community": 207,
       "id": "brand_bindalscreation"
     },
     {
@@ -3970,7 +3994,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 207,
+      "community": 208,
       "id": "visual_monogram_b"
     },
     {
@@ -3982,7 +4006,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 208,
+      "community": 209,
       "id": "visual_ornamental_frame"
     },
     {
@@ -3994,7 +4018,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 209,
+      "community": 210,
       "id": "visual_floral_scrollwork"
     },
     {
@@ -4006,7 +4030,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 210,
+      "community": 211,
       "id": "design_style_luxury"
     },
     {
@@ -4018,7 +4042,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 211,
+      "community": 212,
       "id": "color_gold_white"
     },
     {
@@ -4030,7 +4054,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 212,
+      "community": 213,
       "id": "LOGOBill_bindals_creation_logo"
     },
     {
@@ -4042,7 +4066,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 213,
+      "community": 214,
       "id": "LOGOBill_letter_b"
     },
     {
@@ -4054,7 +4078,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 214,
+      "community": 215,
       "id": "LOGOBill_ornamental_frame"
     },
     {
@@ -4066,7 +4090,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 215,
+      "community": 216,
       "id": "LOGOBill_scrollwork"
     },
     {
@@ -4078,7 +4102,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 216,
+      "community": 217,
       "id": "LOGOBill_gold_color_scheme"
     },
     {
@@ -4090,7 +4114,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 217,
+      "community": 218,
       "id": "LOGOBill_billing_purpose"
     },
     {
@@ -4102,7 +4126,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 218,
+      "community": 219,
       "id": "LOGOBill_retail_brand"
     },
     {
@@ -4114,7 +4138,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 219,
+      "community": 220,
       "id": "logo_svg"
     },
     {
@@ -4126,7 +4150,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 220,
+      "community": 221,
       "id": "logo_react_atom_symbol"
     },
     {
@@ -4138,7 +4162,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 221,
+      "community": 222,
       "id": "logo_color_61dafb"
     },
     {
@@ -4150,7 +4174,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 222,
+      "community": 223,
       "id": "logo_central_circle"
     },
     {
@@ -4162,7 +4186,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 223,
+      "community": 224,
       "id": "logo_orbital_paths"
     },
     {
@@ -4174,7 +4198,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 224,
+      "community": 225,
       "id": "logo_bindals_creation"
     },
     {
@@ -4186,7 +4210,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 225,
+      "community": 226,
       "id": "brand_bindals_creation"
     },
     {
@@ -4198,7 +4222,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 226,
+      "community": 227,
       "id": "design_element_monogram_b"
     },
     {
@@ -4210,7 +4234,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 227,
+      "community": 228,
       "id": "design_element_ornamental_frame"
     },
     {
@@ -4222,7 +4246,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 228,
+      "community": 229,
       "id": "design_element_floral_scrollwork"
     },
     {
@@ -4234,7 +4258,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 229,
+      "community": 230,
       "id": "design_element_butterfly_silhouette"
     },
     {
@@ -4246,7 +4270,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 230,
+      "community": 231,
       "id": "color_gold"
     },
     {
@@ -4258,7 +4282,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 231,
+      "community": 232,
       "id": "color_white"
     },
     {
@@ -4270,7 +4294,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 232,
+      "community": 233,
       "id": "style_luxury_elegant"
     },
     {
@@ -4282,7 +4306,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 233,
+      "community": 234,
       "id": "purpose_brand_identity"
     },
     {
@@ -4294,7 +4318,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 234,
+      "community": 235,
       "id": "logo_bill_brand_logo"
     },
     {
@@ -4306,7 +4330,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 235,
+      "community": 236,
       "id": "logo_bill_letter_b"
     },
     {
@@ -4318,7 +4342,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 236,
+      "community": 237,
       "id": "logo_bill_design_style"
     },
     {
@@ -4330,7 +4354,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 237,
+      "community": 238,
       "id": "logo_bill_color_scheme"
     },
     {
@@ -4342,7 +4366,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 238,
+      "community": 239,
       "id": "logo_bill_purpose"
     },
     {
@@ -4354,7 +4378,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 239,
+      "community": 240,
       "id": "bills_table"
     },
     {
@@ -4366,7 +4390,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 240,
+      "community": 241,
       "id": "sample_bill_document"
     },
     {
@@ -4378,7 +4402,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 241,
+      "community": 242,
       "id": "sample_bill_business_bindals_creation"
     },
     {
@@ -4390,7 +4414,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 242,
+      "community": 243,
       "id": "sample_bill_customer_akash_raghani"
     },
     {
@@ -4402,7 +4426,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 243,
+      "community": 244,
       "id": "sample_bill_field_bill_number"
     },
     {
@@ -4414,7 +4438,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 244,
+      "community": 245,
       "id": "sample_bill_field_customer_name"
     },
     {
@@ -4426,7 +4450,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 245,
+      "community": 246,
       "id": "sample_bill_field_phone"
     },
     {
@@ -4438,7 +4462,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 246,
+      "community": 247,
       "id": "sample_bill_line_item_1"
     },
     {
@@ -4450,7 +4474,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 247,
+      "community": 248,
       "id": "sample_bill_line_item_2"
     },
     {
@@ -4462,7 +4486,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 248,
+      "community": 249,
       "id": "sample_bill_field_total_qty"
     },
     {
@@ -4474,7 +4498,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 249,
+      "community": 250,
       "id": "sample_bill_field_net_amount"
     },
     {
@@ -4486,7 +4510,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 250,
+      "community": 251,
       "id": "sample_bill_field_discount"
     },
     {
@@ -4498,7 +4522,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 251,
+      "community": 252,
       "id": "sample_bill_policy_notes"
     },
     {
@@ -4510,7 +4534,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 252,
+      "community": 253,
       "id": "sample_bill_layout_handwritten"
     },
     {
@@ -4522,7 +4546,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 253,
+      "community": 254,
       "id": "sample_bill_product_suit"
     }
   ],
@@ -5635,19 +5659,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
-      "source_location": "L34",
-      "weight": 1.0,
-      "_src": "src_admin_components_suppliertransactiondialog_js",
-      "_tgt": "suppliertransactiondialog_amountpreview",
-      "source": "src_admin_components_suppliertransactiondialog_js",
-      "target": "suppliertransactiondialog_amountpreview",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "src/admin/components/SupplierTransactionDialog.js",
-      "source_location": "L68",
+      "source_location": "L63",
       "weight": 1.0,
       "_src": "src_admin_components_suppliertransactiondialog_js",
       "_tgt": "suppliertransactiondialog_supplierpicker",
@@ -5659,7 +5671,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
-      "source_location": "L119",
+      "source_location": "L114",
       "weight": 1.0,
       "_src": "src_admin_components_suppliertransactiondialog_js",
       "_tgt": "suppliertransactiondialog_suppliertransactiondialog",
@@ -5743,7 +5755,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
-      "source_location": "L314",
+      "source_location": "L333",
       "weight": 1.0,
       "_src": "supplierledgerdialog_supplierledgerdialog",
       "_tgt": "supplierledgerdialog_formatinr",
@@ -5755,7 +5767,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
-      "source_location": "L319",
+      "source_location": "L338",
       "weight": 1.0,
       "_src": "supplierledgerdialog_supplierledgerdialog",
       "_tgt": "supplierledgerdialog_balanceclass",
@@ -7542,6 +7554,18 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "src/components/ui/currency-input.jsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_src": "src_components_ui_currency_input_jsx",
+      "_tgt": "currency_input_currencyinput",
+      "source": "src_components_ui_currency_input_jsx",
+      "target": "currency_input_currencyinput",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "src/components/ui/badge.tsx",
       "source_location": "L30",
       "weight": 1.0,
@@ -8251,7 +8275,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/utility/dateFormat.js",
-      "source_location": "L12",
+      "source_location": "L17",
       "weight": 1.0,
       "_src": "src_utility_dateformat_js",
       "_tgt": "dateformat_formatdatetimeist",
@@ -8287,12 +8311,60 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/utility/supplierBillCalc.js",
-      "source_location": "L25",
+      "source_location": "L24",
+      "weight": 1.0,
+      "_src": "src_utility_supplierbillcalc_js",
+      "_tgt": "supplierbillcalc_computegrossamount",
+      "source": "src_utility_supplierbillcalc_js",
+      "target": "supplierbillcalc_computegrossamount",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utility/supplierBillCalc.js",
+      "source_location": "L32",
+      "weight": 1.0,
+      "_src": "src_utility_supplierbillcalc_js",
+      "_tgt": "supplierbillcalc_computediscountamount",
+      "source": "src_utility_supplierbillcalc_js",
+      "target": "supplierbillcalc_computediscountamount",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utility/supplierBillCalc.js",
+      "source_location": "L41",
       "weight": 1.0,
       "_src": "src_utility_supplierbillcalc_js",
       "_tgt": "supplierbillcalc_computebilltotal",
       "source": "src_utility_supplierbillcalc_js",
       "target": "supplierbillcalc_computebilltotal",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utility/supplierBillCalc.js",
+      "source_location": "L33",
+      "weight": 1.0,
+      "_src": "supplierbillcalc_computediscountamount",
+      "_tgt": "supplierbillcalc_computetaxableamount",
+      "source": "supplierbillcalc_computetaxableamount",
+      "target": "supplierbillcalc_computediscountamount",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/utility/supplierBillCalc.js",
+      "source_location": "L33",
+      "weight": 1.0,
+      "_src": "supplierbillcalc_computediscountamount",
+      "_tgt": "supplierbillcalc_computegrossamount",
+      "source": "supplierbillcalc_computegrossamount",
+      "target": "supplierbillcalc_computediscountamount",
       "confidence_score": 1.0
     },
     {

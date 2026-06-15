@@ -545,159 +545,53 @@ export default function SupplierTransactionDialog({
               )}
             />
 
-            {/* Amount */}
-            <FormField
-              name="amount"
-              control={form.control}
-              render={() => (
-                <FormItem>
-                  <FormLabel>
-                    Amount (₹){txnType === "bill" ? " — auto" : ""}
-                  </FormLabel>
-                  <FormControl>
-                    <CurrencyInput control={form.control} name="amount" disabled={txnType === "bill"} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Amount — non-bill types shown up top */}
+            {txnType !== "bill" && (
+              <FormField
+                name="amount"
+                control={form.control}
+                render={() => (
+                  <FormItem>
+                    <FormLabel>Amount (₹)</FormLabel>
+                    <FormControl>
+                      <CurrencyInput control={form.control} name="amount" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Bill-specific fields */}
             {txnType === "bill" && (
               <>
-                <FormField
-                  name="invoice_number"
-                  control={form.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Invoice Number</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="e.g. 033/26-27" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <div className="grid grid-cols-2 gap-3">
                   <FormField
-                    name="gross_amount"
+                    name="invoice_number"
                     control={form.control}
-                    render={() => (
+                    render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Gross Amount (₹){fields.length > 0 ? " — auto" : ""}
-                        </FormLabel>
+                        <FormLabel>Invoice Number</FormLabel>
                         <FormControl>
-                          <CurrencyInput
-                            control={form.control}
-                            name="gross_amount"
-                            disabled={fields.length > 0}
-                            placeholder="Pre-discount total"
-                          />
+                          <Input {...field} placeholder="e.g. 033/26-27" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
-                    name="discount_amount"
+                    name="transaction_date"
                     control={form.control}
-                    render={() => (
+                    render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          Discount (₹){fields.length > 0 ? " — auto" : ""}
-                        </FormLabel>
+                        <FormLabel>Date</FormLabel>
                         <FormControl>
-                          <CurrencyInput
-                            control={form.control}
-                            name="discount_amount"
-                            disabled={fields.length > 0}
-                            placeholder="Total discount applied"
-                          />
+                          <Input {...field} type="date" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </div>
-                <div className="border rounded-md p-3 space-y-3 bg-gray-50">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    GST Breakdown (optional)
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField
-                      name="taxable_amount"
-                      control={form.control}
-                      render={() => (
-                        <FormItem>
-                          <FormLabel>
-                            Taxable (₹){fields.length > 0 ? " — auto" : ""}
-                          </FormLabel>
-                          <FormControl>
-                            <CurrencyInput
-                              control={form.control}
-                              name="taxable_amount"
-                              disabled={fields.length > 0}
-                              placeholder="0.00"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      name="cgst_amount"
-                      control={form.control}
-                      render={() => (
-                        <FormItem>
-                          <FormLabel>CGST (₹)</FormLabel>
-                          <FormControl>
-                            <CurrencyInput control={form.control} name="cgst_amount" placeholder="0.00" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      name="sgst_amount"
-                      control={form.control}
-                      render={() => (
-                        <FormItem>
-                          <FormLabel>SGST (₹)</FormLabel>
-                          <FormControl>
-                            <CurrencyInput control={form.control} name="sgst_amount" placeholder="0.00" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      name="igst_amount"
-                      control={form.control}
-                      render={() => (
-                        <FormItem>
-                          <FormLabel>IGST (₹)</FormLabel>
-                          <FormControl>
-                            <CurrencyInput control={form.control} name="igst_amount" placeholder="0.00" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      name="round_off_amount"
-                      control={form.control}
-                      render={() => (
-                        <FormItem>
-                          <FormLabel>Round Off (₹)</FormLabel>
-                          <FormControl>
-                            <CurrencyInput control={form.control} name="round_off_amount" placeholder="0.00" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
                 </div>
                 <div className="border rounded-md p-3 space-y-2">
                   <div className="flex items-center justify-between">
@@ -830,23 +724,159 @@ export default function SupplierTransactionDialog({
                     </div>
                   )}
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    name="gross_amount"
+                    control={form.control}
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>
+                          Gross Amount (₹){fields.length > 0 ? " — auto" : ""}
+                        </FormLabel>
+                        <FormControl>
+                          <CurrencyInput
+                            control={form.control}
+                            name="gross_amount"
+                            disabled={fields.length > 0}
+                            placeholder="Pre-discount total"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="discount_amount"
+                    control={form.control}
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>
+                          Discount (₹){fields.length > 0 ? " — auto" : ""}
+                        </FormLabel>
+                        <FormControl>
+                          <CurrencyInput
+                            control={form.control}
+                            name="discount_amount"
+                            disabled={fields.length > 0}
+                            placeholder="Total discount applied"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="border rounded-md p-3 space-y-3 bg-gray-50">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    GST Breakdown (optional)
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      name="taxable_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>
+                            Taxable (₹){fields.length > 0 ? " — auto" : ""}
+                          </FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              control={form.control}
+                              name="taxable_amount"
+                              disabled={fields.length > 0}
+                              placeholder="0.00"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="cgst_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>CGST (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="cgst_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="sgst_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>SGST (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="sgst_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="igst_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>IGST (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="igst_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="round_off_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>Round Off (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="round_off_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+                <FormField
+                  name="amount"
+                  control={form.control}
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>Amount (₹) — auto</FormLabel>
+                      <FormControl>
+                        <CurrencyInput control={form.control} name="amount" disabled />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </>
             )}
 
-            {/* Date */}
-            <FormField
-              name="transaction_date"
-              control={form.control}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Date</FormLabel>
-                  <FormControl>
-                    <Input {...field} type="date" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Date — non-bill types shown after type-specific fields */}
+            {txnType !== "bill" && (
+              <FormField
+                name="transaction_date"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="date" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Notes */}
             <FormField
