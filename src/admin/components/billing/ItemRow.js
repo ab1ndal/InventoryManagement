@@ -9,11 +9,13 @@ import {
 } from "../../../components/ui/select";
 import { Button } from "../../../components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
-import { priceItem, money } from "./billUtils";
+import { priceItem, money, round2 } from "./billUtils";
 
 export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {} }) {
   const pricing = priceItem(item);
   const [discountRaw, setDiscountRaw] = useState(null);
+  const [discountUnit, setDiscountUnit] = useState("pct"); // "pct" | "amt"
+  const base = Number(item.mrp || 0) * Number(item.quantity || 1);
 
   return (
     <tr className="border-t text-xs">
@@ -59,28 +61,57 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
         {money(item.mrp)}{item.unit_type === "meter" && <span className="text-xs text-muted-foreground">/m</span>}
       </td>
       <td className="px-2 py-1 text-center">
-        <Input
-          type="number"
-          min={0}
-          max={50}
-          value={
-            discountRaw !== null ? discountRaw : (item.quickDiscountPct ?? "")
-          }
-          onFocus={() =>
-            setDiscountRaw(
-              item.quickDiscountPct === 0
-                ? ""
-                : String(item.quickDiscountPct ?? ""),
-            )
-          }
-          onChange={(e) => setDiscountRaw(e.target.value)}
-          onBlur={(e) => {
-            const val = Math.min(50, Math.max(0, Number(e.target.value) || 0));
-            onUpdate(item._id, { quickDiscountPct: val });
-            setDiscountRaw(null);
-          }}
-          className="h-7 w-20 mx-auto text-center"
-        />
+        <div className="flex items-center justify-center gap-1">
+          <Input
+            type="number"
+            min={0}
+            max={discountUnit === "pct" ? 50 : base * 0.5}
+            value={
+              discountRaw !== null
+                ? discountRaw
+                : discountUnit === "pct"
+                  ? (item.quickDiscountPct ?? "")
+                  : (round2((base * Number(item.quickDiscountPct || 0)) / 100) || "")
+            }
+            onFocus={() => {
+              if (discountUnit === "pct") {
+                setDiscountRaw(
+                  item.quickDiscountPct === 0
+                    ? ""
+                    : String(item.quickDiscountPct ?? ""),
+                );
+              } else {
+                const amt = round2((base * Number(item.quickDiscountPct || 0)) / 100);
+                setDiscountRaw(amt === 0 ? "" : String(amt));
+              }
+            }}
+            onChange={(e) => setDiscountRaw(e.target.value)}
+            onBlur={(e) => {
+              const raw = Number(e.target.value) || 0;
+              let pct;
+              if (discountUnit === "pct") {
+                pct = Math.min(50, Math.max(0, raw));
+              } else {
+                const amt = Math.min(Math.max(0, raw), base * 0.5);
+                pct = base > 0 ? round2((amt / base) * 100) : 0;
+              }
+              onUpdate(item._id, { quickDiscountPct: pct });
+              setDiscountRaw(null);
+            }}
+            className="h-7 w-20 text-center"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setDiscountUnit((u) => (u === "pct" ? "amt" : "pct"));
+              setDiscountRaw(null);
+            }}
+            className="text-xs text-muted-foreground border rounded px-1 py-0.5 hover:bg-gray-100 w-6"
+            title="Toggle discount unit"
+          >
+            {discountUnit === "pct" ? "%" : "₹"}
+          </button>
+        </div>
       </td>
       <td className="px-2 py-1 text-center">
         {money(item.alteration_charge) || 0}
