@@ -350,11 +350,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .eq("billid", billId)
           .single();
         if (dateRow?.orderdate) {
-          setBackdatedDate(
-            new Date(dateRow.orderdate).toLocaleDateString("en-CA", {
-              timeZone: "Asia/Kolkata",
-            }),
-          );
+          setBackdatedDate(dateRow.orderdate.slice(0, 10));
         }
 
         // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts

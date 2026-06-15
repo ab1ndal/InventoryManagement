@@ -122,10 +122,85 @@ export default function SupplierTransactionDialog({
 }) {
   const [submitting, setSubmitting] = React.useState(false);
   const [selectedSupplier, setSelectedSupplier] = React.useState(supplier ?? null);
+  const [deletedBillIds, setDeletedBillIds] = React.useState([]);
+  const [deletingBillId, setDeletingBillId] = React.useState(null);
 
   React.useEffect(() => {
     setSelectedSupplier(supplier ?? null);
   }, [supplier, open]);
+
+  React.useEffect(() => {
+    setDeletedBillIds([]);
+  }, [open, transaction]);
+
+  const handleDeleteBill = async (bill) => {
+    if (!window.confirm("Delete this bill document?")) return;
+    setDeletingBillId(bill.bill_id);
+    try {
+      if (bill.storage_path) {
+        await supabase.storage.from("supplier-bills").remove([bill.storage_path]);
+      }
+      const { error } = await supabase
+        .from("supplier_bills")
+        .delete()
+        .eq("bill_id", bill.bill_id);
+      if (error) throw error;
+      setDeletedBillIds((prev) => [...prev, bill.bill_id]);
+      toast.success("Bill document deleted");
+    } catch (err) {
+      toast.error("Error deleting bill document", { description: err.message });
+    } finally {
+      setDeletingBillId(null);
+    }
+  };
+
+  const existingBills = (transaction?.bills || []).filter((b) => !deletedBillIds.includes(b.bill_id));
+
+  const handleViewBill = async (bill) => {
+    const path = bill.storage_path || bill.image_url;
+    if (!path) return;
+    const { data, error } = await supabase.storage.from("supplier-bills").createSignedUrl(path, 3600);
+    if (error) {
+      toast.error("Error opening bill document", { description: error.message });
+      return;
+    }
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  };
+
+  // Uploads each selected bill file to storage and inserts a supplier_bills row per file.
+  // When multiple files are uploaded together, filenames get a "_1", "_2", ... suffix
+  // in upload order.
+  const uploadBillFiles = async ({ files, values, transaction_id }) => {
+    const fileList = Array.from(files || []);
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const ext = file.name.split(".").pop();
+      const filename = buildBillFilename({
+        date: values.transaction_date,
+        supplierName: selectedSupplier.name,
+        invoiceNumber: values.invoice_number,
+        transactionId: transaction_id,
+        ext,
+        suffix: fileList.length > 1 ? String(i + 1) : undefined,
+      });
+      const storagePath = `${selectedSupplier.supplierid}/${filename}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("supplier-bills")
+        .upload(storagePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { error: billError } = await supabase
+        .from("supplier_bills")
+        .insert({
+          transaction_id,
+          supplier_id: selectedSupplier.supplierid,
+          image_url: storagePath,
+          storage_path: storagePath,
+        });
+      if (billError) throw billError;
+    }
+  };
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -317,50 +392,7 @@ export default function SupplierTransactionDialog({
             if (lineItemsError) throw lineItemsError;
           }
 
-          const file = values.bill_image?.[0];
-          if (file) {
-            const ext = file.name.split(".").pop();
-            const filename = buildBillFilename({
-              date: values.transaction_date,
-              supplierName: selectedSupplier.name,
-              invoiceNumber: values.invoice_number,
-              transactionId: transaction_id,
-              ext,
-            });
-            const storagePath = transaction.bill?.storage_path || `${selectedSupplier.supplierid}/${filename}`;
-
-            const { error: uploadError } = await supabase.storage
-              .from("supplier-bills")
-              .upload(storagePath, file, { upsert: true });
-
-            if (uploadError) throw uploadError;
-
-            const { data: urlData } = supabase.storage
-              .from("supplier-bills")
-              .getPublicUrl(storagePath);
-
-            if (transaction.bill) {
-              const { error: billError } = await supabase
-                .from("supplier_bills")
-                .update({
-                  image_url: urlData.publicUrl,
-                  storage_path: storagePath,
-                  uploaded_at: new Date().toISOString(),
-                })
-                .eq("bill_id", transaction.bill.bill_id);
-              if (billError) throw billError;
-            } else {
-              const { error: billError } = await supabase
-                .from("supplier_bills")
-                .insert({
-                  transaction_id,
-                  supplier_id: selectedSupplier.supplierid,
-                  image_url: urlData.publicUrl,
-                  storage_path: storagePath,
-                });
-              if (billError) throw billError;
-            }
-          }
+          await uploadBillFiles({ files: values.bill_image, values, transaction_id });
         }
 
         logActivity({
@@ -421,39 +453,9 @@ export default function SupplierTransactionDialog({
         );
       }
 
-      // 3. If type === bill and image provided, upload to storage
-      const file = values.bill_image?.[0];
-      if (isBill && file) {
-        const ext = file.name.split(".").pop();
-        const filename = buildBillFilename({
-          date: values.transaction_date,
-          supplierName: selectedSupplier.name,
-          invoiceNumber: values.invoice_number,
-          transactionId: transaction_id,
-          ext,
-        });
-        const storagePath = `${selectedSupplier.supplierid}/${filename}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("supplier-bills")
-          .upload(storagePath, file, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("supplier-bills")
-          .getPublicUrl(storagePath);
-
-        const { error: billError } = await supabase
-          .from("supplier_bills")
-          .insert({
-            transaction_id,
-            supplier_id: selectedSupplier.supplierid,
-            image_url: urlData.publicUrl,
-            storage_path: storagePath,
-          });
-
-        if (billError) throw billError;
+      // 3. If type === bill and images/PDFs provided, upload to storage
+      if (isBill) {
+        await uploadBillFiles({ files: values.bill_image, values, transaction_id });
       }
 
       const typeLabel = { bill: "supplier bill", payment: "supplier payment", advance: "supplier advance" }[values.type] || "supplier transaction";
@@ -900,27 +902,37 @@ export default function SupplierTransactionDialog({
                 render={({ field: { onChange, value, ...rest } }) => (
                   <FormItem>
                     <FormLabel>
-                      Bill Document — image or PDF (optional)
+                      Bill Documents — images or PDF, multiple allowed (optional)
                     </FormLabel>
-                    {mode === "edit" && transaction?.bill?.image_url && (
-                      <p className="text-xs text-muted-foreground">
-                        Current file:{" "}
-                        <a
-                          href={transaction.bill.image_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          View ↗
-                        </a>{" "}
-                        — choose a file below to replace it.
-                      </p>
+                    {mode === "edit" && existingBills.length > 0 && (
+                      <ul className="text-xs text-muted-foreground space-y-1">
+                        {existingBills.map((bill) => (
+                          <li key={bill.bill_id} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleViewBill(bill)}
+                              className="text-blue-600 hover:underline"
+                            >
+                              {bill.storage_path?.split("/").pop() || "View ↗"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBill(bill)}
+                              disabled={deletingBillId === bill.bill_id}
+                              className="text-red-500 hover:text-red-700 hover:underline disabled:opacity-50"
+                            >
+                              {deletingBillId === bill.bill_id ? "Deleting…" : "Delete"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                     <FormControl>
                       <Input
                         {...rest}
                         type="file"
                         accept="image/*,application/pdf"
+                        multiple
                         onChange={(e) => onChange(e.target.files)}
                       />
                     </FormControl>

@@ -86,6 +86,16 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
   const [expandedRow, setExpandedRow] = useState(null);
   const [openingBalance, setOpeningBalance] = useState(0);
 
+  const handleViewBill = async (path) => {
+    if (!path) return;
+    const { data, error } = await supabase.storage.from("supplier-bills").createSignedUrl(path, 3600);
+    if (error) {
+      toast.error("Error opening bill document", { description: error.message });
+      return;
+    }
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  };
+
   const handleLineItemLinked = (txnId, updatedItem) => {
     setRows((prev) =>
       prev.map((r) =>
@@ -125,8 +135,9 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
           .order("transaction_id", { ascending: true }),
         supabase
           .from("supplier_bills")
-          .select("transaction_id, image_url")
-          .eq("supplier_id", supplier.supplierid),
+          .select("transaction_id, storage_path, bill_id")
+          .eq("supplier_id", supplier.supplierid)
+          .order("bill_id"),
       ]);
 
     if (txnErr) {
@@ -135,15 +146,16 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
       return;
     }
 
-    const billsByTxn = Object.fromEntries(
-      (bills || []).map((b) => [b.transaction_id, b.image_url])
-    );
+    const billsByTxn = {};
+    (bills || []).forEach((b) => {
+      (billsByTxn[b.transaction_id] ||= []).push(b.storage_path);
+    });
 
     const ob = Number(supplierData?.opening_balance) || 0;
     const openingBalanceDate = supplierData?.opening_balance_date ?? null;
     const computed = computeRunningLedger(txns || [], ob, openingBalanceDate).map((row) => ({
       ...row,
-      imageUrl: row.transaction_id !== "opening" ? (billsByTxn[row.transaction_id] ?? null) : null,
+      billPaths: row.transaction_id !== "opening" ? (billsByTxn[row.transaction_id] || []) : [],
     }));
 
     setOpeningBalance(ob);
@@ -249,11 +261,18 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                   {row.igst_amount && <div><span className="font-medium">IGST:</span> {formatINR(row.igst_amount, 2)}</div>}
                                   {row.round_off_amount != null && Number(row.round_off_amount) !== 0 && <div><span className="font-medium">Round Off:</span> {formatINR(row.round_off_amount, 2)}</div>}
                                   {row.notes && <div className="col-span-2"><span className="font-medium">Notes:</span> {row.notes}</div>}
-                                  {row.imageUrl && (
-                                    <div>
-                                      <a href={row.imageUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">
-                                        View Bill ↗
-                                      </a>
+                                  {row.billPaths?.length > 0 && (
+                                    <div className="col-span-2 flex flex-wrap gap-3">
+                                      {row.billPaths.map((path, i) => (
+                                        <button
+                                          key={i}
+                                          type="button"
+                                          onClick={() => handleViewBill(path)}
+                                          className="text-blue-600 hover:underline font-medium"
+                                        >
+                                          View Bill{row.billPaths.length > 1 ? ` ${i + 1}` : ""} ↗
+                                        </button>
+                                      ))}
                                     </div>
                                   )}
                                 </div>

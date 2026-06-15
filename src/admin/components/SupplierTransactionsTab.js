@@ -42,20 +42,20 @@ export default function SupplierTransactionsTab() {
 
   const handleEditClick = async (t) => {
     let line_items = [];
-    let bill = null;
+    let bills = [];
     if (t.type === "bill") {
       const [{ data: liData, error: liError }, { data: billData, error: billError }] = await Promise.all([
         supabase.from("supplier_bill_line_items").select("*").eq("transaction_id", t.transaction_id),
-        supabase.from("supplier_bills").select("*").eq("transaction_id", t.transaction_id).maybeSingle(),
+        supabase.from("supplier_bills").select("*").eq("transaction_id", t.transaction_id).order("bill_id"),
       ]);
       if (liError || billError) {
         toast.error("Failed to load transaction details", { description: (liError || billError).message });
         return;
       }
       line_items = liData || [];
-      bill = billData || null;
+      bills = billData || [];
     }
-    setEditTransaction({ ...t, line_items, bill });
+    setEditTransaction({ ...t, line_items, bills });
     setEditDialogOpen(true);
   };
 

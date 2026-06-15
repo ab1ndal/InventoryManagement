@@ -4,8 +4,13 @@ export const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     if (dateStr instanceof Date) return format(dateStr, "dd/MM/yyyy");
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return dateStr;
-    const d = dateStr.includes("T") ? new Date(dateStr) : new Date(dateStr + "T00:00:00+05:30");
-    return format(d, "dd/MM/yyyy");
+    // Plain date (no time component) — format the y/m/d parts directly so the
+    // result can never shift by a day depending on the browser's timezone.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [y, m, d] = dateStr.split("-");
+        return `${d}/${m}/${y}`;
+    }
+    return format(new Date(dateStr), "dd/MM/yyyy");
 };
 
 // Always render activity-log timestamps in Indian Standard Time.
