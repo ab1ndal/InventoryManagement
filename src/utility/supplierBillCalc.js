@@ -19,6 +19,22 @@ export function computeTaxableAmount(lineItems) {
 }
 
 /**
+ * Sum of qty * unit_price across line items, before any discount. Rounded to 2 decimals.
+ */
+export function computeGrossAmount(lineItems) {
+  const sum = (lineItems || []).reduce((total, li) => total + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
+  return Math.round(sum * 100) / 100;
+}
+
+/**
+ * Total discount applied across line items: gross - taxable. Rounded to 2 decimals.
+ */
+export function computeDiscountAmount(lineItems) {
+  const discount = computeGrossAmount(lineItems) - computeTaxableAmount(lineItems);
+  return Math.round(discount * 100) / 100;
+}
+
+/**
  * Final bill total: taxable + CGST + SGST + IGST + round-off.
  * Rounded to 2 decimals. round_off_amount may be negative.
  */

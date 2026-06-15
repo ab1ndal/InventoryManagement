@@ -8,9 +8,9 @@ import { toast } from "sonner";
 import { logActivity } from "../../lib/activityLog";
 import { money } from "../../utility/activitySummary";
 import { buildBillFilename } from "../../utility/billFilename";
-import { formatINR } from "../../utility/formatCurrency";
-import { computeLineAmount, computeTaxableAmount, computeBillTotal } from "../../utility/supplierBillCalc";
+import { computeLineAmount, computeTaxableAmount, computeGrossAmount, computeDiscountAmount, computeBillTotal } from "../../utility/supplierBillCalc";
 import { Input } from "../../components/ui/input";
+import { CurrencyInput } from "../../components/ui/currency-input";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
 import {
@@ -31,11 +31,6 @@ import {
 
 const today = new Date().toISOString().split("T")[0];
 
-function AmountPreview({ value }) {
-  const num = Number(value);
-  if (value === "" || value == null || isNaN(num) || num === 0) return null;
-  return <p className="text-xs text-muted-foreground mt-0.5">{formatINR(num, 2)}</p>;
-}
 
 const formSchema = z.object({
   type: z.enum(["bill", "payment", "advance"]),
@@ -234,6 +229,20 @@ export default function SupplierTransactionDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txnType, JSON.stringify((watchedLineItems || []).map((li) => li.amount))]);
+
+  // Recompute gross_amount and discount_amount from line items, when line items exist
+  React.useEffect(() => {
+    if (txnType !== "bill" || (watchedLineItems || []).length === 0) return;
+    const computedGross = computeGrossAmount(watchedLineItems);
+    if (Number(form.getValues("gross_amount")) !== computedGross) {
+      form.setValue("gross_amount", computedGross, { shouldValidate: false });
+    }
+    const computedDiscount = computeDiscountAmount(watchedLineItems);
+    if (Number(form.getValues("discount_amount")) !== computedDiscount) {
+      form.setValue("discount_amount", computedDiscount, { shouldValidate: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txnType, JSON.stringify((watchedLineItems || []).map((li) => [li.qty, li.unit_price, li.amount]))]);
 
   // Recompute the top-level amount as taxable + CGST + SGST + IGST + round-off
   React.useEffect(() => {
@@ -503,7 +512,10 @@ export default function SupplierTransactionDialog({
         )}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="space-y-4"
+          >
             {/* Type */}
             <FormField
               name="type"
@@ -518,8 +530,12 @@ export default function SupplierTransactionDialog({
                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100 disabled:text-muted-foreground"
                     >
                       <option value="bill">Bill (debit — we owe)</option>
-                      <option value="payment">Payment (credit — we paid)</option>
-                      <option value="advance">Advance (credit — pre-payment)</option>
+                      <option value="payment">
+                        Payment (credit — we paid)
+                      </option>
+                      <option value="advance">
+                        Advance (credit — pre-payment)
+                      </option>
                     </select>
                   </FormControl>
                   <FormMessage />
@@ -531,20 +547,14 @@ export default function SupplierTransactionDialog({
             <FormField
               name="amount"
               control={form.control}
-              render={({ field }) => (
+              render={() => (
                 <FormItem>
-                  <FormLabel>₹ Amount{txnType === "bill" ? " (auto-calculated)" : ""}</FormLabel>
+                  <FormLabel>
+                    Amount (₹){txnType === "bill" ? " — auto" : ""}
+                  </FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      placeholder="0.00"
-                      disabled={txnType === "bill"}
-                    />
+                    <CurrencyInput control={form.control} name="amount" disabled={txnType === "bill"} />
                   </FormControl>
-                  <AmountPreview value={field.value} />
                   <FormMessage />
                 </FormItem>
               )}
@@ -570,11 +580,19 @@ export default function SupplierTransactionDialog({
                   <FormField
                     name="gross_amount"
                     control={form.control}
-                    render={({ field }) => (
+                    render={() => (
                       <FormItem>
-                        <FormLabel>Gross Amount (₹)</FormLabel>
-                        <FormControl><Input {...field} type="number" step="0.01" placeholder="Pre-discount total" /></FormControl>
-                        <AmountPreview value={field.value} />
+                        <FormLabel>
+                          Gross Amount (₹){fields.length > 0 ? " — auto" : ""}
+                        </FormLabel>
+                        <FormControl>
+                          <CurrencyInput
+                            control={form.control}
+                            name="gross_amount"
+                            disabled={fields.length > 0}
+                            placeholder="Pre-discount total"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -582,105 +600,227 @@ export default function SupplierTransactionDialog({
                   <FormField
                     name="discount_amount"
                     control={form.control}
-                    render={({ field }) => (
+                    render={() => (
                       <FormItem>
-                        <FormLabel>Discount (₹)</FormLabel>
-                        <FormControl><Input {...field} type="number" step="0.01" placeholder="Total discount applied" /></FormControl>
-                        <AmountPreview value={field.value} />
+                        <FormLabel>
+                          Discount (₹){fields.length > 0 ? " — auto" : ""}
+                        </FormLabel>
+                        <FormControl>
+                          <CurrencyInput
+                            control={form.control}
+                            name="discount_amount"
+                            disabled={fields.length > 0}
+                            placeholder="Total discount applied"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
                 <div className="border rounded-md p-3 space-y-3 bg-gray-50">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">GST Breakdown (optional)</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    GST Breakdown (optional)
+                  </p>
                   <div className="grid grid-cols-2 gap-3">
-                    <FormField name="taxable_amount" control={form.control} render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Taxable (₹){fields.length > 0 ? " (auto)" : ""}</FormLabel>
-                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" disabled={fields.length > 0} /></FormControl>
-                        <AmountPreview value={field.value} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField name="cgst_amount" control={form.control} render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CGST (₹)</FormLabel>
-                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
-                        <AmountPreview value={field.value} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField name="sgst_amount" control={form.control} render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>SGST (₹)</FormLabel>
-                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
-                        <AmountPreview value={field.value} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField name="igst_amount" control={form.control} render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>IGST (₹)</FormLabel>
-                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
-                        <AmountPreview value={field.value} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField name="round_off_amount" control={form.control} render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Round Off (₹)</FormLabel>
-                        <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" /></FormControl>
-                        <AmountPreview value={field.value} />
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                    <FormField
+                      name="taxable_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>
+                            Taxable (₹){fields.length > 0 ? " — auto" : ""}
+                          </FormLabel>
+                          <FormControl>
+                            <CurrencyInput
+                              control={form.control}
+                              name="taxable_amount"
+                              disabled={fields.length > 0}
+                              placeholder="0.00"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="cgst_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>CGST (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="cgst_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="sgst_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>SGST (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="sgst_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="igst_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>IGST (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="igst_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      name="round_off_amount"
+                      control={form.control}
+                      render={() => (
+                        <FormItem>
+                          <FormLabel>Round Off (₹)</FormLabel>
+                          <FormControl>
+                            <CurrencyInput control={form.control} name="round_off_amount" placeholder="0.00" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </div>
                 <div className="border rounded-md p-3 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Line Items</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Line Items
+                    </p>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => append({ description: "", hsn_code: "", qty: 1, unit: "Pcs", discount_pct: "", unit_price: "", amount: 0 })}
+                      onClick={() =>
+                        append({
+                          description: "",
+                          hsn_code: "",
+                          qty: 1,
+                          unit: "Pcs",
+                          discount_pct: "",
+                          unit_price: "",
+                          amount: 0,
+                        })
+                      }
                     >
                       + Add Row
                     </Button>
                   </div>
                   {fields.length > 0 && (
                     <div className="overflow-auto">
-                      <table className="min-w-full text-xs">
+                      <table className="min-w-full text-[10px] sm:text-xs">
                         <thead>
                           <tr className="text-muted-foreground">
-                            <th className="text-left pb-1 pr-2">Description</th>
-                            <th className="text-left pb-1 pr-2 w-20">HSN</th>
-                            <th className="text-right pb-1 pr-2 w-16">Qty</th>
-                            <th className="text-left pb-1 pr-2 w-16">Unit</th>
-                            <th className="text-right pb-1 pr-2 w-16">Disc %</th>
-                            <th className="text-right pb-1 pr-2 w-24">Price (₹)</th>
-                            <th className="text-right pb-1 pr-2 w-24">Amount (₹) — auto</th>
+                            <th className="text-center pb-1 pr-2">
+                              Description
+                            </th>
+                            <th className="text-center pb-1 pr-2 w-24">HSN</th>
+                            <th className="text-center pb-1 pr-2 w-16">Qty</th>
+                            <th className="text-center pb-1 pr-2 w-16">Unit</th>
+                            <th className="text-center pb-1 pr-2 w-16">
+                              Disc %
+                            </th>
+                            <th className="text-center pb-1 pr-2 w-28">
+                              Price (₹)
+                            </th>
+                            <th className="text-center pb-1 pr-2 w-28">
+                              Amount (₹)
+                            </th>
                             <th className="w-6"></th>
                           </tr>
                         </thead>
                         <tbody>
                           {fields.map((field, idx) => (
                             <tr key={field.id}>
-                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.description`)} placeholder="e.g. SHIRTS" /></td>
-                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.hsn_code`)} placeholder="620590" /></td>
-                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.qty`)} type="number" step="0.01" className="text-right" /></td>
-                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.unit`)} placeholder="Pcs" /></td>
-                              <td className="pr-2 pb-1"><Input {...form.register(`line_items.${idx}.discount_pct`)} type="number" step="0.01" min="0" max="100" className="text-right" placeholder="0" /></td>
                               <td className="pr-2 pb-1">
-                                <Input {...form.register(`line_items.${idx}.unit_price`)} type="number" step="0.01" className="text-right" />
-                                <AmountPreview value={watchedLineItems?.[idx]?.unit_price} />
+                                <Input
+                                  {...form.register(
+                                    `line_items.${idx}.description`,
+                                  )}
+                                  placeholder="e.g. SHIRTS"
+                                  className="text-[11px] sm:text-sm"
+                                />
                               </td>
                               <td className="pr-2 pb-1">
-                                <Input {...form.register(`line_items.${idx}.amount`)} type="number" step="0.01" className="text-right" disabled />
-                                <AmountPreview value={watchedLineItems?.[idx]?.amount} />
+                                <Input
+                                  {...form.register(
+                                    `line_items.${idx}.hsn_code`,
+                                  )}
+                                  placeholder="620590"
+                                  className="text-[11px] sm:text-sm"
+                                />
                               </td>
-                              <td><button type="button" onClick={() => remove(idx)} className="text-red-400 hover:text-red-600 text-base leading-none">×</button></td>
+                              <td className="pr-2 pb-1">
+                                <Input
+                                  {...form.register(`line_items.${idx}.qty`)}
+                                  type="number"
+                                  step={
+                                    watchedLineItems?.[idx]?.unit === "Pcs"
+                                      ? "1"
+                                      : "0.01"
+                                  }
+                                  className="text-right text-[11px] sm:text-sm"
+                                />
+                              </td>
+                              <td className="pr-2 pb-1">
+                                <Input
+                                  {...form.register(`line_items.${idx}.unit`)}
+                                  placeholder="Pcs"
+                                  className="text-[11px] sm:text-sm"
+                                />
+                              </td>
+                              <td className="pr-2 pb-1">
+                                <Input
+                                  {...form.register(
+                                    `line_items.${idx}.discount_pct`,
+                                  )}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  max="100"
+                                  className="text-right text-[11px] sm:text-sm"
+                                  placeholder="0"
+                                />
+                              </td>
+                              <td className="pr-2 pb-1">
+                                <CurrencyInput
+                                  control={form.control}
+                                  name={`line_items.${idx}.unit_price`}
+                                  className="text-right text-[11px] sm:text-sm"
+                                />
+                              </td>
+                              <td className="pr-2 pb-1">
+                                <CurrencyInput
+                                  control={form.control}
+                                  name={`line_items.${idx}.amount`}
+                                  className="text-right text-[11px] sm:text-sm"
+                                  disabled
+                                />
+                              </td>
+                              <td>
+                                <button
+                                  type="button"
+                                  onClick={() => remove(idx)}
+                                  className="text-red-400 hover:text-red-600 text-base leading-none"
+                                >
+                                  ×
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -714,7 +854,11 @@ export default function SupplierTransactionDialog({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea {...field} rows={2} placeholder="Optional notes..." />
+                    <Textarea
+                      {...field}
+                      rows={2}
+                      placeholder="Optional notes..."
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -755,10 +899,21 @@ export default function SupplierTransactionDialog({
                 control={form.control}
                 render={({ field: { onChange, value, ...rest } }) => (
                   <FormItem>
-                    <FormLabel>Bill Document — image or PDF (optional)</FormLabel>
+                    <FormLabel>
+                      Bill Document — image or PDF (optional)
+                    </FormLabel>
                     {mode === "edit" && transaction?.bill?.image_url && (
                       <p className="text-xs text-muted-foreground">
-                        Current file: <a href={transaction.bill.image_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View ↗</a> — choose a file below to replace it.
+                        Current file:{" "}
+                        <a
+                          href={transaction.bill.image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          View ↗
+                        </a>{" "}
+                        — choose a file below to replace it.
                       </p>
                     )}
                     <FormControl>
@@ -776,7 +931,15 @@ export default function SupplierTransactionDialog({
             )}
 
             <Button type="submit" disabled={submitting} className="w-full">
-              {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : txnType === "bill" ? "Record Bill" : txnType === "advance" ? "Record Advance" : "Record Payment"}
+              {submitting
+                ? "Saving..."
+                : mode === "edit"
+                  ? "Save Changes"
+                  : txnType === "bill"
+                    ? "Record Bill"
+                    : txnType === "advance"
+                      ? "Record Advance"
+                      : "Record Payment"}
             </Button>
           </form>
         </Form>
