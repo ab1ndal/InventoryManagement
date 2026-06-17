@@ -180,6 +180,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
           <Button size="sm" onClick={() => onAddTransaction?.("bill")}>+ Bill</Button>
           <Button size="sm" variant="outline" onClick={() => onAddTransaction?.("payment")}>+ Payment</Button>
           <Button size="sm" variant="outline" onClick={() => onAddTransaction?.("advance")}>+ Advance</Button>
+          <Button size="sm" variant="outline" onClick={() => onAddTransaction?.("return")}>+ Return</Button>
         </div>
 
         {loading ? (
@@ -225,10 +226,12 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                                   ? "bg-red-100 text-red-700 border-none"
                                   : row.type === "advance"
                                   ? "bg-yellow-100 text-yellow-700 border-none"
+                                  : row.type === "return"
+                                  ? "bg-blue-100 text-blue-700 border-none"
                                   : "bg-green-100 text-green-700 border-none"
                               }
                             >
-                              {row.type === "bill" ? "Bill" : row.type === "advance" ? "Advance" : "Payment"}
+                              {row.type === "bill" ? "Bill" : row.type === "advance" ? "Advance" : row.type === "return" ? "Return" : "Payment"}
                             </Badge>
                           )}
                         </td>
@@ -239,7 +242,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                           {row.type === "bill" ? formatINR(row.amount, 2) : ""}
                         </td>
                         <td className="p-2 text-right tabular-nums text-green-600">
-                          {row.type === "payment" || row.type === "advance" ? formatINR(row.amount, 2) : ""}
+                          {row.type !== "bill" ? formatINR(row.amount, 2) : ""}
                         </td>
                         <td className={`p-2 text-right tabular-nums ${balanceClass(row.running)}`}>
                           {formatINR(row.running, 2)}

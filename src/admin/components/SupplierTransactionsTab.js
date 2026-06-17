@@ -68,6 +68,7 @@ export default function SupplierTransactionsTab() {
   const typeBadgeClass = (type) => {
     if (type === "bill") return "bg-red-100 text-red-700 border-none";
     if (type === "advance") return "bg-yellow-100 text-yellow-700 border-none";
+    if (type === "return") return "bg-blue-100 text-blue-700 border-none";
     return "bg-green-100 text-green-700 border-none";
   };
 
@@ -94,6 +95,7 @@ export default function SupplierTransactionsTab() {
             <option value="bill">Bill</option>
             <option value="payment">Payment</option>
             <option value="advance">Advance</option>
+            <option value="return">Return</option>
           </select>
         </div>
         <Button
@@ -137,7 +139,7 @@ export default function SupplierTransactionsTab() {
                     <td className="p-3 font-medium">{t.suppliers?.name ?? "—"}</td>
                     <td className="p-3">
                       <Badge variant="outline" className={typeBadgeClass(t.type)}>
-                        {t.type === "bill" ? "Bill" : t.type === "advance" ? "Advance" : "Payment"}
+                        {t.type === "bill" ? "Bill" : t.type === "advance" ? "Advance" : t.type === "return" ? "Return" : "Payment"}
                       </Badge>
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">{t.invoice_number || "—"}</td>

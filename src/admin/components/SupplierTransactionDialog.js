@@ -33,7 +33,7 @@ const today = new Date().toISOString().split("T")[0];
 
 
 const formSchema = z.object({
-  type: z.enum(["bill", "payment", "advance"]),
+  type: z.enum(["bill", "payment", "advance", "return"]),
   amount: z.coerce
     .number({ invalid_type_error: "Amount must be a number" })
     .positive("Amount must be greater than 0"),
@@ -399,7 +399,7 @@ export default function SupplierTransactionDialog({
           action: "update",
           entityType: isBill ? "supplier_bill" : "supplier",
           entityId: transaction_id,
-          summary: `Edited ${isBill ? "supplier bill" : transaction.type === "advance" ? "supplier advance" : "supplier payment"} for supplier ${selectedSupplier.name} — ${money(values.amount)}`,
+          summary: `Edited ${isBill ? "supplier bill" : transaction.type === "advance" ? "supplier advance" : transaction.type === "return" ? "supplier return" : "supplier payment"} for supplier ${selectedSupplier.name} — ${money(values.amount)}`,
         });
 
         toast.success("Transaction updated");
@@ -458,7 +458,7 @@ export default function SupplierTransactionDialog({
         await uploadBillFiles({ files: values.bill_image, values, transaction_id });
       }
 
-      const typeLabel = { bill: "supplier bill", payment: "supplier payment", advance: "supplier advance" }[values.type] || "supplier transaction";
+      const typeLabel = { bill: "supplier bill", payment: "supplier payment", advance: "supplier advance", return: "supplier return" }[values.type] || "supplier transaction";
       logActivity({
         action: "create",
         entityType: values.type === "bill" ? "supplier_bill" : "supplier",
@@ -469,6 +469,7 @@ export default function SupplierTransactionDialog({
       toast.success(
         values.type === "bill" ? "Bill recorded"
         : values.type === "advance" ? "Advance recorded"
+        : values.type === "return" ? "Return recorded"
         : "Payment recorded"
       );
       onSuccess?.();
@@ -537,6 +538,9 @@ export default function SupplierTransactionDialog({
                       </option>
                       <option value="advance">
                         Advance (credit — pre-payment)
+                      </option>
+                      <option value="return">
+                        Return (credit — defective goods)
                       </option>
                     </select>
                   </FormControl>
@@ -981,7 +985,9 @@ export default function SupplierTransactionDialog({
                     ? "Record Bill"
                     : txnType === "advance"
                       ? "Record Advance"
-                      : "Record Payment"}
+                      : txnType === "return"
+                        ? "Record Return"
+                        : "Record Payment"}
             </Button>
           </form>
         </Form>
