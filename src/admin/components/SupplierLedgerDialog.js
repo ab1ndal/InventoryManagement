@@ -12,7 +12,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "../../components/ui/dialog";
-import { ScrollArea } from "../../components/ui/scroll-area";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -191,7 +190,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
           </div>
         ) : (
           <>
-            <ScrollArea className="flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-auto border rounded-md">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-100 sticky top-0">
                   <tr>
@@ -328,7 +327,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                   ))}
                 </tbody>
               </table>
-            </ScrollArea>
+            </div>
 
             {/* Footer summary bar */}
             <div className="border-t pt-3 mt-2 flex justify-between items-center text-sm flex-wrap gap-2">

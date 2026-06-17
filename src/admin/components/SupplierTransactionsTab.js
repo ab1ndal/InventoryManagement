@@ -244,7 +244,7 @@ export default function SupplierTransactionsTab() {
 
       {txnDialogOpen && !txnSupplier && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl space-y-3">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-xl space-y-3 max-h-[90vh] overflow-y-auto">
             <p className="font-semibold">Select supplier first:</p>
             {suppliers.map((s) => (
               <Button
