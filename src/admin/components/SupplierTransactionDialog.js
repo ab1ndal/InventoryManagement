@@ -124,7 +124,16 @@ export default function SupplierTransactionDialog({
   const [selectedSupplier, setSelectedSupplier] = React.useState(supplier ?? null);
   const [deletedBillIds, setDeletedBillIds] = React.useState([]);
   const [deletingBillId, setDeletingBillId] = React.useState(null);
-  const [detailedReturn, setDetailedReturn] = React.useState(false);
+
+  // Edit-mode transaction available at mount — used to seed `type` / `detailedReturn`
+  // so `billLike` is correct on the FIRST render. Otherwise the default type "bill"
+  // makes billLike=true, and the bill-total recompute effect clobbers the just-reset
+  // amount to 0 for payments / simple returns (they have no taxable to self-heal from).
+  const editTxn = mode === "edit" && transaction ? transaction : null;
+  const isDetailedReturn = (t) =>
+    !!t && t.type === "return" && ((t.line_items?.length > 0) || !!t.invoice_number);
+
+  const [detailedReturn, setDetailedReturn] = React.useState(() => isDetailedReturn(editTxn));
 
   React.useEffect(() => {
     setSelectedSupplier(supplier ?? null);
@@ -206,8 +215,8 @@ export default function SupplierTransactionDialog({
   const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      type: "bill",
-      amount: "",
+      type: editTxn ? editTxn.type : defaultType,
+      amount: editTxn ? (editTxn.amount ?? "") : "",
       transaction_date: today,
       notes: "",
       invoice_number: "",
