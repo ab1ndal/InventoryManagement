@@ -124,6 +124,7 @@ export default function SupplierTransactionDialog({
   const [selectedSupplier, setSelectedSupplier] = React.useState(supplier ?? null);
   const [deletedBillIds, setDeletedBillIds] = React.useState([]);
   const [deletingBillId, setDeletingBillId] = React.useState(null);
+  const [detailedReturn, setDetailedReturn] = React.useState(false);
 
   React.useEffect(() => {
     setSelectedSupplier(supplier ?? null);
@@ -233,10 +234,18 @@ export default function SupplierTransactionDialog({
   const watchedIgst = form.watch("igst_amount");
   const watchedRoundOff = form.watch("round_off_amount");
 
+  // A "detailed return" carries the same fields as a bill (invoice, line items, GST, docs).
+  // billLike drives every place the bill-detail UI / calc / persistence applies.
+  const billLike = txnType === "bill" || (txnType === "return" && detailedReturn);
+
   // Reset form on open — prefill from `transaction` in edit mode, blank in create mode
   React.useEffect(() => {
     if (!open) return;
     if (mode === "edit" && transaction) {
+      setDetailedReturn(
+        transaction.type === "return" &&
+          ((transaction.line_items?.length > 0) || !!transaction.invoice_number)
+      );
       form.reset({
         type: transaction.type,
         amount: transaction.amount ?? "",
@@ -263,6 +272,7 @@ export default function SupplierTransactionDialog({
         })),
       });
     } else {
+      setDetailedReturn(false);
       form.reset({
         type: defaultType,
         amount: "",
@@ -285,7 +295,7 @@ export default function SupplierTransactionDialog({
 
   // Recompute each line item's amount from qty / unit_price / discount_pct
   React.useEffect(() => {
-    if (txnType !== "bill") return;
+    if (!billLike) return;
     (watchedLineItems || []).forEach((li, idx) => {
       const computed = computeLineAmount(li);
       if (Number(li.amount) !== computed) {
@@ -293,21 +303,21 @@ export default function SupplierTransactionDialog({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txnType, JSON.stringify((watchedLineItems || []).map((li) => [li.qty, li.unit_price, li.discount_pct]))]);
+  }, [billLike, JSON.stringify((watchedLineItems || []).map((li) => [li.qty, li.unit_price, li.discount_pct]))]);
 
   // Recompute taxable_amount as the sum of line item amounts, when line items exist
   React.useEffect(() => {
-    if (txnType !== "bill" || (watchedLineItems || []).length === 0) return;
+    if (!billLike || (watchedLineItems || []).length === 0) return;
     const computed = computeTaxableAmount(watchedLineItems);
     if (Number(form.getValues("taxable_amount")) !== computed) {
       form.setValue("taxable_amount", computed, { shouldValidate: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txnType, JSON.stringify((watchedLineItems || []).map((li) => li.amount))]);
+  }, [billLike, JSON.stringify((watchedLineItems || []).map((li) => li.amount))]);
 
   // Recompute gross_amount and discount_amount from line items, when line items exist
   React.useEffect(() => {
-    if (txnType !== "bill" || (watchedLineItems || []).length === 0) return;
+    if (!billLike || (watchedLineItems || []).length === 0) return;
     const computedGross = computeGrossAmount(watchedLineItems);
     if (Number(form.getValues("gross_amount")) !== computedGross) {
       form.setValue("gross_amount", computedGross, { shouldValidate: false });
@@ -317,11 +327,11 @@ export default function SupplierTransactionDialog({
       form.setValue("discount_amount", computedDiscount, { shouldValidate: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txnType, JSON.stringify((watchedLineItems || []).map((li) => [li.qty, li.unit_price, li.amount]))]);
+  }, [billLike, JSON.stringify((watchedLineItems || []).map((li) => [li.qty, li.unit_price, li.amount]))]);
 
   // Recompute the top-level amount as taxable + CGST + SGST + IGST + round-off
   React.useEffect(() => {
-    if (txnType !== "bill") return;
+    if (!billLike) return;
     const computed = computeBillTotal({
       taxable_amount: watchedTaxable,
       cgst_amount: watchedCgst,
@@ -333,7 +343,7 @@ export default function SupplierTransactionDialog({
       form.setValue("amount", computed, { shouldValidate: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txnType, watchedTaxable, watchedCgst, watchedSgst, watchedIgst, watchedRoundOff]);
+  }, [billLike, watchedTaxable, watchedCgst, watchedSgst, watchedIgst, watchedRoundOff]);
 
   const handleSubmit = async (values) => {
     if (!selectedSupplier) {
@@ -345,7 +355,11 @@ export default function SupplierTransactionDialog({
       if (mode === "edit") {
         const transaction_id = transaction.transaction_id;
         const isBill = transaction.type === "bill";
-        const isPaymentOrAdvance = !isBill;
+        const isPaymentOrAdvance = transaction.type === "payment" || transaction.type === "advance";
+        // detail = persist bill-like fields; manageDetail = type that *can* carry them
+        // (so unchecking "detailed" on a return clears its old line items / columns).
+        const detail = billLike;
+        const manageDetail = isBill || transaction.type === "return";
 
         const { error: updateError } = await supabase
           .from("supplier_transactions")
@@ -353,21 +367,21 @@ export default function SupplierTransactionDialog({
             amount: values.amount,
             transaction_date: values.transaction_date,
             notes: values.notes ?? null,
-            invoice_number: isBill ? (values.invoice_number ?? null) : null,
-            gross_amount: isBill ? (values.gross_amount || null) : null,
-            discount_amount: isBill ? (values.discount_amount || null) : null,
-            taxable_amount: isBill ? (values.taxable_amount || null) : null,
-            cgst_amount: isBill ? (values.cgst_amount || null) : null,
-            sgst_amount: isBill ? (values.sgst_amount || null) : null,
-            igst_amount: isBill ? (values.igst_amount || null) : null,
-            round_off_amount: isBill ? (values.round_off_amount ?? null) : null,
+            invoice_number: detail ? (values.invoice_number ?? null) : null,
+            gross_amount: detail ? (values.gross_amount || null) : null,
+            discount_amount: detail ? (values.discount_amount || null) : null,
+            taxable_amount: detail ? (values.taxable_amount || null) : null,
+            cgst_amount: detail ? (values.cgst_amount || null) : null,
+            sgst_amount: detail ? (values.sgst_amount || null) : null,
+            igst_amount: detail ? (values.igst_amount || null) : null,
+            round_off_amount: detail ? (values.round_off_amount ?? null) : null,
             payment_mode: isPaymentOrAdvance ? (values.payment_mode ?? null) : null,
           })
           .eq("transaction_id", transaction_id);
 
         if (updateError) throw updateError;
 
-        if (isBill) {
+        if (manageDetail) {
           const { error: deleteError } = await supabase
             .from("supplier_bill_line_items")
             .delete()
@@ -375,7 +389,7 @@ export default function SupplierTransactionDialog({
 
           if (deleteError) throw deleteError;
 
-          if (values.line_items?.length > 0) {
+          if (detail && values.line_items?.length > 0) {
             const { error: lineItemsError } = await supabase.from("supplier_bill_line_items").insert(
               values.line_items.map((li) => ({
                 transaction_id,
@@ -407,8 +421,9 @@ export default function SupplierTransactionDialog({
         return;
       }
 
-      const isBill = values.type === "bill";
       const isPaymentOrAdvance = values.type === "payment" || values.type === "advance";
+      // detail = bill, or a return flagged "detailed" — both carry bill-like fields.
+      const detail = billLike;
 
       // 1. Insert transaction row
       const { data: txnData, error: txnError } = await supabase
@@ -419,14 +434,14 @@ export default function SupplierTransactionDialog({
           amount: values.amount,
           transaction_date: values.transaction_date,
           notes: values.notes ?? null,
-          invoice_number: isBill ? (values.invoice_number ?? null) : null,
-          gross_amount: isBill ? (values.gross_amount || null) : null,
-          discount_amount: isBill ? (values.discount_amount || null) : null,
-          taxable_amount: isBill ? (values.taxable_amount || null) : null,
-          cgst_amount: isBill ? (values.cgst_amount || null) : null,
-          sgst_amount: isBill ? (values.sgst_amount || null) : null,
-          igst_amount: isBill ? (values.igst_amount || null) : null,
-          round_off_amount: isBill ? (values.round_off_amount ?? null) : null,
+          invoice_number: detail ? (values.invoice_number ?? null) : null,
+          gross_amount: detail ? (values.gross_amount || null) : null,
+          discount_amount: detail ? (values.discount_amount || null) : null,
+          taxable_amount: detail ? (values.taxable_amount || null) : null,
+          cgst_amount: detail ? (values.cgst_amount || null) : null,
+          sgst_amount: detail ? (values.sgst_amount || null) : null,
+          igst_amount: detail ? (values.igst_amount || null) : null,
+          round_off_amount: detail ? (values.round_off_amount ?? null) : null,
           payment_mode: isPaymentOrAdvance ? (values.payment_mode ?? null) : null,
         })
         .select("transaction_id")
@@ -436,8 +451,8 @@ export default function SupplierTransactionDialog({
 
       const transaction_id = txnData.transaction_id;
 
-      // 2. Insert line items for bills
-      if (isBill && values.line_items?.length > 0) {
+      // 2. Insert line items for bills / detailed returns
+      if (detail && values.line_items?.length > 0) {
         await supabase.from("supplier_bill_line_items").insert(
           values.line_items.map((li) => ({
             transaction_id: txnData.transaction_id,
@@ -453,8 +468,8 @@ export default function SupplierTransactionDialog({
         );
       }
 
-      // 3. If type === bill and images/PDFs provided, upload to storage
-      if (isBill) {
+      // 3. Upload any attached documents (bills / detailed returns)
+      if (detail) {
         await uploadBillFiles({ files: values.bill_image, values, transaction_id });
       }
 
@@ -549,8 +564,21 @@ export default function SupplierTransactionDialog({
               )}
             />
 
-            {/* Amount — non-bill types shown up top */}
-            {txnType !== "bill" && (
+            {/* Detailed return toggle — reveals the same fields a bill uses */}
+            {txnType === "return" && (
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={detailedReturn}
+                  onChange={(e) => setDetailedReturn(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Add bill details (invoice, items, GST, documents)
+              </label>
+            )}
+
+            {/* Amount — simple (non-detailed) types shown up top; detailed types auto-calc below */}
+            {!billLike && (
               <FormField
                 name="amount"
                 control={form.control}
@@ -566,8 +594,8 @@ export default function SupplierTransactionDialog({
               />
             )}
 
-            {/* Bill-specific fields */}
-            {txnType === "bill" && (
+            {/* Bill / detailed-return fields */}
+            {billLike && (
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <FormField
@@ -865,8 +893,8 @@ export default function SupplierTransactionDialog({
               </>
             )}
 
-            {/* Date — non-bill types shown after type-specific fields */}
-            {txnType !== "bill" && (
+            {/* Date — simple types shown here; bill / detailed-return have date in their grid */}
+            {!billLike && (
               <FormField
                 name="transaction_date"
                 control={form.control}
@@ -928,8 +956,8 @@ export default function SupplierTransactionDialog({
               />
             )}
 
-            {/* Bill image — only shown for bill type */}
-            {txnType === "bill" && (
+            {/* Document upload — bills and detailed returns */}
+            {billLike && (
               <FormField
                 name="bill_image"
                 control={form.control}

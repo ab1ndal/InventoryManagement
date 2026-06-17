@@ -252,7 +252,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
                       {expandedRow === row.transaction_id && row.type !== "opening" && (
                         <tr className="bg-blue-50 border-t border-blue-100">
                           <td colSpan={6} className="px-4 py-3">
-                            {row.type === "bill" ? (
+                            {row.type === "bill" || row.supplier_bill_line_items?.length > 0 || row.invoice_number || row.gross_amount ? (
                               <div className="space-y-2 text-xs">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                   {row.invoice_number && <div><span className="font-medium">Invoice:</span> {row.invoice_number}</div>}

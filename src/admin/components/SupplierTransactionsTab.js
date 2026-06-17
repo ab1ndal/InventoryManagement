@@ -45,7 +45,7 @@ export default function SupplierTransactionsTab() {
   const handleEditClick = async (t) => {
     let line_items = [];
     let bills = [];
-    if (t.type === "bill") {
+    if (t.type === "bill" || t.type === "return") {
       const [{ data: liData, error: liError }, { data: billData, error: billError }] = await Promise.all([
         supabase.from("supplier_bill_line_items").select("*").eq("transaction_id", t.transaction_id),
         supabase.from("supplier_bills").select("*").eq("transaction_id", t.transaction_id).order("bill_id"),
