@@ -865,7 +865,7 @@
       "label": "SupplierTransactionsTab()",
       "file_type": "code",
       "source_file": "src/admin/components/SupplierTransactionsTab.js",
-      "source_location": "L10",
+      "source_location": "L11",
       "id": "suppliertransactionstab_suppliertransactionstab",
       "community": 70
     },
@@ -5323,7 +5323,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/admin/components/SupplierTransactionsTab.js",
-      "source_location": "L10",
+      "source_location": "L11",
       "weight": 1.0,
       "_src": "src_admin_components_suppliertransactionstab_js",
       "_tgt": "suppliertransactionstab_suppliertransactionstab",

@@ -5,6 +5,7 @@ import { formatINR } from "../../utility/formatCurrency";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { toast } from "sonner";
+import { logActivity } from "../../lib/activityLog";
 import SupplierTransactionDialog from "./SupplierTransactionDialog";
 
 export default function SupplierTransactionsTab() {
@@ -18,6 +19,7 @@ export default function SupplierTransactionsTab() {
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editTransaction, setEditTransaction] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     fetchAll();
@@ -57,6 +59,59 @@ export default function SupplierTransactionsTab() {
     }
     setEditTransaction({ ...t, line_items, bills });
     setEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = async (t) => {
+    const label = t.type === "bill" ? "Bill" : t.type === "advance" ? "Advance" : t.type === "return" ? "Return" : "Payment";
+    if (!window.confirm(
+      `Delete this ${label.toLowerCase()} of ${formatINR(t.amount, 2)} for ${t.suppliers?.name ?? "supplier"}?` +
+      (t.type === "bill" ? "\n\nAttached line items and bill documents will also be deleted." : "")
+    )) return;
+
+    setDeletingId(t.transaction_id);
+    try {
+      // For bills, remove attached documents + storage files first
+      // (supplier_bills.transaction_id is ON DELETE SET NULL, so it won't cascade).
+      // Line items cascade automatically.
+      if (t.type === "bill") {
+        const { data: bills, error: billErr } = await supabase
+          .from("supplier_bills")
+          .select("bill_id, storage_path")
+          .eq("transaction_id", t.transaction_id);
+        if (billErr) throw billErr;
+
+        const paths = (bills || []).map((b) => b.storage_path).filter(Boolean);
+        if (paths.length > 0) {
+          await supabase.storage.from("supplier-bills").remove(paths);
+        }
+        if (bills?.length > 0) {
+          const { error: delBillsErr } = await supabase
+            .from("supplier_bills")
+            .delete()
+            .in("bill_id", bills.map((b) => b.bill_id));
+          if (delBillsErr) throw delBillsErr;
+        }
+      }
+
+      const { error } = await supabase
+        .from("supplier_transactions")
+        .delete()
+        .eq("transaction_id", t.transaction_id);
+      if (error) throw error;
+
+      logActivity({
+        action: "delete",
+        entityType: t.type === "bill" ? "supplier_bill" : "supplier",
+        entityId: t.transaction_id,
+        summary: `Deleted supplier ${label.toLowerCase()} for ${t.suppliers?.name ?? "supplier"} — ${formatINR(t.amount, 2)}`,
+      });
+      toast.success(`${label} deleted`);
+      setRefreshSignal((p) => p + 1);
+    } catch (err) {
+      toast.error("Error deleting transaction", { description: err.message });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const filtered = transactions.filter((t) => {
@@ -152,9 +207,20 @@ export default function SupplierTransactionsTab() {
                     <td className="p-3 text-xs text-muted-foreground capitalize">{t.payment_mode || "—"}</td>
                     <td className="p-3 text-xs text-muted-foreground max-w-[160px] truncate">{t.notes || "—"}</td>
                     <td className="p-3">
-                      <Button size="sm" variant="outline" onClick={() => handleEditClick(t)}>
-                        Edit
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleEditClick(t)}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={deletingId === t.transaction_id}
+                          onClick={() => handleDeleteClick(t)}
+                        >
+                          {deletingId === t.transaction_id ? "Deleting…" : "Delete"}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))
