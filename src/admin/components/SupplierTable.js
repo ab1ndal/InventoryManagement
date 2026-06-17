@@ -99,7 +99,9 @@ export default function SupplierTable({
               </tr>
             ) : (
               suppliers.map((s) => {
-                const bal = balances[s.supplierid] ?? 0;
+                const bal =
+                  (Number(s.opening_balance) || 0) +
+                  (balances[s.supplierid] ?? 0);
                 const lastTxn = lastTransactions[s.supplierid];
                 const purchases = totalPurchases[s.supplierid] ?? 0;
                 return (
