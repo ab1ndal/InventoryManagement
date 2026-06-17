@@ -168,7 +168,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl bg-white rounded-lg shadow-xl p-6">
+      <DialogContent className="max-w-4xl bg-white rounded-lg shadow-xl p-6 max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Ledger — {supplier?.name}</DialogTitle>
           <DialogDescription>
@@ -191,7 +191,7 @@ export default function SupplierLedgerDialog({ supplier, open, onOpenChange, onA
           </div>
         ) : (
           <>
-            <ScrollArea className={rows.length > 20 ? "h-[480px]" : undefined}>
+            <ScrollArea className="flex-1 min-h-0">
               <table className="min-w-full text-sm">
                 <thead className="bg-gray-100 sticky top-0">
                   <tr>

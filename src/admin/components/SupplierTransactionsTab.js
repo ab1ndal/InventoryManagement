@@ -167,9 +167,9 @@ export default function SupplierTransactionsTab() {
       {loading ? (
         <div className="py-12 text-center text-gray-400 text-sm">Loading…</div>
       ) : (
-        <div className="overflow-auto border rounded-md">
+        <div className="overflow-auto border rounded-md max-h-[70vh]">
           <table className="min-w-full text-sm text-left">
-            <thead className="bg-gray-100">
+            <thead className="bg-gray-100 sticky top-0 z-10">
               <tr>
                 <th className="p-3 font-semibold">Date</th>
                 <th className="p-3 font-semibold">Supplier</th>
