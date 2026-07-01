@@ -1,11 +1,11 @@
-# Graph Report - .  (2026-06-17)
+# Graph Report - .  (2026-06-30)
 
 ## Corpus Check
-- 173 files · ~287,837 words
+- 175 files · ~289,055 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 521 nodes · 331 edges · 255 communities detected
+- 531 nodes · 342 edges · 257 communities detected
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS
 - Token cost: 0 input · 0 output
 
@@ -265,6 +265,8 @@
 - [[_COMMUNITY_Community 252|Community 252]]
 - [[_COMMUNITY_Community 253|Community 253]]
 - [[_COMMUNITY_Community 254|Community 254]]
+- [[_COMMUNITY_Community 255|Community 255]]
+- [[_COMMUNITY_Community 256|Community 256]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `round2()` - 7 edges
@@ -276,7 +278,7 @@
 7. `valueOfDiscount()` - 4 edges
 8. `groupBillsByFy()` - 4 edges
 9. `fyLabel()` - 4 edges
-10. `SupplierLedgerDialog()` - 3 edges
+10. `getProductImagePaths()` - 3 edges
 
 ## Surprising Connections (you probably didn't know these)
 - None detected - all connections are within the same source files.
@@ -313,84 +315,84 @@ Cohesion: 0.48
 Nodes (5): compareColors(), compareSizes(), compareVariantsBySizeColor(), normalize(), parseSize()
 
 ### Community 6 - "Community 6"
-Cohesion: 0.4
-Nodes (2): DiscountForm(), toFormValues()
+Cohesion: 0.53
+Nodes (4): getProductImagePaths(), getProductImages(), getProductImageUrl(), resolve()
 
 ### Community 7 - "Community 7"
 Cohesion: 0.4
-Nodes (2): diffFields(), productEditSummary()
+Nodes (2): DiscountForm(), toFormValues()
 
 ### Community 8 - "Community 8"
+Cohesion: 0.4
+Nodes (2): diffFields(), productEditSummary()
+
+### Community 9 - "Community 9"
 Cohesion: 0.47
 Nodes (3): computeDiscountAmount(), computeGrossAmount(), computeTaxableAmount()
 
-### Community 9 - "Community 9"
-Cohesion: 0.5
-Nodes (2): CategoryCard(), getImage()
-
 ### Community 10 - "Community 10"
-Cohesion: 0.6
-Nodes (3): balanceClass(), formatINR(), SupplierLedgerDialog()
-
-### Community 11 - "Community 11"
-Cohesion: 0.6
-Nodes (3): discountLabel(), DiscountRow(), resolveCatNames()
-
-### Community 12 - "Community 12"
 Cohesion: 0.4
 Nodes (0): 
 
-### Community 13 - "Community 13"
+### Community 11 - "Community 11"
 Cohesion: 0.5
-Nodes (2): fetchAllRows(), fetchPeriod()
+Nodes (2): ProductDetailPage(), renderDescription()
+
+### Community 12 - "Community 12"
+Cohesion: 0.6
+Nodes (3): balanceClass(), formatINR(), SupplierLedgerDialog()
+
+### Community 13 - "Community 13"
+Cohesion: 0.6
+Nodes (3): discountLabel(), DiscountRow(), resolveCatNames()
 
 ### Community 14 - "Community 14"
 Cohesion: 0.4
 Nodes (0): 
 
 ### Community 15 - "Community 15"
+Cohesion: 0.5
+Nodes (2): fetchAllRows(), fetchPeriod()
+
+### Community 16 - "Community 16"
+Cohesion: 0.4
+Nodes (0): 
+
+### Community 17 - "Community 17"
 Cohesion: 0.67
 Nodes (2): fetchAvailableOptionsFromDB(), getMatchingPids()
 
-### Community 16 - "Community 16"
+### Community 18 - "Community 18"
 Cohesion: 0.67
 Nodes (2): computeAvailableOptions(), matchExcluding()
 
-### Community 17 - "Community 17"
-Cohesion: 0.5
-Nodes (0): 
-
-### Community 18 - "Community 18"
-Cohesion: 0.5
-Nodes (0): 
-
 ### Community 19 - "Community 19"
+Cohesion: 0.5
+Nodes (0): 
+
+### Community 20 - "Community 20"
+Cohesion: 0.5
+Nodes (0): 
+
+### Community 21 - "Community 21"
 Cohesion: 0.67
 Nodes (2): getBCXPrefix(), getNextManualItemId()
 
-### Community 20 - "Community 20"
+### Community 22 - "Community 22"
 Cohesion: 0.83
 Nodes (3): fmt(), fmtDate(), generateBillText()
 
-### Community 21 - "Community 21"
+### Community 23 - "Community 23"
 Cohesion: 0.5
 Nodes (0): 
 
-### Community 22 - "Community 22"
+### Community 24 - "Community 24"
 Cohesion: 0.83
 Nodes (3): encodePriceToCode(), generateTSPLLabel(), printLabel()
 
-### Community 23 - "Community 23"
+### Community 25 - "Community 25"
 Cohesion: 1.0
 Nodes (2): loadEnv(), main()
-
-### Community 24 - "Community 24"
-Cohesion: 0.67
-Nodes (0): 
-
-### Community 25 - "Community 25"
-Cohesion: 0.67
-Nodes (0): 
 
 ### Community 26 - "Community 26"
 Cohesion: 0.67
@@ -425,52 +427,52 @@ Cohesion: 0.67
 Nodes (0): 
 
 ### Community 34 - "Community 34"
-Cohesion: 1.0
-Nodes (2): makeCtx(), renderDrawer()
+Cohesion: 0.67
+Nodes (0): 
 
 ### Community 35 - "Community 35"
 Cohesion: 0.67
 Nodes (0): 
 
 ### Community 36 - "Community 36"
-Cohesion: 0.67
-Nodes (0): 
+Cohesion: 1.0
+Nodes (2): makeCtx(), renderDrawer()
 
 ### Community 37 - "Community 37"
 Cohesion: 0.67
 Nodes (0): 
 
 ### Community 38 - "Community 38"
+Cohesion: 0.67
+Nodes (0): 
+
+### Community 39 - "Community 39"
 Cohesion: 1.0
 Nodes (2): createProductFolder(), findOrCreateFolder()
 
-### Community 39 - "Community 39"
+### Community 40 - "Community 40"
 Cohesion: 0.67
 Nodes (0): 
 
-### Community 40 - "Community 40"
+### Community 41 - "Community 41"
 Cohesion: 1.0
 Nodes (2): formatDate(), MockupRow()
 
-### Community 41 - "Community 41"
-Cohesion: 0.67
-Nodes (0): 
-
 ### Community 42 - "Community 42"
 Cohesion: 0.67
-Nodes (1): DiscountTable()
+Nodes (0): 
 
 ### Community 43 - "Community 43"
 Cohesion: 0.67
-Nodes (0): 
+Nodes (1): DiscountTable()
 
 ### Community 44 - "Community 44"
 Cohesion: 0.67
-Nodes (1): SalespersonTable()
+Nodes (0): 
 
 ### Community 45 - "Community 45"
 Cohesion: 0.67
-Nodes (0): 
+Nodes (1): SalespersonTable()
 
 ### Community 46 - "Community 46"
 Cohesion: 0.67
@@ -505,7 +507,7 @@ Cohesion: 0.67
 Nodes (0): 
 
 ### Community 54 - "Community 54"
-Cohesion: 1.0
+Cohesion: 0.67
 Nodes (0): 
 
 ### Community 55 - "Community 55"
@@ -974,744 +976,754 @@ Nodes (0):
 
 ### Community 171 - "Community 171"
 Cohesion: 1.0
-Nodes (1): Create React App
+Nodes (0): 
 
 ### Community 172 - "Community 172"
 Cohesion: 1.0
-Nodes (1): npm start (Dev Server)
+Nodes (0): 
 
 ### Community 173 - "Community 173"
 Cohesion: 1.0
-Nodes (1): npm test (Test Runner)
+Nodes (1): Create React App
 
 ### Community 174 - "Community 174"
 Cohesion: 1.0
-Nodes (1): npm run build (Production Build)
+Nodes (1): npm start (Dev Server)
 
 ### Community 175 - "Community 175"
 Cohesion: 1.0
-Nodes (1): npm run eject
+Nodes (1): npm test (Test Runner)
 
 ### Community 176 - "Community 176"
 Cohesion: 1.0
-Nodes (1): React 19 SPA
+Nodes (1): npm run build (Production Build)
 
 ### Community 177 - "Community 177"
 Cohesion: 1.0
-Nodes (1): Supabase (PostgreSQL + Auth)
+Nodes (1): npm run eject
 
 ### Community 178 - "Community 178"
 Cohesion: 1.0
-Nodes (1): @supabase/supabase-js Client Library
+Nodes (1): React 19 SPA
 
 ### Community 179 - "Community 179"
 Cohesion: 1.0
-Nodes (1): Environment Variables (REACT_APP_SUPABASE_URL, REACT_APP_SUPABASE_ANON_KEY)
+Nodes (1): Supabase (PostgreSQL + Auth)
 
 ### Community 180 - "Community 180"
 Cohesion: 1.0
-Nodes (1): DB Table: products
+Nodes (1): @supabase/supabase-js Client Library
 
 ### Community 181 - "Community 181"
 Cohesion: 1.0
-Nodes (1): DB Table: productsizecolors
+Nodes (1): Environment Variables (REACT_APP_SUPABASE_URL, REACT_APP_SUPABASE_ANON_KEY)
 
 ### Community 182 - "Community 182"
 Cohesion: 1.0
-Nodes (1): DB Table: categories
+Nodes (1): DB Table: products
 
 ### Community 183 - "Community 183"
 Cohesion: 1.0
-Nodes (1): DB Table: customers
+Nodes (1): DB Table: productsizecolors
 
 ### Community 184 - "Community 184"
 Cohesion: 1.0
-Nodes (1): DB Table: suppliers
+Nodes (1): DB Table: categories
 
 ### Community 185 - "Community 185"
 Cohesion: 1.0
-Nodes (1): DB Table: profiles
+Nodes (1): DB Table: customers
 
 ### Community 186 - "Community 186"
 Cohesion: 1.0
-Nodes (1): DB Table: discounts
+Nodes (1): DB Table: suppliers
 
 ### Community 187 - "Community 187"
 Cohesion: 1.0
-Nodes (1): DB Table: bills
+Nodes (1): DB Table: profiles
 
 ### Community 188 - "Community 188"
 Cohesion: 1.0
-Nodes (1): DB Table: mockups
+Nodes (1): DB Table: discounts
 
 ### Community 189 - "Community 189"
 Cohesion: 1.0
-Nodes (1): Product ID Format BC{YY}{###}
+Nodes (1): DB Table: bills
 
 ### Community 190 - "Community 190"
 Cohesion: 1.0
-Nodes (1): Supabase RPC: get_max_product_suffix
+Nodes (1): DB Table: mockups
 
 ### Community 191 - "Community 191"
 Cohesion: 1.0
-Nodes (1): Shadcn/ui Components
+Nodes (1): Product ID Format BC{YY}{###}
 
 ### Community 192 - "Community 192"
 Cohesion: 1.0
-Nodes (1): Radix UI Primitives
+Nodes (1): Supabase RPC: get_max_product_suffix
 
 ### Community 193 - "Community 193"
 Cohesion: 1.0
-Nodes (1): Tailwind CSS
+Nodes (1): Shadcn/ui Components
 
 ### Community 194 - "Community 194"
 Cohesion: 1.0
-Nodes (1): Sonner (Toast Notifications)
+Nodes (1): Radix UI Primitives
 
 ### Community 195 - "Community 195"
 Cohesion: 1.0
-Nodes (1): React Hook Form
+Nodes (1): Tailwind CSS
 
 ### Community 196 - "Community 196"
 Cohesion: 1.0
-Nodes (1): Zod (Form Validation)
+Nodes (1): Sonner (Toast Notifications)
 
 ### Community 197 - "Community 197"
 Cohesion: 1.0
-Nodes (1): Plotly.js (react-plotly.js)
+Nodes (1): React Hook Form
 
 ### Community 198 - "Community 198"
 Cohesion: 1.0
-Nodes (1): Path Alias @/* → src/*
+Nodes (1): Zod (Form Validation)
 
 ### Community 199 - "Community 199"
 Cohesion: 1.0
-Nodes (1): Local State Management (useState/useEffect)
+Nodes (1): Plotly.js (react-plotly.js)
 
 ### Community 200 - "Community 200"
 Cohesion: 1.0
-Nodes (1): refreshFlag Re-fetch Pattern
+Nodes (1): Path Alias @/* → src/*
 
 ### Community 201 - "Community 201"
 Cohesion: 1.0
-Nodes (1): Rationale: No Global Store — local state per component
+Nodes (1): Local State Management (useState/useEffect)
 
 ### Community 202 - "Community 202"
 Cohesion: 1.0
-Nodes (1): QZ Tray (Label/Invoice Printing)
+Nodes (1): refreshFlag Re-fetch Pattern
 
 ### Community 203 - "Community 203"
 Cohesion: 1.0
-Nodes (1): Rationale: No Server-Side Code — all data access direct from client
+Nodes (1): Rationale: No Global Store — local state per component
 
 ### Community 204 - "Community 204"
 Cohesion: 1.0
-Nodes (1): robots.txt Sitemap (bindalscreations.com)
+Nodes (1): QZ Tray (Label/Invoice Printing)
 
 ### Community 205 - "Community 205"
 Cohesion: 1.0
-Nodes (1): robots.txt Allow All Crawlers
+Nodes (1): Rationale: No Server-Side Code — all data access direct from client
 
 ### Community 206 - "Community 206"
 Cohesion: 1.0
-Nodes (1): Bindals Creation Logo
+Nodes (1): robots.txt Sitemap (bindalscreations.com)
 
 ### Community 207 - "Community 207"
 Cohesion: 1.0
-Nodes (1): Bindals Creation
+Nodes (1): robots.txt Allow All Crawlers
 
 ### Community 208 - "Community 208"
 Cohesion: 1.0
-Nodes (1): Monogram Letter B
+Nodes (1): Bindals Creation Logo
 
 ### Community 209 - "Community 209"
 Cohesion: 1.0
-Nodes (1): Ornamental Circular Frame
+Nodes (1): Bindals Creation
 
 ### Community 210 - "Community 210"
 Cohesion: 1.0
-Nodes (1): Floral Scrollwork / Filigree
+Nodes (1): Monogram Letter B
 
 ### Community 211 - "Community 211"
 Cohesion: 1.0
-Nodes (1): Luxury / Ornate Design Style
+Nodes (1): Ornamental Circular Frame
 
 ### Community 212 - "Community 212"
 Cohesion: 1.0
-Nodes (1): Gold and White Color Scheme
+Nodes (1): Floral Scrollwork / Filigree
 
 ### Community 213 - "Community 213"
 Cohesion: 1.0
-Nodes (1): Bindal's Creation Bill Logo
+Nodes (1): Luxury / Ornate Design Style
 
 ### Community 214 - "Community 214"
 Cohesion: 1.0
-Nodes (1): Stylized Letter B
+Nodes (1): Gold and White Color Scheme
 
 ### Community 215 - "Community 215"
 Cohesion: 1.0
-Nodes (1): Ornamental Circular Frame
+Nodes (1): Bindal's Creation Bill Logo
 
 ### Community 216 - "Community 216"
 Cohesion: 1.0
-Nodes (1): Decorative Scrollwork Base
+Nodes (1): Stylized Letter B
 
 ### Community 217 - "Community 217"
 Cohesion: 1.0
-Nodes (1): Gold Color Scheme
+Nodes (1): Ornamental Circular Frame
 
 ### Community 218 - "Community 218"
 Cohesion: 1.0
-Nodes (1): Billing Document Branding Purpose
+Nodes (1): Decorative Scrollwork Base
 
 ### Community 219 - "Community 219"
 Cohesion: 1.0
-Nodes (1): Retail Brand Identity
+Nodes (1): Gold Color Scheme
 
 ### Community 220 - "Community 220"
 Cohesion: 1.0
-Nodes (1): React Logo SVG
+Nodes (1): Billing Document Branding Purpose
 
 ### Community 221 - "Community 221"
 Cohesion: 1.0
-Nodes (1): React Atom Symbol
+Nodes (1): Retail Brand Identity
 
 ### Community 222 - "Community 222"
 Cohesion: 1.0
-Nodes (1): React Blue Color (#61DAFB)
+Nodes (1): React Logo SVG
 
 ### Community 223 - "Community 223"
 Cohesion: 1.0
-Nodes (1): Central Nucleus Circle
+Nodes (1): React Atom Symbol
 
 ### Community 224 - "Community 224"
 Cohesion: 1.0
-Nodes (1): Elliptical Orbital Paths
+Nodes (1): React Blue Color (#61DAFB)
 
 ### Community 225 - "Community 225"
 Cohesion: 1.0
-Nodes (1): Bindal's Creation Logo
+Nodes (1): Central Nucleus Circle
 
 ### Community 226 - "Community 226"
 Cohesion: 1.0
-Nodes (1): Bindal's Creation Brand
+Nodes (1): Elliptical Orbital Paths
 
 ### Community 227 - "Community 227"
 Cohesion: 1.0
-Nodes (1): Monogram Letter B
+Nodes (1): Bindal's Creation Logo
 
 ### Community 228 - "Community 228"
 Cohesion: 1.0
-Nodes (1): Ornamental Circular Frame
+Nodes (1): Bindal's Creation Brand
 
 ### Community 229 - "Community 229"
 Cohesion: 1.0
-Nodes (1): Floral Scrollwork / Acanthus Flourishes
+Nodes (1): Monogram Letter B
 
 ### Community 230 - "Community 230"
 Cohesion: 1.0
-Nodes (1): Butterfly Silhouette
+Nodes (1): Ornamental Circular Frame
 
 ### Community 231 - "Community 231"
 Cohesion: 1.0
-Nodes (1): Gold / Amber Color Scheme
+Nodes (1): Floral Scrollwork / Acanthus Flourishes
 
 ### Community 232 - "Community 232"
 Cohesion: 1.0
-Nodes (1): White Background
+Nodes (1): Butterfly Silhouette
 
 ### Community 233 - "Community 233"
 Cohesion: 1.0
-Nodes (1): Luxury / Elegant Design Style
+Nodes (1): Gold / Amber Color Scheme
 
 ### Community 234 - "Community 234"
 Cohesion: 1.0
-Nodes (1): Brand Identity / Logo Asset
+Nodes (1): White Background
 
 ### Community 235 - "Community 235"
 Cohesion: 1.0
-Nodes (1): Bindal's Creation Bill Logo
+Nodes (1): Luxury / Elegant Design Style
 
 ### Community 236 - "Community 236"
 Cohesion: 1.0
-Nodes (1): Stylized Letter B
+Nodes (1): Brand Identity / Logo Asset
 
 ### Community 237 - "Community 237"
 Cohesion: 1.0
-Nodes (1): Ornate Gold Scrollwork Design
+Nodes (1): Bindal's Creation Bill Logo
 
 ### Community 238 - "Community 238"
 Cohesion: 1.0
-Nodes (1): Gold on White Color Scheme
+Nodes (1): Stylized Letter B
 
 ### Community 239 - "Community 239"
 Cohesion: 1.0
-Nodes (1): Invoice/Bill Header Branding
+Nodes (1): Ornate Gold Scrollwork Design
 
 ### Community 240 - "Community 240"
 Cohesion: 1.0
-Nodes (1): Bills Table
+Nodes (1): Gold on White Color Scheme
 
 ### Community 241 - "Community 241"
 Cohesion: 1.0
-Nodes (1): Sample Bill - Bindal's Creation Invoice
+Nodes (1): Invoice/Bill Header Branding
 
 ### Community 242 - "Community 242"
 Cohesion: 1.0
-Nodes (1): Bindal's Creation (Business)
+Nodes (1): Bills Table
 
 ### Community 243 - "Community 243"
 Cohesion: 1.0
-Nodes (1): Akash Raghani (Customer)
+Nodes (1): Sample Bill - Bindal's Creation Invoice
 
 ### Community 244 - "Community 244"
 Cohesion: 1.0
-Nodes (1): Bill Number Field (012)
+Nodes (1): Bindal's Creation (Business)
 
 ### Community 245 - "Community 245"
 Cohesion: 1.0
-Nodes (1): Customer Name Field
+Nodes (1): Akash Raghani (Customer)
 
 ### Community 246 - "Community 246"
 Cohesion: 1.0
-Nodes (1): Phone Number Field (9662160069 / 6260971106)
+Nodes (1): Bill Number Field (012)
 
 ### Community 247 - "Community 247"
 Cohesion: 1.0
-Nodes (1): Line Item 1 - Product (Qty:1, Rate:595, Amt:595)
+Nodes (1): Customer Name Field
 
 ### Community 248 - "Community 248"
 Cohesion: 1.0
-Nodes (1): Line Item 2 - Suit BS25316 (Qty:1, Rate:1026, Amt:1026)
+Nodes (1): Phone Number Field (9662160069 / 6260971106)
 
 ### Community 249 - "Community 249"
 Cohesion: 1.0
-Nodes (1): Total Quantity Field
+Nodes (1): Line Item 1 - Product (Qty:1, Rate:595, Amt:595)
 
 ### Community 250 - "Community 250"
 Cohesion: 1.0
-Nodes (1): Net Amount Field (1636)
+Nodes (1): Line Item 2 - Suit BS25316 (Qty:1, Rate:1026, Amt:1026)
 
 ### Community 251 - "Community 251"
 Cohesion: 1.0
-Nodes (1): Discount / Adjustment Field (-836)
+Nodes (1): Total Quantity Field
 
 ### Community 252 - "Community 252"
 Cohesion: 1.0
-Nodes (1): Bill Footer Policy Notes (no returns, guarantee terms)
+Nodes (1): Net Amount Field (1636)
 
 ### Community 253 - "Community 253"
 Cohesion: 1.0
-Nodes (1): Handwritten Bill Layout (pre-printed template)
+Nodes (1): Discount / Adjustment Field (-836)
 
 ### Community 254 - "Community 254"
+Cohesion: 1.0
+Nodes (1): Bill Footer Policy Notes (no returns, guarantee terms)
+
+### Community 255 - "Community 255"
+Cohesion: 1.0
+Nodes (1): Handwritten Bill Layout (pre-printed template)
+
+### Community 256 - "Community 256"
 Cohesion: 1.0
 Nodes (1): Suit Product (BC-format product code BS25316)
 
 ## Knowledge Gaps
 - **84 isolated node(s):** `Create React App`, `npm start (Dev Server)`, `npm test (Test Runner)`, `npm run build (Production Build)`, `npm run eject` (+79 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 54`** (2 nodes): `reportWebVitals()`, `reportWebVitals.js`
+- **Thin community `Community 55`** (2 nodes): `reportWebVitals()`, `reportWebVitals.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 55`** (2 nodes): `App()`, `App.js`
+- **Thin community `Community 56`** (2 nodes): `App()`, `App.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 56`** (2 nodes): `StorefrontLayout.jsx`, `StorefrontLayout()`
+- **Thin community `Community 57`** (2 nodes): `BlurFillImage()`, `BlurFillImage.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 57`** (2 nodes): `StorefrontHeader.jsx`, `StorefrontHeader()`
+- **Thin community `Community 58`** (2 nodes): `StorefrontLayout.jsx`, `StorefrontLayout()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 58`** (2 nodes): `StorefrontFooter.jsx`, `StorefrontFooter()`
+- **Thin community `Community 59`** (2 nodes): `StorefrontHeader.jsx`, `StorefrontHeader()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 59`** (2 nodes): `FeaturedCollection()`, `FeaturedCollection.jsx`
+- **Thin community `Community 60`** (2 nodes): `StorefrontFooter.jsx`, `StorefrontFooter()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (2 nodes): `HeroBanner()`, `HeroBanner.jsx`
+- **Thin community `Community 61`** (2 nodes): `FeaturedCollection()`, `FeaturedCollection.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 61`** (2 nodes): `TrustBar.jsx`, `TrustBar()`
+- **Thin community `Community 62`** (2 nodes): `HeroBanner()`, `HeroBanner.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 62`** (2 nodes): `NewsletterSignup()`, `NewsletterSignup.jsx`
+- **Thin community `Community 63`** (2 nodes): `TrustBar.jsx`, `TrustBar()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 63`** (2 nodes): `PriceInputs()`, `PriceInputs.jsx`
+- **Thin community `Community 64`** (2 nodes): `NewsletterSignup()`, `NewsletterSignup.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 64`** (2 nodes): `CategoryRow()`, `CategoryRow.jsx`
+- **Thin community `Community 65`** (2 nodes): `PriceInputs()`, `PriceInputs.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (2 nodes): `FilterBar()`, `FilterBar.jsx`
+- **Thin community `Community 66`** (2 nodes): `CategoryRow()`, `CategoryRow.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (2 nodes): `VariantPicker.jsx`, `VariantPicker()`
+- **Thin community `Community 67`** (2 nodes): `FilterBar()`, `FilterBar.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 67`** (2 nodes): `useProduct.js`, `useProduct()`
+- **Thin community `Community 68`** (2 nodes): `VariantPicker.jsx`, `VariantPicker()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (2 nodes): `HomePage()`, `HomePage.jsx`
+- **Thin community `Community 69`** (2 nodes): `useProduct.js`, `useProduct()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 69`** (2 nodes): `AdminLayout()`, `AdminLayout.js`
+- **Thin community `Community 70`** (2 nodes): `HomePage()`, `HomePage.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (2 nodes): `SupplierTransactionsTab.js`, `SupplierTransactionsTab()`
+- **Thin community `Community 71`** (2 nodes): `AdminLayout()`, `AdminLayout.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 71`** (2 nodes): `SupplierTable.js`, `SupplierTable()`
+- **Thin community `Community 72`** (2 nodes): `SupplierTransactionsTab.js`, `SupplierTransactionsTab()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 72`** (2 nodes): `VariantRow.js`, `VariantRow()`
+- **Thin community `Community 73`** (2 nodes): `SupplierTable.js`, `SupplierTable()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 73`** (2 nodes): `Navbar()`, `Navbar.js`
+- **Thin community `Community 74`** (2 nodes): `VariantRow.js`, `VariantRow()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 74`** (2 nodes): `CustomerForm()`, `CustomerForm.js`
+- **Thin community `Community 75`** (2 nodes): `Navbar()`, `Navbar.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (2 nodes): `SupplierForm.js`, `SupplierForm()`
+- **Thin community `Community 76`** (2 nodes): `CustomerForm()`, `CustomerForm.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (2 nodes): `ChevronIcon()`, `ChevronIcon.js`
+- **Thin community `Community 77`** (2 nodes): `SupplierForm.js`, `SupplierForm()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (2 nodes): `ProductRow()`, `ProductRow.js`
+- **Thin community `Community 78`** (2 nodes): `ChevronIcon()`, `ChevronIcon.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (2 nodes): `RequireAdminAuth()`, `RequireAdminAuth.jsx`
+- **Thin community `Community 79`** (2 nodes): `ProductRow()`, `ProductRow.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (2 nodes): `CustomerTable()`, `CustomerTable.js`
+- **Thin community `Community 80`** (2 nodes): `RequireAdminAuth()`, `RequireAdminAuth.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (2 nodes): `MockupTable()`, `MockupTable.js`
+- **Thin community `Community 81`** (2 nodes): `CustomerTable()`, `CustomerTable.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (2 nodes): `BillTable()`, `BillTable.js`
+- **Thin community `Community 82`** (2 nodes): `MockupTable()`, `MockupTable.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (2 nodes): `CategoryTable()`, `CategoryTable.js`
+- **Thin community `Community 83`** (2 nodes): `BillTable()`, `BillTable.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (2 nodes): `ProductEditDialog()`, `ProductEditDialog.js`
+- **Thin community `Community 84`** (2 nodes): `CategoryTable()`, `CategoryTable.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (2 nodes): `UserRegistration.jsx`, `UserRegistration()`
+- **Thin community `Community 85`** (2 nodes): `ProductEditDialog()`, `ProductEditDialog.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 85`** (2 nodes): `CategoryBreakdown()`, `CategoryBreakdown.js`
+- **Thin community `Community 86`** (2 nodes): `UserRegistration.jsx`, `UserRegistration()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 86`** (2 nodes): `DashboardFilters()`, `DashboardFilters.js`
+- **Thin community `Community 87`** (2 nodes): `CategoryBreakdown()`, `CategoryBreakdown.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 87`** (2 nodes): `period()`, `RevenueChart.test.js`
+- **Thin community `Community 88`** (2 nodes): `DashboardFilters()`, `DashboardFilters.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 88`** (2 nodes): `createMockQuery()`, `HistoricalTrends.test.js`
+- **Thin community `Community 89`** (2 nodes): `period()`, `RevenueChart.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 89`** (2 nodes): `Notes()`, `Notes.js`
+- **Thin community `Community 90`** (2 nodes): `createMockQuery()`, `HistoricalTrends.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 90`** (2 nodes): `InventoryPicker()`, `InventoryPicker.js`
+- **Thin community `Community 91`** (2 nodes): `Notes()`, `Notes.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 91`** (2 nodes): `ItemTable()`, `ItemTable.js`
+- **Thin community `Community 92`** (2 nodes): `InventoryPicker()`, `InventoryPicker.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 92`** (2 nodes): `AddItemDialog()`, `AddItemDialog.js`
+- **Thin community `Community 93`** (2 nodes): `ItemTable()`, `ItemTable.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 93`** (2 nodes): `formatDate()`, `InvoiceView.js`
+- **Thin community `Community 94`** (2 nodes): `AddItemDialog()`, `AddItemDialog.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 94`** (2 nodes): `CustomerSelector()`, `CustomerSelector.js`
+- **Thin community `Community 95`** (2 nodes): `formatDate()`, `InvoiceView.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 95`** (2 nodes): `SalespersonSelector()`, `SalespersonSelector.js`
+- **Thin community `Community 96`** (2 nodes): `CustomerSelector()`, `CustomerSelector.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 96`** (2 nodes): `ItemRow()`, `ItemRow.js`
+- **Thin community `Community 97`** (2 nodes): `SalespersonSelector()`, `SalespersonSelector.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 97`** (2 nodes): `Summary.js`, `Summary()`
+- **Thin community `Community 98`** (2 nodes): `ItemRow()`, `ItemRow.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 98`** (2 nodes): `generateInvoicePdf()`, `generateInvoicePdf.js`
+- **Thin community `Community 99`** (2 nodes): `Summary.js`, `Summary()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 99`** (2 nodes): `makeDate()`, `exchangeHelpers.test.js`
+- **Thin community `Community 100`** (2 nodes): `generateInvoicePdf()`, `generateInvoicePdf.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 100`** (2 nodes): `useTableFilters.js`, `useTableFilters()`
+- **Thin community `Community 101`** (2 nodes): `makeDate()`, `exchangeHelpers.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 101`** (2 nodes): `CategoriesPage()`, `CategoriesPage.js`
+- **Thin community `Community 102`** (2 nodes): `useTableFilters.js`, `useTableFilters()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 102`** (2 nodes): `SuppliersPage.js`, `SuppliersPage()`
+- **Thin community `Community 103`** (2 nodes): `CategoriesPage()`, `CategoriesPage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 103`** (2 nodes): `InventoryPage()`, `InventoryPage.js`
+- **Thin community `Community 104`** (2 nodes): `SuppliersPage.js`, `SuppliersPage()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 104`** (2 nodes): `MockupOverlayPercentBars()`, `MockupGraphsPage.js`
+- **Thin community `Community 105`** (2 nodes): `InventoryPage()`, `InventoryPage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 105`** (2 nodes): `SignupPage()`, `SignupPage.jsx`
+- **Thin community `Community 106`** (2 nodes): `MockupOverlayPercentBars()`, `MockupGraphsPage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 106`** (2 nodes): `VoucherPage.js`, `VoucherPage()`
+- **Thin community `Community 107`** (2 nodes): `SignupPage()`, `SignupPage.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 107`** (2 nodes): `BillingPage()`, `BillingPage.js`
+- **Thin community `Community 108`** (2 nodes): `VoucherPage.js`, `VoucherPage()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 108`** (2 nodes): `DiscountPage()`, `DiscountPage.js`
+- **Thin community `Community 109`** (2 nodes): `BillingPage()`, `BillingPage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 109`** (2 nodes): `ExchangePage()`, `ExchangePage.js`
+- **Thin community `Community 110`** (2 nodes): `DiscountPage()`, `DiscountPage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 110`** (2 nodes): `CustomersPage()`, `CustomersPage.js`
+- **Thin community `Community 111`** (2 nodes): `ExchangePage()`, `ExchangePage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 111`** (2 nodes): `HistoryPage()`, `HistoryPage.jsx`
+- **Thin community `Community 112`** (2 nodes): `CustomersPage()`, `CustomersPage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 112`** (2 nodes): `LoginPage()`, `LoginPage.jsx`
+- **Thin community `Community 113`** (2 nodes): `HistoryPage()`, `HistoryPage.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 113`** (2 nodes): `TotalValuePage.js`, `TotalValuePage()`
+- **Thin community `Community 114`** (2 nodes): `LoginPage()`, `LoginPage.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 114`** (2 nodes): `SalespersonsPage()`, `SalespersonsPage.js`
+- **Thin community `Community 115`** (2 nodes): `TotalValuePage.js`, `TotalValuePage()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 115`** (2 nodes): `CustomDropdown()`, `CustomDropdown.js`
+- **Thin community `Community 116`** (2 nodes): `SalespersonsPage()`, `SalespersonsPage.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 116`** (2 nodes): `CurrencyInput()`, `currency-input.jsx`
+- **Thin community `Community 117`** (2 nodes): `CustomDropdown()`, `CustomDropdown.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 117`** (2 nodes): `Badge()`, `badge.tsx`
+- **Thin community `Community 118`** (2 nodes): `CurrencyInput()`, `currency-input.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 118`** (2 nodes): `cn()`, `button.tsx`
+- **Thin community `Community 119`** (2 nodes): `Badge()`, `badge.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 119`** (2 nodes): `utils.ts`, `cn()`
+- **Thin community `Community 120`** (2 nodes): `cn()`, `button.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 120`** (2 nodes): `logActivity()`, `activityLog.js`
+- **Thin community `Community 121`** (2 nodes): `utils.ts`, `cn()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 121`** (2 nodes): `UnauthorizedPage.jsx`, `UnauthorizedPage()`
+- **Thin community `Community 122`** (2 nodes): `logActivity()`, `activityLog.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 122`** (2 nodes): `formatINR()`, `formatCurrency.js`
+- **Thin community `Community 123`** (2 nodes): `UnauthorizedPage.jsx`, `UnauthorizedPage()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 123`** (2 nodes): `variantDiff.js`, `variantChanges()`
+- **Thin community `Community 124`** (2 nodes): `formatINR()`, `formatCurrency.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 124`** (2 nodes): `buildBillFilename()`, `billFilename.js`
+- **Thin community `Community 125`** (2 nodes): `variantDiff.js`, `variantChanges()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 125`** (2 nodes): `formatStock()`, `formatStock.js`
+- **Thin community `Community 126`** (2 nodes): `buildBillFilename()`, `billFilename.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 126`** (1 nodes): `tailwind.config.js`
+- **Thin community `Community 127`** (2 nodes): `formatStock()`, `formatStock.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 127`** (1 nodes): `postcss.config.js`
+- **Thin community `Community 128`** (1 nodes): `tailwind.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 128`** (1 nodes): `index.ts`
+- **Thin community `Community 129`** (1 nodes): `postcss.config.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 129`** (1 nodes): `index.js`
+- **Thin community `Community 130`** (1 nodes): `index.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 130`** (1 nodes): `App.test.js`
+- **Thin community `Community 131`** (1 nodes): `index.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 131`** (1 nodes): `setupTests.js`
+- **Thin community `Community 132`** (1 nodes): `App.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 132`** (1 nodes): `VariantPicker.test.jsx`
+- **Thin community `Community 133`** (1 nodes): `setupTests.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 133`** (1 nodes): `filterUtils.test.js`
+- **Thin community `Community 134`** (1 nodes): `VariantPicker.test.jsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 134`** (1 nodes): `ProductTable.js`
+- **Thin community `Community 135`** (1 nodes): `filterUtils.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 135`** (1 nodes): `KpiCards.test.js`
+- **Thin community `Community 136`** (1 nodes): `ProductTable.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 136`** (1 nodes): `SalespersonTable.test.js`
+- **Thin community `Community 137`** (1 nodes): `KpiCards.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 137`** (1 nodes): `DashboardFilters.test.js`
+- **Thin community `Community 138`** (1 nodes): `SalespersonTable.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 138`** (1 nodes): `DiscountTable.test.js`
+- **Thin community `Community 139`** (1 nodes): `DashboardFilters.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 139`** (1 nodes): `CategoryBreakdown.test.js`
+- **Thin community `Community 140`** (1 nodes): `DiscountTable.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 140`** (1 nodes): `ReturnReceiptView.js`
+- **Thin community `Community 141`** (1 nodes): `CategoryBreakdown.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 141`** (1 nodes): `stockDelta.test.js`
+- **Thin community `Community 142`** (1 nodes): `ReturnReceiptView.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 142`** (1 nodes): `billUtils.test.js`
+- **Thin community `Community 143`** (1 nodes): `stockDelta.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 143`** (1 nodes): `useTableFilters.test.js`
+- **Thin community `Community 144`** (1 nodes): `billUtils.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 144`** (1 nodes): `tabs.tsx`
+- **Thin community `Community 145`** (1 nodes): `useTableFilters.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 145`** (1 nodes): `card.tsx`
+- **Thin community `Community 146`** (1 nodes): `tabs.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 146`** (1 nodes): `toaster.tsx`
+- **Thin community `Community 147`** (1 nodes): `card.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 147`** (1 nodes): `scroll-area.tsx`
+- **Thin community `Community 148`** (1 nodes): `toaster.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 148`** (1 nodes): `label.tsx`
+- **Thin community `Community 149`** (1 nodes): `scroll-area.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 149`** (1 nodes): `tooltip.tsx`
+- **Thin community `Community 150`** (1 nodes): `label.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 150`** (1 nodes): `dialog.tsx`
+- **Thin community `Community 151`** (1 nodes): `tooltip.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 151`** (1 nodes): `table.tsx`
+- **Thin community `Community 152`** (1 nodes): `dialog.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 152`** (1 nodes): `toast.tsx`
+- **Thin community `Community 153`** (1 nodes): `table.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 153`** (1 nodes): `checkbox.tsx`
+- **Thin community `Community 154`** (1 nodes): `toast.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 154`** (1 nodes): `select.tsx`
+- **Thin community `Community 155`** (1 nodes): `checkbox.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 155`** (1 nodes): `textarea.tsx`
+- **Thin community `Community 156`** (1 nodes): `select.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 156`** (1 nodes): `input.tsx`
+- **Thin community `Community 157`** (1 nodes): `textarea.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 157`** (1 nodes): `form.tsx`
+- **Thin community `Community 158`** (1 nodes): `input.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 158`** (1 nodes): `supabaseClient.js`
+- **Thin community `Community 159`** (1 nodes): `form.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 159`** (1 nodes): `activityLog.test.js`
+- **Thin community `Community 160`** (1 nodes): `supabaseClient.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 160`** (1 nodes): `formatStock.test.js`
+- **Thin community `Community 161`** (1 nodes): `activityLog.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 161`** (1 nodes): `dashboardData.test.js`
+- **Thin community `Community 162`** (1 nodes): `formatStock.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 162`** (1 nodes): `billFilename.test.js`
+- **Thin community `Community 163`** (1 nodes): `dashboardData.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 163`** (1 nodes): `supplierBillCalc.test.js`
+- **Thin community `Community 164`** (1 nodes): `billFilename.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 164`** (1 nodes): `activitySummary.test.js`
+- **Thin community `Community 165`** (1 nodes): `supplierBillCalc.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 165`** (1 nodes): `variantDiff.test.js`
+- **Thin community `Community 166`** (1 nodes): `activitySummary.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 166`** (1 nodes): `formatCurrency.test.js`
+- **Thin community `Community 167`** (1 nodes): `variantDiff.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 167`** (1 nodes): `supplierBalance.test.js`
+- **Thin community `Community 168`** (1 nodes): `formatCurrency.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 168`** (1 nodes): `productName.test.js`
+- **Thin community `Community 169`** (1 nodes): `supplierBalance.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 169`** (1 nodes): `formatPhone.test.js`
+- **Thin community `Community 170`** (1 nodes): `productName.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 170`** (1 nodes): `dateFormat.test.js`
+- **Thin community `Community 171`** (1 nodes): `formatPhone.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 171`** (1 nodes): `Create React App`
+- **Thin community `Community 172`** (1 nodes): `dateFormat.test.js`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 172`** (1 nodes): `npm start (Dev Server)`
+- **Thin community `Community 173`** (1 nodes): `Create React App`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 173`** (1 nodes): `npm test (Test Runner)`
+- **Thin community `Community 174`** (1 nodes): `npm start (Dev Server)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 174`** (1 nodes): `npm run build (Production Build)`
+- **Thin community `Community 175`** (1 nodes): `npm test (Test Runner)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 175`** (1 nodes): `npm run eject`
+- **Thin community `Community 176`** (1 nodes): `npm run build (Production Build)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 176`** (1 nodes): `React 19 SPA`
+- **Thin community `Community 177`** (1 nodes): `npm run eject`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 177`** (1 nodes): `Supabase (PostgreSQL + Auth)`
+- **Thin community `Community 178`** (1 nodes): `React 19 SPA`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 178`** (1 nodes): `@supabase/supabase-js Client Library`
+- **Thin community `Community 179`** (1 nodes): `Supabase (PostgreSQL + Auth)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 179`** (1 nodes): `Environment Variables (REACT_APP_SUPABASE_URL, REACT_APP_SUPABASE_ANON_KEY)`
+- **Thin community `Community 180`** (1 nodes): `@supabase/supabase-js Client Library`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 180`** (1 nodes): `DB Table: products`
+- **Thin community `Community 181`** (1 nodes): `Environment Variables (REACT_APP_SUPABASE_URL, REACT_APP_SUPABASE_ANON_KEY)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 181`** (1 nodes): `DB Table: productsizecolors`
+- **Thin community `Community 182`** (1 nodes): `DB Table: products`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 182`** (1 nodes): `DB Table: categories`
+- **Thin community `Community 183`** (1 nodes): `DB Table: productsizecolors`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 183`** (1 nodes): `DB Table: customers`
+- **Thin community `Community 184`** (1 nodes): `DB Table: categories`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 184`** (1 nodes): `DB Table: suppliers`
+- **Thin community `Community 185`** (1 nodes): `DB Table: customers`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 185`** (1 nodes): `DB Table: profiles`
+- **Thin community `Community 186`** (1 nodes): `DB Table: suppliers`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 186`** (1 nodes): `DB Table: discounts`
+- **Thin community `Community 187`** (1 nodes): `DB Table: profiles`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 187`** (1 nodes): `DB Table: bills`
+- **Thin community `Community 188`** (1 nodes): `DB Table: discounts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 188`** (1 nodes): `DB Table: mockups`
+- **Thin community `Community 189`** (1 nodes): `DB Table: bills`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 189`** (1 nodes): `Product ID Format BC{YY}{###}`
+- **Thin community `Community 190`** (1 nodes): `DB Table: mockups`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 190`** (1 nodes): `Supabase RPC: get_max_product_suffix`
+- **Thin community `Community 191`** (1 nodes): `Product ID Format BC{YY}{###}`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 191`** (1 nodes): `Shadcn/ui Components`
+- **Thin community `Community 192`** (1 nodes): `Supabase RPC: get_max_product_suffix`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 192`** (1 nodes): `Radix UI Primitives`
+- **Thin community `Community 193`** (1 nodes): `Shadcn/ui Components`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 193`** (1 nodes): `Tailwind CSS`
+- **Thin community `Community 194`** (1 nodes): `Radix UI Primitives`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 194`** (1 nodes): `Sonner (Toast Notifications)`
+- **Thin community `Community 195`** (1 nodes): `Tailwind CSS`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 195`** (1 nodes): `React Hook Form`
+- **Thin community `Community 196`** (1 nodes): `Sonner (Toast Notifications)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 196`** (1 nodes): `Zod (Form Validation)`
+- **Thin community `Community 197`** (1 nodes): `React Hook Form`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 197`** (1 nodes): `Plotly.js (react-plotly.js)`
+- **Thin community `Community 198`** (1 nodes): `Zod (Form Validation)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 198`** (1 nodes): `Path Alias @/* → src/*`
+- **Thin community `Community 199`** (1 nodes): `Plotly.js (react-plotly.js)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 199`** (1 nodes): `Local State Management (useState/useEffect)`
+- **Thin community `Community 200`** (1 nodes): `Path Alias @/* → src/*`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 200`** (1 nodes): `refreshFlag Re-fetch Pattern`
+- **Thin community `Community 201`** (1 nodes): `Local State Management (useState/useEffect)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 201`** (1 nodes): `Rationale: No Global Store — local state per component`
+- **Thin community `Community 202`** (1 nodes): `refreshFlag Re-fetch Pattern`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 202`** (1 nodes): `QZ Tray (Label/Invoice Printing)`
+- **Thin community `Community 203`** (1 nodes): `Rationale: No Global Store — local state per component`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 203`** (1 nodes): `Rationale: No Server-Side Code — all data access direct from client`
+- **Thin community `Community 204`** (1 nodes): `QZ Tray (Label/Invoice Printing)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 204`** (1 nodes): `robots.txt Sitemap (bindalscreations.com)`
+- **Thin community `Community 205`** (1 nodes): `Rationale: No Server-Side Code — all data access direct from client`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 205`** (1 nodes): `robots.txt Allow All Crawlers`
+- **Thin community `Community 206`** (1 nodes): `robots.txt Sitemap (bindalscreations.com)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 206`** (1 nodes): `Bindals Creation Logo`
+- **Thin community `Community 207`** (1 nodes): `robots.txt Allow All Crawlers`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 207`** (1 nodes): `Bindals Creation`
+- **Thin community `Community 208`** (1 nodes): `Bindals Creation Logo`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 208`** (1 nodes): `Monogram Letter B`
+- **Thin community `Community 209`** (1 nodes): `Bindals Creation`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 209`** (1 nodes): `Ornamental Circular Frame`
+- **Thin community `Community 210`** (1 nodes): `Monogram Letter B`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 210`** (1 nodes): `Floral Scrollwork / Filigree`
+- **Thin community `Community 211`** (1 nodes): `Ornamental Circular Frame`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 211`** (1 nodes): `Luxury / Ornate Design Style`
+- **Thin community `Community 212`** (1 nodes): `Floral Scrollwork / Filigree`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 212`** (1 nodes): `Gold and White Color Scheme`
+- **Thin community `Community 213`** (1 nodes): `Luxury / Ornate Design Style`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 213`** (1 nodes): `Bindal's Creation Bill Logo`
+- **Thin community `Community 214`** (1 nodes): `Gold and White Color Scheme`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 214`** (1 nodes): `Stylized Letter B`
+- **Thin community `Community 215`** (1 nodes): `Bindal's Creation Bill Logo`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 215`** (1 nodes): `Ornamental Circular Frame`
+- **Thin community `Community 216`** (1 nodes): `Stylized Letter B`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 216`** (1 nodes): `Decorative Scrollwork Base`
+- **Thin community `Community 217`** (1 nodes): `Ornamental Circular Frame`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 217`** (1 nodes): `Gold Color Scheme`
+- **Thin community `Community 218`** (1 nodes): `Decorative Scrollwork Base`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 218`** (1 nodes): `Billing Document Branding Purpose`
+- **Thin community `Community 219`** (1 nodes): `Gold Color Scheme`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 219`** (1 nodes): `Retail Brand Identity`
+- **Thin community `Community 220`** (1 nodes): `Billing Document Branding Purpose`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 220`** (1 nodes): `React Logo SVG`
+- **Thin community `Community 221`** (1 nodes): `Retail Brand Identity`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 221`** (1 nodes): `React Atom Symbol`
+- **Thin community `Community 222`** (1 nodes): `React Logo SVG`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 222`** (1 nodes): `React Blue Color (#61DAFB)`
+- **Thin community `Community 223`** (1 nodes): `React Atom Symbol`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 223`** (1 nodes): `Central Nucleus Circle`
+- **Thin community `Community 224`** (1 nodes): `React Blue Color (#61DAFB)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 224`** (1 nodes): `Elliptical Orbital Paths`
+- **Thin community `Community 225`** (1 nodes): `Central Nucleus Circle`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 225`** (1 nodes): `Bindal's Creation Logo`
+- **Thin community `Community 226`** (1 nodes): `Elliptical Orbital Paths`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 226`** (1 nodes): `Bindal's Creation Brand`
+- **Thin community `Community 227`** (1 nodes): `Bindal's Creation Logo`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 227`** (1 nodes): `Monogram Letter B`
+- **Thin community `Community 228`** (1 nodes): `Bindal's Creation Brand`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 228`** (1 nodes): `Ornamental Circular Frame`
+- **Thin community `Community 229`** (1 nodes): `Monogram Letter B`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 229`** (1 nodes): `Floral Scrollwork / Acanthus Flourishes`
+- **Thin community `Community 230`** (1 nodes): `Ornamental Circular Frame`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 230`** (1 nodes): `Butterfly Silhouette`
+- **Thin community `Community 231`** (1 nodes): `Floral Scrollwork / Acanthus Flourishes`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 231`** (1 nodes): `Gold / Amber Color Scheme`
+- **Thin community `Community 232`** (1 nodes): `Butterfly Silhouette`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 232`** (1 nodes): `White Background`
+- **Thin community `Community 233`** (1 nodes): `Gold / Amber Color Scheme`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 233`** (1 nodes): `Luxury / Elegant Design Style`
+- **Thin community `Community 234`** (1 nodes): `White Background`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 234`** (1 nodes): `Brand Identity / Logo Asset`
+- **Thin community `Community 235`** (1 nodes): `Luxury / Elegant Design Style`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 235`** (1 nodes): `Bindal's Creation Bill Logo`
+- **Thin community `Community 236`** (1 nodes): `Brand Identity / Logo Asset`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 236`** (1 nodes): `Stylized Letter B`
+- **Thin community `Community 237`** (1 nodes): `Bindal's Creation Bill Logo`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 237`** (1 nodes): `Ornate Gold Scrollwork Design`
+- **Thin community `Community 238`** (1 nodes): `Stylized Letter B`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 238`** (1 nodes): `Gold on White Color Scheme`
+- **Thin community `Community 239`** (1 nodes): `Ornate Gold Scrollwork Design`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 239`** (1 nodes): `Invoice/Bill Header Branding`
+- **Thin community `Community 240`** (1 nodes): `Gold on White Color Scheme`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 240`** (1 nodes): `Bills Table`
+- **Thin community `Community 241`** (1 nodes): `Invoice/Bill Header Branding`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 241`** (1 nodes): `Sample Bill - Bindal's Creation Invoice`
+- **Thin community `Community 242`** (1 nodes): `Bills Table`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 242`** (1 nodes): `Bindal's Creation (Business)`
+- **Thin community `Community 243`** (1 nodes): `Sample Bill - Bindal's Creation Invoice`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 243`** (1 nodes): `Akash Raghani (Customer)`
+- **Thin community `Community 244`** (1 nodes): `Bindal's Creation (Business)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 244`** (1 nodes): `Bill Number Field (012)`
+- **Thin community `Community 245`** (1 nodes): `Akash Raghani (Customer)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 245`** (1 nodes): `Customer Name Field`
+- **Thin community `Community 246`** (1 nodes): `Bill Number Field (012)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 246`** (1 nodes): `Phone Number Field (9662160069 / 6260971106)`
+- **Thin community `Community 247`** (1 nodes): `Customer Name Field`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 247`** (1 nodes): `Line Item 1 - Product (Qty:1, Rate:595, Amt:595)`
+- **Thin community `Community 248`** (1 nodes): `Phone Number Field (9662160069 / 6260971106)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 248`** (1 nodes): `Line Item 2 - Suit BS25316 (Qty:1, Rate:1026, Amt:1026)`
+- **Thin community `Community 249`** (1 nodes): `Line Item 1 - Product (Qty:1, Rate:595, Amt:595)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 249`** (1 nodes): `Total Quantity Field`
+- **Thin community `Community 250`** (1 nodes): `Line Item 2 - Suit BS25316 (Qty:1, Rate:1026, Amt:1026)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 250`** (1 nodes): `Net Amount Field (1636)`
+- **Thin community `Community 251`** (1 nodes): `Total Quantity Field`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 251`** (1 nodes): `Discount / Adjustment Field (-836)`
+- **Thin community `Community 252`** (1 nodes): `Net Amount Field (1636)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 252`** (1 nodes): `Bill Footer Policy Notes (no returns, guarantee terms)`
+- **Thin community `Community 253`** (1 nodes): `Discount / Adjustment Field (-836)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 253`** (1 nodes): `Handwritten Bill Layout (pre-printed template)`
+- **Thin community `Community 254`** (1 nodes): `Bill Footer Policy Notes (no returns, guarantee terms)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 254`** (1 nodes): `Suit Product (BC-format product code BS25316)`
+- **Thin community `Community 255`** (1 nodes): `Handwritten Bill Layout (pre-printed template)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 256`** (1 nodes): `Suit Product (BC-format product code BS25316)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions

@@ -51,7 +51,7 @@
       "source_file": "tailwind.config.js",
       "source_location": "L1",
       "id": "tailwind_config_js",
-      "community": 126
+      "community": 128
     },
     {
       "label": "postcss.config.js",
@@ -59,7 +59,7 @@
       "source_file": "postcss.config.js",
       "source_location": "L1",
       "id": "postcss_config_js",
-      "community": 127
+      "community": 129
     },
     {
       "label": "index.ts",
@@ -67,7 +67,7 @@
       "source_file": "supabase/functions/send-bill-sms/index.ts",
       "source_location": "L1",
       "id": "supabase_functions_send_bill_sms_index_ts",
-      "community": 128
+      "community": 130
     },
     {
       "label": "migrate.js",
@@ -75,7 +75,7 @@
       "source_file": "scripts/migrate.js",
       "source_location": "L1",
       "id": "scripts_migrate_js",
-      "community": 23
+      "community": 25
     },
     {
       "label": "loadEnv()",
@@ -83,7 +83,7 @@
       "source_file": "scripts/migrate.js",
       "source_location": "L9",
       "id": "migrate_loadenv",
-      "community": 23
+      "community": 25
     },
     {
       "label": "main()",
@@ -91,7 +91,7 @@
       "source_file": "scripts/migrate.js",
       "source_location": "L23",
       "id": "migrate_main",
-      "community": 23
+      "community": 25
     },
     {
       "label": "reportWebVitals.js",
@@ -99,7 +99,7 @@
       "source_file": "src/reportWebVitals.js",
       "source_location": "L1",
       "id": "src_reportwebvitals_js",
-      "community": 54
+      "community": 55
     },
     {
       "label": "reportWebVitals()",
@@ -107,7 +107,7 @@
       "source_file": "src/reportWebVitals.js",
       "source_location": "L1",
       "id": "reportwebvitals_reportwebvitals",
-      "community": 54
+      "community": 55
     },
     {
       "label": "index.js",
@@ -115,7 +115,7 @@
       "source_file": "src/index.js",
       "source_location": "L1",
       "id": "src_index_js",
-      "community": 129
+      "community": 131
     },
     {
       "label": "App.test.js",
@@ -123,7 +123,7 @@
       "source_file": "src/App.test.js",
       "source_location": "L1",
       "id": "src_app_test_js",
-      "community": 130
+      "community": 132
     },
     {
       "label": "setupTests.js",
@@ -131,7 +131,7 @@
       "source_file": "src/setupTests.js",
       "source_location": "L1",
       "id": "src_setuptests_js",
-      "community": 131
+      "community": 133
     },
     {
       "label": "App.js",
@@ -139,7 +139,7 @@
       "source_file": "src/App.js",
       "source_location": "L1",
       "id": "src_app_js",
-      "community": 55
+      "community": 56
     },
     {
       "label": "App()",
@@ -147,7 +147,7 @@
       "source_file": "src/App.js",
       "source_location": "L35",
       "id": "app_app",
-      "community": 55
+      "community": 56
     },
     {
       "label": "CartContext.jsx",
@@ -155,7 +155,7 @@
       "source_file": "src/storefront/context/CartContext.jsx",
       "source_location": "L1",
       "id": "src_storefront_context_cartcontext_jsx",
-      "community": 24
+      "community": 26
     },
     {
       "label": "CartProvider()",
@@ -163,7 +163,7 @@
       "source_file": "src/storefront/context/CartContext.jsx",
       "source_location": "L13",
       "id": "cartcontext_cartprovider",
-      "community": 24
+      "community": 26
     },
     {
       "label": "useCart()",
@@ -171,7 +171,23 @@
       "source_file": "src/storefront/context/CartContext.jsx",
       "source_location": "L89",
       "id": "cartcontext_usecart",
-      "community": 24
+      "community": 26
+    },
+    {
+      "label": "BlurFillImage.jsx",
+      "file_type": "code",
+      "source_file": "src/storefront/components/BlurFillImage.jsx",
+      "source_location": "L1",
+      "id": "src_storefront_components_blurfillimage_jsx",
+      "community": 57
+    },
+    {
+      "label": "BlurFillImage()",
+      "file_type": "code",
+      "source_file": "src/storefront/components/BlurFillImage.jsx",
+      "source_location": "L8",
+      "id": "blurfillimage_blurfillimage",
+      "community": 57
     },
     {
       "label": "StorefrontLayout.jsx",
@@ -179,7 +195,7 @@
       "source_file": "src/storefront/components/StorefrontLayout.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_storefrontlayout_jsx",
-      "community": 56
+      "community": 58
     },
     {
       "label": "StorefrontLayout()",
@@ -187,7 +203,7 @@
       "source_file": "src/storefront/components/StorefrontLayout.jsx",
       "source_location": "L8",
       "id": "storefrontlayout_storefrontlayout",
-      "community": 56
+      "community": 58
     },
     {
       "label": "StorefrontHeader.jsx",
@@ -195,7 +211,7 @@
       "source_file": "src/storefront/components/StorefrontHeader.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_storefrontheader_jsx",
-      "community": 57
+      "community": 59
     },
     {
       "label": "StorefrontHeader()",
@@ -203,7 +219,7 @@
       "source_file": "src/storefront/components/StorefrontHeader.jsx",
       "source_location": "L13",
       "id": "storefrontheader_storefrontheader",
-      "community": 57
+      "community": 59
     },
     {
       "label": "StorefrontFooter.jsx",
@@ -211,7 +227,7 @@
       "source_file": "src/storefront/components/StorefrontFooter.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_storefrontfooter_jsx",
-      "community": 58
+      "community": 60
     },
     {
       "label": "StorefrontFooter()",
@@ -219,7 +235,7 @@
       "source_file": "src/storefront/components/StorefrontFooter.jsx",
       "source_location": "L5",
       "id": "storefrontfooter_storefrontfooter",
-      "community": 58
+      "community": 60
     },
     {
       "label": "ProductCard.jsx",
@@ -227,23 +243,23 @@
       "source_file": "src/storefront/components/ProductCard.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_productcard_jsx",
-      "community": 25
+      "community": 27
     },
     {
       "label": "PlaceholderImage()",
       "file_type": "code",
       "source_file": "src/storefront/components/ProductCard.jsx",
-      "source_location": "L5",
+      "source_location": "L7",
       "id": "productcard_placeholderimage",
-      "community": 25
+      "community": 27
     },
     {
       "label": "ProductCard()",
       "file_type": "code",
       "source_file": "src/storefront/components/ProductCard.jsx",
-      "source_location": "L26",
+      "source_location": "L28",
       "id": "productcard_productcard",
-      "community": 25
+      "community": 27
     },
     {
       "label": "BestsellerGrid.jsx",
@@ -251,7 +267,7 @@
       "source_file": "src/storefront/components/home/BestsellerGrid.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_bestsellergrid_jsx",
-      "community": 26
+      "community": 28
     },
     {
       "label": "GridSkeleton()",
@@ -259,7 +275,7 @@
       "source_file": "src/storefront/components/home/BestsellerGrid.jsx",
       "source_location": "L6",
       "id": "bestsellergrid_gridskeleton",
-      "community": 26
+      "community": 28
     },
     {
       "label": "BestsellerGrid()",
@@ -267,7 +283,7 @@
       "source_file": "src/storefront/components/home/BestsellerGrid.jsx",
       "source_location": "L22",
       "id": "bestsellergrid_bestsellergrid",
-      "community": 26
+      "community": 28
     },
     {
       "label": "NewArrivals.jsx",
@@ -275,7 +291,7 @@
       "source_file": "src/storefront/components/home/NewArrivals.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_newarrivals_jsx",
-      "community": 27
+      "community": 29
     },
     {
       "label": "ProductSkeleton()",
@@ -283,7 +299,7 @@
       "source_file": "src/storefront/components/home/NewArrivals.jsx",
       "source_location": "L7",
       "id": "newarrivals_productskeleton",
-      "community": 27
+      "community": 29
     },
     {
       "label": "NewArrivals()",
@@ -291,7 +307,7 @@
       "source_file": "src/storefront/components/home/NewArrivals.jsx",
       "source_location": "L19",
       "id": "newarrivals_newarrivals",
-      "community": 27
+      "community": 29
     },
     {
       "label": "FeaturedCollection.jsx",
@@ -299,7 +315,7 @@
       "source_file": "src/storefront/components/home/FeaturedCollection.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_featuredcollection_jsx",
-      "community": 59
+      "community": 61
     },
     {
       "label": "FeaturedCollection()",
@@ -307,7 +323,7 @@
       "source_file": "src/storefront/components/home/FeaturedCollection.jsx",
       "source_location": "L5",
       "id": "featuredcollection_featuredcollection",
-      "community": 59
+      "community": 61
     },
     {
       "label": "HeroBanner.jsx",
@@ -315,7 +331,7 @@
       "source_file": "src/storefront/components/home/HeroBanner.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_herobanner_jsx",
-      "community": 60
+      "community": 62
     },
     {
       "label": "HeroBanner()",
@@ -323,7 +339,7 @@
       "source_file": "src/storefront/components/home/HeroBanner.jsx",
       "source_location": "L5",
       "id": "herobanner_herobanner",
-      "community": 60
+      "community": 62
     },
     {
       "label": "TrustBar.jsx",
@@ -331,7 +347,7 @@
       "source_file": "src/storefront/components/home/TrustBar.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_trustbar_jsx",
-      "community": 61
+      "community": 63
     },
     {
       "label": "TrustBar()",
@@ -339,7 +355,7 @@
       "source_file": "src/storefront/components/home/TrustBar.jsx",
       "source_location": "L11",
       "id": "trustbar_trustbar",
-      "community": 61
+      "community": 63
     },
     {
       "label": "ReviewsSection.jsx",
@@ -347,7 +363,7 @@
       "source_file": "src/storefront/components/home/ReviewsSection.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_reviewssection_jsx",
-      "community": 28
+      "community": 30
     },
     {
       "label": "Stars()",
@@ -355,7 +371,7 @@
       "source_file": "src/storefront/components/home/ReviewsSection.jsx",
       "source_location": "L29",
       "id": "reviewssection_stars",
-      "community": 28
+      "community": 30
     },
     {
       "label": "ReviewsSection()",
@@ -363,7 +379,7 @@
       "source_file": "src/storefront/components/home/ReviewsSection.jsx",
       "source_location": "L43",
       "id": "reviewssection_reviewssection",
-      "community": 28
+      "community": 30
     },
     {
       "label": "NewsletterSignup.jsx",
@@ -371,7 +387,7 @@
       "source_file": "src/storefront/components/home/NewsletterSignup.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_newslettersignup_jsx",
-      "community": 62
+      "community": 64
     },
     {
       "label": "NewsletterSignup()",
@@ -379,7 +395,7 @@
       "source_file": "src/storefront/components/home/NewsletterSignup.jsx",
       "source_location": "L5",
       "id": "newslettersignup_newslettersignup",
-      "community": 62
+      "community": 64
     },
     {
       "label": "CategoryShowcase.jsx",
@@ -387,39 +403,39 @@
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_home_categoryshowcase_jsx",
-      "community": 9
+      "community": 10
     },
     {
-      "label": "getImage()",
+      "label": "getCategoryHeroImage()",
       "file_type": "code",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L58",
-      "id": "categoryshowcase_getimage",
-      "community": 9
+      "source_location": "L17",
+      "id": "categoryshowcase_getcategoryheroimage",
+      "community": 10
     },
     {
       "label": "CategoryCard()",
       "file_type": "code",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L70",
+      "source_location": "L39",
       "id": "categoryshowcase_categorycard",
-      "community": 9
+      "community": 10
     },
     {
       "label": "CategorySkeleton()",
       "file_type": "code",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L112",
+      "source_location": "L81",
       "id": "categoryshowcase_categoryskeleton",
-      "community": 9
+      "community": 10
     },
     {
       "label": "CategoryShowcase()",
       "file_type": "code",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L121",
+      "source_location": "L90",
       "id": "categoryshowcase_categoryshowcase",
-      "community": 9
+      "community": 10
     },
     {
       "label": "FilterDropdown.jsx",
@@ -427,7 +443,7 @@
       "source_file": "src/storefront/components/shop/FilterDropdown.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_filterdropdown_jsx",
-      "community": 29
+      "community": 31
     },
     {
       "label": "ColorSwatch()",
@@ -435,7 +451,7 @@
       "source_file": "src/storefront/components/shop/FilterDropdown.jsx",
       "source_location": "L42",
       "id": "filterdropdown_colorswatch",
-      "community": 29
+      "community": 31
     },
     {
       "label": "FilterDropdown()",
@@ -443,7 +459,7 @@
       "source_file": "src/storefront/components/shop/FilterDropdown.jsx",
       "source_location": "L98",
       "id": "filterdropdown_filterdropdown",
-      "community": 29
+      "community": 31
     },
     {
       "label": "PriceInputs.jsx",
@@ -451,7 +467,7 @@
       "source_file": "src/storefront/components/shop/PriceInputs.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_priceinputs_jsx",
-      "community": 63
+      "community": 65
     },
     {
       "label": "PriceInputs()",
@@ -459,7 +475,7 @@
       "source_file": "src/storefront/components/shop/PriceInputs.jsx",
       "source_location": "L11",
       "id": "priceinputs_priceinputs",
-      "community": 63
+      "community": 65
     },
     {
       "label": "CategoryRow.jsx",
@@ -467,7 +483,7 @@
       "source_file": "src/storefront/components/shop/CategoryRow.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_categoryrow_jsx",
-      "community": 64
+      "community": 66
     },
     {
       "label": "CategoryRow()",
@@ -475,7 +491,7 @@
       "source_file": "src/storefront/components/shop/CategoryRow.jsx",
       "source_location": "L3",
       "id": "categoryrow_categoryrow",
-      "community": 64
+      "community": 66
     },
     {
       "label": "ProductGrid.jsx",
@@ -483,7 +499,7 @@
       "source_file": "src/storefront/components/shop/ProductGrid.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_productgrid_jsx",
-      "community": 30
+      "community": 32
     },
     {
       "label": "ProductSkeleton()",
@@ -491,7 +507,7 @@
       "source_file": "src/storefront/components/shop/ProductGrid.jsx",
       "source_location": "L4",
       "id": "productgrid_productskeleton",
-      "community": 30
+      "community": 32
     },
     {
       "label": "ProductGrid()",
@@ -499,7 +515,7 @@
       "source_file": "src/storefront/components/shop/ProductGrid.jsx",
       "source_location": "L16",
       "id": "productgrid_productgrid",
-      "community": 30
+      "community": 32
     },
     {
       "label": "FilterBar.jsx",
@@ -507,7 +523,7 @@
       "source_file": "src/storefront/components/shop/FilterBar.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_filterbar_jsx",
-      "community": 65
+      "community": 67
     },
     {
       "label": "FilterBar()",
@@ -515,7 +531,7 @@
       "source_file": "src/storefront/components/shop/FilterBar.jsx",
       "source_location": "L13",
       "id": "filterbar_filterbar",
-      "community": 65
+      "community": 67
     },
     {
       "label": "AllFiltersPanel.jsx",
@@ -523,7 +539,7 @@
       "source_file": "src/storefront/components/shop/AllFiltersPanel.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_shop_allfilterspanel_jsx",
-      "community": 31
+      "community": 33
     },
     {
       "label": "SectionLabel()",
@@ -531,7 +547,7 @@
       "source_file": "src/storefront/components/shop/AllFiltersPanel.jsx",
       "source_location": "L42",
       "id": "allfilterspanel_sectionlabel",
-      "community": 31
+      "community": 33
     },
     {
       "label": "AllFiltersPanel()",
@@ -539,7 +555,7 @@
       "source_file": "src/storefront/components/shop/AllFiltersPanel.jsx",
       "source_location": "L50",
       "id": "allfilterspanel_allfilterspanel",
-      "community": 31
+      "community": 33
     },
     {
       "label": "VariantPicker.jsx",
@@ -547,7 +563,7 @@
       "source_file": "src/storefront/components/product/VariantPicker.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_product_variantpicker_jsx",
-      "community": 66
+      "community": 68
     },
     {
       "label": "VariantPicker()",
@@ -555,7 +571,7 @@
       "source_file": "src/storefront/components/product/VariantPicker.jsx",
       "source_location": "L3",
       "id": "variantpicker_variantpicker",
-      "community": 66
+      "community": 68
     },
     {
       "label": "CartDrawer.jsx",
@@ -563,7 +579,7 @@
       "source_file": "src/storefront/components/cart/CartDrawer.jsx",
       "source_location": "L1",
       "id": "src_storefront_components_cart_cartdrawer_jsx",
-      "community": 32
+      "community": 34
     },
     {
       "label": "CartItem()",
@@ -571,7 +587,7 @@
       "source_file": "src/storefront/components/cart/CartDrawer.jsx",
       "source_location": "L6",
       "id": "cartdrawer_cartitem",
-      "community": 32
+      "community": 34
     },
     {
       "label": "CartDrawer()",
@@ -579,7 +595,7 @@
       "source_file": "src/storefront/components/cart/CartDrawer.jsx",
       "source_location": "L72",
       "id": "cartdrawer_cartdrawer",
-      "community": 32
+      "community": 34
     },
     {
       "label": "CartContext.test.jsx",
@@ -587,7 +603,7 @@
       "source_file": "src/storefront/__tests__/CartContext.test.jsx",
       "source_location": "L1",
       "id": "src_storefront_tests_cartcontext_test_jsx",
-      "community": 33
+      "community": 35
     },
     {
       "label": "Harness()",
@@ -595,7 +611,7 @@
       "source_file": "src/storefront/__tests__/CartContext.test.jsx",
       "source_location": "L27",
       "id": "cartcontext_test_harness",
-      "community": 33
+      "community": 35
     },
     {
       "label": "renderHarness()",
@@ -603,7 +619,7 @@
       "source_file": "src/storefront/__tests__/CartContext.test.jsx",
       "source_location": "L44",
       "id": "cartcontext_test_renderharness",
-      "community": 33
+      "community": 35
     },
     {
       "label": "VariantPicker.test.jsx",
@@ -611,7 +627,7 @@
       "source_file": "src/storefront/__tests__/VariantPicker.test.jsx",
       "source_location": "L1",
       "id": "src_storefront_tests_variantpicker_test_jsx",
-      "community": 132
+      "community": 134
     },
     {
       "label": "filterUtils.test.js",
@@ -619,7 +635,7 @@
       "source_file": "src/storefront/__tests__/filterUtils.test.js",
       "source_location": "L1",
       "id": "src_storefront_tests_filterutils_test_js",
-      "community": 133
+      "community": 135
     },
     {
       "label": "CartDrawer.test.jsx",
@@ -627,7 +643,7 @@
       "source_file": "src/storefront/__tests__/CartDrawer.test.jsx",
       "source_location": "L1",
       "id": "src_storefront_tests_cartdrawer_test_jsx",
-      "community": 34
+      "community": 36
     },
     {
       "label": "makeCtx()",
@@ -635,7 +651,7 @@
       "source_file": "src/storefront/__tests__/CartDrawer.test.jsx",
       "source_location": "L29",
       "id": "cartdrawer_test_makectx",
-      "community": 34
+      "community": 36
     },
     {
       "label": "renderDrawer()",
@@ -643,7 +659,7 @@
       "source_file": "src/storefront/__tests__/CartDrawer.test.jsx",
       "source_location": "L44",
       "id": "cartdrawer_test_renderdrawer",
-      "community": 34
+      "community": 36
     },
     {
       "label": "useProduct.test.js",
@@ -651,7 +667,7 @@
       "source_file": "src/storefront/__tests__/useProduct.test.js",
       "source_location": "L1",
       "id": "src_storefront_tests_useproduct_test_js",
-      "community": 35
+      "community": 37
     },
     {
       "label": "mockSuccess()",
@@ -659,7 +675,7 @@
       "source_file": "src/storefront/__tests__/useProduct.test.js",
       "source_location": "L26",
       "id": "useproduct_test_mocksuccess",
-      "community": 35
+      "community": 37
     },
     {
       "label": "mockProductError()",
@@ -667,7 +683,7 @@
       "source_file": "src/storefront/__tests__/useProduct.test.js",
       "source_location": "L49",
       "id": "useproduct_test_mockproducterror",
-      "community": 35
+      "community": 37
     },
     {
       "label": "useShopFilters.js",
@@ -675,7 +691,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L1",
       "id": "src_storefront_hooks_useshopfilters_js",
-      "community": 15
+      "community": 17
     },
     {
       "label": "getMatchingPids()",
@@ -683,7 +699,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L17",
       "id": "useshopfilters_getmatchingpids",
-      "community": 15
+      "community": 17
     },
     {
       "label": "fetchAvailableOptionsFromDB()",
@@ -691,7 +707,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L44",
       "id": "useshopfilters_fetchavailableoptionsfromdb",
-      "community": 15
+      "community": 17
     },
     {
       "label": "useShopFilters()",
@@ -699,7 +715,7 @@
       "source_file": "src/storefront/hooks/useShopFilters.js",
       "source_location": "L85",
       "id": "useshopfilters_useshopfilters",
-      "community": 15
+      "community": 17
     },
     {
       "label": "filterUtils.js",
@@ -707,7 +723,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L1",
       "id": "src_storefront_hooks_filterutils_js",
-      "community": 16
+      "community": 18
     },
     {
       "label": "matchExcluding()",
@@ -715,7 +731,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L1",
       "id": "filterutils_matchexcluding",
-      "community": 16
+      "community": 18
     },
     {
       "label": "computeAvailableOptions()",
@@ -723,7 +739,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L29",
       "id": "filterutils_computeavailableoptions",
-      "community": 16
+      "community": 18
     },
     {
       "label": "sortByAvailability()",
@@ -731,7 +747,7 @@
       "source_file": "src/storefront/hooks/filterUtils.js",
       "source_location": "L64",
       "id": "filterutils_sortbyavailability",
-      "community": 16
+      "community": 18
     },
     {
       "label": "useProduct.js",
@@ -739,7 +755,7 @@
       "source_file": "src/storefront/hooks/useProduct.js",
       "source_location": "L1",
       "id": "src_storefront_hooks_useproduct_js",
-      "community": 67
+      "community": 69
     },
     {
       "label": "useProduct()",
@@ -747,7 +763,55 @@
       "source_file": "src/storefront/hooks/useProduct.js",
       "source_location": "L4",
       "id": "useproduct_useproduct",
-      "community": 67
+      "community": 69
+    },
+    {
+      "label": "productImage.js",
+      "file_type": "code",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L1",
+      "id": "src_storefront_lib_productimage_js",
+      "community": 6
+    },
+    {
+      "label": "resolve()",
+      "file_type": "code",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L16",
+      "id": "productimage_resolve",
+      "community": 6
+    },
+    {
+      "label": "imageUrl()",
+      "file_type": "code",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L37",
+      "id": "productimage_imageurl",
+      "community": 6
+    },
+    {
+      "label": "getProductImagePaths()",
+      "file_type": "code",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L48",
+      "id": "productimage_getproductimagepaths",
+      "community": 6
+    },
+    {
+      "label": "getProductImages()",
+      "file_type": "code",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L65",
+      "id": "productimage_getproductimages",
+      "community": 6
+    },
+    {
+      "label": "getProductImageUrl()",
+      "file_type": "code",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L77",
+      "id": "productimage_getproductimageurl",
+      "community": 6
     },
     {
       "label": "HomePage.jsx",
@@ -755,7 +819,7 @@
       "source_file": "src/storefront/pages/HomePage.jsx",
       "source_location": "L1",
       "id": "src_storefront_pages_homepage_jsx",
-      "community": 68
+      "community": 70
     },
     {
       "label": "HomePage()",
@@ -763,7 +827,7 @@
       "source_file": "src/storefront/pages/HomePage.jsx",
       "source_location": "L11",
       "id": "homepage_homepage",
-      "community": 68
+      "community": 70
     },
     {
       "label": "ProductDetailPage.jsx",
@@ -771,23 +835,39 @@
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
       "source_location": "L1",
       "id": "src_storefront_pages_productdetailpage_jsx",
-      "community": 36
+      "community": 11
     },
     {
-      "label": "ProductImage()",
+      "label": "renderDescription()",
       "file_type": "code",
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
-      "source_location": "L9",
-      "id": "productdetailpage_productimage",
-      "community": 36
+      "source_location": "L13",
+      "id": "productdetailpage_renderdescription",
+      "community": 11
+    },
+    {
+      "label": "GalleryPlaceholder()",
+      "file_type": "code",
+      "source_file": "src/storefront/pages/ProductDetailPage.jsx",
+      "source_location": "L25",
+      "id": "productdetailpage_galleryplaceholder",
+      "community": 11
+    },
+    {
+      "label": "ProductGallery()",
+      "file_type": "code",
+      "source_file": "src/storefront/pages/ProductDetailPage.jsx",
+      "source_location": "L46",
+      "id": "productdetailpage_productgallery",
+      "community": 11
     },
     {
       "label": "ProductDetailPage()",
       "file_type": "code",
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
-      "source_location": "L47",
+      "source_location": "L140",
       "id": "productdetailpage_productdetailpage",
-      "community": 36
+      "community": 11
     },
     {
       "label": "ShopPage.jsx",
@@ -795,7 +875,7 @@
       "source_file": "src/storefront/pages/ShopPage.jsx",
       "source_location": "L1",
       "id": "src_storefront_pages_shoppage_jsx",
-      "community": 37
+      "community": 38
     },
     {
       "label": "ActiveChips()",
@@ -803,7 +883,7 @@
       "source_file": "src/storefront/pages/ShopPage.jsx",
       "source_location": "L8",
       "id": "shoppage_activechips",
-      "community": 37
+      "community": 38
     },
     {
       "label": "ShopPage()",
@@ -811,7 +891,7 @@
       "source_file": "src/storefront/pages/ShopPage.jsx",
       "source_location": "L52",
       "id": "shoppage_shoppage",
-      "community": 37
+      "community": 38
     },
     {
       "label": "AdminLayout.js",
@@ -819,7 +899,7 @@
       "source_file": "src/admin/components/AdminLayout.js",
       "source_location": "L1",
       "id": "src_admin_components_adminlayout_js",
-      "community": 69
+      "community": 71
     },
     {
       "label": "AdminLayout()",
@@ -827,7 +907,7 @@
       "source_file": "src/admin/components/AdminLayout.js",
       "source_location": "L20",
       "id": "adminlayout_adminlayout",
-      "community": 69
+      "community": 71
     },
     {
       "label": "createFolder.js",
@@ -835,7 +915,7 @@
       "source_file": "src/admin/components/createFolder.js",
       "source_location": "L1",
       "id": "src_admin_components_createfolder_js",
-      "community": 38
+      "community": 39
     },
     {
       "label": "findOrCreateFolder()",
@@ -843,7 +923,7 @@
       "source_file": "src/admin/components/createFolder.js",
       "source_location": "L14",
       "id": "createfolder_findorcreatefolder",
-      "community": 38
+      "community": 39
     },
     {
       "label": "createProductFolder()",
@@ -851,7 +931,7 @@
       "source_file": "src/admin/components/createFolder.js",
       "source_location": "L34",
       "id": "createfolder_createproductfolder",
-      "community": 38
+      "community": 39
     },
     {
       "label": "SupplierTransactionsTab.js",
@@ -859,7 +939,7 @@
       "source_file": "src/admin/components/SupplierTransactionsTab.js",
       "source_location": "L1",
       "id": "src_admin_components_suppliertransactionstab_js",
-      "community": 70
+      "community": 72
     },
     {
       "label": "SupplierTransactionsTab()",
@@ -867,7 +947,7 @@
       "source_file": "src/admin/components/SupplierTransactionsTab.js",
       "source_location": "L11",
       "id": "suppliertransactionstab_suppliertransactionstab",
-      "community": 70
+      "community": 72
     },
     {
       "label": "SupplierTable.js",
@@ -875,7 +955,7 @@
       "source_file": "src/admin/components/SupplierTable.js",
       "source_location": "L1",
       "id": "src_admin_components_suppliertable_js",
-      "community": 71
+      "community": 73
     },
     {
       "label": "SupplierTable()",
@@ -883,7 +963,7 @@
       "source_file": "src/admin/components/SupplierTable.js",
       "source_location": "L9",
       "id": "suppliertable_suppliertable",
-      "community": 71
+      "community": 73
     },
     {
       "label": "VariantRow.js",
@@ -891,7 +971,7 @@
       "source_file": "src/admin/components/VariantRow.js",
       "source_location": "L1",
       "id": "src_admin_components_variantrow_js",
-      "community": 72
+      "community": 74
     },
     {
       "label": "VariantRow()",
@@ -899,7 +979,7 @@
       "source_file": "src/admin/components/VariantRow.js",
       "source_location": "L3",
       "id": "variantrow_variantrow",
-      "community": 72
+      "community": 74
     },
     {
       "label": "Navbar.js",
@@ -907,7 +987,7 @@
       "source_file": "src/admin/components/Navbar.js",
       "source_location": "L1",
       "id": "src_admin_components_navbar_js",
-      "community": 73
+      "community": 75
     },
     {
       "label": "Navbar()",
@@ -915,7 +995,7 @@
       "source_file": "src/admin/components/Navbar.js",
       "source_location": "L3",
       "id": "navbar_navbar",
-      "community": 73
+      "community": 75
     },
     {
       "label": "CategoryForm.js",
@@ -923,7 +1003,7 @@
       "source_file": "src/admin/components/CategoryForm.js",
       "source_location": "L1",
       "id": "src_admin_components_categoryform_js",
-      "community": 39
+      "community": 40
     },
     {
       "label": "Field()",
@@ -931,7 +1011,7 @@
       "source_file": "src/admin/components/CategoryForm.js",
       "source_location": "L23",
       "id": "categoryform_field",
-      "community": 39
+      "community": 40
     },
     {
       "label": "CategoryForm()",
@@ -939,7 +1019,7 @@
       "source_file": "src/admin/components/CategoryForm.js",
       "source_location": "L35",
       "id": "categoryform_categoryform",
-      "community": 39
+      "community": 40
     },
     {
       "label": "CustomerForm.js",
@@ -947,7 +1027,7 @@
       "source_file": "src/admin/components/CustomerForm.js",
       "source_location": "L1",
       "id": "src_admin_components_customerform_js",
-      "community": 74
+      "community": 76
     },
     {
       "label": "CustomerForm()",
@@ -955,7 +1035,7 @@
       "source_file": "src/admin/components/CustomerForm.js",
       "source_location": "L60",
       "id": "customerform_customerform",
-      "community": 74
+      "community": 76
     },
     {
       "label": "MockupRow.js",
@@ -963,7 +1043,7 @@
       "source_file": "src/admin/components/MockupRow.js",
       "source_location": "L1",
       "id": "src_admin_components_mockuprow_js",
-      "community": 40
+      "community": 41
     },
     {
       "label": "formatDate()",
@@ -971,7 +1051,7 @@
       "source_file": "src/admin/components/MockupRow.js",
       "source_location": "L7",
       "id": "mockuprow_formatdate",
-      "community": 40
+      "community": 41
     },
     {
       "label": "MockupRow()",
@@ -979,7 +1059,7 @@
       "source_file": "src/admin/components/MockupRow.js",
       "source_location": "L9",
       "id": "mockuprow_mockuprow",
-      "community": 40
+      "community": 41
     },
     {
       "label": "SupplierForm.js",
@@ -987,7 +1067,7 @@
       "source_file": "src/admin/components/SupplierForm.js",
       "source_location": "L1",
       "id": "src_admin_components_supplierform_js",
-      "community": 75
+      "community": 77
     },
     {
       "label": "SupplierForm()",
@@ -995,7 +1075,7 @@
       "source_file": "src/admin/components/SupplierForm.js",
       "source_location": "L78",
       "id": "supplierform_supplierform",
-      "community": 75
+      "community": 77
     },
     {
       "label": "ChevronIcon.js",
@@ -1003,7 +1083,7 @@
       "source_file": "src/admin/components/ChevronIcon.js",
       "source_location": "L1",
       "id": "src_admin_components_chevronicon_js",
-      "community": 76
+      "community": 78
     },
     {
       "label": "ChevronIcon()",
@@ -1011,7 +1091,7 @@
       "source_file": "src/admin/components/ChevronIcon.js",
       "source_location": "L3",
       "id": "chevronicon_chevronicon",
-      "community": 76
+      "community": 78
     },
     {
       "label": "ProductRow.js",
@@ -1019,7 +1099,7 @@
       "source_file": "src/admin/components/ProductRow.js",
       "source_location": "L1",
       "id": "src_admin_components_productrow_js",
-      "community": 77
+      "community": 79
     },
     {
       "label": "ProductRow()",
@@ -1027,7 +1107,7 @@
       "source_file": "src/admin/components/ProductRow.js",
       "source_location": "L12",
       "id": "productrow_productrow",
-      "community": 77
+      "community": 79
     },
     {
       "label": "DiscountForm.js",
@@ -1035,7 +1115,7 @@
       "source_file": "src/admin/components/DiscountForm.js",
       "source_location": "L1",
       "id": "src_admin_components_discountform_js",
-      "community": 6
+      "community": 7
     },
     {
       "label": "FieldError()",
@@ -1043,7 +1123,7 @@
       "source_file": "src/admin/components/DiscountForm.js",
       "source_location": "L124",
       "id": "discountform_fielderror",
-      "community": 6
+      "community": 7
     },
     {
       "label": "Field()",
@@ -1051,7 +1131,7 @@
       "source_file": "src/admin/components/DiscountForm.js",
       "source_location": "L129",
       "id": "discountform_field",
-      "community": 6
+      "community": 7
     },
     {
       "label": "CategoryMultiSelect()",
@@ -1059,7 +1139,7 @@
       "source_file": "src/admin/components/DiscountForm.js",
       "source_location": "L147",
       "id": "discountform_categorymultiselect",
-      "community": 6
+      "community": 7
     },
     {
       "label": "toFormValues()",
@@ -1067,7 +1147,7 @@
       "source_file": "src/admin/components/DiscountForm.js",
       "source_location": "L226",
       "id": "discountform_toformvalues",
-      "community": 6
+      "community": 7
     },
     {
       "label": "DiscountForm()",
@@ -1075,7 +1155,7 @@
       "source_file": "src/admin/components/DiscountForm.js",
       "source_location": "L283",
       "id": "discountform_discountform",
-      "community": 6
+      "community": 7
     },
     {
       "label": "RequireAdminAuth.jsx",
@@ -1083,7 +1163,7 @@
       "source_file": "src/admin/components/RequireAdminAuth.jsx",
       "source_location": "L1",
       "id": "src_admin_components_requireadminauth_jsx",
-      "community": 78
+      "community": 80
     },
     {
       "label": "RequireAdminAuth()",
@@ -1091,7 +1171,7 @@
       "source_file": "src/admin/components/RequireAdminAuth.jsx",
       "source_location": "L8",
       "id": "requireadminauth_requireadminauth",
-      "community": 78
+      "community": 80
     },
     {
       "label": "SalespersonForm.js",
@@ -1099,7 +1179,7 @@
       "source_file": "src/admin/components/SalespersonForm.js",
       "source_location": "L1",
       "id": "src_admin_components_salespersonform_js",
-      "community": 41
+      "community": 42
     },
     {
       "label": "Field()",
@@ -1107,7 +1187,7 @@
       "source_file": "src/admin/components/SalespersonForm.js",
       "source_location": "L19",
       "id": "salespersonform_field",
-      "community": 41
+      "community": 42
     },
     {
       "label": "SalespersonForm()",
@@ -1115,7 +1195,7 @@
       "source_file": "src/admin/components/SalespersonForm.js",
       "source_location": "L31",
       "id": "salespersonform_salespersonform",
-      "community": 41
+      "community": 42
     },
     {
       "label": "CustomerTable.js",
@@ -1123,7 +1203,7 @@
       "source_file": "src/admin/components/CustomerTable.js",
       "source_location": "L1",
       "id": "src_admin_components_customertable_js",
-      "community": 79
+      "community": 81
     },
     {
       "label": "CustomerTable()",
@@ -1131,7 +1211,7 @@
       "source_file": "src/admin/components/CustomerTable.js",
       "source_location": "L32",
       "id": "customertable_customertable",
-      "community": 79
+      "community": 81
     },
     {
       "label": "MockupTable.js",
@@ -1139,7 +1219,7 @@
       "source_file": "src/admin/components/MockupTable.js",
       "source_location": "L1",
       "id": "src_admin_components_mockuptable_js",
-      "community": 80
+      "community": 82
     },
     {
       "label": "MockupTable()",
@@ -1147,7 +1227,7 @@
       "source_file": "src/admin/components/MockupTable.js",
       "source_location": "L13",
       "id": "mockuptable_mockuptable",
-      "community": 80
+      "community": 82
     },
     {
       "label": "ProductTable.js",
@@ -1155,7 +1235,7 @@
       "source_file": "src/admin/components/ProductTable.js",
       "source_location": "L1",
       "id": "src_admin_components_producttable_js",
-      "community": 134
+      "community": 136
     },
     {
       "label": "DiscountTable.js",
@@ -1163,7 +1243,7 @@
       "source_file": "src/admin/components/DiscountTable.js",
       "source_location": "L1",
       "id": "src_admin_components_discounttable_js",
-      "community": 42
+      "community": 43
     },
     {
       "label": "DiscountTable()",
@@ -1171,7 +1251,7 @@
       "source_file": "src/admin/components/dashboard/DiscountTable.js",
       "source_location": "L9",
       "id": "discounttable_discounttable",
-      "community": 42
+      "community": 43
     },
     {
       "label": "BillTable.js",
@@ -1179,7 +1259,7 @@
       "source_file": "src/admin/components/BillTable.js",
       "source_location": "L1",
       "id": "src_admin_components_billtable_js",
-      "community": 81
+      "community": 83
     },
     {
       "label": "BillTable()",
@@ -1187,7 +1267,7 @@
       "source_file": "src/admin/components/BillTable.js",
       "source_location": "L34",
       "id": "billtable_billtable",
-      "community": 81
+      "community": 83
     },
     {
       "label": "CategoryTable.js",
@@ -1195,7 +1275,7 @@
       "source_file": "src/admin/components/CategoryTable.js",
       "source_location": "L1",
       "id": "src_admin_components_categorytable_js",
-      "community": 82
+      "community": 84
     },
     {
       "label": "CategoryTable()",
@@ -1203,7 +1283,7 @@
       "source_file": "src/admin/components/CategoryTable.js",
       "source_location": "L10",
       "id": "categorytable_categorytable",
-      "community": 82
+      "community": 84
     },
     {
       "label": "SupplierTransactionDialog.js",
@@ -1211,7 +1291,7 @@
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
       "source_location": "L1",
       "id": "src_admin_components_suppliertransactiondialog_js",
-      "community": 43
+      "community": 44
     },
     {
       "label": "SupplierPicker()",
@@ -1219,7 +1299,7 @@
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
       "source_location": "L63",
       "id": "suppliertransactiondialog_supplierpicker",
-      "community": 43
+      "community": 44
     },
     {
       "label": "SupplierTransactionDialog()",
@@ -1227,7 +1307,7 @@
       "source_file": "src/admin/components/SupplierTransactionDialog.js",
       "source_location": "L114",
       "id": "suppliertransactiondialog_suppliertransactiondialog",
-      "community": 43
+      "community": 44
     },
     {
       "label": "ProductEditDialog.js",
@@ -1235,7 +1315,7 @@
       "source_file": "src/admin/components/ProductEditDialog.js",
       "source_location": "L1",
       "id": "src_admin_components_producteditdialog_js",
-      "community": 83
+      "community": 85
     },
     {
       "label": "ProductEditDialog()",
@@ -1243,7 +1323,7 @@
       "source_file": "src/admin/components/ProductEditDialog.js",
       "source_location": "L51",
       "id": "producteditdialog_producteditdialog",
-      "community": 83
+      "community": 85
     },
     {
       "label": "UserRegistration.jsx",
@@ -1251,7 +1331,7 @@
       "source_file": "src/admin/components/UserRegistration.jsx",
       "source_location": "L1",
       "id": "src_admin_components_userregistration_jsx",
-      "community": 84
+      "community": 86
     },
     {
       "label": "UserRegistration()",
@@ -1259,7 +1339,7 @@
       "source_file": "src/admin/components/UserRegistration.jsx",
       "source_location": "L5",
       "id": "userregistration_userregistration",
-      "community": 84
+      "community": 86
     },
     {
       "label": "SupplierLedgerDialog.js",
@@ -1267,7 +1347,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L1",
       "id": "src_admin_components_supplierledgerdialog_js",
-      "community": 10
+      "community": 12
     },
     {
       "label": "LineItemProductLink()",
@@ -1275,7 +1355,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L19",
       "id": "supplierledgerdialog_lineitemproductlink",
-      "community": 10
+      "community": 12
     },
     {
       "label": "formatINR()",
@@ -1283,7 +1363,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L76",
       "id": "supplierledgerdialog_formatinr",
-      "community": 10
+      "community": 12
     },
     {
       "label": "balanceClass()",
@@ -1291,7 +1371,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L79",
       "id": "supplierledgerdialog_balanceclass",
-      "community": 10
+      "community": 12
     },
     {
       "label": "SupplierLedgerDialog()",
@@ -1299,7 +1379,7 @@
       "source_file": "src/admin/components/SupplierLedgerDialog.js",
       "source_location": "L82",
       "id": "supplierledgerdialog_supplierledgerdialog",
-      "community": 10
+      "community": 12
     },
     {
       "label": "SalespersonTable.js",
@@ -1307,7 +1387,7 @@
       "source_file": "src/admin/components/SalespersonTable.js",
       "source_location": "L1",
       "id": "src_admin_components_salespersontable_js",
-      "community": 44
+      "community": 45
     },
     {
       "label": "SalespersonTable()",
@@ -1315,7 +1395,7 @@
       "source_file": "src/admin/components/dashboard/SalespersonTable.js",
       "source_location": "L8",
       "id": "salespersontable_salespersontable",
-      "community": 44
+      "community": 45
     },
     {
       "label": "BillForm.js",
@@ -1491,7 +1571,7 @@
       "source_file": "src/admin/components/dashboard/CategoryBreakdown.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_categorybreakdown_js",
-      "community": 85
+      "community": 87
     },
     {
       "label": "CategoryBreakdown()",
@@ -1499,7 +1579,7 @@
       "source_file": "src/admin/components/dashboard/CategoryBreakdown.js",
       "source_location": "L8",
       "id": "categorybreakdown_categorybreakdown",
-      "community": 85
+      "community": 87
     },
     {
       "label": "HistoricalTrends.js",
@@ -1507,7 +1587,7 @@
       "source_file": "src/admin/components/dashboard/HistoricalTrends.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_historicaltrends_js",
-      "community": 17
+      "community": 19
     },
     {
       "label": "toLakhs()",
@@ -1515,7 +1595,7 @@
       "source_file": "src/admin/components/dashboard/HistoricalTrends.js",
       "source_location": "L17",
       "id": "historicaltrends_tolakhs",
-      "community": 17
+      "community": 19
     },
     {
       "label": "fetchAllRows()",
@@ -1523,7 +1603,7 @@
       "source_file": "src/admin/components/dashboard/HistoricalTrends.js",
       "source_location": "L22",
       "id": "historicaltrends_fetchallrows",
-      "community": 17
+      "community": 19
     },
     {
       "label": "HistoricalTrends()",
@@ -1531,7 +1611,7 @@
       "source_file": "src/admin/components/dashboard/HistoricalTrends.js",
       "source_location": "L54",
       "id": "historicaltrends_historicaltrends",
-      "community": 17
+      "community": 19
     },
     {
       "label": "KpiCards.js",
@@ -1539,7 +1619,7 @@
       "source_file": "src/admin/components/dashboard/KpiCards.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_kpicards_js",
-      "community": 18
+      "community": 20
     },
     {
       "label": "Badge()",
@@ -1547,7 +1627,7 @@
       "source_file": "src/admin/components/dashboard/KpiCards.js",
       "source_location": "L11",
       "id": "kpicards_badge",
-      "community": 18
+      "community": 20
     },
     {
       "label": "Card()",
@@ -1555,7 +1635,7 @@
       "source_file": "src/admin/components/dashboard/KpiCards.js",
       "source_location": "L21",
       "id": "kpicards_card",
-      "community": 18
+      "community": 20
     },
     {
       "label": "KpiCards()",
@@ -1563,7 +1643,7 @@
       "source_file": "src/admin/components/dashboard/KpiCards.js",
       "source_location": "L34",
       "id": "kpicards_kpicards",
-      "community": 18
+      "community": 20
     },
     {
       "label": "RevenueChart.js",
@@ -1571,7 +1651,7 @@
       "source_file": "src/admin/components/dashboard/RevenueChart.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_revenuechart_js",
-      "community": 45
+      "community": 46
     },
     {
       "label": "toLakhs()",
@@ -1579,7 +1659,7 @@
       "source_file": "src/admin/components/dashboard/RevenueChart.js",
       "source_location": "L7",
       "id": "revenuechart_tolakhs",
-      "community": 45
+      "community": 46
     },
     {
       "label": "RevenueChart()",
@@ -1587,7 +1667,7 @@
       "source_file": "src/admin/components/dashboard/RevenueChart.js",
       "source_location": "L9",
       "id": "revenuechart_revenuechart",
-      "community": 45
+      "community": 46
     },
     {
       "label": "DashboardFilters.js",
@@ -1595,7 +1675,7 @@
       "source_file": "src/admin/components/dashboard/DashboardFilters.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_dashboardfilters_js",
-      "community": 86
+      "community": 88
     },
     {
       "label": "DashboardFilters()",
@@ -1603,7 +1683,7 @@
       "source_file": "src/admin/components/dashboard/DashboardFilters.js",
       "source_location": "L8",
       "id": "dashboardfilters_dashboardfilters",
-      "community": 86
+      "community": 88
     },
     {
       "label": "DiscountTable.js",
@@ -1611,7 +1691,7 @@
       "source_file": "src/admin/components/dashboard/DiscountTable.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_discounttable_js",
-      "community": 42
+      "community": 43
     },
     {
       "label": "SalespersonTable.js",
@@ -1619,7 +1699,7 @@
       "source_file": "src/admin/components/dashboard/SalespersonTable.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_salespersontable_js",
-      "community": 44
+      "community": 45
     },
     {
       "label": "KpiCards.test.js",
@@ -1627,7 +1707,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/KpiCards.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_kpicards_test_js",
-      "community": 135
+      "community": 137
     },
     {
       "label": "SalespersonTable.test.js",
@@ -1635,7 +1715,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/SalespersonTable.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_salespersontable_test_js",
-      "community": 136
+      "community": 138
     },
     {
       "label": "DashboardFilters.test.js",
@@ -1643,7 +1723,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/DashboardFilters.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_dashboardfilters_test_js",
-      "community": 137
+      "community": 139
     },
     {
       "label": "RevenueChart.test.js",
@@ -1651,7 +1731,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/RevenueChart.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_revenuechart_test_js",
-      "community": 87
+      "community": 89
     },
     {
       "label": "period()",
@@ -1659,7 +1739,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/RevenueChart.test.js",
       "source_location": "L11",
       "id": "revenuechart_test_period",
-      "community": 87
+      "community": 89
     },
     {
       "label": "DiscountTable.test.js",
@@ -1667,7 +1747,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/DiscountTable.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_discounttable_test_js",
-      "community": 138
+      "community": 140
     },
     {
       "label": "HistoricalTrends.test.js",
@@ -1675,7 +1755,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/HistoricalTrends.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_historicaltrends_test_js",
-      "community": 88
+      "community": 90
     },
     {
       "label": "createMockQuery()",
@@ -1683,7 +1763,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/HistoricalTrends.test.js",
       "source_location": "L6",
       "id": "historicaltrends_test_createmockquery",
-      "community": 88
+      "community": 90
     },
     {
       "label": "CategoryBreakdown.test.js",
@@ -1691,7 +1771,7 @@
       "source_file": "src/admin/components/dashboard/__tests__/CategoryBreakdown.test.js",
       "source_location": "L1",
       "id": "src_admin_components_dashboard_tests_categorybreakdown_test_js",
-      "community": 139
+      "community": 141
     },
     {
       "label": "Notes.js",
@@ -1699,7 +1779,7 @@
       "source_file": "src/admin/components/billing/Notes.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_notes_js",
-      "community": 89
+      "community": 91
     },
     {
       "label": "Notes()",
@@ -1707,7 +1787,7 @@
       "source_file": "src/admin/components/billing/Notes.js",
       "source_location": "L4",
       "id": "notes_notes",
-      "community": 89
+      "community": 91
     },
     {
       "label": "ManualItemForm.js",
@@ -1715,7 +1795,7 @@
       "source_file": "src/admin/components/billing/ManualItemForm.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_manualitemform_js",
-      "community": 19
+      "community": 21
     },
     {
       "label": "getBCXPrefix()",
@@ -1723,7 +1803,7 @@
       "source_file": "src/admin/components/billing/ManualItemForm.js",
       "source_location": "L17",
       "id": "manualitemform_getbcxprefix",
-      "community": 19
+      "community": 21
     },
     {
       "label": "getNextManualItemId()",
@@ -1731,7 +1811,7 @@
       "source_file": "src/admin/components/billing/ManualItemForm.js",
       "source_location": "L22",
       "id": "manualitemform_getnextmanualitemid",
-      "community": 19
+      "community": 21
     },
     {
       "label": "ManualItemForm()",
@@ -1739,7 +1819,7 @@
       "source_file": "src/admin/components/billing/ManualItemForm.js",
       "source_location": "L40",
       "id": "manualitemform_manualitemform",
-      "community": 19
+      "community": 21
     },
     {
       "label": "generateBillText.js",
@@ -1747,7 +1827,7 @@
       "source_file": "src/admin/components/billing/generateBillText.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_generatebilltext_js",
-      "community": 20
+      "community": 22
     },
     {
       "label": "fmt()",
@@ -1755,7 +1835,7 @@
       "source_file": "src/admin/components/billing/generateBillText.js",
       "source_location": "L12",
       "id": "generatebilltext_fmt",
-      "community": 20
+      "community": 22
     },
     {
       "label": "fmtDate()",
@@ -1763,7 +1843,7 @@
       "source_file": "src/admin/components/billing/generateBillText.js",
       "source_location": "L13",
       "id": "generatebilltext_fmtdate",
-      "community": 20
+      "community": 22
     },
     {
       "label": "generateBillText()",
@@ -1771,7 +1851,7 @@
       "source_file": "src/admin/components/billing/generateBillText.js",
       "source_location": "L29",
       "id": "generatebilltext_generatebilltext",
-      "community": 20
+      "community": 22
     },
     {
       "label": "InventoryPicker.js",
@@ -1779,7 +1859,7 @@
       "source_file": "src/admin/components/billing/InventoryPicker.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_inventorypicker_js",
-      "community": 90
+      "community": 92
     },
     {
       "label": "InventoryPicker()",
@@ -1787,7 +1867,7 @@
       "source_file": "src/admin/components/billing/InventoryPicker.js",
       "source_location": "L17",
       "id": "inventorypicker_inventorypicker",
-      "community": 90
+      "community": 92
     },
     {
       "label": "BillingForm.js",
@@ -1795,7 +1875,7 @@
       "source_file": "src/admin/components/billing/BillingForm.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_billingform_js",
-      "community": 46
+      "community": 47
     },
     {
       "label": "isAutoApplyEligible()",
@@ -1803,7 +1883,7 @@
       "source_file": "src/admin/components/billing/BillingForm.js",
       "source_location": "L47",
       "id": "billingform_isautoapplyeligible",
-      "community": 46
+      "community": 47
     },
     {
       "label": "BillingForm()",
@@ -1811,7 +1891,7 @@
       "source_file": "src/admin/components/billing/BillingForm.js",
       "source_location": "L71",
       "id": "billingform_billingform",
-      "community": 46
+      "community": 47
     },
     {
       "label": "stockHelpers.js",
@@ -1819,7 +1899,7 @@
       "source_file": "src/admin/components/billing/stockHelpers.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_stockhelpers_js",
-      "community": 21
+      "community": 23
     },
     {
       "label": "computeStockDelta()",
@@ -1827,7 +1907,7 @@
       "source_file": "src/admin/components/billing/stockHelpers.js",
       "source_location": "L16",
       "id": "stockhelpers_computestockdelta",
-      "community": 21
+      "community": 23
     },
     {
       "label": "buildBillItemsPayload()",
@@ -1835,7 +1915,7 @@
       "source_file": "src/admin/components/billing/stockHelpers.js",
       "source_location": "L48",
       "id": "stockhelpers_buildbillitemspayload",
-      "community": 21
+      "community": 23
     },
     {
       "label": "backCalcDiscountPct()",
@@ -1843,7 +1923,7 @@
       "source_file": "src/admin/components/billing/stockHelpers.js",
       "source_location": "L134",
       "id": "stockhelpers_backcalcdiscountpct",
-      "community": 21
+      "community": 23
     },
     {
       "label": "ItemTable.js",
@@ -1851,7 +1931,7 @@
       "source_file": "src/admin/components/billing/ItemTable.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_itemtable_js",
-      "community": 91
+      "community": 93
     },
     {
       "label": "ItemTable()",
@@ -1859,7 +1939,7 @@
       "source_file": "src/admin/components/billing/ItemTable.js",
       "source_location": "L3",
       "id": "itemtable_itemtable",
-      "community": 91
+      "community": 93
     },
     {
       "label": "ReturnReceiptView.js",
@@ -1867,7 +1947,7 @@
       "source_file": "src/admin/components/billing/ReturnReceiptView.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_returnreceiptview_js",
-      "community": 140
+      "community": 142
     },
     {
       "label": "AddItemDialog.js",
@@ -1875,7 +1955,7 @@
       "source_file": "src/admin/components/billing/AddItemDialog.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_additemdialog_js",
-      "community": 92
+      "community": 94
     },
     {
       "label": "AddItemDialog()",
@@ -1883,7 +1963,7 @@
       "source_file": "src/admin/components/billing/AddItemDialog.js",
       "source_location": "L28",
       "id": "additemdialog_additemdialog",
-      "community": 92
+      "community": 94
     },
     {
       "label": "InvoiceView.js",
@@ -1891,7 +1971,7 @@
       "source_file": "src/admin/components/billing/InvoiceView.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_invoiceview_js",
-      "community": 93
+      "community": 95
     },
     {
       "label": "formatDate()",
@@ -1899,7 +1979,7 @@
       "source_file": "src/admin/components/billing/InvoiceView.js",
       "source_location": "L14",
       "id": "invoiceview_formatdate",
-      "community": 93
+      "community": 95
     },
     {
       "label": "billUtils.js",
@@ -2011,7 +2091,7 @@
       "source_file": "src/admin/components/billing/CustomerSelector.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_customerselector_js",
-      "community": 94
+      "community": 96
     },
     {
       "label": "CustomerSelector()",
@@ -2019,7 +2099,7 @@
       "source_file": "src/admin/components/billing/CustomerSelector.js",
       "source_location": "L7",
       "id": "customerselector_customerselector",
-      "community": 94
+      "community": 96
     },
     {
       "label": "SalespersonSelector.js",
@@ -2027,7 +2107,7 @@
       "source_file": "src/admin/components/billing/SalespersonSelector.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_salespersonselector_js",
-      "community": 95
+      "community": 97
     },
     {
       "label": "SalespersonSelector()",
@@ -2035,7 +2115,7 @@
       "source_file": "src/admin/components/billing/SalespersonSelector.js",
       "source_location": "L9",
       "id": "salespersonselector_salespersonselector",
-      "community": 95
+      "community": 97
     },
     {
       "label": "ItemRow.js",
@@ -2043,7 +2123,7 @@
       "source_file": "src/admin/components/billing/ItemRow.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_itemrow_js",
-      "community": 96
+      "community": 98
     },
     {
       "label": "ItemRow()",
@@ -2051,7 +2131,7 @@
       "source_file": "src/admin/components/billing/ItemRow.js",
       "source_location": "L14",
       "id": "itemrow_itemrow",
-      "community": 96
+      "community": 98
     },
     {
       "label": "DiscountSelector.js",
@@ -2059,7 +2139,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_discountselector_js",
-      "community": 11
+      "community": 13
     },
     {
       "label": "resolveCatNames()",
@@ -2067,7 +2147,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L5",
       "id": "discountselector_resolvecatnames",
-      "community": 11
+      "community": 13
     },
     {
       "label": "discountLabel()",
@@ -2075,7 +2155,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L11",
       "id": "discountselector_discountlabel",
-      "community": 11
+      "community": 13
     },
     {
       "label": "DiscountRow()",
@@ -2083,7 +2163,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L34",
       "id": "discountselector_discountrow",
-      "community": 11
+      "community": 13
     },
     {
       "label": "DiscountSelector()",
@@ -2091,7 +2171,7 @@
       "source_file": "src/admin/components/billing/DiscountSelector.js",
       "source_location": "L87",
       "id": "discountselector_discountselector",
-      "community": 11
+      "community": 13
     },
     {
       "label": "exchangeHelpers.js",
@@ -2171,7 +2251,7 @@
       "source_file": "src/admin/components/billing/PaymentHistory.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_paymenthistory_js",
-      "community": 47
+      "community": 48
     },
     {
       "label": "fmtDate()",
@@ -2179,7 +2259,7 @@
       "source_file": "src/admin/components/billing/PaymentHistory.js",
       "source_location": "L4",
       "id": "paymenthistory_fmtdate",
-      "community": 47
+      "community": 48
     },
     {
       "label": "PaymentHistory()",
@@ -2187,7 +2267,7 @@
       "source_file": "src/admin/components/billing/PaymentHistory.js",
       "source_location": "L13",
       "id": "paymenthistory_paymenthistory",
-      "community": 47
+      "community": 48
     },
     {
       "label": "Summary.js",
@@ -2195,7 +2275,7 @@
       "source_file": "src/admin/components/billing/Summary.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_summary_js",
-      "community": 97
+      "community": 99
     },
     {
       "label": "Summary()",
@@ -2203,7 +2283,7 @@
       "source_file": "src/admin/components/billing/Summary.js",
       "source_location": "L4",
       "id": "summary_summary",
-      "community": 97
+      "community": 99
     },
     {
       "label": "generateInvoicePdf.js",
@@ -2211,7 +2291,7 @@
       "source_file": "src/admin/components/billing/generateInvoicePdf.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_generateinvoicepdf_js",
-      "community": 98
+      "community": 100
     },
     {
       "label": "generateInvoicePdf()",
@@ -2219,7 +2299,7 @@
       "source_file": "src/admin/components/billing/generateInvoicePdf.js",
       "source_location": "L10",
       "id": "generateinvoicepdf_generateinvoicepdf",
-      "community": 98
+      "community": 100
     },
     {
       "label": "exchangeHelpers.test.js",
@@ -2227,7 +2307,7 @@
       "source_file": "src/admin/components/billing/__tests__/exchangeHelpers.test.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_tests_exchangehelpers_test_js",
-      "community": 99
+      "community": 101
     },
     {
       "label": "makeDate()",
@@ -2235,7 +2315,7 @@
       "source_file": "src/admin/components/billing/__tests__/exchangeHelpers.test.js",
       "source_location": "L150",
       "id": "exchangehelpers_test_makedate",
-      "community": 99
+      "community": 101
     },
     {
       "label": "stockDelta.test.js",
@@ -2243,7 +2323,7 @@
       "source_file": "src/admin/components/billing/__tests__/stockDelta.test.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_tests_stockdelta_test_js",
-      "community": 141
+      "community": 143
     },
     {
       "label": "billUtils.test.js",
@@ -2251,7 +2331,7 @@
       "source_file": "src/admin/components/billing/__tests__/billUtils.test.js",
       "source_location": "L1",
       "id": "src_admin_components_billing_tests_billutils_test_js",
-      "community": 142
+      "community": 144
     },
     {
       "label": "useTableFilters.js",
@@ -2259,7 +2339,7 @@
       "source_file": "src/admin/hooks/useTableFilters.js",
       "source_location": "L1",
       "id": "src_admin_hooks_usetablefilters_js",
-      "community": 100
+      "community": 102
     },
     {
       "label": "useTableFilters()",
@@ -2267,7 +2347,7 @@
       "source_file": "src/admin/hooks/useTableFilters.js",
       "source_location": "L3",
       "id": "usetablefilters_usetablefilters",
-      "community": 100
+      "community": 102
     },
     {
       "label": "useTableFilters.test.js",
@@ -2275,7 +2355,7 @@
       "source_file": "src/admin/hooks/__tests__/useTableFilters.test.js",
       "source_location": "L1",
       "id": "src_admin_hooks_tests_usetablefilters_test_js",
-      "community": 143
+      "community": 145
     },
     {
       "label": "CategoriesPage.js",
@@ -2283,7 +2363,7 @@
       "source_file": "src/admin/pages/CategoriesPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_categoriespage_js",
-      "community": 101
+      "community": 103
     },
     {
       "label": "CategoriesPage()",
@@ -2291,7 +2371,7 @@
       "source_file": "src/admin/pages/CategoriesPage.js",
       "source_location": "L13",
       "id": "categoriespage_categoriespage",
-      "community": 101
+      "community": 103
     },
     {
       "label": "SuppliersPage.js",
@@ -2299,7 +2379,7 @@
       "source_file": "src/admin/pages/SuppliersPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_supplierspage_js",
-      "community": 102
+      "community": 104
     },
     {
       "label": "SuppliersPage()",
@@ -2307,7 +2387,7 @@
       "source_file": "src/admin/pages/SuppliersPage.js",
       "source_location": "L11",
       "id": "supplierspage_supplierspage",
-      "community": 102
+      "community": 104
     },
     {
       "label": "InventoryPage.js",
@@ -2315,7 +2395,7 @@
       "source_file": "src/admin/pages/InventoryPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_inventorypage_js",
-      "community": 103
+      "community": 105
     },
     {
       "label": "InventoryPage()",
@@ -2323,7 +2403,7 @@
       "source_file": "src/admin/pages/InventoryPage.js",
       "source_location": "L32",
       "id": "inventorypage_inventorypage",
-      "community": 103
+      "community": 105
     },
     {
       "label": "MockupGraphsPage.js",
@@ -2331,7 +2411,7 @@
       "source_file": "src/admin/pages/MockupGraphsPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_mockupgraphspage_js",
-      "community": 104
+      "community": 106
     },
     {
       "label": "MockupOverlayPercentBars()",
@@ -2339,7 +2419,7 @@
       "source_file": "src/admin/pages/MockupGraphsPage.js",
       "source_location": "L9",
       "id": "mockupgraphspage_mockupoverlaypercentbars",
-      "community": 104
+      "community": 106
     },
     {
       "label": "SignupPage.jsx",
@@ -2347,7 +2427,7 @@
       "source_file": "src/admin/pages/SignupPage.jsx",
       "source_location": "L1",
       "id": "src_admin_pages_signuppage_jsx",
-      "community": 105
+      "community": 107
     },
     {
       "label": "SignupPage()",
@@ -2355,7 +2435,7 @@
       "source_file": "src/admin/pages/SignupPage.jsx",
       "source_location": "L7",
       "id": "signuppage_signuppage",
-      "community": 105
+      "community": 107
     },
     {
       "label": "VoucherPage.js",
@@ -2363,7 +2443,7 @@
       "source_file": "src/admin/pages/VoucherPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_voucherpage_js",
-      "community": 106
+      "community": 108
     },
     {
       "label": "VoucherPage()",
@@ -2371,7 +2451,7 @@
       "source_file": "src/admin/pages/VoucherPage.js",
       "source_location": "L4",
       "id": "voucherpage_voucherpage",
-      "community": 106
+      "community": 108
     },
     {
       "label": "AdminPage.jsx",
@@ -2379,7 +2459,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L1",
       "id": "src_admin_pages_adminpage_jsx",
-      "community": 12
+      "community": 14
     },
     {
       "label": "getFinancialYear()",
@@ -2387,7 +2467,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L41",
       "id": "adminpage_getfinancialyear",
-      "community": 12
+      "community": 14
     },
     {
       "label": "MonthlySales()",
@@ -2395,7 +2475,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L46",
       "id": "adminpage_monthlysales",
-      "community": 12
+      "community": 14
     },
     {
       "label": "UsersTab()",
@@ -2403,7 +2483,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L208",
       "id": "adminpage_userstab",
-      "community": 12
+      "community": 14
     },
     {
       "label": "AdminPage()",
@@ -2411,7 +2491,7 @@
       "source_file": "src/admin/pages/AdminPage.jsx",
       "source_location": "L375",
       "id": "adminpage_adminpage",
-      "community": 12
+      "community": 14
     },
     {
       "label": "BillingPage.js",
@@ -2419,7 +2499,7 @@
       "source_file": "src/admin/pages/BillingPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_billingpage_js",
-      "community": 107
+      "community": 109
     },
     {
       "label": "BillingPage()",
@@ -2427,7 +2507,7 @@
       "source_file": "src/admin/pages/BillingPage.js",
       "source_location": "L8",
       "id": "billingpage_billingpage",
-      "community": 107
+      "community": 109
     },
     {
       "label": "DiscountPage.js",
@@ -2435,7 +2515,7 @@
       "source_file": "src/admin/pages/DiscountPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_discountpage_js",
-      "community": 108
+      "community": 110
     },
     {
       "label": "DiscountPage()",
@@ -2443,7 +2523,7 @@
       "source_file": "src/admin/pages/DiscountPage.js",
       "source_location": "L14",
       "id": "discountpage_discountpage",
-      "community": 108
+      "community": 110
     },
     {
       "label": "ExchangePage.js",
@@ -2451,7 +2531,7 @@
       "source_file": "src/admin/pages/ExchangePage.js",
       "source_location": "L1",
       "id": "src_admin_pages_exchangepage_js",
-      "community": 109
+      "community": 111
     },
     {
       "label": "ExchangePage()",
@@ -2459,7 +2539,7 @@
       "source_file": "src/admin/pages/ExchangePage.js",
       "source_location": "L29",
       "id": "exchangepage_exchangepage",
-      "community": 109
+      "community": 111
     },
     {
       "label": "CustomersPage.js",
@@ -2467,7 +2547,7 @@
       "source_file": "src/admin/pages/CustomersPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_customerspage_js",
-      "community": 110
+      "community": 112
     },
     {
       "label": "CustomersPage()",
@@ -2475,7 +2555,7 @@
       "source_file": "src/admin/pages/CustomersPage.js",
       "source_location": "L6",
       "id": "customerspage_customerspage",
-      "community": 110
+      "community": 112
     },
     {
       "label": "HistoryPage.jsx",
@@ -2483,7 +2563,7 @@
       "source_file": "src/admin/pages/HistoryPage.jsx",
       "source_location": "L1",
       "id": "src_admin_pages_historypage_jsx",
-      "community": 111
+      "community": 113
     },
     {
       "label": "HistoryPage()",
@@ -2491,7 +2571,7 @@
       "source_file": "src/admin/pages/HistoryPage.jsx",
       "source_location": "L20",
       "id": "historypage_historypage",
-      "community": 111
+      "community": 113
     },
     {
       "label": "LoginPage.jsx",
@@ -2499,7 +2579,7 @@
       "source_file": "src/admin/pages/LoginPage.jsx",
       "source_location": "L1",
       "id": "src_admin_pages_loginpage_jsx",
-      "community": 112
+      "community": 114
     },
     {
       "label": "LoginPage()",
@@ -2507,7 +2587,7 @@
       "source_file": "src/admin/pages/LoginPage.jsx",
       "source_location": "L7",
       "id": "loginpage_loginpage",
-      "community": 112
+      "community": 114
     },
     {
       "label": "TotalValuePage.js",
@@ -2515,7 +2595,7 @@
       "source_file": "src/admin/pages/TotalValuePage.js",
       "source_location": "L1",
       "id": "src_admin_pages_totalvaluepage_js",
-      "community": 113
+      "community": 115
     },
     {
       "label": "TotalValuePage()",
@@ -2523,7 +2603,7 @@
       "source_file": "src/admin/pages/TotalValuePage.js",
       "source_location": "L4",
       "id": "totalvaluepage_totalvaluepage",
-      "community": 113
+      "community": 115
     },
     {
       "label": "SalespersonsPage.js",
@@ -2531,7 +2611,7 @@
       "source_file": "src/admin/pages/SalespersonsPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_salespersonspage_js",
-      "community": 114
+      "community": 116
     },
     {
       "label": "SalespersonsPage()",
@@ -2539,7 +2619,7 @@
       "source_file": "src/admin/pages/SalespersonsPage.js",
       "source_location": "L13",
       "id": "salespersonspage_salespersonspage",
-      "community": 114
+      "community": 116
     },
     {
       "label": "DashboardPage.js",
@@ -2547,7 +2627,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_dashboardpage_js",
-      "community": 13
+      "community": 15
     },
     {
       "label": "fetchAllRows()",
@@ -2555,7 +2635,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L23",
       "id": "dashboardpage_fetchallrows",
-      "community": 13
+      "community": 15
     },
     {
       "label": "iso()",
@@ -2563,7 +2643,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L36",
       "id": "dashboardpage_iso",
-      "community": 13
+      "community": 15
     },
     {
       "label": "fetchPeriod()",
@@ -2571,7 +2651,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L41",
       "id": "dashboardpage_fetchperiod",
-      "community": 13
+      "community": 15
     },
     {
       "label": "DashboardPage()",
@@ -2579,7 +2659,7 @@
       "source_file": "src/admin/pages/DashboardPage.js",
       "source_location": "L102",
       "id": "dashboardpage_dashboardpage",
-      "community": 13
+      "community": 15
     },
     {
       "label": "MockupPage.js",
@@ -2587,7 +2667,7 @@
       "source_file": "src/admin/pages/MockupPage.js",
       "source_location": "L1",
       "id": "src_admin_pages_mockuppage_js",
-      "community": 48
+      "community": 49
     },
     {
       "label": "ChartSkeleton()",
@@ -2595,7 +2675,7 @@
       "source_file": "src/admin/pages/MockupPage.js",
       "source_location": "L17",
       "id": "mockuppage_chartskeleton",
-      "community": 48
+      "community": 49
     },
     {
       "label": "MockupPage()",
@@ -2603,7 +2683,7 @@
       "source_file": "src/admin/pages/MockupPage.js",
       "source_location": "L43",
       "id": "mockuppage_mockuppage",
-      "community": 48
+      "community": 49
     },
     {
       "label": "printLabel.jsx",
@@ -2611,7 +2691,7 @@
       "source_file": "src/components/printLabel.jsx",
       "source_location": "L1",
       "id": "src_components_printlabel_jsx",
-      "community": 22
+      "community": 24
     },
     {
       "label": "encodePriceToCode()",
@@ -2619,7 +2699,7 @@
       "source_file": "src/components/printLabel.jsx",
       "source_location": "L4",
       "id": "printlabel_encodepricetocode",
-      "community": 22
+      "community": 24
     },
     {
       "label": "generateTSPLLabel()",
@@ -2627,7 +2707,7 @@
       "source_file": "src/components/printLabel.jsx",
       "source_location": "L28",
       "id": "printlabel_generatetspllabel",
-      "community": 22
+      "community": 24
     },
     {
       "label": "printLabel()",
@@ -2635,7 +2715,7 @@
       "source_file": "src/components/printLabel.jsx",
       "source_location": "L54",
       "id": "printlabel_printlabel",
-      "community": 22
+      "community": 24
     },
     {
       "label": "CustomDropdown.js",
@@ -2643,7 +2723,7 @@
       "source_file": "src/components/CustomDropdown.js",
       "source_location": "L1",
       "id": "src_components_customdropdown_js",
-      "community": 115
+      "community": 117
     },
     {
       "label": "CustomDropdown()",
@@ -2651,7 +2731,7 @@
       "source_file": "src/components/CustomDropdown.js",
       "source_location": "L3",
       "id": "customdropdown_customdropdown",
-      "community": 115
+      "community": 117
     },
     {
       "label": "ActionButtons.jsx",
@@ -2659,7 +2739,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L1",
       "id": "src_components_actionbuttons_jsx",
-      "community": 14
+      "community": 16
     },
     {
       "label": "safeClick()",
@@ -2667,7 +2747,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L11",
       "id": "actionbuttons_safeclick",
-      "community": 14
+      "community": 16
     },
     {
       "label": "EditButton()",
@@ -2675,7 +2755,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L17",
       "id": "actionbuttons_editbutton",
-      "community": 14
+      "community": 16
     },
     {
       "label": "PrintButton()",
@@ -2683,7 +2763,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L34",
       "id": "actionbuttons_printbutton",
-      "community": 14
+      "community": 16
     },
     {
       "label": "DeleteButton()",
@@ -2691,7 +2771,7 @@
       "source_file": "src/components/ActionButtons.jsx",
       "source_location": "L51",
       "id": "actionbuttons_deletebutton",
-      "community": 14
+      "community": 16
     },
     {
       "label": "currency-input.jsx",
@@ -2699,7 +2779,7 @@
       "source_file": "src/components/ui/currency-input.jsx",
       "source_location": "L1",
       "id": "src_components_ui_currency_input_jsx",
-      "community": 116
+      "community": 118
     },
     {
       "label": "CurrencyInput()",
@@ -2707,7 +2787,7 @@
       "source_file": "src/components/ui/currency-input.jsx",
       "source_location": "L7",
       "id": "currency_input_currencyinput",
-      "community": 116
+      "community": 118
     },
     {
       "label": "tabs.tsx",
@@ -2715,7 +2795,7 @@
       "source_file": "src/components/ui/tabs.tsx",
       "source_location": "L1",
       "id": "src_components_ui_tabs_tsx",
-      "community": 144
+      "community": 146
     },
     {
       "label": "card.tsx",
@@ -2723,7 +2803,7 @@
       "source_file": "src/components/ui/card.tsx",
       "source_location": "L1",
       "id": "src_components_ui_card_tsx",
-      "community": 145
+      "community": 147
     },
     {
       "label": "toaster.tsx",
@@ -2731,7 +2811,7 @@
       "source_file": "src/components/ui/toaster.tsx",
       "source_location": "L1",
       "id": "src_components_ui_toaster_tsx",
-      "community": 146
+      "community": 148
     },
     {
       "label": "scroll-area.tsx",
@@ -2739,7 +2819,7 @@
       "source_file": "src/components/ui/scroll-area.tsx",
       "source_location": "L1",
       "id": "src_components_ui_scroll_area_tsx",
-      "community": 147
+      "community": 149
     },
     {
       "label": "label.tsx",
@@ -2747,7 +2827,7 @@
       "source_file": "src/components/ui/label.tsx",
       "source_location": "L1",
       "id": "src_components_ui_label_tsx",
-      "community": 148
+      "community": 150
     },
     {
       "label": "tooltip.tsx",
@@ -2755,7 +2835,7 @@
       "source_file": "src/components/ui/tooltip.tsx",
       "source_location": "L1",
       "id": "src_components_ui_tooltip_tsx",
-      "community": 149
+      "community": 151
     },
     {
       "label": "dialog.tsx",
@@ -2763,7 +2843,7 @@
       "source_file": "src/components/ui/dialog.tsx",
       "source_location": "L1",
       "id": "src_components_ui_dialog_tsx",
-      "community": 150
+      "community": 152
     },
     {
       "label": "badge.tsx",
@@ -2771,7 +2851,7 @@
       "source_file": "src/components/ui/badge.tsx",
       "source_location": "L1",
       "id": "src_components_ui_badge_tsx",
-      "community": 117
+      "community": 119
     },
     {
       "label": "Badge()",
@@ -2779,7 +2859,7 @@
       "source_file": "src/components/ui/badge.tsx",
       "source_location": "L30",
       "id": "badge_badge",
-      "community": 117
+      "community": 119
     },
     {
       "label": "table.tsx",
@@ -2787,7 +2867,7 @@
       "source_file": "src/components/ui/table.tsx",
       "source_location": "L1",
       "id": "src_components_ui_table_tsx",
-      "community": 151
+      "community": 153
     },
     {
       "label": "button.tsx",
@@ -2795,7 +2875,7 @@
       "source_file": "src/components/ui/button.tsx",
       "source_location": "L1",
       "id": "src_components_ui_button_tsx",
-      "community": 118
+      "community": 120
     },
     {
       "label": "cn()",
@@ -2803,7 +2883,7 @@
       "source_file": "src/components/ui/button.tsx",
       "source_location": "L53",
       "id": "button_cn",
-      "community": 118
+      "community": 120
     },
     {
       "label": "toast.tsx",
@@ -2811,7 +2891,7 @@
       "source_file": "src/components/ui/toast.tsx",
       "source_location": "L1",
       "id": "src_components_ui_toast_tsx",
-      "community": 152
+      "community": 154
     },
     {
       "label": "checkbox.tsx",
@@ -2819,7 +2899,7 @@
       "source_file": "src/components/ui/checkbox.tsx",
       "source_location": "L1",
       "id": "src_components_ui_checkbox_tsx",
-      "community": 153
+      "community": 155
     },
     {
       "label": "select.tsx",
@@ -2827,7 +2907,7 @@
       "source_file": "src/components/ui/select.tsx",
       "source_location": "L1",
       "id": "src_components_ui_select_tsx",
-      "community": 154
+      "community": 156
     },
     {
       "label": "textarea.tsx",
@@ -2835,7 +2915,7 @@
       "source_file": "src/components/ui/textarea.tsx",
       "source_location": "L1",
       "id": "src_components_ui_textarea_tsx",
-      "community": 155
+      "community": 157
     },
     {
       "label": "input.tsx",
@@ -2843,7 +2923,7 @@
       "source_file": "src/components/ui/input.tsx",
       "source_location": "L1",
       "id": "src_components_ui_input_tsx",
-      "community": 156
+      "community": 158
     },
     {
       "label": "form.tsx",
@@ -2851,7 +2931,7 @@
       "source_file": "src/components/ui/form.tsx",
       "source_location": "L1",
       "id": "src_components_ui_form_tsx",
-      "community": 157
+      "community": 159
     },
     {
       "label": "use-toast.ts",
@@ -2915,7 +2995,7 @@
       "source_file": "src/lib/utils.ts",
       "source_location": "L1",
       "id": "src_lib_utils_ts",
-      "community": 119
+      "community": 121
     },
     {
       "label": "cn()",
@@ -2923,7 +3003,7 @@
       "source_file": "src/lib/utils.ts",
       "source_location": "L4",
       "id": "utils_cn",
-      "community": 119
+      "community": 121
     },
     {
       "label": "supabaseClient.js",
@@ -2931,7 +3011,7 @@
       "source_file": "src/lib/supabaseClient.js",
       "source_location": "L1",
       "id": "src_lib_supabaseclient_js",
-      "community": 158
+      "community": 160
     },
     {
       "label": "activityLog.js",
@@ -2939,7 +3019,7 @@
       "source_file": "src/lib/activityLog.js",
       "source_location": "L1",
       "id": "src_lib_activitylog_js",
-      "community": 120
+      "community": 122
     },
     {
       "label": "logActivity()",
@@ -2947,7 +3027,7 @@
       "source_file": "src/lib/activityLog.js",
       "source_location": "L13",
       "id": "activitylog_logactivity",
-      "community": 120
+      "community": 122
     },
     {
       "label": "activityLog.test.js",
@@ -2955,7 +3035,7 @@
       "source_file": "src/lib/__tests__/activityLog.test.js",
       "source_location": "L1",
       "id": "src_lib_tests_activitylog_test_js",
-      "community": 159
+      "community": 161
     },
     {
       "label": "UnauthorizedPage.jsx",
@@ -2963,7 +3043,7 @@
       "source_file": "src/pages/UnauthorizedPage.jsx",
       "source_location": "L1",
       "id": "src_pages_unauthorizedpage_jsx",
-      "community": 121
+      "community": 123
     },
     {
       "label": "UnauthorizedPage()",
@@ -2971,7 +3051,7 @@
       "source_file": "src/pages/UnauthorizedPage.jsx",
       "source_location": "L5",
       "id": "unauthorizedpage_unauthorizedpage",
-      "community": 121
+      "community": 123
     },
     {
       "label": "activitySummary.js",
@@ -2979,7 +3059,7 @@
       "source_file": "src/utility/activitySummary.js",
       "source_location": "L1",
       "id": "src_utility_activitysummary_js",
-      "community": 7
+      "community": 8
     },
     {
       "label": "money()",
@@ -2987,7 +3067,7 @@
       "source_file": "src/utility/activitySummary.js",
       "source_location": "L4",
       "id": "activitysummary_money",
-      "community": 7
+      "community": 8
     },
     {
       "label": "variantLabel()",
@@ -2995,7 +3075,7 @@
       "source_file": "src/utility/activitySummary.js",
       "source_location": "L10",
       "id": "activitysummary_variantlabel",
-      "community": 7
+      "community": 8
     },
     {
       "label": "customerName()",
@@ -3003,7 +3083,7 @@
       "source_file": "src/utility/activitySummary.js",
       "source_location": "L15",
       "id": "activitysummary_customername",
-      "community": 7
+      "community": 8
     },
     {
       "label": "diffFields()",
@@ -3011,7 +3091,7 @@
       "source_file": "src/utility/activitySummary.js",
       "source_location": "L25",
       "id": "activitysummary_difffields",
-      "community": 7
+      "community": 8
     },
     {
       "label": "productEditSummary()",
@@ -3019,7 +3099,7 @@
       "source_file": "src/utility/activitySummary.js",
       "source_location": "L36",
       "id": "activitysummary_producteditsummary",
-      "community": 7
+      "community": 8
     },
     {
       "label": "supplierBalance.js",
@@ -3027,7 +3107,7 @@
       "source_file": "src/utility/supplierBalance.js",
       "source_location": "L1",
       "id": "src_utility_supplierbalance_js",
-      "community": 49
+      "community": 50
     },
     {
       "label": "computeRunningLedger()",
@@ -3035,7 +3115,7 @@
       "source_file": "src/utility/supplierBalance.js",
       "source_location": "L3",
       "id": "supplierbalance_computerunningledger",
-      "community": 49
+      "community": 50
     },
     {
       "label": "computeSummary()",
@@ -3043,7 +3123,7 @@
       "source_file": "src/utility/supplierBalance.js",
       "source_location": "L18",
       "id": "supplierbalance_computesummary",
-      "community": 49
+      "community": 50
     },
     {
       "label": "formatCurrency.js",
@@ -3051,7 +3131,7 @@
       "source_file": "src/utility/formatCurrency.js",
       "source_location": "L1",
       "id": "src_utility_formatcurrency_js",
-      "community": 122
+      "community": 124
     },
     {
       "label": "formatINR()",
@@ -3059,7 +3139,7 @@
       "source_file": "src/utility/formatCurrency.js",
       "source_location": "L1",
       "id": "formatcurrency_formatinr",
-      "community": 122
+      "community": 124
     },
     {
       "label": "variantDiff.js",
@@ -3067,7 +3147,7 @@
       "source_file": "src/utility/variantDiff.js",
       "source_location": "L1",
       "id": "src_utility_variantdiff_js",
-      "community": 123
+      "community": 125
     },
     {
       "label": "variantChanges()",
@@ -3075,7 +3155,7 @@
       "source_file": "src/utility/variantDiff.js",
       "source_location": "L4",
       "id": "variantdiff_variantchanges",
-      "community": 123
+      "community": 125
     },
     {
       "label": "billFilename.js",
@@ -3083,7 +3163,7 @@
       "source_file": "src/utility/billFilename.js",
       "source_location": "L1",
       "id": "src_utility_billfilename_js",
-      "community": 124
+      "community": 126
     },
     {
       "label": "buildBillFilename()",
@@ -3091,7 +3171,7 @@
       "source_file": "src/utility/billFilename.js",
       "source_location": "L1",
       "id": "billfilename_buildbillfilename",
-      "community": 124
+      "community": 126
     },
     {
       "label": "productName.js",
@@ -3099,7 +3179,7 @@
       "source_file": "src/utility/productName.js",
       "source_location": "L1",
       "id": "src_utility_productname_js",
-      "community": 50
+      "community": 51
     },
     {
       "label": "composeProductName()",
@@ -3107,7 +3187,7 @@
       "source_file": "src/utility/productName.js",
       "source_location": "L5",
       "id": "productname_composeproductname",
-      "community": 50
+      "community": 51
     },
     {
       "label": "shouldRecomposeName()",
@@ -3115,7 +3195,7 @@
       "source_file": "src/utility/productName.js",
       "source_location": "L14",
       "id": "productname_shouldrecomposename",
-      "community": 50
+      "community": 51
     },
     {
       "label": "dashboardData.js",
@@ -3267,7 +3347,7 @@
       "source_file": "src/utility/zCode.js",
       "source_location": "L1",
       "id": "src_utility_zcode_js",
-      "community": 51
+      "community": 52
     },
     {
       "label": "encodePriceToZCode()",
@@ -3275,7 +3355,7 @@
       "source_file": "src/utility/zCode.js",
       "source_location": "L18",
       "id": "zcode_encodepricetozcode",
-      "community": 51
+      "community": 52
     },
     {
       "label": "decodeZCodeToPrice()",
@@ -3283,7 +3363,7 @@
       "source_file": "src/utility/zCode.js",
       "source_location": "L25",
       "id": "zcode_decodezcodetoprice",
-      "community": 51
+      "community": 52
     },
     {
       "label": "dateFormat.js",
@@ -3291,7 +3371,7 @@
       "source_file": "src/utility/dateFormat.js",
       "source_location": "L1",
       "id": "src_utility_dateformat_js",
-      "community": 52
+      "community": 53
     },
     {
       "label": "formatDate()",
@@ -3299,7 +3379,7 @@
       "source_file": "src/utility/dateFormat.js",
       "source_location": "L3",
       "id": "dateformat_formatdate",
-      "community": 52
+      "community": 53
     },
     {
       "label": "formatDateTimeIST()",
@@ -3307,7 +3387,7 @@
       "source_file": "src/utility/dateFormat.js",
       "source_location": "L17",
       "id": "dateformat_formatdatetimeist",
-      "community": 52
+      "community": 53
     },
     {
       "label": "supplierBillCalc.js",
@@ -3315,7 +3395,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L1",
       "id": "src_utility_supplierbillcalc_js",
-      "community": 8
+      "community": 9
     },
     {
       "label": "computeLineAmount()",
@@ -3323,7 +3403,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L5",
       "id": "supplierbillcalc_computelineamount",
-      "community": 8
+      "community": 9
     },
     {
       "label": "computeTaxableAmount()",
@@ -3331,7 +3411,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L16",
       "id": "supplierbillcalc_computetaxableamount",
-      "community": 8
+      "community": 9
     },
     {
       "label": "computeGrossAmount()",
@@ -3339,7 +3419,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L24",
       "id": "supplierbillcalc_computegrossamount",
-      "community": 8
+      "community": 9
     },
     {
       "label": "computeDiscountAmount()",
@@ -3347,7 +3427,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L32",
       "id": "supplierbillcalc_computediscountamount",
-      "community": 8
+      "community": 9
     },
     {
       "label": "computeBillTotal()",
@@ -3355,7 +3435,7 @@
       "source_file": "src/utility/supplierBillCalc.js",
       "source_location": "L41",
       "id": "supplierbillcalc_computebilltotal",
-      "community": 8
+      "community": 9
     },
     {
       "label": "sortVariants.js",
@@ -3419,7 +3499,7 @@
       "source_file": "src/utility/formatPhone.js",
       "source_location": "L1",
       "id": "src_utility_formatphone_js",
-      "community": 53
+      "community": 54
     },
     {
       "label": "formatLivePhoneInput()",
@@ -3427,7 +3507,7 @@
       "source_file": "src/utility/formatPhone.js",
       "source_location": "L3",
       "id": "formatphone_formatlivephoneinput",
-      "community": 53
+      "community": 54
     },
     {
       "label": "formatPhone()",
@@ -3435,7 +3515,7 @@
       "source_file": "src/utility/formatPhone.js",
       "source_location": "L12",
       "id": "formatphone_formatphone",
-      "community": 53
+      "community": 54
     },
     {
       "label": "formatStock.js",
@@ -3443,7 +3523,7 @@
       "source_file": "src/utility/formatStock.js",
       "source_location": "L1",
       "id": "src_utility_formatstock_js",
-      "community": 125
+      "community": 127
     },
     {
       "label": "formatStock()",
@@ -3451,7 +3531,7 @@
       "source_file": "src/utility/formatStock.js",
       "source_location": "L1",
       "id": "formatstock_formatstock",
-      "community": 125
+      "community": 127
     },
     {
       "label": "formatStock.test.js",
@@ -3459,7 +3539,7 @@
       "source_file": "src/utility/__tests__/formatStock.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_formatstock_test_js",
-      "community": 160
+      "community": 162
     },
     {
       "label": "dashboardData.test.js",
@@ -3467,7 +3547,7 @@
       "source_file": "src/utility/__tests__/dashboardData.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_dashboarddata_test_js",
-      "community": 161
+      "community": 163
     },
     {
       "label": "billFilename.test.js",
@@ -3475,7 +3555,7 @@
       "source_file": "src/utility/__tests__/billFilename.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_billfilename_test_js",
-      "community": 162
+      "community": 164
     },
     {
       "label": "supplierBillCalc.test.js",
@@ -3483,7 +3563,7 @@
       "source_file": "src/utility/__tests__/supplierBillCalc.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_supplierbillcalc_test_js",
-      "community": 163
+      "community": 165
     },
     {
       "label": "activitySummary.test.js",
@@ -3491,7 +3571,7 @@
       "source_file": "src/utility/__tests__/activitySummary.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_activitysummary_test_js",
-      "community": 164
+      "community": 166
     },
     {
       "label": "variantDiff.test.js",
@@ -3499,7 +3579,7 @@
       "source_file": "src/utility/__tests__/variantDiff.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_variantdiff_test_js",
-      "community": 165
+      "community": 167
     },
     {
       "label": "formatCurrency.test.js",
@@ -3507,7 +3587,7 @@
       "source_file": "src/utility/__tests__/formatCurrency.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_formatcurrency_test_js",
-      "community": 166
+      "community": 168
     },
     {
       "label": "supplierBalance.test.js",
@@ -3515,7 +3595,7 @@
       "source_file": "src/utility/__tests__/supplierBalance.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_supplierbalance_test_js",
-      "community": 167
+      "community": 169
     },
     {
       "label": "productName.test.js",
@@ -3523,7 +3603,7 @@
       "source_file": "src/utility/__tests__/productName.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_productname_test_js",
-      "community": 168
+      "community": 170
     },
     {
       "label": "formatPhone.test.js",
@@ -3531,7 +3611,7 @@
       "source_file": "src/utility/__tests__/formatPhone.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_formatphone_test_js",
-      "community": 169
+      "community": 171
     },
     {
       "label": "dateFormat.test.js",
@@ -3539,7 +3619,7 @@
       "source_file": "src/utility/__tests__/dateFormat.test.js",
       "source_location": "L1",
       "id": "src_utility_tests_dateformat_test_js",
-      "community": 170
+      "community": 172
     },
     {
       "label": "Create React App",
@@ -3550,7 +3630,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 171,
+      "community": 173,
       "id": "readme_create_react_app"
     },
     {
@@ -3562,7 +3642,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 172,
+      "community": 174,
       "id": "readme_npm_start"
     },
     {
@@ -3574,7 +3654,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 173,
+      "community": 175,
       "id": "readme_npm_test"
     },
     {
@@ -3586,7 +3666,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 174,
+      "community": 176,
       "id": "readme_npm_build"
     },
     {
@@ -3598,7 +3678,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 175,
+      "community": 177,
       "id": "readme_npm_eject"
     },
     {
@@ -3610,7 +3690,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 176,
+      "community": 178,
       "id": "claudemd_react19_spa"
     },
     {
@@ -3622,7 +3702,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 177,
+      "community": 179,
       "id": "claudemd_supabase"
     },
     {
@@ -3634,7 +3714,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 178,
+      "community": 180,
       "id": "claudemd_supabase_js"
     },
     {
@@ -3646,7 +3726,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 179,
+      "community": 181,
       "id": "claudemd_env_vars"
     },
     {
@@ -3658,7 +3738,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 180,
+      "community": 182,
       "id": "claudemd_table_products"
     },
     {
@@ -3670,7 +3750,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 181,
+      "community": 183,
       "id": "claudemd_table_productsizecolors"
     },
     {
@@ -3682,7 +3762,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 182,
+      "community": 184,
       "id": "claudemd_table_categories"
     },
     {
@@ -3694,7 +3774,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 183,
+      "community": 185,
       "id": "claudemd_table_customers"
     },
     {
@@ -3706,7 +3786,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 184,
+      "community": 186,
       "id": "claudemd_table_suppliers"
     },
     {
@@ -3718,7 +3798,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 185,
+      "community": 187,
       "id": "claudemd_table_profiles"
     },
     {
@@ -3730,7 +3810,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 186,
+      "community": 188,
       "id": "claudemd_table_discounts"
     },
     {
@@ -3742,7 +3822,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 187,
+      "community": 189,
       "id": "claudemd_table_bills"
     },
     {
@@ -3754,7 +3834,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 188,
+      "community": 190,
       "id": "claudemd_table_mockups"
     },
     {
@@ -3766,7 +3846,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 189,
+      "community": 191,
       "id": "claudemd_product_id_format"
     },
     {
@@ -3778,7 +3858,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 190,
+      "community": 192,
       "id": "claudemd_rpc_get_max_product_suffix"
     },
     {
@@ -3790,7 +3870,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 191,
+      "community": 193,
       "id": "claudemd_shadcn_ui"
     },
     {
@@ -3802,7 +3882,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 192,
+      "community": 194,
       "id": "claudemd_radix_ui"
     },
     {
@@ -3814,7 +3894,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 193,
+      "community": 195,
       "id": "claudemd_tailwind_css"
     },
     {
@@ -3826,7 +3906,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 194,
+      "community": 196,
       "id": "claudemd_sonner"
     },
     {
@@ -3838,7 +3918,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 195,
+      "community": 197,
       "id": "claudemd_react_hook_form"
     },
     {
@@ -3850,7 +3930,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 196,
+      "community": 198,
       "id": "claudemd_zod"
     },
     {
@@ -3862,7 +3942,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 197,
+      "community": 199,
       "id": "claudemd_plotly_js"
     },
     {
@@ -3874,7 +3954,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 198,
+      "community": 200,
       "id": "claudemd_path_alias"
     },
     {
@@ -3886,7 +3966,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 199,
+      "community": 201,
       "id": "claudemd_state_management"
     },
     {
@@ -3898,7 +3978,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 200,
+      "community": 202,
       "id": "claudemd_refresh_flag_pattern"
     },
     {
@@ -3910,7 +3990,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 201,
+      "community": 203,
       "id": "claudemd_rationale_no_global_store"
     },
     {
@@ -3922,7 +4002,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 202,
+      "community": 204,
       "id": "claudemd_qz_tray"
     },
     {
@@ -3934,7 +4014,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 203,
+      "community": 205,
       "id": "claudemd_rationale_no_server_side"
     },
     {
@@ -3946,7 +4026,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 204,
+      "community": 206,
       "id": "robots_sitemap"
     },
     {
@@ -3958,7 +4038,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 205,
+      "community": 207,
       "id": "robots_allow_all"
     },
     {
@@ -3970,7 +4050,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 206,
+      "community": 208,
       "id": "logo_bindalscreation"
     },
     {
@@ -3982,7 +4062,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 207,
+      "community": 209,
       "id": "brand_bindalscreation"
     },
     {
@@ -3994,7 +4074,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 208,
+      "community": 210,
       "id": "visual_monogram_b"
     },
     {
@@ -4006,7 +4086,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 209,
+      "community": 211,
       "id": "visual_ornamental_frame"
     },
     {
@@ -4018,7 +4098,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 210,
+      "community": 212,
       "id": "visual_floral_scrollwork"
     },
     {
@@ -4030,7 +4110,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 211,
+      "community": 213,
       "id": "design_style_luxury"
     },
     {
@@ -4042,7 +4122,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 212,
+      "community": 214,
       "id": "color_gold_white"
     },
     {
@@ -4054,7 +4134,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 213,
+      "community": 215,
       "id": "LOGOBill_bindals_creation_logo"
     },
     {
@@ -4066,7 +4146,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 214,
+      "community": 216,
       "id": "LOGOBill_letter_b"
     },
     {
@@ -4078,7 +4158,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 215,
+      "community": 217,
       "id": "LOGOBill_ornamental_frame"
     },
     {
@@ -4090,7 +4170,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 216,
+      "community": 218,
       "id": "LOGOBill_scrollwork"
     },
     {
@@ -4102,7 +4182,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 217,
+      "community": 219,
       "id": "LOGOBill_gold_color_scheme"
     },
     {
@@ -4114,7 +4194,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 218,
+      "community": 220,
       "id": "LOGOBill_billing_purpose"
     },
     {
@@ -4126,7 +4206,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 219,
+      "community": 221,
       "id": "LOGOBill_retail_brand"
     },
     {
@@ -4138,7 +4218,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 220,
+      "community": 222,
       "id": "logo_svg"
     },
     {
@@ -4150,7 +4230,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 221,
+      "community": 223,
       "id": "logo_react_atom_symbol"
     },
     {
@@ -4162,7 +4242,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 222,
+      "community": 224,
       "id": "logo_color_61dafb"
     },
     {
@@ -4174,7 +4254,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 223,
+      "community": 225,
       "id": "logo_central_circle"
     },
     {
@@ -4186,7 +4266,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 224,
+      "community": 226,
       "id": "logo_orbital_paths"
     },
     {
@@ -4198,7 +4278,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 225,
+      "community": 227,
       "id": "logo_bindals_creation"
     },
     {
@@ -4210,7 +4290,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 226,
+      "community": 228,
       "id": "brand_bindals_creation"
     },
     {
@@ -4222,7 +4302,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 227,
+      "community": 229,
       "id": "design_element_monogram_b"
     },
     {
@@ -4234,7 +4314,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 228,
+      "community": 230,
       "id": "design_element_ornamental_frame"
     },
     {
@@ -4246,7 +4326,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 229,
+      "community": 231,
       "id": "design_element_floral_scrollwork"
     },
     {
@@ -4258,7 +4338,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 230,
+      "community": 232,
       "id": "design_element_butterfly_silhouette"
     },
     {
@@ -4270,7 +4350,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 231,
+      "community": 233,
       "id": "color_gold"
     },
     {
@@ -4282,7 +4362,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 232,
+      "community": 234,
       "id": "color_white"
     },
     {
@@ -4294,7 +4374,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 233,
+      "community": 235,
       "id": "style_luxury_elegant"
     },
     {
@@ -4306,7 +4386,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 234,
+      "community": 236,
       "id": "purpose_brand_identity"
     },
     {
@@ -4318,7 +4398,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 235,
+      "community": 237,
       "id": "logo_bill_brand_logo"
     },
     {
@@ -4330,7 +4410,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 236,
+      "community": 238,
       "id": "logo_bill_letter_b"
     },
     {
@@ -4342,7 +4422,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 237,
+      "community": 239,
       "id": "logo_bill_design_style"
     },
     {
@@ -4354,7 +4434,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 238,
+      "community": 240,
       "id": "logo_bill_color_scheme"
     },
     {
@@ -4366,7 +4446,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 239,
+      "community": 241,
       "id": "logo_bill_purpose"
     },
     {
@@ -4378,7 +4458,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 240,
+      "community": 242,
       "id": "bills_table"
     },
     {
@@ -4390,7 +4470,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 241,
+      "community": 243,
       "id": "sample_bill_document"
     },
     {
@@ -4402,7 +4482,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 242,
+      "community": 244,
       "id": "sample_bill_business_bindals_creation"
     },
     {
@@ -4414,7 +4494,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 243,
+      "community": 245,
       "id": "sample_bill_customer_akash_raghani"
     },
     {
@@ -4426,7 +4506,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 244,
+      "community": 246,
       "id": "sample_bill_field_bill_number"
     },
     {
@@ -4438,7 +4518,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 245,
+      "community": 247,
       "id": "sample_bill_field_customer_name"
     },
     {
@@ -4450,7 +4530,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 246,
+      "community": 248,
       "id": "sample_bill_field_phone"
     },
     {
@@ -4462,7 +4542,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 247,
+      "community": 249,
       "id": "sample_bill_line_item_1"
     },
     {
@@ -4474,7 +4554,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 248,
+      "community": 250,
       "id": "sample_bill_line_item_2"
     },
     {
@@ -4486,7 +4566,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 249,
+      "community": 251,
       "id": "sample_bill_field_total_qty"
     },
     {
@@ -4498,7 +4578,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 250,
+      "community": 252,
       "id": "sample_bill_field_net_amount"
     },
     {
@@ -4510,7 +4590,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 251,
+      "community": 253,
       "id": "sample_bill_field_discount"
     },
     {
@@ -4522,7 +4602,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 252,
+      "community": 254,
       "id": "sample_bill_policy_notes"
     },
     {
@@ -4534,7 +4614,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 253,
+      "community": 255,
       "id": "sample_bill_layout_handwritten"
     },
     {
@@ -4546,7 +4626,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "community": 254,
+      "community": 256,
       "id": "sample_bill_product_suit"
     }
   ],
@@ -4638,6 +4718,18 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "src/storefront/components/BlurFillImage.jsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_src": "src_storefront_components_blurfillimage_jsx",
+      "_tgt": "blurfillimage_blurfillimage",
+      "source": "src_storefront_components_blurfillimage_jsx",
+      "target": "blurfillimage_blurfillimage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "src/storefront/components/StorefrontLayout.jsx",
       "source_location": "L8",
       "weight": 1.0,
@@ -4675,7 +4767,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/components/ProductCard.jsx",
-      "source_location": "L5",
+      "source_location": "L7",
       "weight": 1.0,
       "_src": "src_storefront_components_productcard_jsx",
       "_tgt": "productcard_placeholderimage",
@@ -4687,7 +4779,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/components/ProductCard.jsx",
-      "source_location": "L26",
+      "source_location": "L28",
       "weight": 1.0,
       "_src": "src_storefront_components_productcard_jsx",
       "_tgt": "productcard_productcard",
@@ -4819,19 +4911,19 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L58",
+      "source_location": "L17",
       "weight": 1.0,
       "_src": "src_storefront_components_home_categoryshowcase_jsx",
-      "_tgt": "categoryshowcase_getimage",
+      "_tgt": "categoryshowcase_getcategoryheroimage",
       "source": "src_storefront_components_home_categoryshowcase_jsx",
-      "target": "categoryshowcase_getimage",
+      "target": "categoryshowcase_getcategoryheroimage",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L70",
+      "source_location": "L39",
       "weight": 1.0,
       "_src": "src_storefront_components_home_categoryshowcase_jsx",
       "_tgt": "categoryshowcase_categorycard",
@@ -4843,7 +4935,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L112",
+      "source_location": "L81",
       "weight": 1.0,
       "_src": "src_storefront_components_home_categoryshowcase_jsx",
       "_tgt": "categoryshowcase_categoryskeleton",
@@ -4855,24 +4947,12 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L121",
+      "source_location": "L90",
       "weight": 1.0,
       "_src": "src_storefront_components_home_categoryshowcase_jsx",
       "_tgt": "categoryshowcase_categoryshowcase",
       "source": "src_storefront_components_home_categoryshowcase_jsx",
       "target": "categoryshowcase_categoryshowcase",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "calls",
-      "confidence": "EXTRACTED",
-      "source_file": "src/storefront/components/home/CategoryShowcase.jsx",
-      "source_location": "L72",
-      "weight": 1.0,
-      "_src": "categoryshowcase_categorycard",
-      "_tgt": "categoryshowcase_getimage",
-      "source": "categoryshowcase_getimage",
-      "target": "categoryshowcase_categorycard",
       "confidence_score": 1.0
     },
     {
@@ -5214,6 +5294,102 @@
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L16",
+      "weight": 1.0,
+      "_src": "src_storefront_lib_productimage_js",
+      "_tgt": "productimage_resolve",
+      "source": "src_storefront_lib_productimage_js",
+      "target": "productimage_resolve",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L37",
+      "weight": 1.0,
+      "_src": "src_storefront_lib_productimage_js",
+      "_tgt": "productimage_imageurl",
+      "source": "src_storefront_lib_productimage_js",
+      "target": "productimage_imageurl",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L48",
+      "weight": 1.0,
+      "_src": "src_storefront_lib_productimage_js",
+      "_tgt": "productimage_getproductimagepaths",
+      "source": "src_storefront_lib_productimage_js",
+      "target": "productimage_getproductimagepaths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L65",
+      "weight": 1.0,
+      "_src": "src_storefront_lib_productimage_js",
+      "_tgt": "productimage_getproductimages",
+      "source": "src_storefront_lib_productimage_js",
+      "target": "productimage_getproductimages",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L77",
+      "weight": 1.0,
+      "_src": "src_storefront_lib_productimage_js",
+      "_tgt": "productimage_getproductimageurl",
+      "source": "src_storefront_lib_productimage_js",
+      "target": "productimage_getproductimageurl",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L49",
+      "weight": 1.0,
+      "_src": "productimage_getproductimagepaths",
+      "_tgt": "productimage_resolve",
+      "source": "productimage_resolve",
+      "target": "productimage_getproductimagepaths",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L66",
+      "weight": 1.0,
+      "_src": "productimage_getproductimages",
+      "_tgt": "productimage_getproductimagepaths",
+      "source": "productimage_getproductimagepaths",
+      "target": "productimage_getproductimages",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/lib/productImage.js",
+      "source_location": "L78",
+      "weight": 1.0,
+      "_src": "productimage_getproductimageurl",
+      "_tgt": "productimage_getproductimages",
+      "source": "productimage_getproductimages",
+      "target": "productimage_getproductimageurl",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
       "source_file": "src/storefront/pages/HomePage.jsx",
       "source_location": "L11",
       "weight": 1.0,
@@ -5227,23 +5403,59 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
-      "source_location": "L9",
+      "source_location": "L13",
       "weight": 1.0,
       "_src": "src_storefront_pages_productdetailpage_jsx",
-      "_tgt": "productdetailpage_productimage",
+      "_tgt": "productdetailpage_renderdescription",
       "source": "src_storefront_pages_productdetailpage_jsx",
-      "target": "productdetailpage_productimage",
+      "target": "productdetailpage_renderdescription",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/storefront/pages/ProductDetailPage.jsx",
-      "source_location": "L47",
+      "source_location": "L25",
+      "weight": 1.0,
+      "_src": "src_storefront_pages_productdetailpage_jsx",
+      "_tgt": "productdetailpage_galleryplaceholder",
+      "source": "src_storefront_pages_productdetailpage_jsx",
+      "target": "productdetailpage_galleryplaceholder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/pages/ProductDetailPage.jsx",
+      "source_location": "L46",
+      "weight": 1.0,
+      "_src": "src_storefront_pages_productdetailpage_jsx",
+      "_tgt": "productdetailpage_productgallery",
+      "source": "src_storefront_pages_productdetailpage_jsx",
+      "target": "productdetailpage_productgallery",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/pages/ProductDetailPage.jsx",
+      "source_location": "L140",
       "weight": 1.0,
       "_src": "src_storefront_pages_productdetailpage_jsx",
       "_tgt": "productdetailpage_productdetailpage",
       "source": "src_storefront_pages_productdetailpage_jsx",
+      "target": "productdetailpage_productdetailpage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src/storefront/pages/ProductDetailPage.jsx",
+      "source_location": "L271",
+      "weight": 1.0,
+      "_src": "productdetailpage_productdetailpage",
+      "_tgt": "productdetailpage_renderdescription",
+      "source": "productdetailpage_renderdescription",
       "target": "productdetailpage_productdetailpage",
       "confidence_score": 1.0
     },

@@ -5,7 +5,7 @@ import { Instagram, Facebook, MessageCircle, Mail, Phone } from "lucide-react";
 export default function StorefrontFooter() {
   return (
     <>
-      <footer className="bg-storefront-charcoal text-storefront-cream font-montserrat">
+      <footer className="bg-storefront-charcoal text-storefront-cream font-sans">
         {/* Main footer */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
           {/* Brand */}
@@ -15,7 +15,7 @@ export default function StorefrontFooter() {
               alt="Bindal's Creations"
               className="h-12 w-auto object-contain mb-4 brightness-0 invert"
             />
-            <p className="font-cormorant text-lg text-storefront-cream/80 leading-relaxed mb-5">
+            <p className="font-display text-lg text-storefront-cream/80 leading-relaxed mb-5">
               Rooted in tradition,<br />crafted with love.
             </p>
             <div className="flex gap-4">
@@ -42,7 +42,7 @@ export default function StorefrontFooter() {
 
           {/* Shop */}
           <div>
-            <h4 className="font-cormorant text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
+            <h4 className="font-display text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
               Shop
             </h4>
             <ul className="space-y-2.5 text-sm text-storefront-cream/70">
@@ -63,7 +63,7 @@ export default function StorefrontFooter() {
 
           {/* Help */}
           <div>
-            <h4 className="font-cormorant text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
+            <h4 className="font-display text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
               Help
             </h4>
             <ul className="space-y-2.5 text-sm text-storefront-cream/70">
@@ -87,7 +87,7 @@ export default function StorefrontFooter() {
 
           {/* Contact */}
           <div>
-            <h4 className="font-cormorant text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
+            <h4 className="font-display text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
               Get in Touch
             </h4>
             <ul className="space-y-3 text-sm text-storefront-cream/70">

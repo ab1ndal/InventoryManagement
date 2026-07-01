@@ -42,14 +42,14 @@ export default function BestsellerGrid() {
         <div>
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-            <span className="font-montserrat text-xs tracking-[0.25em] uppercase text-storefront-gold">
+            <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold">
               Featured
             </span>
           </div>
-          <h2 className="font-cormorant font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
+          <h2 className="font-display font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
             Curated Picks
           </h2>
-          <p className="font-montserrat text-sm text-storefront-muted mt-2 max-w-sm">
+          <p className="font-sans text-sm text-storefront-muted mt-2 max-w-sm">
             Handpicked pieces — timeless, versatile, crafted to perfection.
           </p>
         </div>
@@ -68,7 +68,7 @@ export default function BestsellerGrid() {
       <div className="text-center mt-12">
         <Link
           to="/shop"
-          className="inline-flex items-center gap-2 bg-storefront-charcoal hover:bg-storefront-warm text-storefront-cream font-montserrat text-sm font-medium tracking-widest uppercase px-10 py-3.5 transition-colors duration-200"
+          className="inline-flex items-center gap-2 bg-storefront-charcoal hover:bg-storefront-warm text-storefront-cream font-sans text-sm font-medium tracking-widest uppercase px-10 py-3.5 transition-colors duration-200"
         >
           View All Products
         </Link>

@@ -43,8 +43,17 @@ module.exports = {
         },
       },
       fontFamily: {
-        cormorant: ["Cormorant", "serif"],
-        montserrat: ["Montserrat", "sans-serif"],
+        display: ['"Fraunces"', "Georgia", "serif"],
+        sans: [
+          '"Inter"',
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif",
+        ],
+        // Back-compat aliases (old class names still resolve to new fonts)
+        cormorant: ['"Fraunces"', "Georgia", "serif"],
+        montserrat: ['"Inter"', "sans-serif"],
       },
     },
   },

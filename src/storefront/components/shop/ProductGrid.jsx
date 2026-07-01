@@ -50,10 +50,10 @@ export default function ProductGrid({
   if (products.length === 0) {
     return (
       <div className="py-24 text-center">
-        <p className="font-cormorant text-3xl text-storefront-charcoal mb-3">
+        <p className="font-display text-3xl text-storefront-charcoal mb-3">
           No products found
         </p>
-        <p className="font-montserrat text-sm text-storefront-muted">
+        <p className="font-sans text-sm text-storefront-muted">
           Try adjusting your filters to see more results.
         </p>
       </div>
@@ -80,7 +80,7 @@ export default function ProductGrid({
       )}
 
       {!hasMore && products.length > 0 && (
-        <p className="text-center font-montserrat text-xs tracking-[0.2em] uppercase text-storefront-muted mt-12">
+        <p className="text-center font-sans text-xs tracking-[0.2em] uppercase text-storefront-muted mt-12">
           End of results
         </p>
       )}

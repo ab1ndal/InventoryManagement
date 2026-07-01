@@ -39,7 +39,7 @@ export default function PriceInputs({ priceMin, priceMax, onSetPrice }) {
           <button
             key={p.label}
             onClick={() => onSetPrice(p.min, p.max)}
-            className={`px-3 py-1 text-[11px] font-montserrat tracking-wide border whitespace-nowrap transition-colors duration-150 cursor-pointer ${
+            className={`px-3 py-1 text-[11px] font-sans tracking-wide border whitespace-nowrap transition-colors duration-150 cursor-pointer ${
               isPresetActive(p)
                 ? "bg-storefront-charcoal text-storefront-cream border-storefront-charcoal"
                 : "border-storefront-border text-storefront-warm hover:border-storefront-charcoal hover:text-storefront-charcoal"
@@ -53,11 +53,11 @@ export default function PriceInputs({ priceMin, priceMax, onSetPrice }) {
       {/* Free inputs */}
       <div className="flex items-end gap-2">
         <div className="flex-1">
-          <label className="block text-[10px] text-storefront-muted font-montserrat tracking-[0.15em] uppercase mb-1.5">
+          <label className="block text-[10px] text-storefront-muted font-sans tracking-[0.15em] uppercase mb-1.5">
             Min
           </label>
           <div className="flex items-center border border-storefront-border focus-within:border-storefront-charcoal transition-colors">
-            <span className="pl-2.5 text-sm text-storefront-muted font-montserrat select-none">₹</span>
+            <span className="pl-2.5 text-sm text-storefront-muted font-sans select-none">₹</span>
             <input
               type="number"
               min={0}
@@ -67,7 +67,7 @@ export default function PriceInputs({ priceMin, priceMax, onSetPrice }) {
               onChange={(e) => setLocalMin(e.target.value)}
               onBlur={() => commit(localMin, localMax)}
               onKeyDown={(e) => e.key === "Enter" && commit(localMin, localMax)}
-              className="w-full px-2 py-2 text-sm font-montserrat text-storefront-charcoal bg-transparent outline-none tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="w-full px-2 py-2 text-sm font-sans text-storefront-charcoal bg-transparent outline-none tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
         </div>
@@ -75,11 +75,11 @@ export default function PriceInputs({ priceMin, priceMax, onSetPrice }) {
         <span className="text-storefront-muted text-sm pb-2.5 flex-shrink-0">–</span>
 
         <div className="flex-1">
-          <label className="block text-[10px] text-storefront-muted font-montserrat tracking-[0.15em] uppercase mb-1.5">
+          <label className="block text-[10px] text-storefront-muted font-sans tracking-[0.15em] uppercase mb-1.5">
             Max
           </label>
           <div className="flex items-center border border-storefront-border focus-within:border-storefront-charcoal transition-colors">
-            <span className="pl-2.5 text-sm text-storefront-muted font-montserrat select-none">₹</span>
+            <span className="pl-2.5 text-sm text-storefront-muted font-sans select-none">₹</span>
             <input
               type="number"
               min={0}
@@ -89,7 +89,7 @@ export default function PriceInputs({ priceMin, priceMax, onSetPrice }) {
               onChange={(e) => setLocalMax(e.target.value)}
               onBlur={() => commit(localMin, localMax)}
               onKeyDown={(e) => e.key === "Enter" && commit(localMin, localMax)}
-              className="w-full px-2 py-2 text-sm font-montserrat text-storefront-charcoal bg-transparent outline-none tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="w-full px-2 py-2 text-sm font-sans text-storefront-charcoal bg-transparent outline-none tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
         </div>

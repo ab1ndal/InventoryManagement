@@ -31,7 +31,7 @@ function ActiveChips({ filters, categoryOptions, sizeDisplayMap, onClearOne, onC
             <button
               key={i}
               onClick={() => onClearOne(chip.field, chip.value)}
-              className="flex items-center gap-1.5 bg-storefront-charcoal text-storefront-cream font-montserrat text-[10px] tracking-wide px-3 py-1 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer"
+              className="flex items-center gap-1.5 bg-storefront-charcoal text-storefront-cream font-sans text-[10px] tracking-wide px-3 py-1 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer"
             >
               {chip.label}
               <X size={10} className="opacity-70" />
@@ -39,7 +39,7 @@ function ActiveChips({ filters, categoryOptions, sizeDisplayMap, onClearOne, onC
           ))}
           <button
             onClick={onClearAll}
-            className="text-[10px] font-montserrat text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 transition-colors duration-150 cursor-pointer ml-1 tracking-wide"
+            className="text-[10px] font-sans text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 transition-colors duration-150 cursor-pointer ml-1 tracking-wide"
           >
             Clear all
           </button>
@@ -97,14 +97,14 @@ export default function ShopPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-10">
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-            <span className="font-montserrat text-xs tracking-[0.25em] uppercase text-storefront-gold">
+            <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold">
               Collection
             </span>
           </div>
-          <h1 className="font-cormorant font-semibold text-5xl sm:text-6xl text-storefront-charcoal leading-none">
+          <h1 className="font-display font-semibold text-5xl sm:text-6xl text-storefront-charcoal leading-none">
             Shop
           </h1>
-          <p className="font-montserrat text-sm text-storefront-muted mt-3">
+          <p className="font-sans text-sm text-storefront-muted mt-3">
             Handcrafted garments, thoughtfully made.
           </p>
         </div>

@@ -28,7 +28,7 @@ export default function StorefrontHeader() {
 
   return (
     <header
-      className={`sticky top-0 z-50 bg-storefront-cream font-montserrat transition-shadow duration-200 ${
+      className={`sticky top-0 z-50 bg-storefront-cream font-sans transition-shadow duration-200 ${
         scrolled ? "shadow-sm" : ""
       }`}
     >
@@ -47,7 +47,7 @@ export default function StorefrontHeader() {
               alt="Bindal's Creations"
               className="h-10 w-auto object-contain"
             />
-            <span className="hidden sm:block font-cormorant font-semibold text-xl text-storefront-charcoal leading-tight">
+            <span className="hidden sm:block font-display font-semibold text-xl text-storefront-charcoal leading-tight">
               Bindal's<br />
               <span className="text-storefront-gold">Creations</span>
             </span>
@@ -94,7 +94,7 @@ export default function StorefrontHeader() {
             >
               <ShoppingBag size={20} />
               {itemCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-storefront-gold text-storefront-cream text-[9px] font-montserrat font-semibold rounded-full px-1 leading-none">
+                <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-storefront-gold text-storefront-cream text-[9px] font-sans font-semibold rounded-full px-1 leading-none">
                   {itemCount > 99 ? "99+" : itemCount}
                 </span>
               )}

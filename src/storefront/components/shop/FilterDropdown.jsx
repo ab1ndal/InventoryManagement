@@ -84,7 +84,7 @@ function ColorSwatch({ color, selected, onToggle, unavailable }) {
       title={color}
       onClick={() => onToggle(color)}
       aria-label={`${selected ? "Remove" : "Select"} color ${color}`}
-      className={`px-3 py-1.5 text-[11px] font-montserrat font-medium tracking-wide border whitespace-nowrap cursor-pointer transition-colors duration-150 ${dimClass} ${
+      className={`px-3 py-1.5 text-[11px] font-sans font-medium tracking-wide border whitespace-nowrap cursor-pointer transition-colors duration-150 ${dimClass} ${
         selected
           ? "bg-storefront-charcoal text-storefront-cream border-storefront-charcoal"
           : "border-storefront-border text-storefront-warm hover:border-storefront-charcoal"
@@ -135,7 +135,7 @@ export default function FilterDropdown({
                   }`}>
                     {isSelected && <Check size={10} className="text-white" />}
                   </span>
-                  <span className="text-sm font-montserrat text-storefront-charcoal">
+                  <span className="text-sm font-sans text-storefront-charcoal">
                     {cat.name}
                   </span>
                 </button>
@@ -167,7 +167,7 @@ export default function FilterDropdown({
                 <button
                   key={size}
                   onClick={() => onToggle(size)}
-                  className={`px-3 py-1.5 text-[11px] font-montserrat font-medium tracking-wide border cursor-pointer transition-colors duration-150 ${
+                  className={`px-3 py-1.5 text-[11px] font-sans font-medium tracking-wide border cursor-pointer transition-colors duration-150 ${
                     unavailable ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
                   } ${
                     isSelected
@@ -210,7 +210,7 @@ export default function FilterDropdown({
                   }`}>
                     {isSelected && <Check size={10} className="text-white" />}
                   </span>
-                  <span className="text-sm font-montserrat text-storefront-charcoal capitalize">
+                  <span className="text-sm font-sans text-storefront-charcoal capitalize">
                     {fabric}
                   </span>
                 </button>
@@ -221,12 +221,12 @@ export default function FilterDropdown({
       </div>
 
       <div className="border-t border-storefront-border px-4 py-2.5 flex items-center justify-between">
-        <span className="text-[11px] text-storefront-muted font-montserrat">
+        <span className="text-[11px] text-storefront-muted font-sans">
           {selectedCount > 0 ? `${selectedCount} selected` : " "}
         </span>
         <button
           onClick={onApply}
-          className="text-[11px] font-montserrat font-medium tracking-widest uppercase text-storefront-cream bg-storefront-charcoal px-4 py-1.5 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer"
+          className="text-[11px] font-sans font-medium tracking-widest uppercase text-storefront-cream bg-storefront-charcoal px-4 py-1.5 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer"
         >
           Apply
         </button>

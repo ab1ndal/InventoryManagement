@@ -48,12 +48,12 @@ export default function ReviewsSection() {
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-4 mb-4">
             <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-            <span className="font-montserrat text-xs tracking-[0.25em] uppercase text-storefront-gold">
+            <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold">
               Testimonials
             </span>
             <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
           </div>
-          <h2 className="font-cormorant font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
+          <h2 className="font-display font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
             What Our Customers Say
           </h2>
         </div>
@@ -66,14 +66,14 @@ export default function ReviewsSection() {
               className="bg-storefront-cream rounded-sm p-7 border border-storefront-border flex flex-col gap-4"
             >
               <Stars count={r.rating} />
-              <p className="font-montserrat text-sm text-storefront-warm leading-relaxed italic">
+              <p className="font-sans text-sm text-storefront-warm leading-relaxed italic">
                 "{r.text}"
               </p>
               <div className="mt-auto pt-3 border-t border-storefront-border">
-                <p className="font-cormorant font-semibold text-storefront-charcoal text-lg leading-none">
+                <p className="font-display font-semibold text-storefront-charcoal text-lg leading-none">
                   {r.name}
                 </p>
-                <p className="font-montserrat text-xs text-storefront-muted mt-0.5">
+                <p className="font-sans text-xs text-storefront-muted mt-0.5">
                   {r.location}
                 </p>
               </div>
