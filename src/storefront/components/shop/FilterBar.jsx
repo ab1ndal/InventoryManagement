@@ -86,7 +86,7 @@ export default function FilterBar({
                 <div key={pill.type} className="relative flex-shrink-0">
                   <button
                     onClick={() => onToggleDropdown(isOpen ? null : pill.type)}
-                    className={`flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-montserrat font-medium tracking-[0.14em] uppercase border transition-colors duration-150 cursor-pointer whitespace-nowrap ${
+                    className={`flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-sans font-medium tracking-[0.14em] uppercase border transition-colors duration-150 cursor-pointer whitespace-nowrap ${
                       count > 0 || isOpen
                         ? "bg-storefront-charcoal text-storefront-cream border-storefront-charcoal"
                         : "border-storefront-border text-storefront-warm hover:border-storefront-charcoal hover:text-storefront-charcoal"
@@ -121,7 +121,7 @@ export default function FilterBar({
             {/* All Filters */}
             <button
               onClick={onAllFilters}
-              className={`flex items-center gap-1.5 flex-shrink-0 px-4 py-1.5 text-[11px] font-montserrat font-medium tracking-[0.14em] uppercase border transition-colors duration-150 cursor-pointer ${
+              className={`flex items-center gap-1.5 flex-shrink-0 px-4 py-1.5 text-[11px] font-sans font-medium tracking-[0.14em] uppercase border transition-colors duration-150 cursor-pointer ${
                 activeCount > 0
                   ? "border-storefront-gold text-storefront-gold hover:border-storefront-charcoal hover:text-storefront-charcoal"
                   : "border-storefront-border text-storefront-warm hover:border-storefront-charcoal hover:text-storefront-charcoal"
@@ -139,7 +139,7 @@ export default function FilterBar({
 
           {/* Item count */}
           {!loading && (
-            <span className="flex-shrink-0 text-[11px] font-montserrat tracking-[0.12em] text-storefront-muted uppercase">
+            <span className="flex-shrink-0 text-[11px] font-sans tracking-[0.12em] text-storefront-muted uppercase">
               {totalCount.toLocaleString("en-IN")} items
             </span>
           )}

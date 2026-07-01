@@ -17,7 +17,7 @@ function CartItem({ item }) {
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-storefront-charcoal to-storefront-warm">
-            <span className="font-cormorant text-lg font-semibold text-storefront-gold opacity-60">
+            <span className="font-display text-lg font-semibold text-storefront-gold opacity-60">
               {item.name?.[0]?.toUpperCase() ?? "B"}
             </span>
           </div>
@@ -25,10 +25,10 @@ function CartItem({ item }) {
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-montserrat text-xs font-medium text-storefront-charcoal leading-snug line-clamp-2 mb-1">
+        <p className="font-sans text-xs font-medium text-storefront-charcoal leading-snug line-clamp-2 mb-1">
           {item.name}
         </p>
-        <p className="text-[10px] text-storefront-muted font-montserrat mb-2">
+        <p className="text-[10px] text-storefront-muted font-sans mb-2">
           {item.size} · {item.color}
         </p>
         <div className="flex items-center justify-between">
@@ -41,7 +41,7 @@ function CartItem({ item }) {
             >
               −
             </button>
-            <span className="w-8 text-center text-xs font-montserrat tabular-nums">
+            <span className="w-8 text-center text-xs font-sans tabular-nums">
               {item.quantity}
             </span>
             <button
@@ -52,7 +52,7 @@ function CartItem({ item }) {
               +
             </button>
           </div>
-          <p className="font-montserrat text-xs font-semibold text-storefront-charcoal tabular-nums">
+          <p className="font-sans text-xs font-semibold text-storefront-charcoal tabular-nums">
             ₹{(item.price * item.quantity).toLocaleString("en-IN")}
           </p>
         </div>
@@ -95,10 +95,10 @@ export default function CartDrawer() {
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-storefront-border">
-          <h2 className="font-cormorant text-xl font-semibold text-storefront-charcoal">
+          <h2 className="font-display text-xl font-semibold text-storefront-charcoal">
             Cart{" "}
             {itemCount > 0 && (
-              <span className="text-storefront-muted font-montserrat text-sm font-normal">
+              <span className="text-storefront-muted font-sans text-sm font-normal">
                 ({itemCount})
               </span>
             )}
@@ -116,13 +116,13 @@ export default function CartDrawer() {
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 py-16">
               <ShoppingBag size={40} className="text-storefront-border" />
-              <p className="font-montserrat text-sm text-storefront-muted">
+              <p className="font-sans text-sm text-storefront-muted">
                 Your cart is empty.
               </p>
               <Link
                 to="/shop"
                 onClick={closeCart}
-                className="text-xs font-montserrat tracking-widest uppercase text-storefront-charcoal border border-storefront-charcoal px-6 py-2.5 hover:bg-storefront-charcoal hover:text-storefront-cream transition-colors"
+                className="text-xs font-sans tracking-widest uppercase text-storefront-charcoal border border-storefront-charcoal px-6 py-2.5 hover:bg-storefront-charcoal hover:text-storefront-cream transition-colors"
               >
                 Shop Now
               </Link>
@@ -139,21 +139,21 @@ export default function CartDrawer() {
         {items.length > 0 && (
           <div className="border-t border-storefront-border px-5 py-5">
             <div className="flex justify-between mb-4">
-              <span className="font-montserrat text-sm text-storefront-charcoal">
+              <span className="font-sans text-sm text-storefront-charcoal">
                 Subtotal
               </span>
-              <span className="font-montserrat text-sm font-semibold text-storefront-charcoal tabular-nums">
+              <span className="font-sans text-sm font-semibold text-storefront-charcoal tabular-nums">
                 ₹{subtotal.toLocaleString("en-IN")}
               </span>
             </div>
             <Link
               to="/checkout"
               onClick={closeCart}
-              className="block w-full text-center bg-storefront-charcoal text-storefront-cream font-montserrat text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors"
+              className="block w-full text-center bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors"
             >
               Checkout
             </Link>
-            <p className="text-[10px] text-storefront-muted font-montserrat text-center mt-3">
+            <p className="text-[10px] text-storefront-muted font-sans text-center mt-3">
               Shipping calculated at checkout
             </p>
           </div>

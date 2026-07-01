@@ -41,7 +41,7 @@ const COLOR_MAP = {
 
 function SectionLabel({ children }) {
   return (
-    <p className="font-montserrat text-[10px] tracking-[0.2em] uppercase text-storefront-muted mb-3">
+    <p className="font-sans text-[10px] tracking-[0.2em] uppercase text-storefront-muted mb-3">
       {children}
     </p>
   );
@@ -94,7 +94,7 @@ export default function AllFiltersPanel({
               <div className="space-y-1 max-h-60 overflow-y-auto pr-2">
                 <button
                   onClick={onClearCategories}
-                  className={`w-full text-left py-1.5 px-2 text-sm font-montserrat transition-colors duration-150 cursor-pointer ${
+                  className={`w-full text-left py-1.5 px-2 text-sm font-sans transition-colors duration-150 cursor-pointer ${
                     filters.categories.length === 0
                       ? "text-storefront-charcoal font-medium bg-storefront-cream"
                       : "text-storefront-muted hover:text-storefront-charcoal"
@@ -109,7 +109,7 @@ export default function AllFiltersPanel({
                     <button
                       key={cat.categoryid}
                       onClick={() => onToggle("categories", cat.categoryid)}
-                      className={`w-full flex items-center justify-between py-1.5 px-2 text-sm font-montserrat transition-colors duration-150 cursor-pointer ${
+                      className={`w-full flex items-center justify-between py-1.5 px-2 text-sm font-sans transition-colors duration-150 cursor-pointer ${
                         unavailable ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
                       } ${
                         active
@@ -136,7 +136,7 @@ export default function AllFiltersPanel({
                     <button
                       key={size}
                       onClick={() => onToggle("sizes", size)}
-                      className={`px-3 py-1.5 text-[11px] font-montserrat font-medium tracking-wide border cursor-pointer transition-colors duration-150 ${
+                      className={`px-3 py-1.5 text-[11px] font-sans font-medium tracking-wide border cursor-pointer transition-colors duration-150 ${
                         unavailable ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
                       } ${
                         active
@@ -197,7 +197,7 @@ export default function AllFiltersPanel({
                     <button
                       key={color}
                       onClick={() => onToggle("colors", color)}
-                      className={`px-3 py-1.5 text-[11px] font-montserrat font-medium tracking-wide border cursor-pointer transition-colors duration-150 whitespace-nowrap ${
+                      className={`px-3 py-1.5 text-[11px] font-sans font-medium tracking-wide border cursor-pointer transition-colors duration-150 whitespace-nowrap ${
                         unavailable ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
                       } ${
                         active
@@ -246,7 +246,7 @@ export default function AllFiltersPanel({
                         >
                           {active && <Check size={10} className="text-white" />}
                         </span>
-                        <span className="text-sm font-montserrat text-storefront-charcoal capitalize">
+                        <span className="text-sm font-sans text-storefront-charcoal capitalize">
                           {fabric}
                         </span>
                       </button>
@@ -261,13 +261,13 @@ export default function AllFiltersPanel({
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-storefront-border">
             <button
               onClick={onClearAll}
-              className="text-xs font-montserrat text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 transition-colors duration-150 cursor-pointer tracking-wide"
+              className="text-xs font-sans text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 transition-colors duration-150 cursor-pointer tracking-wide"
             >
               Clear all filters
             </button>
             <button
               onClick={onClose}
-              className="flex items-center gap-2 bg-storefront-charcoal hover:bg-storefront-warm text-storefront-cream font-montserrat text-[11px] font-medium tracking-widest uppercase px-8 py-2.5 transition-colors duration-150 cursor-pointer"
+              className="flex items-center gap-2 bg-storefront-charcoal hover:bg-storefront-warm text-storefront-cream font-sans text-[11px] font-medium tracking-widest uppercase px-8 py-2.5 transition-colors duration-150 cursor-pointer"
             >
               Apply Filters
             </button>

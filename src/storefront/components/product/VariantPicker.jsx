@@ -42,7 +42,7 @@ export default function VariantPicker({ variants, onVariantSelect }) {
     <div className="space-y-5">
       {/* Sizes */}
       <div>
-        <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal mb-2.5 font-montserrat">
+        <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal mb-2.5 font-sans">
           Size
           {selectedSize && (
             <span className="font-normal text-storefront-muted ml-2 normal-case tracking-normal">
@@ -56,7 +56,7 @@ export default function VariantPicker({ variants, onVariantSelect }) {
               key={size}
               onClick={() => handleSizeClick(size, available)}
               disabled={!available}
-              className={`px-3.5 py-1.5 text-xs border font-montserrat tracking-wide transition-colors duration-150 ${
+              className={`px-3.5 py-1.5 text-xs border font-sans tracking-wide transition-colors duration-150 ${
                 selectedSize === size
                   ? "border-storefront-charcoal bg-storefront-charcoal text-storefront-cream"
                   : available
@@ -73,7 +73,7 @@ export default function VariantPicker({ variants, onVariantSelect }) {
       {/* Colours — only shown after a size is selected */}
       {selectedSize && (
         <div>
-          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal mb-2.5 font-montserrat">
+          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal mb-2.5 font-sans">
             Colour
             {selectedColor && (
               <span className="font-normal text-storefront-muted ml-2 normal-case tracking-normal">
@@ -87,7 +87,7 @@ export default function VariantPicker({ variants, onVariantSelect }) {
                 key={variantOption.id}
                 onClick={() => handleColorClick(variantOption)}
                 disabled={!variantOption.available}
-                className={`px-3.5 py-1.5 text-xs border font-montserrat tracking-wide transition-colors duration-150 ${
+                className={`px-3.5 py-1.5 text-xs border font-sans tracking-wide transition-colors duration-150 ${
                   selectedColor === variantOption.color
                     ? "border-storefront-charcoal bg-storefront-charcoal text-storefront-cream"
                     : variantOption.available

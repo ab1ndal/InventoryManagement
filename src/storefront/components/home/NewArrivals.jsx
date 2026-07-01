@@ -47,11 +47,11 @@ export default function NewArrivals() {
           <div>
             <div className="flex items-center gap-3 mb-3">
               <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-              <span className="font-montserrat text-xs tracking-[0.25em] uppercase text-storefront-gold">
+              <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold">
                 Just In
               </span>
             </div>
-            <h2 className="font-cormorant font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
+            <h2 className="font-display font-semibold text-4xl sm:text-5xl text-storefront-charcoal">
               New Arrivals
             </h2>
           </div>
@@ -100,7 +100,7 @@ export default function NewArrivals() {
         <div className="text-center mt-10">
           <Link
             to="/shop"
-            className="inline-flex items-center gap-2 font-montserrat text-sm font-medium tracking-widest uppercase text-storefront-charcoal border-b border-storefront-charcoal hover:text-storefront-gold hover:border-storefront-gold transition-colors pb-0.5"
+            className="inline-flex items-center gap-2 font-sans text-sm font-medium tracking-widest uppercase text-storefront-charcoal border-b border-storefront-charcoal hover:text-storefront-gold hover:border-storefront-gold transition-colors pb-0.5"
           >
             View All New Arrivals
           </Link>

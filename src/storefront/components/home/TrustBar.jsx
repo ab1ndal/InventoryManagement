@@ -18,10 +18,10 @@ export default function TrustBar() {
               <Icon size={18} className="text-storefront-gold" />
             </div>
             <div>
-              <p className="font-cormorant font-semibold text-storefront-cream text-lg leading-tight">
+              <p className="font-display font-semibold text-storefront-cream text-lg leading-tight">
                 {title}
               </p>
-              <p className="font-montserrat text-xs text-storefront-cream/50 mt-0.5 leading-snug">
+              <p className="font-sans text-xs text-storefront-cream/50 mt-0.5 leading-snug">
                 {desc}
               </p>
             </div>

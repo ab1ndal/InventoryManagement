@@ -14,7 +14,7 @@ export default function CategoryRow({
   const allSelected = selected.length === 0;
 
   const pillBase =
-    "flex-shrink-0 px-4 py-1.5 text-[11px] font-medium font-montserrat tracking-[0.14em] uppercase border whitespace-nowrap transition-colors duration-150 cursor-pointer";
+    "flex-shrink-0 px-4 py-1.5 text-[11px] font-medium font-sans tracking-[0.14em] uppercase border whitespace-nowrap transition-colors duration-150 cursor-pointer";
   const pillActive = "bg-storefront-charcoal text-storefront-cream border-storefront-charcoal";
   const pillInactive =
     "border-storefront-border text-storefront-warm hover:border-storefront-charcoal hover:text-storefront-charcoal";

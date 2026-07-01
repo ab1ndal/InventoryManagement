@@ -29,22 +29,22 @@ export default function FeaturedCollection() {
             <div className="flex flex-col justify-center">
               <div className="flex items-center gap-3 mb-5">
                 <div className="h-px w-8 bg-storefront-gold" aria-hidden="true" />
-                <span className="font-montserrat text-xs tracking-[0.3em] uppercase text-storefront-gold">
+                <span className="font-sans text-xs tracking-[0.3em] uppercase text-storefront-gold">
                   Featured Edit
                 </span>
               </div>
-              <h2 className="font-cormorant font-semibold text-storefront-cream text-[clamp(2.25rem,5vw,4rem)] leading-tight mb-4">
+              <h2 className="font-display font-semibold text-storefront-cream text-[clamp(2.25rem,5vw,4rem)] leading-tight mb-4">
                 The Bridal<br />
                 <span className="italic text-storefront-gold">Edit 2025</span>
               </h2>
-              <p className="font-montserrat text-sm text-storefront-cream/60 leading-relaxed max-w-sm mb-8">
+              <p className="font-sans text-sm text-storefront-cream/60 leading-relaxed max-w-sm mb-8">
                 Exquisite lehengas, bridal sarees, and shararas — each piece tells
                 a story of artistry passed down through generations.
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link
                   to="/shop"
-                  className="group inline-flex items-center gap-2 bg-storefront-gold hover:bg-storefront-gold-dark text-white font-montserrat text-sm font-medium tracking-widest uppercase px-7 py-3 transition-colors duration-200"
+                  className="group inline-flex items-center gap-2 bg-storefront-gold hover:bg-storefront-gold-dark text-white font-sans text-sm font-medium tracking-widest uppercase px-7 py-3 transition-colors duration-200"
                 >
                   Shop Bridal
                   <ArrowRight
@@ -65,10 +65,10 @@ export default function FeaturedCollection() {
                 <div key={label} className="flex items-center gap-5">
                   <div className="h-px w-8 bg-storefront-gold/40" aria-hidden="true" />
                   <div>
-                    <div className="font-cormorant font-semibold text-3xl text-storefront-gold">
+                    <div className="font-display font-semibold text-3xl text-storefront-gold">
                       {number}
                     </div>
-                    <div className="font-montserrat text-xs text-storefront-cream/50 tracking-wider uppercase">
+                    <div className="font-sans text-xs text-storefront-cream/50 tracking-wider uppercase">
                       {label}
                     </div>
                   </div>

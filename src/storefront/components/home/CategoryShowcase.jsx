@@ -1,50 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
-
-// Curated images per category keyword — onError falls back to gradient
-const IMAGE_MAP = [
-  {
-    match: "saree",
-    url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "lehenga",
-    url: "https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "salwar",
-    url: "https://images.unsplash.com/photo-1617196034282-8f93b79c5d24?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "kurti",
-    url: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "dupatta",
-    url: "https://images.unsplash.com/photo-1614093302611-4b0dff45ba25?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "bridal",
-    url: "https://images.unsplash.com/photo-1606800052052-a08af7148866?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "suit",
-    url: "https://images.unsplash.com/photo-1617196034183-421b4040ed20?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "anarkali",
-    url: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "sharara",
-    url: "https://images.unsplash.com/photo-1583391733956-6c78276477e2?auto=format&fit=crop&w=400&q=85",
-  },
-  {
-    match: "ethnic",
-    url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=400&q=85",
-  },
-];
+import { getProductImageUrl } from "../../lib/productImage";
 
 const GRADIENT_FALLBACKS = [
   "from-[#2C1810] to-storefront-charcoal",
@@ -55,9 +12,21 @@ const GRADIENT_FALLBACKS = [
   "from-storefront-charcoal to-[#1a1614]",
 ];
 
-function getImage(name) {
-  const lower = name.toLowerCase();
-  return IMAGE_MAP.find(({ match }) => lower.includes(match))?.url ?? null;
+// Pick a representative product image for a category from the mockups bucket.
+// Tries the newest products until one has an uploaded image; null otherwise.
+async function getCategoryHeroImage(categoryid) {
+  const { data } = await supabase
+    .from("products")
+    .select("productid")
+    .eq("categoryid", categoryid)
+    .order("productid", { ascending: false })
+    .limit(10);
+  const ids = (data || []).map((r) => r.productid);
+  if (ids.length === 0) return null;
+  const urls = await Promise.all(
+    ids.map((id) => getProductImageUrl(id, { width: 400, quality: 70 }))
+  );
+  return urls.find(Boolean) ?? null;
 }
 
 // Card dimensions: original w-44 (176px) × aspect 2/3 (264px tall)
@@ -69,7 +38,7 @@ const CARD_ASPECT = "141 / 396";
 
 function CategoryCard({ category, index }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const imageUrl = getImage(category.name);
+  const imageUrl = category.heroImage;
   const gradient = GRADIENT_FALLBACKS[index % GRADIENT_FALLBACKS.length];
 
   return (
@@ -98,7 +67,7 @@ function CategoryCard({ category, index }) {
 
       {/* Name — hidden by default, reveals top→down on hover via clip-path */}
       <div className="absolute inset-0 flex items-center justify-center px-3">
-        <h3 className="font-cormorant font-semibold text-white text-2xl leading-tight text-center tracking-wide transition-[clip-path] duration-500 ease-out [clip-path:inset(0_0_100%_0)] group-hover:[clip-path:inset(0_0_0%_0)]">
+        <h3 className="font-display font-semibold text-white text-2xl leading-tight text-center tracking-wide transition-[clip-path] duration-500 ease-out [clip-path:inset(0_0_100%_0)] group-hover:[clip-path:inset(0_0_0%_0)]">
           {category.name}
         </h3>
       </div>
@@ -145,8 +114,17 @@ export default function CategoryShowcase() {
           (a, b) =>
             (countMap[b.categoryid] || 0) - (countMap[a.categoryid] || 0),
         );
+
+      // Render names immediately, then resolve real product images per category.
       setCategories(sorted);
       setLoading(false);
+
+      Promise.all(
+        sorted.map(async (c) => ({
+          ...c,
+          heroImage: await getCategoryHeroImage(c.categoryid),
+        })),
+      ).then(setCategories);
     });
   }, []);
 
@@ -196,11 +174,11 @@ export default function CategoryShowcase() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
         <div className="flex items-center gap-3 mb-2">
           <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-          <span className="font-montserrat text-xs tracking-[0.25em] uppercase text-storefront-gold">
+          <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold">
             Explore
           </span>
         </div>
-        <h2 className="font-cormorant font-semibold text-3xl sm:text-4xl text-storefront-charcoal">
+        <h2 className="font-display font-semibold text-3xl sm:text-4xl text-storefront-charcoal">
           Shop by Category
         </h2>
       </div>
@@ -225,7 +203,7 @@ export default function CategoryShowcase() {
       </div>
 
       {/* Scroll hint */}
-      <p className="text-center font-montserrat text-[10px] tracking-[0.25em] uppercase text-storefront-muted/60 mt-5">
+      <p className="text-center font-sans text-[10px] tracking-[0.25em] uppercase text-storefront-muted/60 mt-5">
         Scroll to explore
       </p>
     </section>
