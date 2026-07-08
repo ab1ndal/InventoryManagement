@@ -58,6 +58,14 @@ async function fetchPeriod({ start, end }) {
       .in("billid", billIds)
   );
 
+  const billSalespersonRows = await fetchAllRows(() =>
+    supabase.from("bill_salespersons").select("billid, salesperson_id").in("billid", billIds)
+  );
+  const billSalespersonsMap = {};
+  for (const r of billSalespersonRows) {
+    (billSalespersonsMap[r.billid] ||= []).push(r.salesperson_id);
+  }
+
   const manualCodes = [...new Set(
     rawItems.filter((i) => i.product_code?.startsWith("BCX")).map((i) => i.product_code)
   )];
@@ -88,7 +96,7 @@ async function fetchPeriod({ start, end }) {
     const cost_price = isManual
       ? (manualPriceMap[i.product_code] || 0)
       : (variantPriceMap[i.variantid] || 0);
-    return { ...i, cost_price };
+    return { ...i, cost_price, bill_salesperson_ids: billSalespersonsMap[i.billid] || [] };
   });
 
   const normalizedBills = bills.map((b) => ({

@@ -85,12 +85,32 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
 
   async function handleSubmit() {
     if (!name.trim()) return;
+    if (!categoryId) {
+      toast({ title: "Category is required", variant: "destructive" });
+      return;
+    }
+    const purchasePrice = decodeZCodeToPrice(zCode);
+    if (!zCode.trim() || purchasePrice <= 0) {
+      toast({ title: "A valid Z code (purchase price) is required", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      const purchasePrice = decodeZCodeToPrice(zCode);
       let manualItemId;
       if (isEditing) {
         manualItemId = initialVal.productid || initialVal.manual_code || null;
+        const { error } = await supabase
+          .from("manual_items")
+          .update({
+            name: name.trim(),
+            categoryid: categoryId || null,
+            size: size || null,
+            color: color || null,
+            purchase_price: purchasePrice,
+            mrp: Number(mrp) || 0,
+          })
+          .eq("manual_item_id", manualItemId);
+        if (error) throw new Error(error.message);
       } else {
         manualItemId = await getNextManualItemId();
         const { error } = await supabase.from("manual_items").insert({
@@ -196,7 +216,9 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
             />
           </div>
           <div className="grid gap-1">
-            <Label>Category (optional)</Label>
+            <Label>
+              Category <span className="text-destructive">*</span>
+            </Label>
             <select
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
               value={categoryId}
@@ -292,7 +314,9 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
             </div>
           </div>
           <div className="grid gap-1">
-            <Label>Z Code (Purchase Price)</Label>
+            <Label>
+              Z Code (Purchase Price) <span className="text-destructive">*</span>
+            </Label>
             <Input
               placeholder="e.g. ZABCD"
               value={zCode}
@@ -327,7 +351,10 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
         </div>
       )}
 
-      <Button onClick={handleSubmit} disabled={!name.trim() || saving}>
+      <Button
+        onClick={handleSubmit}
+        disabled={!name.trim() || !categoryId || !zCode.trim() || saving}
+      >
         {saving ? "Adding..." : "Add Item"}
       </Button>
     </div>

@@ -237,29 +237,18 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             .eq("active", true)
             .order("name"),
         ]);
-      if (locs) setSalesLocations(locs);
+      if (locs) {
+        setSalesLocations(locs);
+        if (!billId) {
+          const walkIn = locs.find((l) => l.locationname === "Walk-In");
+          if (walkIn) setSalesLocationId((prev) => prev ?? walkIn.saleslocationid);
+        }
+      }
       if (methods) setSalesMethods(methods);
       if (sps) setSalespersonsList(sps);
     };
     loadLookups();
   }, [open]);
-
-  useEffect(() => {
-    const uniqueIds = Array.from(
-      new Set(items.map((it) => it.salesperson_id).filter(Boolean)),
-    );
-
-    setSelectedSalespersonIds((prev) => {
-      // prevent unnecessary re-renders
-      if (
-        prev.length === uniqueIds.length &&
-        prev.every((id) => uniqueIds.includes(id))
-      ) {
-        return prev;
-      }
-      return uniqueIds;
-    });
-  }, [items]);
 
   useEffect(() => {
     if (!open || !billId) return;
@@ -402,6 +391,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             productid: bi.product_code || null,
             product_name: bi.product_name || "",
             category: bi.category || null,
+            categoryid: bi.category || null,
+            cost_price: bi.cost_price ?? null,
             quantity: bi.quantity,
             unit_type: bi.unit_type || "piece",
             mrp: bi.mrp,

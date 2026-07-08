@@ -151,13 +151,21 @@ export function aggregateCategories(items) {
 
 export function aggregateSalespersons(items, salespersonsById = {}) {
   const map = new Map();
-  for (const i of items) {
-    if (i.salesperson_id == null) continue;
-    const id = i.salesperson_id;
+  const credit = (id, revenueShare, billid) => {
     const row = map.get(id) || { salespersonId: id, revenue: 0, billIds: new Set() };
-    row.revenue += num(i.total);
-    row.billIds.add(i.billid);
+    row.revenue += revenueShare;
+    row.billIds.add(billid);
     map.set(id, row);
+  };
+  for (const i of items) {
+    if (i.salesperson_id != null) {
+      credit(i.salesperson_id, num(i.total), i.billid);
+    } else if (i.bill_salesperson_ids?.length > 0) {
+      // No item-level assignment — split this item's revenue evenly across
+      // the bill's salespersons rather than crediting one person in full.
+      const share = num(i.total) / i.bill_salesperson_ids.length;
+      for (const id of i.bill_salesperson_ids) credit(id, share, i.billid);
+    }
   }
   return [...map.values()]
     .map((r) => {

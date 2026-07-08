@@ -107,6 +107,7 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
       product_name: it.product_name || it.name || "",
       product_code: it.productid || it.product_code || null,
       category: it.category || null,
+      cost_price: it.cost_price ?? null,
       alteration_charge: Number(it.alteration_charge || 0),
       discount_total: round2(
         priced.itemDisc + itemOverallDisc + itemBalanceDisc,
