@@ -248,7 +248,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       if (sps) setSalespersonsList(sps);
     };
     loadLookups();
-  }, [open]);
+  }, [open, billId]);
 
   useEffect(() => {
     if (!open || !billId) return;
