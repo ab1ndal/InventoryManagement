@@ -66,6 +66,7 @@ export default function ShopPage() {
     activeCount,
     categoryOptions,
     colorOptions,
+    colorFamilyHex,
     sizeOptions,
     sizeDisplayMap,
     fabricOptions,
@@ -123,6 +124,7 @@ export default function ShopPage() {
         loading={loading}
         categoryOptions={categoryOptions}
         colorOptions={colorOptions}
+        colorFamilyHex={colorFamilyHex}
         sizeOptions={sizeOptions}
         sizeDisplayMap={sizeDisplayMap}
         fabricOptions={fabricOptions}
@@ -134,6 +136,7 @@ export default function ShopPage() {
         filters={filters}
         categoryOptions={categoryOptions}
         colorOptions={colorOptions}
+        colorFamilyHex={colorFamilyHex}
         sizeOptions={sizeOptions}
         sizeDisplayMap={sizeDisplayMap}
         fabricOptions={fabricOptions}

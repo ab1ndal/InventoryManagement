@@ -20,9 +20,16 @@ function fabricCodesFor(families, familyToCodes) {
   return codes.length ? codes : ["__no_match__"];
 }
 
+// Color works the same way, but a code can belong to several families
+// (multi-family). Expanding a family yields every code that lists it.
+function colorCodesFor(families, familyToCodes) {
+  const codes = [...new Set(families.flatMap((f) => familyToCodes[f] || []))];
+  return codes.length ? codes : ["__no_match__"];
+}
+
 // Returns product IDs matching all filters except the excluded dimension.
 // Mirrors the runQuery join logic so results are always consistent.
-async function getMatchingPids(filters, excludeDim, fabricIndex) {
+async function getMatchingPids(filters, excludeDim, fabricIndex, colorIndex) {
   const colors = excludeDim === "colors" ? [] : filters.colors;
   const sizes = excludeDim === "sizes" ? [] : filters.sizes;
   const categories = excludeDim === "categories" ? [] : filters.categories;
@@ -31,7 +38,7 @@ async function getMatchingPids(filters, excludeDim, fabricIndex) {
   let productIds = null;
   if (colors.length > 0 || sizes.length > 0) {
     let q = supabase.from("productsizecolors").select("productid");
-    if (colors.length > 0) q = q.in("color", colors);
+    if (colors.length > 0) q = q.in("color", colorCodesFor(colors, colorIndex.familyToCodes));
     if (sizes.length > 0) q = q.in("size", sizes);
     const { data } = await q;
     productIds = [...new Set((data || []).map((r) => r.productid))];
@@ -50,12 +57,12 @@ async function getMatchingPids(filters, excludeDim, fabricIndex) {
   return (data || []).map((r) => r.productid);
 }
 
-async function fetchAvailableOptionsFromDB(filters, fabricIndex) {
+async function fetchAvailableOptionsFromDB(filters, fabricIndex, colorIndex) {
   const [catPids, colorPids, sizePids, fabricPids] = await Promise.all([
-    getMatchingPids(filters, "categories", fabricIndex),
-    getMatchingPids(filters, "colors", fabricIndex),
-    getMatchingPids(filters, "sizes", fabricIndex),
-    getMatchingPids(filters, "fabrics", fabricIndex),
+    getMatchingPids(filters, "categories", fabricIndex, colorIndex),
+    getMatchingPids(filters, "colors", fabricIndex, colorIndex),
+    getMatchingPids(filters, "sizes", fabricIndex, colorIndex),
+    getMatchingPids(filters, "fabrics", fabricIndex, colorIndex),
   ]);
 
   const [cats, colorRows, sizeRows, fabRows] = await Promise.all([
@@ -74,7 +81,8 @@ async function fetchAvailableOptionsFromDB(filters, fabricIndex) {
     sizePids.length
       ? (() => {
           let q = supabase.from("productsizecolors").select("size").in("productid", sizePids);
-          if (filters.colors.length) q = q.in("color", filters.colors);
+          if (filters.colors.length)
+            q = q.in("color", colorCodesFor(filters.colors, colorIndex.familyToCodes));
           return q;
         })()
       : Promise.resolve({ data: [] }),
@@ -85,7 +93,11 @@ async function fetchAvailableOptionsFromDB(filters, fabricIndex) {
 
   return {
     categories: new Set((cats.data || []).map((r) => r.categoryid).filter(Boolean)),
-    colors: new Set((colorRows.data || []).map((r) => r.color).filter(Boolean)),
+    // Color availability is in the filter's vocabulary — families — so map each
+    // product color code up to every family it belongs to (multi-family).
+    colors: new Set(
+      (colorRows.data || []).flatMap((r) => colorIndex.codeToFamilies[r.color] || [])
+    ),
     sizes: new Set((sizeRows.data || []).map((r) => r.size).filter(Boolean)),
     // Availability is expressed in the filter's own vocabulary — families, not
     // codes — so map each product's fabric code back up to its family.
@@ -107,7 +119,8 @@ export default function useShopFilters() {
   const [offset, setOffset] = useState(0);
 
   const [categoryOptions, setCategoryOptions] = useState([]);
-  const [colorOptions, setColorOptions] = useState([]);
+  const [colorOptions, setColorOptions] = useState([]); // family names (filter buckets)
+  const [colorFamilyHex, setColorFamilyHex] = useState({}); // family -> swatch hex
   const [sizeOptions, setSizeOptions] = useState([]);
   const [sizeDisplayMap, setSizeDisplayMap] = useState({});
   const [fabricOptions, setFabricOptions] = useState([]);
@@ -118,12 +131,15 @@ export default function useShopFilters() {
   // fabric family <-> code maps, loaded once from the `fabrics` lookup. A ref
   // (not state) so the query callbacks read the latest without re-subscribing.
   const fabricIndexRef = useRef({ familyToCodes: {}, codeToFamily: {} });
+  // color maps: family -> [codes] (multi-family), code -> [families].
+  const colorIndexRef = useRef({ familyToCodes: {}, codeToFamilies: {} });
 
   useEffect(() => {
     async function fetchOptions() {
-      const [cats, variants, fabrics, priceRange, distinctSizes, sizeDefs] = await Promise.all([
+      const [cats, colorRows, colorFams, fabrics, priceRange, distinctSizes, sizeDefs] = await Promise.all([
         supabase.from("categories").select("categoryid, name").order("name"),
-        supabase.from("productsizecolors").select("color").limit(50000),
+        supabase.from("colors").select("code, families"),
+        supabase.from("color_families").select("family, hex, sort_order").order("sort_order"),
         supabase.from("fabrics").select("code, family, sort_order").order("sort_order"),
         supabase
           .from("products")
@@ -136,9 +152,25 @@ export default function useShopFilters() {
 
       setCategoryOptions(cats.data || []);
 
-      if (variants.data) {
-        const colors = [...new Set(variants.data.map((r) => r.color).filter(Boolean))].sort();
-        setColorOptions(colors);
+      if (colorFams.data) {
+        // Filter buckets = families, ordered by color_families.sort_order.
+        setColorOptions(colorFams.data.map((f) => f.family));
+        setColorFamilyHex(
+          Object.fromEntries(colorFams.data.map((f) => [f.family, f.hex]))
+        );
+      }
+
+      if (colorRows.data) {
+        // Multi-family maps: a code lists 1..n families; each family gathers
+        // every code that includes it, so filtering any family surfaces it.
+        const familyToCodes = {};
+        const codeToFamilies = {};
+        colorRows.data.forEach(({ code, families }) => {
+          const fams = families || [];
+          codeToFamilies[code] = fams;
+          fams.forEach((fam) => (familyToCodes[fam] ||= []).push(code));
+        });
+        colorIndexRef.current = { familyToCodes, codeToFamilies };
       }
 
       if (sizeDefs.data) {
@@ -207,7 +239,11 @@ export default function useShopFilters() {
 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const available = await fetchAvailableOptionsFromDB(filters, fabricIndexRef.current);
+      const available = await fetchAvailableOptionsFromDB(
+        filters,
+        fabricIndexRef.current,
+        colorIndexRef.current
+      );
       setAvailableOptions(available);
     }, 200);
 
@@ -222,7 +258,8 @@ export default function useShopFilters() {
 
       if (currentFilters.colors.length > 0 || currentFilters.sizes.length > 0) {
         let q = supabase.from("productsizecolors").select("productid");
-        if (currentFilters.colors.length > 0) q = q.in("color", currentFilters.colors);
+        if (currentFilters.colors.length > 0)
+          q = q.in("color", colorCodesFor(currentFilters.colors, colorIndexRef.current.familyToCodes));
         if (currentFilters.sizes.length > 0) q = q.in("size", currentFilters.sizes);
         const { data } = await q;
         productIds = [...new Set((data || []).map((r) => r.productid))];
@@ -341,6 +378,7 @@ export default function useShopFilters() {
     activeCount,
     categoryOptions,
     colorOptions,
+    colorFamilyHex,
     sizeOptions,
     sizeDisplayMap,
     fabricOptions,

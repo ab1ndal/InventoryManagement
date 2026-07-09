@@ -3,41 +3,9 @@ import { Check } from "lucide-react";
 import PriceInputs from "./PriceInputs";
 import { sortByAvailability } from "../../hooks/filterUtils";
 
-const COLOR_MAP = {
-  white: "#F5F5F4",
-  black: "#1C1917",
-  red: "#DC2626",
-  blue: "#1D4ED8",
-  navy: "#1E3A5F",
-  "navy blue": "#1E3A5F",
-  green: "#16A34A",
-  yellow: "#EAB308",
-  orange: "#EA580C",
-  pink: "#EC4899",
-  purple: "#7C3AED",
-  maroon: "#7F1D1D",
-  grey: "#6B7280",
-  gray: "#6B7280",
-  beige: "#D2B48C",
-  brown: "#92400E",
-  cream: "#F5F5DC",
-  ivory: "#FFFFF0",
-  gold: "#A16207",
-  silver: "#9CA3AF",
-  peach: "#FBBF24",
-  teal: "#0D9488",
-  turquoise: "#06B6D4",
-  khaki: "#A0845C",
-  mustard: "#CA8A04",
-  olive: "#4D7C0F",
-  coral: "#F97316",
-  lavender: "#A78BFA",
-  rose: "#FB7185",
-  mint: "#34D399",
-  charcoal: "#374151",
-  "off white": "#F5F5F4",
-  "off-white": "#F5F5F4",
-};
+// null family hex (Multi/Printed) -> rainbow dot
+const MULTI_GRADIENT =
+  "conic-gradient(from 0deg, #e74c3c, #f1c40f, #2ecc71, #3498db, #9b59b6, #e74c3c)";
 
 function SectionLabel({ children }) {
   return (
@@ -52,6 +20,7 @@ export default function AllFiltersPanel({
   filters,
   categoryOptions,
   colorOptions,
+  colorFamilyHex = {},
   sizeOptions,
   sizeDisplayMap = {},
   fabricOptions,
@@ -156,56 +125,40 @@ export default function AllFiltersPanel({
               <SectionLabel>Color</SectionLabel>
               <div className="flex flex-wrap gap-2.5">
                 {sortByAvailability(colorOptions, (c) => c, availableOptions?.colors).map((color) => {
-                  const hex = COLOR_MAP[color.toLowerCase().trim()];
+                  const hex = colorFamilyHex[color];
                   const active = filters.colors.includes(color);
                   const unavailable = availableOptions && !availableOptions.colors.has(color) && !active;
-
-                  if (hex) {
-                    const isLight = (() => {
-                      const r = parseInt(hex.slice(1, 3), 16);
-                      const g = parseInt(hex.slice(3, 5), 16);
-                      const b = parseInt(hex.slice(5, 7), 16);
-                      return 0.299 * r + 0.587 * g + 0.114 * b > 200;
-                    })();
-                    return (
-                      <button
-                        key={color}
-                        title={color}
-                        onClick={() => onToggle("colors", color)}
-                        aria-label={`${active ? "Remove" : "Select"} ${color}`}
-                        className={`relative w-8 h-8 rounded-full cursor-pointer transition-all duration-150 flex-shrink-0 ${
-                          unavailable ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
-                        } ${
-                          active
-                            ? "ring-2 ring-storefront-gold ring-offset-2"
-                            : isLight
-                            ? "ring-1 ring-storefront-border hover:ring-storefront-charcoal"
-                            : "hover:ring-2 hover:ring-storefront-charcoal hover:ring-offset-1"
-                        }`}
-                        style={{ backgroundColor: hex }}
-                      >
-                        {active && (
-                          <span className="absolute inset-0 flex items-center justify-center">
-                            <Check size={12} className={isLight ? "text-storefront-charcoal" : "text-white"} />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  }
-
+                  const isLight = hex
+                    ? (() => {
+                        const r = parseInt(hex.slice(1, 3), 16);
+                        const g = parseInt(hex.slice(3, 5), 16);
+                        const b = parseInt(hex.slice(5, 7), 16);
+                        return 0.299 * r + 0.587 * g + 0.114 * b > 200;
+                      })()
+                    : false;
                   return (
                     <button
                       key={color}
+                      title={color}
                       onClick={() => onToggle("colors", color)}
-                      className={`px-3 py-1.5 text-[11px] font-sans font-medium tracking-wide border cursor-pointer transition-colors duration-150 whitespace-nowrap ${
+                      aria-label={`${active ? "Remove" : "Select"} ${color}`}
+                      aria-pressed={active}
+                      className={`relative w-8 h-8 rounded-full cursor-pointer transition-all duration-150 flex-shrink-0 ${
                         unavailable ? "opacity-40 cursor-not-allowed pointer-events-none" : ""
                       } ${
                         active
-                          ? "bg-storefront-charcoal text-storefront-cream border-storefront-charcoal"
-                          : "border-storefront-border text-storefront-warm hover:border-storefront-charcoal"
+                          ? "ring-2 ring-storefront-gold ring-offset-2"
+                          : isLight
+                          ? "ring-1 ring-storefront-border hover:ring-storefront-charcoal"
+                          : "hover:ring-2 hover:ring-storefront-charcoal hover:ring-offset-1"
                       }`}
+                      style={hex ? { backgroundColor: hex } : { background: MULTI_GRADIENT }}
                     >
-                      {color}
+                      {active && (
+                        <span className="absolute inset-0 flex items-center justify-center">
+                          <Check size={12} className={isLight ? "text-storefront-charcoal" : "text-white"} />
+                        </span>
+                      )}
                     </button>
                   );
                 })}

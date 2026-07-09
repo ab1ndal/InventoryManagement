@@ -24,6 +24,7 @@ export default function FilterBar({
   colorOptions,
   sizeOptions,
   sizeDisplayMap = {},
+  colorFamilyHex = {},
   fabricOptions,
   availableOptions,
 }) {
@@ -112,6 +113,7 @@ export default function FilterBar({
                       onApply={() => onToggleDropdown(null)}
                       availableSet={getAvailableSet(pill.type)}
                       sizeDisplayMap={sizeDisplayMap}
+                      colorFamilyHex={colorFamilyHex}
                     />
                   )}
                 </div>
