@@ -1,0 +1,9 @@
+numeric_size,non_pants_categories_with_variant_counts,variants,target_letter_code,display_after,confidence,notes
+32,Blazer (1),1,XXS?,XXS|32,REVIEW,"no letter maps to 32 today (XS=34) — either add XXS (numeric_in 32) to sizes lookup, or leave this 1 Blazer variant numeric. Owner call"
+34,"Suit (Jodhpuri) - 3Pc (2), Kurta Pajama (1)",3,XS,XS|34,high,chest 34 = XS per existing sizes lookup
+36,Suit (Jodhpuri) - 3Pc (2),2,S,S|36,high,chest 36 = S
+38,"Suit (3 Pc) (5), Suit (Jodhpuri) - 3Pc (2), Cord Sets (2), Nehru Jacket (1)",10,M,M|38,high,chest 38 = M
+40,"Suit (3 Pc) (9), Cord Sets (2), Suit (Jodhpuri) - 3Pc (2), Nehru Jacket (1)",14,L,L|40,high,chest 40 = L
+42,"Suit (3 Pc) (5), Cord Sets (2), Suit (Jodhpuri) - 3Pc (2), Nehru Jacket (1)",10,XL,XL|42,high,chest 42 = XL
+44,"Suit (3 Pc) (12), Shirt (10), Cord Sets (2), Nehru Jacket (1)",25,2XL,2XL|44,high,chest 44 = 2XL
+46,Cord Sets (2),2,3XL,3XL|46,high,chest 46 = 3XL

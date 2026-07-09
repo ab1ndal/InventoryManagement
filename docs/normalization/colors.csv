@@ -1,0 +1,392 @@
+canonical_name,family,hex,row_count,raw_spellings_merged,confidence,notes
+Black,Black,#1A1A1A,829,black;Black;black ;Black ,high,
+Black Lining,Black,#1A1A1A,7,Black_line;Line Black,REVIEW,pattern descriptor; MERGE Black Line -> Black Lining (needs approval); merge with Black Line?; MERGE Line Black -> Black Lining (needs approval)
+Black Mustard,Black,#1A1A1A,6,Black_mustard,medium,combo (Black+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Red,Black,#1A1A1A,5,Black Red;Black_red,medium,combo (Black+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Grey,Black,#1A1A1A,5,Black Grey;Black_grey,medium,combo (Black+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Neck,Black,#1A1A1A,4,Black_neck,REVIEW,"garment detail, not color"
+Black Rust,Black,#1A1A1A,3,Black Rust,medium,combo (Black+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Maroon,Black,#1A1A1A,3,Black Maroon,medium,combo (Black+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black White,Black,#1A1A1A,2,Black_white,medium,combo (Black+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Blue,Black,#1A1A1A,2,Black Blue;Black_blue,medium,combo (Black+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Orange,Black,#1A1A1A,2,Black Orange;Black_orange,medium,combo (Black+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Print,Black,#1A1A1A,2,black print;Black_print,medium,combo (Black+Multi/Printed) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Brown,Black,#1A1A1A,2,Black Brown;Black_brown,medium,combo (Black+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Check,Black,#1A1A1A,1,Black Check,high,
+Black Fawn,Black,#1A1A1A,1,Black Fawn,medium,combo (Black+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Firozi,Black,#1A1A1A,1,Black Firozi,medium,combo (Black+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Golden,Black,#1A1A1A,1,Black Golden,medium,combo (Black+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Green Brown,Black,#1A1A1A,1,Black green brown,medium,combo (Black+Green+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Lavender,Black,#1A1A1A,1,Black Lavender,medium,combo (Black+Purple) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Light Grey,Black,#1A1A1A,1,Black Light_grey,medium,combo (Black+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Magenta,Black,#1A1A1A,1,Black Magenta,medium,combo (Black+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Off White,Black,#1A1A1A,1,Black Off White,medium,combo (Black+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Wine,Black,#1A1A1A,1,Black Wine,medium,combo (Black+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Yellow,Black,#1A1A1A,1,Black Yellow,medium,combo (Black+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Black Zigzag,Black,#1A1A1A,1,Black_zigzag,high,
+White,White/Cream,#F5F0E6,456,White;White_plain,high,merge; MERGE White Plain -> White (needs approval)
+Off White,White/Cream,#F8F4E9,218,Off White;Off white ;Off_white,high,
+Cream,White/Cream,#F3E5C0,115,Cream;Cream ;Craem,high,misspelling; MERGE Craem -> Cream (needs approval)
+White Black,White/Cream,#F5F0E6,10,White Black;White_black,medium,combo (White/Cream+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Blue,White/Cream,#F5F0E6,10,White Blue;White_blue,medium,combo (White/Cream+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Grey,White/Cream,#F5F0E6,8,White Grey;White_grey,medium,combo (White/Cream+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Brown,White/Cream,#F5F0E6,7,White Brown;White_brown,medium,combo (White/Cream+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Red,White/Cream,#F5F0E6,5,white red;White Red;White_red,medium,combo (White/Cream+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Cream Grey,White/Cream,#F5F0E6,3,Cream Grey,medium,combo (White/Cream+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Red,White/Cream,#F5F0E6,3,Off white Red;Off White_red;Off_white Red,medium,combo (White/Cream+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Green,White/Cream,#F5F0E6,2,White Green,medium,combo (White/Cream+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Neck,White/Cream,#F5F0E6,2,White_neck,REVIEW,"garment detail, not color"
+White Self,White/Cream,#F5F0E6,2,White_self,medium,self-woven pattern
+Off White Orange,White/Cream,#F5F0E6,2,Off White_orange;Off_white Orange,medium,combo (White/Cream+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Navy Blue,White/Cream,#F5F0E6,2,Off White_navy_blue,medium,combo (White/Cream+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Cream Sky Blue,White/Cream,#F5F0E6,1,Cream with sky blue,medium,combo; MERGE Cream With Sky Blue -> Cream Sky Blue (needs approval)
+Off White Black,White/Cream,#F5F0E6,1,Off_white_black,medium,combo (White/Cream+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Coffe,White/Cream,#F5F0E6,1,Off_white_coffe,high,
+Off White Coffee,White/Cream,#F5F0E6,1,Off_white Coffee,medium,combo (White/Cream+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Gazari,White/Cream,#F5F0E6,1,Off White_gazari,medium,combo (White/Cream+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Golden,White/Cream,#F5F0E6,1,Off_white_golden,medium,combo (White/Cream+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Parrot Green,White/Cream,#F5F0E6,1,Off White_parrot_green,medium,combo (White/Cream+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Pink,White/Cream,#F5F0E6,1,Off_white Pink,medium,combo (White/Cream+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Off White Yellow,White/Cream,#F5F0E6,1,Off White_yellow,medium,combo (White/Cream+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Maroon,White/Cream,#F5F0E6,1,White Maroon,medium,combo (White/Cream+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Mustard,White/Cream,#F5F0E6,1,White_mustard,medium,combo (White/Cream+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Print,White/Cream,#F5F0E6,1,White_print,medium,combo (White/Cream+Multi/Printed) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+White Sky Blue,White/Cream,#F5F0E6,1,White_sky_blue,medium,combo (White/Cream+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey,Grey,#8A8A8A,498,grey;Grey;Grey ;gray,high,spelling; MERGE Gray -> Grey (needs approval)
+Light Grey,Grey,#8A8A8A,44,Light Grey;Light_grey,high,
+Teal Grey,Grey,#6E8387,42,Teel Grey;Teel_grey,medium,spelling; MERGE Teel Grey -> Teal Grey (needs approval)
+Dark Grey,Grey,#8A8A8A,24,Dark Grey;Dark_grey,high,
+Blueish Grey,Grey,#8A8A8A,7,Blueish Grey;Blueish_grey,medium,
+Mouse Grey,Grey,#8A8A8A,5,Mouse colour ,medium,mouse = greyish; MERGE Mouse Colour -> Mouse Grey (needs approval)
+Charcoal Grey,Grey,#36454F,4,Charcoal Grey,medium,
+Grey Red,Grey,#8A8A8A,4,Grey_red,medium,combo (Grey+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Pink,Grey,#8A8A8A,3,Grey Pink,medium,combo (Grey+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Off White,Grey,#8A8A8A,3,Grey_off_white,medium,combo (Grey+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Orange,Grey,#8A8A8A,3,Grey Orange;Grey_orange,medium,combo (Grey+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Steel Blue,Grey,#4682B4,2,Steel Blue,medium,combo (Grey+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Steel Grey,Grey,#71797E,2,Steel grey;Steel_grey,high,
+Pencil Grey,Grey,#8A8A8A,2,Pencil Grey,medium,
+Grey Blue,Grey,#8A8A8A,2,Grey Blue;Grey_blue,medium,combo (Grey+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Charcoal,Grey,#36454F,2,Charcoal,medium,
+Charcoal Black,Grey,#8A8A8A,1,Charcoal Black,medium,combo
+Grey Black,Grey,#8A8A8A,1,Grey_black,medium,combo (Grey+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Brown,Grey,#8A8A8A,1,Grey_brown,medium,combo (Grey+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Check,Grey,#8A8A8A,1,Grey Check,high,
+Grey Green,Grey,#8A8A8A,1,Grey_green,medium,combo (Grey+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Light,Grey,#8A8A8A,1,Grey_light,high,
+Grey Magenta,Grey,#8A8A8A,1,Grey Magenta,medium,combo (Grey+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Maroon,Grey,#8A8A8A,1,Grey_Maroon,medium,combo (Grey+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Grey Golden,Grey,#8A8A8A,1,Grey with golden beads,REVIEW,embellishment detail; MERGE Grey With Golden Beads -> Grey Golden (needs approval)
+Metallic Grey,Grey,#8A8A8A,1,Metallic grey,medium,
+Slate,Grey,#708090,1,Slate,medium,
+Steel Grey Red,Grey,#8A8A8A,1,Steel grey & Red,medium,combo; MERGE Steel Grey & Red -> Steel Grey Red (needs approval)
+Red,Red,#C0392B,518,red;Red;Red ,high,
+Red Black,Red,#C0392B,12,Red Black;Red_black,medium,combo (Red+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Blue,Red,#C0392B,5,Red Blue;Red_blue,medium,combo (Red+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Fawn,Red,#C0392B,4,Red Fawn,medium,combo (Red+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Orange,Red,#C0392B,4,Red Orange;Red_orange,medium,combo (Red+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Yellow,Red,#C0392B,3,Red Yellow,medium,combo (Red+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Golden,Red,#C0392B,3,Red Golden,medium,combo (Red+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Green,Red,#C0392B,3,Red Green;Red_green,medium,combo (Red+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Navy Blue,Red,#C0392B,2,Red Navy Blue;Red_navy_blue,medium,combo (Red+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Off White,Red,#C0392B,2,Red Off white;Red Off White,medium,combo (Red+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Bright Red,Red,#C0392B,1,Bright Red,high,
+Cherry,Red,#9E1B32,1,Cherry,medium,
+Deep Red,Red,#C0392B,1,Deep Red,high,
+Red Firozi,Red,#C0392B,1,Red Firozi,medium,combo (Red+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Magenta,Red,#C0392B,1,Red Magenta,medium,combo (Red+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Mustard,Red,#C0392B,1,Red Mustard,medium,combo (Red+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Orange Green,Red,#C0392B,1,Red Orange Green,medium,combo (Red+Orange+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Peach,Red,#C0392B,1,Red Peach,medium,combo (Red+Peach) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red Pink,Red,#C0392B,1,Red Pink,medium,combo (Red+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Red-Yellow-Green,Red,#C0392B,1,Red-yellow-Green,medium,combo (Red+Yellow+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Tusser Red,Red,#C0392B,1,Tusser Red,high,
+Maroon,Maroon/Wine,#800000,389,Maroon;Mahroon;mehroon;mehroon ;Marron,medium,misspelling; MERGE Mahroon -> Maroon (needs approval); misspelling; MERGE Mehroon -> Maroon (needs approval); misspelling; MERGE Marron -> Maroon (needs approval)
+Wine,Maroon/Wine,#722F37,259,wine;Wine,medium,
+Light Maroon,Maroon/Wine,#722F37,2,Light Maroon,high,
+Maroon Check,Maroon/Wine,#722F37,2,Maroon Check,high,
+Dark Maroon,Maroon/Wine,#722F37,1,Dark Maroon,high,
+Falsa,Maroon/Wine,#6C3461,1,Falsa,medium,"falsa-berry purple, trade name"
+Maroon Black,Maroon/Wine,#722F37,1,Maroon Black,medium,combo (Maroon/Wine+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Maroon Blue,Maroon/Wine,#722F37,1,Maroon Blue,medium,combo (Maroon/Wine+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Maroon Golden,Maroon/Wine,#722F37,1,Maroon Golden,medium,combo (Maroon/Wine+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Maroon Navy Blue,Maroon/Wine,#722F37,1,Maroon navy blue,medium,combo (Maroon/Wine+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Plum Maroon,Maroon/Wine,#722F37,1,Plum Maroon,medium,
+Wine Golden,Maroon/Wine,#722F37,1,Wine Golden,medium,combo (Maroon/Wine+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink,Pink,#E75480,375,pink;Pink;Pink ,high,
+Magenta,Pink,#C2185B,219,Magenta;mergenta,medium,magenta→Pink family (rani); or Purple — owner call; misspelling; MERGE Mergenta -> Magenta (needs approval)
+Gazari,Pink,#F28C6B,182,Gazari;gajari;Gajari,high,misspelling; MERGE Gajari -> Gazari (needs approval)
+Dark Pink,Pink,#E75480,10,Dark Pink;Dark_pink,high,
+Light Pink,Pink,#E75480,6,Light Pink,high,
+Hot Pink,Pink,#E0218A,6,Hot Pink,medium,
+Pink Green,Pink,#E75480,6,Pink Green;Pink Green ;Pink_green,medium,combo (Pink+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Baby Pink,Pink,#F4C2C2,4,Baby Pink,medium,
+Gazari Golden,Pink,#E75480,2,Gazari Golden,medium,combo (Pink+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink Blue,Pink,#E75480,2,Pink Blue;Pink_blue,medium,combo (Pink+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Dusty Rose,Pink,#C08081,2,Dusty Rose,medium,
+Gazari Blue,Pink,#E75480,2,Gazari Blue ;Gazri Blue,medium,combo (Pink+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone; misspelling; MERGE Gazri Blue -> Gazari Blue (needs approval); combo (Pink+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Bright Pink,Pink,#E75480,1,Bright Pink,medium,
+Dusty Magenta,Pink,#E75480,1,Dusty_Magenta,medium,
+Dusty Pink,Pink,#E75480,1,Dusty Pink,medium,
+Gazari Brown,Pink,#E75480,1,Gazari Brown,medium,combo (Pink+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Gazari Cream,Pink,#E75480,1,Gazari Cream,medium,combo (Pink+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Gazari Fawn,Pink,#E75480,1,Gazari Fawn,medium,combo (Pink+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Gazari Green,Pink,#E75480,1,Gazari Green,medium,combo (Pink+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Gazari Navy Blue,Pink,#E75480,1,Gazari Navy Blue,medium,combo (Pink+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Gazari Pink,Pink,#E75480,1,Gazari Pink,high,
+Gazari Yellow,Pink,#E75480,1,Gazari_yellow,medium,combo (Pink+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Dust Pink,Pink,#E75480,1,Golden Dust Pink,medium,combo
+Magenta Mustard,Pink,#E75480,1,Magenta Mustard,medium,combo (Pink+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Magenta Off White,Pink,#E75480,1,Magenta Off White,medium,combo (Pink+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Magenta Orange,Pink,#E75480,1,Magenta Orange,medium,combo (Pink+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Magenta Pink,Pink,#E75480,1,Magenta Pink,high,
+Magenta Red,Pink,#E75480,1,Magenta Red ,medium,combo (Pink+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Onion Pink,Pink,#C97B84,1,Onion Pink,medium,
+Pink Black,Pink,#E75480,1,Pink Black,medium,combo (Pink+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink Dot,Pink,#E75480,1,Pink_dot,high,
+Pink Firozi,Pink,#E75480,1,Pink Firozi,medium,combo (Pink+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink Green And Red,Pink,#E75480,1,Pink Green and Red,medium,combo (Pink+Green+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink Lavender,Pink,#E75480,1,Pink Lavender,medium,combo (Pink+Purple) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink Peach,Pink,#E75480,1,Pink Peach,medium,combo (Pink+Peach) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink Red,Pink,#E75480,1,Pink Red,medium,combo (Pink+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink White,Pink,#E75480,1,Pink White,medium,combo (Pink+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pink Yellow,Pink,#E75480,1,Pink Yellow,medium,combo (Pink+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Tusser Magenta,Pink,#E75480,1,Tusser Magenta,high,
+Peach,Peach,#F4A583,293,peach;Peach;Peach ,high,
+Skin,Peach,#F3D5B5,14,Skin;Skin ;Skin Shade,medium,merge; MERGE Skin Shade -> Skin (needs approval)
+Light Peach,Peach,#F4A583,12,Light Peach,high,
+Deep Peach,Peach,#F4A583,8,Deep Peach,high,
+Peach Orange,Peach,#F4A583,2,Peach Orange;Peach orange ,medium,combo (Peach+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Peach Magenta,Peach,#F4A583,2,Peach Magenta,medium,combo (Peach+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Coral,Peach,#FF7F50,1,Coral,medium,
+Dark Peach,Peach,#F4A583,1,Dark_peach,high,
+Pastel Peach,Peach,#F4A583,1,Pastel Peach,high,
+Peach Golden,Peach,#F4A583,1,Peach Golden,medium,combo (Peach+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Peach Pink,Peach,#F4A583,1,Peach Pink,medium,combo (Peach+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange,Orange,#E67E22,324,orange;Orange,high,
+Rust,Orange,#B7410E,76,Rust;Rust ,high,
+Orange Red,Orange,#E67E22,3,Orange Red;Orange_red,medium,combo (Orange+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Light Orange,Orange,#E67E22,2,Light Orange,high,
+Orange Pink,Orange,#E67E22,2,Orange Pink,medium,combo (Orange+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Magenta,Orange,#E67E22,2,Orange Magenta,medium,combo (Orange+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Golden,Orange,#E67E22,2,Orange Golden;Orange Golden ,medium,combo (Orange+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Blue,Orange,#E67E22,2,Orange_blue,medium,combo (Orange+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Dusty Orange,Orange,#E67E22,2,Dusty_orange,medium,
+Bright Orange,Orange,#E67E22,1,Bright Orange,high,
+Dusty Mustard Orange,Orange,#E67E22,1,Dusty_mustard_orange,medium,combo
+Orange Beige,Orange,#E67E22,1,Orange Beige,medium,combo (Orange+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Fawn,Orange,#E67E22,1,Orange Fawn,medium,combo (Orange+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Green,Orange,#E67E22,1,Orange Green,medium,combo (Orange+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Grey,Orange,#E67E22,1,Orange Grey,medium,combo (Orange+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Off White,Orange,#E67E22,1,Orange Off White,medium,combo (Orange+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Parrot Green,Orange,#E67E22,1,Orange_parrot_green,medium,combo (Orange+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Orange Purple,Orange,#E67E22,1,Orange_purple,medium,combo (Orange+Purple) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Rust Denim,Orange,#E67E22,1,Rust denim,REVIEW,rust on denim?
+Yellow,Yellow,#F1C40F,507,yellow;Yellow;Yellow ,high,
+Mustard,Yellow,#D4A017,236,Mustard;mustard ;Mustard ;Mus,REVIEW,guess: truncated mustard; MERGE Mus -> Mustard (needs approval)
+Lemon,Yellow,#F5E050,89,lemon;Lemon;leamon;Lmeon,high,misspelling; MERGE Leamon -> Lemon (needs approval); misspelling; MERGE Lmeon -> Lemon (needs approval)
+Mustard Yellow,Yellow,#F1C40F,22,Mustard Yellow,high,
+Lemon Yellow,Yellow,#F1C40F,21,Lemon Yellow,high,
+Light Yellow,Yellow,#F1C40F,4,Light Yellow,high,
+Mustard Green,Yellow,#F1C40F,3,Mustard Green,medium,combo (Yellow+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Lemon Pink,Yellow,#F1C40F,3,Lemon Pink,medium,combo (Yellow+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Pink,Yellow,#F1C40F,3,Yellow Pink,medium,combo (Yellow+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Red,Yellow,#F1C40F,2,Yellow Red,medium,combo (Yellow+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Mustard Red,Yellow,#F1C40F,2,Mustard Red,medium,combo (Yellow+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Magenta,Yellow,#F1C40F,2,Yellow Magenta,medium,combo (Yellow+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Peach,Yellow,#F1C40F,1,Yellow Peach,medium,combo (Yellow+Peach) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow-Blue,Yellow,#F1C40F,1,yellow-blue,medium,combo (Yellow+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow-Red,Yellow,#F1C40F,1,Yellow-Red,medium,combo (Yellow+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow-Red-Green,Yellow,#F1C40F,1,yellow-red-green,medium,combo (Yellow+Red+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Mustard Black,Yellow,#F1C40F,1,Mustard Black,medium,combo (Yellow+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Mustard Blue,Yellow,#F1C40F,1,Mustard Blue,medium,combo (Yellow+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Mustard Brown,Yellow,#F1C40F,1,Mustard_brown,medium,combo (Yellow+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Mustard Magenta,Yellow,#F1C40F,1,Mustard Magenta,medium,combo (Yellow+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Mustard Orange,Yellow,#F1C40F,1,Mustard Orange,medium,combo (Yellow+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pale Yellow,Yellow,#F1C40F,1,Pale Yellow,high,
+Yellow Blue,Yellow,#F1C40F,1,Yellow_blue,medium,combo (Yellow+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Firozi,Yellow,#F1C40F,1,Yellow Firozi,medium,combo (Yellow+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Gazari,Yellow,#F1C40F,1,Yellow Gazari,medium,combo (Yellow+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Maroon,Yellow,#F1C40F,1,Yellow Maroon,medium,combo (Yellow+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Yellow Mustard,Yellow,#F1C40F,1,Yellow Mustard,high,
+Green,Green,#2E8B57,499,green;Green;Green ,high,
+Sea Green,Green,#2E8B6E,127,sea green;Sea green;Sea Green;Sea_green;See Green ;See_green,high,misspelling; MERGE See Green -> Sea Green (needs approval)
+Pista Green,Green,#93C572,122,Pista Green;Pista_green,high,
+Peacock Green,Green,#0A6E5C,101,Peacock green;Peacock Green;Peacock_green;Peacock_Green,high,
+Pista,Green,#93C572,74,pista;Pista,high,
+Rama Green,Green,#0F7F6E,73,Rama green;Rama Green;Rama Green ;Rama_green;Rama Green (Morni);Morni;Rama;Rama Green (Morni,REVIEW,"merge into Rama Green?; MERGE Rama Green (Morni) -> Rama Green (needs approval); morni = peahen; same as Rama Green (Morni)?; MERGE Morni -> Rama Green (needs approval); shorthand; MERGE Rama -> Rama Green (needs approval); broken paren, merge; MERGE Rama Green (Morni -> Rama Green (needs approval)"
+Mehndi,Green,#7A8450,65,Mehndi;Mehendi;Mahendra;Mehnidi,REVIEW,spelling variant; MERGE Mehendi -> Mehndi (needs approval); guess: mehndi misspelling — confirm; MERGE Mahendra -> Mehndi (needs approval); misspelling; MERGE Mehnidi -> Mehndi (needs approval)
+Mehndi Green,Green,#7A8450,57,Mehndi Green;Mehndi_green;Mehendi green;Mehendi Green,high,spelling variant; MERGE Mehendi Green -> Mehndi Green (needs approval)
+Parrot Green,Green,#5DBB63,44,Parrot Green;Parrot_green,high,
+Light Green,Green,#2E8B57,28,light green;Light Green;Light_green,high,
+Bottle Green,Green,#0A5C36,18,Bottle green;Bottle Green;Bottle_green;Bottle_gaurd_green;Bottle Guard_green,high,misspelling (gourd); MERGE Bottle Gaurd Green -> Bottle Green (needs approval); misspelling (gourd); MERGE Bottle Guard Green -> Bottle Green (needs approval)
+Olive Green,Green,#708238,13,Olive Green,high,
+Dark Green,Green,#2E8B57,11,Dark Green,high,
+Lime Green,Green,#9ACD32,11,Lime Green,high,
+Sage Green,Green,#9CAF88,9,Sage Green,high,
+Light Pista,Green,#2E8B57,5,Light Pista;Light_pista,high,
+Peacock Green Off White,Green,#2E8B57,5,Peacock Green Off white;Peacock_Green_off_white,medium,combo (Green+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Green Blue,Green,#2E8B57,5,Green Blue;Green_blue,medium,combo (Green+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Light Mehndi,Green,#2E8B57,5,Light_mehndi;Light Mehndi Green,high,merge with Light Mehndi?; MERGE Light Mehndi Green -> Light Mehndi (needs approval)
+Mint Green,Green,#A8E4C0,4,Mint Green,high,
+Peacock,Green,#2E8B57,4,peacock;Peacock,REVIEW,peacock green or blue? confirm
+Pista Green Off White,Green,#2E8B57,3,PistaGreen_off_white,medium,"combo, spelling; MERGE Pistagreen Off White -> Pista Green Off White (needs approval)"
+Forest Green,Green,#228B22,2,Forest Green,high,
+Green Orange,Green,#2E8B57,2,Green Orange;Green_orange,medium,combo (Green+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Green Golden,Green,#2E8B57,2,Green Golden,medium,combo (Green+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Bottle Green Golden,Green,#2E8B57,1,Bottle Green_golden,medium,combo (Green+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Green Black,Green,#2E8B57,1,Green & Black,medium,combo; MERGE Green & Black -> Green Black (needs approval)
+Green Magenta,Green,#2E8B57,1,Green Magenta,medium,combo (Green+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Green Navy Blue,Green,#2E8B57,1,Green Navy Blue,medium,combo (Green+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Light Sea Green,Green,#2E8B57,1,Light Sea Green,high,
+Mehndi Green Pink,Green,#2E8B57,1,Mehendi Green - Pink,REVIEW,combo + spelling; MERGE Mehendi Green - Pink -> Mehndi Green Pink (needs approval)
+Mehndi Blue,Green,#2E8B57,1,Mehndi_blue,medium,combo (Green+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Moongai,Green,#2E8B57,1,Moongai,REVIEW,guess: moong-dal green — confirm
+Pastel Green,Green,#2E8B57,1,Pastel Green,high,
+Pista Black,Green,#2E8B57,1,Pista_black,medium,combo (Green+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pista Blue,Green,#2E8B57,1,Pista_blue,medium,combo (Green+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pista Orange,Green,#2E8B57,1,Pista_orange,medium,combo (Green+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Rama Blue,Green,#2E8B57,1,Rama Blue,medium,combo (Green+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Rama Green Golden,Green,#2E8B57,1,Rama Green Golden,medium,combo (Green+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Rama Green Wine,Green,#2E8B57,1,Rama Green Wine,medium,combo (Green+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Sea Green Brown,Green,#2E8B57,1,Sea Green Brown,medium,combo (Green+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Sea Green Magenta,Green,#2E8B57,1,Sea_green Magenta,medium,combo (Green+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Teal Green,Green,#3E8E7E,1,Teel Green,medium,spelling; MERGE Teel Green -> Teal Green (needs approval)
+Blue,Blue,#2C5F9E,574,blue;Blue;blue ;design blue;normal blue;Blue_shade;Blueish;Elegant Blue,REVIEW,vague descriptor; MERGE Design Blue -> Blue (needs approval); vague descriptor; MERGE Normal Blue -> Blue (needs approval); vague descriptor; MERGE Blue Shade -> Blue (needs approval); vague — fold into Blue?; MERGE Blueish -> Blue (needs approval); vague descriptor; MERGE Elegant Blue -> Blue (needs approval)
+Navy Blue,Blue,#1F3A93,368,Navy Blue;Navy Blue ;Navy_blue,high,
+Sky Blue,Blue,#87CEEB,252,Sky blue;Sky Blue;Sky_blue;sky,high,shorthand; MERGE Sky -> Sky Blue (needs approval)
+Firozi,Blue,#3FA8B8,229,Firozi;firogi;firoji,high,misspelling; MERGE Firogi -> Firozi (needs approval); misspelling; MERGE Firoji -> Firozi (needs approval)
+Royal Blue,Blue,#4169E1,65,Royal Blue;Royal Blue ;Royal_blue,medium,
+Light Blue,Blue,#2C5F9E,18,Light Blue;Light_blue;Llight_blue,high,typo; MERGE Llight Blue -> Light Blue (needs approval)
+Teal Blue,Blue,#367588,16,Teel Blue;Teal Blue,medium,spelling; MERGE Teel Blue -> Teal Blue (needs approval)
+Dark Blue,Blue,#2C5F9E,11,dark blue;Dark Blue,high,
+Peacock Blue,Blue,#1F6F8B,9,Peacock Blue,high,
+Light Sky Blue,Blue,#2C5F9E,7,Light Sky Blue,high,
+Blue Grey,Blue,#2C5F9E,5,Blue_grey,medium,combo (Blue+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Orange,Blue,#2C5F9E,4,Navy_blue Orange;Navy_blue_orange,medium,combo (Blue+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Mustard,Blue,#2C5F9E,4,Blue_mustard,medium,combo (Blue+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Red,Blue,#2C5F9E,4,Blue Red;Blue_red,medium,combo (Blue+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Golden,Blue,#2C5F9E,3,Navy_blue Golden,medium,combo (Blue+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Yellow,Blue,#2C5F9E,3,Navy_blue_yellow,medium,combo (Blue+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Check,Blue,#2C5F9E,3,Navy_blue_check,high,
+Firozi Grey,Blue,#2C5F9E,3,Firozi_grey,medium,combo (Blue+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Firozi Green,Blue,#2C5F9E,3,Firozi Green,medium,combo (Blue+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Dark Navy Blue,Blue,#2C5F9E,3,Dark Navy Blue,high,
+Blue Lining,Blue,#2C5F9E,3,Line Blue,REVIEW,pattern descriptor; MERGE Line Blue -> Blue Lining (needs approval)
+Navy Blue Off White,Blue,#2C5F9E,2,Navy_blue Off white;Navy_blue Off White,medium,combo (Blue+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Sky Blue White,Blue,#2C5F9E,2,Sky blue White;Sky Blue_white,medium,combo (Blue+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Green,Blue,#2C5F9E,2,Navy_blue_green,medium,combo (Blue+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Fawn,Blue,#2C5F9E,2,Navy Blue fawn,medium,combo (Blue+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Dot,Blue,#2C5F9E,2,Blue_dot,high,
+Blue Check,Blue,#2C5F9E,2,Blue_check,high,
+Blue Black,Blue,#2C5F9E,2,Blue Black;Blue_black,medium,combo (Blue+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Pink,Blue,#2C5F9E,2,Blue Pink;Blue_pink,medium,combo (Blue+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Firozi Golden,Blue,#2C5F9E,2,Firozi Golden,medium,combo (Blue+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Firozi Black,Blue,#2C5F9E,2,Firozi_black,medium,combo (Blue+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Off White,Blue,#2C5F9E,2,Blue_off_white,medium,combo (Blue+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Magenta,Blue,#2C5F9E,2,Blue Magenta;Blue_Magenta,medium,combo (Blue+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Sky Blue,Blue,#2C5F9E,2,Navy_Sky_Blue,medium,combo
+Navy Red,Blue,#2C5F9E,2,Navy_red;Navy_Red,medium,combo (Blue+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Green,Blue,#2C5F9E,2,Blue_green,medium,combo (Blue+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Print,Blue,#2C5F9E,2,Navy_blue_print,medium,combo (Blue+Multi/Printed) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Aqua Blue,Blue,#00B7C2,1,Aqua Blue,medium,
+Blue Brown,Blue,#2C5F9E,1,Blue_brown,medium,combo (Blue+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Maroon,Blue,#2C5F9E,1,Blue Maroon,medium,combo (Blue+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Orange,Blue,#2C5F9E,1,Blue_orange,medium,combo (Blue+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Pista,Blue,#2C5F9E,1,Blue Pista,medium,combo (Blue+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue Purple Golden,Blue,#2C5F9E,1,Blue purple golden ,medium,combo (Blue+Purple+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue White,Blue,#2C5F9E,1,Blue_white,medium,combo (Blue+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Blue-Yellow-Pink,Blue,#2C5F9E,1,Blue-yellow-Pink,medium,combo (Blue+Yellow+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Dark Sky Blue,Blue,#2C5F9E,1,Dark Sky Blue,high,
+Firozi Off White,Blue,#2C5F9E,1,Firozi Off White,medium,combo (Blue+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Blue,Blue,#2C5F9E,1,Navy_blue_blue,high,
+Navy Blue Gray,Blue,#2C5F9E,1,Navy Blue Gray,medium,combo (Blue+Grey) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Lining,Blue,#2C5F9E,1,Navy_blue Lining,high,
+Navy Blue Mehendi Green,Blue,#2C5F9E,1,Navy Blue Mehendi Green,medium,combo (Blue+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Pink,Blue,#2C5F9E,1,Navy_blue Pink,medium,combo (Blue+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Blue Red,Blue,#2C5F9E,1,Navy_blue_red,medium,combo (Blue+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Navy Check,Blue,#2C5F9E,1,navy check,high,
+Navy Mustard,Blue,#2C5F9E,1,Navy_mustard,medium,combo (Blue+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Ornage Blue,Blue,#2C5F9E,1,Ornage_blue,high,
+Sky Blue Golden,Blue,#2C5F9E,1,Sky Blue Golden,medium,combo (Blue+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Sky Blue Shade,Blue,#2C5F9E,1,Sky_blue_shade,high,
+Slate Blue,Blue,#2C5F9E,1,Slate Blue,medium,
+Purple,Purple,#7D5BA6,137,purple;Purple;purple ;Purple ,high,
+Lavender,Purple,#B57EDC,128,lavender;Lavender;levender;Levender,high,misspelling; MERGE Levender -> Lavender (needs approval)
+Light Purple,Purple,#7D5BA6,25,Light purple;Light Purple;Light_purple,high,
+Mauve,Purple,#B784A7,7,Mauve;mobe;Mobe;Moave,REVIEW,guess: mauve — confirm; MERGE Mobe -> Mauve (needs approval); misspelling; MERGE Moave -> Mauve (needs approval)
+Dark Purple,Purple,#7D5BA6,6,Dark Purple;Dark Purple ,high,
+Purple Green,Purple,#7D5BA6,2,Purple Green;Purple_green,medium,combo (Purple+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Mauve Pink,Purple,#7D5BA6,1,Mauve Pink,medium,combo
+Purple Mustard,Purple,#7D5BA6,1,Purple_mustard,medium,combo (Purple+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Purple Pink,Purple,#7D5BA6,1,Purple Pink,medium,combo (Purple+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Royal Purple,Purple,#7D5BA6,1,Royal Purple,medium,
+Violet,Purple,#7D5BA6,1,Violets ,medium,trailing s; MERGE Violets -> Violet (needs approval)
+Brown,Brown/Beige,#9C7A5B,238,brown;Brown;Brown ;Brown_shade,REVIEW,vague descriptor; MERGE Brown Shade -> Brown (needs approval)
+Fawn,Brown/Beige,#D9C2A6,184,Fawn;Fawn ,high,
+Beige,Brown/Beige,#D9C7A7,46,beige;Beige,high,
+Light Brown,Brown/Beige,#9C7A5B,29,Light Brown;Light_brown,high,
+Coffee,Brown/Beige,#6F4E37,28,Coffee,medium,
+Tussar,Brown/Beige,#C8A165,8,Tusser;Tusser ;Tushar,REVIEW,tussar-silk tone; MERGE Tusser -> Tussar (needs approval); tussar-silk tone; MERGE Tushar -> Tussar (needs approval)
+Khaki,Brown/Beige,#C3B091,7,Khaki,medium,
+Brown Black,Brown/Beige,#9C7A5B,4,Brown Black,medium,combo (Brown/Beige+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Fawn Blue,Brown/Beige,#9C7A5B,3,Fawn Blue,medium,combo (Brown/Beige+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Brown White,Brown/Beige,#9C7A5B,3,Brown_white,medium,combo (Brown/Beige+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Fawn Black,Brown/Beige,#9C7A5B,3,Fawn Black;Fawn with black,medium,combo (Brown/Beige+Black) — filed under first color; switch to Multi/Printed if garment is truly two-tone; combo — merge with existing Fawn Black; MERGE Fawn With Black -> Fawn Black (needs approval)
+Brown Onion Pink,Brown/Beige,#9C7A5B,2,Brown onion,REVIEW,combo?; MERGE Brown Onion -> Brown Onion Pink (needs approval)
+Dark Brown,Brown/Beige,#9C7A5B,2,Dark Brown,high,
+Light Coffee,Brown/Beige,#9C7A5B,2,Light Coffee,medium,
+Brown Mustard,Brown/Beige,#9C7A5B,1,brown and mustard ,medium,combo; MERGE Brown And Mustard -> Brown Mustard (needs approval)
+Brown Golden,Brown/Beige,#9C7A5B,1,Brown_golden,medium,combo (Brown/Beige+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Brown Green,Brown/Beige,#9C7A5B,1,Brown_green,medium,combo (Brown/Beige+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Brown Khadi,Brown/Beige,#9C7A5B,1,Brown Khadi,REVIEW,fabric word in color
+Brown Print,Brown/Beige,#9C7A5B,1,Brown_print,medium,combo (Brown/Beige+Multi/Printed) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Coffee Brown,Brown/Beige,#9C7A5B,1,Coffee_brown,high,
+Fawn Brown,Brown/Beige,#9C7A5B,1,Fawn Brown,high,
+Fawn Golden,Brown/Beige,#9C7A5B,1,Fawn Golden,medium,combo (Brown/Beige+Gold/Metallic) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Fawn Maroon,Brown/Beige,#9C7A5B,1,Fawn Maroon,medium,combo (Brown/Beige+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Fawn Navy Blue,Brown/Beige,#9C7A5B,1,Fawn Navy Blue,medium,combo (Brown/Beige+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Fawn Pink,Brown/Beige,#9C7A5B,1,Fawn Pink,medium,combo (Brown/Beige+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden,Gold/Metallic,#D4AF37,227,Golden,medium,
+Golden Red,Gold/Metallic,#C9A227,10,Golden Red,medium,combo (Gold/Metallic+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Maroon,Gold/Metallic,#C9A227,6,Golden Maroon,medium,combo (Gold/Metallic+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Beige,Gold/Metallic,#C9A227,4,Golden Beige,medium,combo (Gold/Metallic+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Light Golden,Gold/Metallic,#C9A227,4,Light Golden;Light_golden,high,
+Golden Orange,Gold/Metallic,#C9A227,3,Golden Orange;Golden_orange,medium,combo (Gold/Metallic+Orange) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Blue,Gold/Metallic,#C9A227,3,Golden Blue,medium,combo (Gold/Metallic+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Magenta,Gold/Metallic,#C9A227,3,Golden Magenta,medium,combo (Gold/Metallic+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Brown,Gold/Metallic,#C9A227,2,Golden Brown,medium,combo (Gold/Metallic+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Yellow,Gold/Metallic,#C9A227,2,Golden Yellow,medium,combo (Gold/Metallic+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Fawn,Gold/Metallic,#C9A227,1,Golden Fawn,medium,combo (Gold/Metallic+Brown/Beige) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Firozi,Gold/Metallic,#C9A227,1,Golden Firozi,medium,combo (Gold/Metallic+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Gazari,Gold/Metallic,#C9A227,1,Golden Gazari,medium,combo (Gold/Metallic+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Green,Gold/Metallic,#C9A227,1,Golden Green,medium,combo (Gold/Metallic+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Light Green,Gold/Metallic,#C9A227,1,Golden Light Green,medium,combo (Gold/Metallic+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Mustard,Gold/Metallic,#C9A227,1,Golden Mustard,medium,combo (Gold/Metallic+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Navy Blue,Gold/Metallic,#C9A227,1,Golden Navy Blue,medium,combo (Gold/Metallic+Blue) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Off White,Gold/Metallic,#C9A227,1,Golden_off_white,medium,combo (Gold/Metallic+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Peach,Gold/Metallic,#C9A227,1,Golden Peach,medium,combo (Gold/Metallic+Peach) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Pink,Gold/Metallic,#C9A227,1,Golden Pink,medium,combo (Gold/Metallic+Pink) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Rama Green,Gold/Metallic,#C9A227,1,Golden Rama Green,medium,combo (Gold/Metallic+Green) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Golden Wine,Gold/Metallic,#C9A227,1,Golden Wine,medium,combo (Gold/Metallic+Maroon/Wine) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Pastel Bronze,Gold/Metallic,#C9A227,1,Pastel_bronze,medium,
+Silver,Gold/Metallic,#C0C0C0,1,Silver,medium,
+Multi Color,Multi/Printed,,73,Multi color;Multi Color;Multi_color;Multi Shade;Multishades;Multi Shades;5 colours;Mulitshade;Multi Color(Border);Multi-color;muti colour,REVIEW,merge multi variants; MERGE Multi Shade -> Multi Color (needs approval); merge multi variants; MERGE Multishades -> Multi Color (needs approval); merge multi variants; MERGE Multi Shades -> Multi Color (needs approval); merge; MERGE 5 Colours -> Multi Color (needs approval); misspelling; MERGE Mulitshade -> Multi Color (needs approval); border detail lost — OK?; MERGE Multi Color(Border) -> Multi Color (needs approval); merge multi variants; MERGE Multi-Color -> Multi Color (needs approval); misspelling; MERGE Muti Colour -> Multi Color (needs approval)
+Printed,Multi/Printed,,53,Printed;Print,medium,"pattern, not color — honest family; merge; MERGE Print -> Printed (needs approval)"
+Multi Color White,Multi/Printed,,4,Multi Color White,medium,combo (Multi/Printed+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Floral Print,Multi/Printed,,1,flower,medium,pattern; MERGE Flower -> Floral Print (needs approval)
+Multi Red,Multi/Printed,,1,Multi red,medium,combo (Multi/Printed+Red) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Multi White,Multi/Printed,,1,Multi white,medium,combo (Multi/Printed+White/Cream) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Multi Yellow,Multi/Printed,,1,Multi yellow,medium,combo (Multi/Printed+Yellow) — filed under first color; switch to Multi/Printed if garment is truly two-tone
+Tie-Dye,Multi/Printed,,1,Tie-die,medium,pattern; MERGE Tie-Die -> Tie-Dye (needs approval)
+White With Colour,Multi/Printed,,1,White with colour,REVIEW,vague
+Yellow Green & Green Yellow,Multi/Printed,,1,Yellow Green & green yellow,REVIEW,two colorways in one value? split per product
+Dusty,REVIEW,,13,Dusty,REVIEW,dusty what? reassign per product
+Kurta Pajama,REVIEW,,2,Kurta pajama ,REVIEW,NOT a color — product type in color field; reassign per product
+Cotton,REVIEW,,1,Cotton,REVIEW,NOT a color — fabric in color field; reassign per product
+Gwalior Boss,REVIEW,,1,Gwalior Boss,REVIEW,trade/brand name? not a color
+Gwalior Combo,REVIEW,,1,Gwalior Combo,REVIEW,trade/brand name? not a color
+Light Color,REVIEW,,1,Light Color,REVIEW,not a color — reassign per product
+Melody,REVIEW,,1,Melody,REVIEW,unknown
+Oricletic,REVIEW,,1,Oricletic,REVIEW,unknown
+Orion Fab,REVIEW,,1,Orion Fab,REVIEW,fabric/brand? not a color

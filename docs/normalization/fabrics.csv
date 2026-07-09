@@ -1,0 +1,95 @@
+canonical_name,family,row_count,raw_spellings,confidence,notes
+Chanderi,Chanderi,38,Chanderi,high,
+Chanderi Silk,Chanderi,22,Chanderi Silk,medium,
+Chanderi Cotton,Chanderi,11,Chanderi Cotton,medium,
+Chanderi Georgette,Chanderi,1,Chanderi Georgette,medium,
+Chiffon,Chiffon,225,Chiffon,high,
+Sweety Chiffon,Chiffon,32,Sweety Chiffon,medium,
+Chiffon Chinon,Chiffon,4,Chiffon Chinon,medium,
+Foil Chiffon,Chiffon,1,Foil Chiffon,medium,
+Cotton,Cotton,970,cotton;Cotton,high,
+Rayon Cotton,Cotton,52,Rayon Cotton,high,
+Metti Cotton,Cotton,46,Metti Cotton,medium,
+Cotton Self,Cotton,27,Cotton Self,medium,self-woven pattern
+Satin Cotton,Cotton,24,Satin Cotton,medium,blend
+Khadi Cotton,Cotton,12,Khadi Cotton,high,
+Linen Cotton,Cotton,11,Linen Cotton,medium,
+Fancy Cotton,Cotton,8,Fancy Cotton,medium,
+Linen,Cotton,6,Linen,medium,or own family
+Filafill Cotton,Cotton,5,Filafill Cotton,medium,fil-a-fil weave
+Cotton Blend,Cotton,4,Cotton Blend,high,
+Jaam Cotton,Cotton,3,Jaam Cotton,high,
+Metti,Cotton,3,Metti,REVIEW,merge into Metti Cotton?
+Lycra Cotton,Cotton,3,Lycra Cotton,medium,
+Kota Doriya,Cotton,2,Kota Doriya,medium,kota doria weave
+Muslin,Cotton,2,Muslin,high,
+Sambhalpuri Cotton,Cotton,2,Sambhalpuri Cotton,high,sambalpuri
+Kota,Cotton,2,Kota,medium,merge into Kota Doriya?
+South Cotton,Cotton,1,South Cotton,high,
+Zaali Cotton,Cotton,1,Zaali Cotton,medium,zaali = mesh weave
+Kosha Cotton,Cotton,1,Kosha Cotton,medium,kosa?
+Lachka Cotton,Cotton,1,Lachka Cotton,medium,
+Jute Cotton,Cotton,1,Jute Cotton,medium,
+Fine Cotton,Cotton,1,Fine Cotton,high,
+Crepe,Crepe,66,Crepe,high,
+Satin Crepe,Crepe,3,Satin Crepe,medium,
+Chinon Crepe,Crepe,2,Chinon Crepe,medium,
+Sweety Crape,Crepe,1,Sweety Crape,medium,"MERGE -> ""Sweety Crepe"" (misspelling)"
+Crepe Blend,Crepe,1,Crepe Blend,high,
+Denim,Denim,28,Denim,high,
+Denim Cotton,Denim,7,Denim Cotton,medium,
+Georgette,Georgette,375,Georgette,high,
+Silk Georgette,Georgette,1,Silk Georgette,medium,
+Rayon Georgette,Georgette,1,Rayon Georgette,medium,
+Net,Net,113,Net,high,
+Satin Net,Net,11,Satin Net,medium,
+Silk Net,Net,5,Silk Net,medium,
+Tissue Net,Net,4,Tissue Net,medium,
+Super Net,Net,3,Super Net,medium,supernet
+Net Cotton,Net,2,Net Cotton,medium,blend
+Crepe Net,Net,2,Crepe Net,medium,
+Chiffon Net,Net,1,Chiffon Net,medium,
+Georgette Net,Net,1,Georgette Net,medium,
+Imported Fabric,REVIEW,19,Imported Fabric,REVIEW,not a fabric — reassign per product
+Japanese,REVIEW,8,Japanese,REVIEW,Japanese satin/crepe? confirm
+Kora,REVIEW,3,Kora,REVIEW,kora silk or cotton? confirm
+Fendi,REVIEW,2,Fendi,REVIEW,trade name — what is it?
+Cargo,REVIEW,1,Cargo,REVIEW,workwear cotton? confirm
+Lachka,REVIEW,1,Lachka,REVIEW,unknown — confirm
+Kora Zari,REVIEW,1,Kora Zari,REVIEW,kora base + zari
+Cotton Tuxedo,REVIEW,1,Cotton Tuxedo,REVIEW,unknown weave — confirm
+Satin,Satin,20,Satin,high,
+Jimmy Choo,Shimmer/Party,16,Jimmy Choo,medium,shimmer trade name
+Shimmer,Shimmer/Party,11,Shimmer,high,
+Organza,Shimmer/Party,10,Organza,medium,or own family if organza grows
+Brasso,Shimmer/Party,4,Brasso,medium,burnout fabric
+Shimmer Silk,Shimmer/Party,2,Shimmer Silk,medium,
+Silk,Silk,901,Silk,high,
+Khadi Silk,Silk,55,Khadi Silk,high,
+Satin Silk,Silk,41,Satin Silk,high,
+Cotton Silk,Silk,24,Cotton Silk,medium,blend — Silk or Cotton? owner call
+Banarasi Silk,Silk,16,Banarasi Silk,high,
+Jacquard,Silk,12,Jacquard,medium,woven jacquard
+Malai Silk,Silk,11,Malai Silk,high,
+Jacquard Silk,Silk,10,Jacquard Silk,high,
+Brocade,Silk,9,Brocade,medium,
+Silk Blend,Silk,6,Silk Blend,high,
+Softy Silk,Silk,4,Softy Silk,medium,
+Butter Silk,Silk,1,Butter Silk,high,
+Bangalore Silk,Silk,1,Bangalore Silk,high,
+Tussar Silk,Silk,1,Tussar Silk,high,
+Paper Silk,Silk,1,Paper Silk,high,
+Printed Silk,Silk,1,Printed Silk,high,
+Dola Silk,Silk,1,Dola Silk,high,
+Silk Cotton,Silk,1,Silk Cotton,medium,blend — merge with Cotton Silk? owner call
+Lycra,Synthetic,47,Lycra,high,
+Synthetic,Synthetic,4,Synthetic,high,
+Popcorn,Synthetic,3,Popcorn,REVIEW,popcorn knit? confirm
+Santoon,Synthetic,1,Santoon,medium,poly santoon
+Velvet,Velvet,59,Velvet,high,
+Net Velvet,Velvet,1,Net Velvet,medium,
+Tweed,Wool/Suiting,54,Tweed,high,
+Woolen,Wool/Suiting,51,Woolen,high,
+Director,Wool/Suiting,29,Director,medium,suiting trade name
+T.r.,Wool/Suiting,4,T.R.,medium,"canonical ""T.R."" — terry-rayon suiting"
+Cotton Wool,Wool/Suiting,1,Cotton Wool,REVIEW,cotton-wool blend — which side?
