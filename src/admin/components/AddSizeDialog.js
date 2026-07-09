@@ -12,7 +12,7 @@ import CustomDropdown from "../../components/CustomDropdown";
 import { supabase } from "../../lib/supabaseClient";
 import { useToast } from "../../components/hooks/use-toast";
 
-const SIZE_TYPES = [
+export const SIZE_TYPES = [
   { value: "letter", label: "Adult — letter|chest (e.g. XL|42)" },
   { value: "waist", label: "Waist — pants (e.g. 38)" },
   { value: "kids", label: "Kids (e.g. 6 or 6|26)" },
