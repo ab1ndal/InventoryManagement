@@ -70,9 +70,13 @@ export default function ColorsManager() {
   }
 
   async function updateHex(family, hex) {
+    const prevHex = families.find((f) => f.family === family)?.hex;
     setFamilies((prev) => prev.map((f) => (f.family === family ? { ...f, hex } : f)));
     const { error } = await supabase.from("color_families").update({ hex }).eq("family", family);
-    if (error) toast({ variant: "destructive", title: "Hex update failed", description: error.message });
+    if (error) {
+      setFamilies((prev) => prev.map((f) => (f.family === family ? { ...f, hex: prevHex } : f)));
+      toast({ variant: "destructive", title: "Hex update failed", description: error.message });
+    }
   }
 
   async function addFamily() {
