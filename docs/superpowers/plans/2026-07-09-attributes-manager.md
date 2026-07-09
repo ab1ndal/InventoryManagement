@@ -20,16 +20,19 @@
 
 ## Release coordination (READ BEFORE APPLYING MIGRATIONS)
 
-Two migrations, applied at different times:
+Three migrations. The fabric change is **split** so dev and prod stay safe on the
+single shared Supabase (add early, drop at release):
 
-1. `migration_attributes_manager_rls.sql` — **additive, safe**. Adds `UPDATE`
-   policies only. Apply **early** (before/with the Colors + Sizes managers).
-   Nothing breaks.
-2. `migration_fabric_families.sql` — **breaking**. Adds `families[]`, backfills,
-   **drops `fabrics.family`**. The instant it applies, any deployed build still
-   reading `fabrics.family` breaks. Apply it in the SAME window as the app
-   deploy that reads `families[]`: **apply migration → deploy immediately.**
-   Do NOT apply against the currently live (family-reading) build.
+1. `migration_attributes_manager_rls.sql` (Task 1) — **additive, safe**. Adds
+   `UPDATE` policies only. Apply **early**. Nothing breaks.
+2. `migration_fabric_families_add.sql` (Task 8a) — **additive, safe**. Adds
+   `families[]` + backfills, **keeps `family`**. Apply **early** (right after
+   Task 1) so all fabric-reading app code (Tasks 4-7) is testable against a live
+   `families[]` column while `family` still exists for any old reader.
+3. `migration_fabric_drop_family.sql` (Task 8b) — **breaking**. `drop column
+   family`. The instant it applies, any build still reading `fabrics.family`
+   breaks. Apply it at the release: **deploy the families[]-only build → drop
+   family.** By then no code reads `family`, so there is no broken window.
 
 ---
 
@@ -287,7 +290,7 @@ git commit -m "Attributes manager: reusable FamilyChips toggle component"
 
 **Interfaces:**
 - Consumes: `buildFamilyIndex` from `src/utility/attributeFamilies.js` (Task 2).
-- Note: reads `fabrics.families` — runtime-verifiable only AFTER Task 8 applies the fabric migration. Logic is unit-covered via Task 2.
+- Note: reads `fabrics.families` — runtime-verifiable once Task 8a is applied (additive add+backfill). Logic is unit-covered via Task 2.
 
 - [ ] **Step 1: Add the import**
 
@@ -1140,60 +1143,53 @@ git commit -m "Attributes manager: superadmin subtab in Admin hub"
 
 ---
 
-## Task 8: Fabric families[] migration + coordinated release
+## Task 8a: Fabric families[] — ADD + backfill (additive, apply EARLY)
 
 **Files:**
-- Create: `schema/migration_fabric_families.sql`
+- Create: `schema/migration_fabric_families_add.sql`
 
 **Interfaces:**
-- Consumes: Tasks 4, 5, 6 (app already reads/writes `fabrics.families[]`).
-- Produces: `fabrics.families text[]`, `family` column dropped.
+- Produces: `fabrics.families text[]` backfilled from `family`; `family` retained.
 
-**BREAKING — see "Release coordination". Apply only in the same window as the
-deploy of the families[]-reading build.**
+**Additive and safe. Apply this right after Task 1** — before Tasks 4-7 so the
+fabric-reading app code is testable against a live `families[]` column while
+`family` still exists for any old reader.
 
 - [ ] **Step 1: Write the migration**
 
 ```sql
 -- ============================================================================
--- migration_fabric_families.sql
--- Fabric multi-family: fabrics.family (single) -> fabrics.families text[].
--- Owner decision: no separate fabric_families table — the family vocabulary is
--- the set of distinct values in fabrics.families (derived in the app).
---
--- BREAKING: drops fabrics.family in the same transaction. Any deployed build
--- still reading fabrics.family breaks the instant this applies. Apply in the
--- SAME window as the app deploy that reads families[] (apply -> deploy).
---
--- Steps: backup -> add families[] -> backfill from family -> drop family ->
--- verify every products.fabric still maps to a fabrics.code.
+-- migration_fabric_families_add.sql
+-- Fabric multi-family, part 1 of 2 (additive). Adds fabrics.families text[] and
+-- backfills from the single family column, which is KEPT for now so old readers
+-- keep working. The drop lives in migration_fabric_drop_family.sql, applied at
+-- release once no code reads family. Owner decision: no fabric_families table —
+-- the vocabulary is the set of distinct values in fabrics.families (app-derived).
 -- ============================================================================
 
 begin;
 
--- 1. Backup (drop manually after owner sign-off)
+-- Backup (drop manually after owner sign-off)
 create table _backup_fabrics_family_20260709 as
   select code, family, sort_order from fabrics;
 
--- 2. Add the array column
+-- Add the array column and backfill each code's single family as a 1-element array
 alter table fabrics add column families text[] not null default '{}';
-
--- 3. Backfill: each code's single family becomes a one-element array
 update fabrics set families = array[family];
 
--- 4. Drop the old single-family column (owner: same migration)
-alter table fabrics drop column family;
-
--- 5. Verify: every live products.fabric still maps to a fabrics.code
+-- Verify every backfilled row has exactly its one family, and every live
+-- products.fabric still maps to a fabrics.code
 do $$
-declare unmapped int; bad_val text;
+declare bad int; unmapped int; bad_val text;
 begin
+  select count(*) into bad from fabrics where array_length(families,1) is distinct from 1;
+  if bad > 0 then
+    raise exception 'Fabric backfill error: % row(s) not exactly one family', bad;
+  end if;
   select count(*), min(p.fabric) into unmapped, bad_val
-  from products p
-  left join fabrics f on f.code = p.fabric
-  where f.code is null;
+  from products p left join fabrics f on f.code = p.fabric where f.code is null;
   if unmapped > 0 then
-    raise exception 'Fabric families migration aborted: % product(s) have a fabric not in the lookup (e.g. "%")', unmapped, bad_val;
+    raise exception 'Fabric mapping error: % product(s) have a fabric not in the lookup (e.g. "%")', unmapped, bad_val;
   end if;
 end $$;
 
@@ -1204,50 +1200,102 @@ commit;
 
 Run:
 ```bash
-supabase db query --linked "$(sed 's/^commit;/rollback;/' schema/migration_fabric_families.sql)"
+supabase db query --linked "$(sed 's/^commit;/rollback;/' schema/migration_fabric_families_add.sql)"
 ```
-Expected: no exception (verify DO-block passes); rolls back. Confirms backfill +
-mapping before the real apply.
+Expected: no exception (verify DO-block passes); rolls back.
 
-- [ ] **Step 3: Apply for real (release step — deploy follows immediately)**
+- [ ] **Step 3: Apply for real (additive — safe)**
 
 Run:
 ```bash
-supabase db query --linked "$(cat schema/migration_fabric_families.sql)"
+supabase db query --linked "$(cat schema/migration_fabric_families_add.sql)"
 ```
 Expected: commits, no error.
 
-- [ ] **Step 4: Verify schema + backfill**
+- [ ] **Step 4: Verify backfill**
 
 Run:
 ```bash
 supabase db query --linked "select count(*) total, count(*) filter (where array_length(families,1) is null) empty from fabrics;"
 ```
-Expected: `total` = fabric count (~92), `empty` = 0.
+Expected: `total` = fabric count (~92), `empty` = 0. (`family` column still present.)
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add schema/migration_fabric_families_add.sql
+git commit -m "Fabric multi-family (add): fabrics.families[] backfilled, family kept"
+```
+
+---
+
+## Task 8b: Fabric — DROP family (breaking, apply at RELEASE)
+
+**Files:**
+- Create: `schema/migration_fabric_drop_family.sql`
+
+**Interfaces:**
+- Consumes: Tasks 4, 5, 6, 7 shipped (no code reads `fabrics.family`).
+- Produces: `fabrics.family` dropped.
+
+**BREAKING. Apply only AFTER the families[]-only build is deployed** (Tasks 4-7
+merged + deployed). By then no code reads `family`, so there is no broken window.
+
+- [ ] **Step 1: Confirm no code reads fabrics.family**
+
+Run:
+```bash
+grep -rn "\.family\b" src/ | grep -i fabric
+grep -rn "family" src/storefront/hooks/useShopFilters.js src/admin/components/AddFabricDialog.js src/admin/components/ProductEditDialog.js
+```
+Expected: no reference to a singular `fabric.family` / `fabrics ... family`
+select remains (only `families`). If any remain, fix before dropping.
+
+- [ ] **Step 2: Write the migration**
+
+```sql
+-- ============================================================================
+-- migration_fabric_drop_family.sql
+-- Fabric multi-family, part 2 of 2 (breaking). Drops the now-unused single
+-- family column. Apply only after the families[]-only build is deployed.
+-- ============================================================================
+
+begin;
+alter table fabrics drop column family;
+commit;
+```
+
+- [ ] **Step 3: Apply**
+
+Run:
+```bash
+supabase db query --linked "$(cat schema/migration_fabric_drop_family.sql)"
+```
+Expected: commits, no error.
+
+- [ ] **Step 4: Verify column gone**
 
 Run:
 ```bash
 supabase db query --linked "select column_name from information_schema.columns where table_name='fabrics' and column_name='family';"
 ```
-Expected: 0 rows (column dropped).
+Expected: 0 rows.
 
-- [ ] **Step 5: Manual verify storefront + fabric manager**
+- [ ] **Step 5: Manual verify storefront + fabric manager (post-release)**
 
 - Storefront `/shop`: fabric filter lists the same family groups and returns the
   same product sets as before.
-- Admin → Attributes → Fabrics: loads, family chips reflect backfilled families,
+- Admin → Attributes → Fabrics: loads, chips reflect backfilled families,
   toggling persists across reload.
-- Add a fabric via ProductEditDialog's fabric combobox → AddFabricDialog with
+- Add a fabric via ProductEditDialog's fabric combobox → AddFabricDialog
   multi-family chips → new code appears in FabricsManager with those families.
 
-- [ ] **Step 6: Commit + deploy**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add schema/migration_fabric_families.sql
-git commit -m "Fabric multi-family: migrate fabrics.family -> families[]"
+git add schema/migration_fabric_drop_family.sql
+git commit -m "Fabric multi-family (drop): remove unused fabrics.family column"
 ```
-Then deploy (push to the branch Vercel builds) so production runs the
-families[]-reading build.
 
 ---
 
@@ -1286,7 +1334,7 @@ git commit -m "Rebuild graphify graph for attributes manager"
 **Spec coverage:**
 - Superadmin Attributes subtab under Admin hub → Task 7. ✓
 - Colors: families[] assignment + color_families hex/order + unassigned filter → Task 6 (ColorsManager). ✓
-- Fabrics: families[] migration (drop family, no table) + assignment → Tasks 8, 6, 5, 4. ✓
+- Fabrics: families[] migration split add(8a)/drop(8b), no table, + assignment → Tasks 8a, 8b, 6, 5, 4. ✓
 - Sizes: edit label/type/inches/order, code immutable → Task 6 (SizesManager). ✓
 - UPDATE RLS on the four tables → Task 1. ✓
 - Storefront fabric families[] path → Task 4. ✓
