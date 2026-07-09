@@ -22,6 +22,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 //import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
 import AddSizeDialog from "./AddSizeDialog";
+import AddFabricDialog from "./AddFabricDialog";
 import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatINR } from "../../utility/formatCurrency";
@@ -98,11 +99,33 @@ export default function ProductEditDialog({
     setSizes(data || []);
   }, []);
 
+  // Fabric is a controlled vocabulary too (FK to `fabrics` lookup) — same
+  // pattern as sizes: options from the DB, new codes only via AddFabricDialog.
+  const [fabrics, setFabrics] = useState([]);
+  // { code, onSelect } while the add-new dialog is open, null otherwise
+  const [addFabric, setAddFabric] = useState(null);
+
+  const fetchFabrics = React.useCallback(async () => {
+    const { data, error } = await supabase
+      .from("fabrics")
+      .select("code, family, sort_order")
+      .order("sort_order");
+    if (error) {
+      console.error("Failed to load fabric options:", error.message);
+      return;
+    }
+    setFabrics(data || []);
+  }, []);
+
   useEffect(() => {
-    if (open) fetchSizes();
-  }, [open, fetchSizes]);
+    if (open) {
+      fetchSizes();
+      fetchFabrics();
+    }
+  }, [open, fetchSizes, fetchFabrics]);
 
   const sizeOptions = sizes.map((s) => ({ value: s.code, label: s.label }));
+  const fabricOptions = fabrics.map((f) => ({ value: f.code, label: f.code }));
 
   useEffect(() => {
     if (product) {
@@ -252,12 +275,23 @@ export default function ProductEditDialog({
                   <FormItem>
                     <FormLabel>Fabric</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        onBlur={(e) => {
-                          field.onBlur?.(e); // preserve default blur behavior
+                      <CustomDropdown
+                        value={field.value}
+                        onChange={(val) => {
+                          field.onChange(val);
                           maybeComposeName();
                         }}
+                        options={fabricOptions}
+                        placeholder="Fabric"
+                        onAddNew={(term) =>
+                          setAddFabric({
+                            code: term,
+                            onSelect: (val) => {
+                              field.onChange(val);
+                              maybeComposeName();
+                            },
+                          })
+                        }
                       />
                     </FormControl>
                   </FormItem>
@@ -607,6 +641,17 @@ export default function ProductEditDialog({
           onAdded={async (newCode) => {
             await fetchSizes();
             addSize?.onSelect(newCode);
+          }}
+        />
+
+        <AddFabricDialog
+          open={!!addFabric}
+          initialCode={addFabric?.code || ""}
+          existingFabrics={fabrics}
+          onClose={() => setAddFabric(null)}
+          onAdded={async (newCode) => {
+            await fetchFabrics();
+            addFabric?.onSelect(newCode);
           }}
         />
       </DialogContent>

@@ -9,7 +9,7 @@ Chiffon Chinon,Chiffon,4,Chiffon Chinon,medium,
 Foil Chiffon,Chiffon,1,Foil Chiffon,medium,
 Cotton,Cotton,970,cotton;Cotton,high,
 Rayon Cotton,Cotton,52,Rayon Cotton,high,
-Metti Cotton,Cotton,46,Metti Cotton,medium,
+Metti,Cotton,49,Metti Cotton,medium,
 Cotton Self,Cotton,27,Cotton Self,medium,self-woven pattern
 Satin Cotton,Cotton,24,Satin Cotton,medium,blend
 Khadi Cotton,Cotton,12,Khadi Cotton,high,
@@ -19,22 +19,20 @@ Linen,Cotton,6,Linen,medium,or own family
 Filafill Cotton,Cotton,5,Filafill Cotton,medium,fil-a-fil weave
 Cotton Blend,Cotton,4,Cotton Blend,high,
 Jaam Cotton,Cotton,3,Jaam Cotton,high,
-Metti,Cotton,3,Metti,REVIEW,merge into Metti Cotton?
 Lycra Cotton,Cotton,3,Lycra Cotton,medium,
-Kota Doriya,Cotton,2,Kota Doriya,medium,kota doria weave
+Kota Doria,Cotton,4,Kota Doria,high,
 Muslin,Cotton,2,Muslin,high,
-Sambhalpuri Cotton,Cotton,2,Sambhalpuri Cotton,high,sambalpuri
-Kota,Cotton,2,Kota,medium,merge into Kota Doriya?
+Sambhalpuri Cotton,Cotton,2,Sambhalpuri Cotton,high,
 South Cotton,Cotton,1,South Cotton,high,
-Zaali Cotton,Cotton,1,Zaali Cotton,medium,zaali = mesh weave
-Kosha Cotton,Cotton,1,Kosha Cotton,medium,kosa?
+Zaali Cotton,Cotton,1,Zaali Cotton,medium,
+Kosha Cotton,Cotton,1,Kosha Cotton,medium,
 Lachka Cotton,Cotton,1,Lachka Cotton,medium,
 Jute Cotton,Cotton,1,Jute Cotton,medium,
 Fine Cotton,Cotton,1,Fine Cotton,high,
 Crepe,Crepe,66,Crepe,high,
 Satin Crepe,Crepe,3,Satin Crepe,medium,
 Chinon Crepe,Crepe,2,Chinon Crepe,medium,
-Sweety Crape,Crepe,1,Sweety Crape,medium,"MERGE -> ""Sweety Crepe"" (misspelling)"
+Sweety Crepe,Crepe,1,Sweety Crepe,medium,
 Crepe Blend,Crepe,1,Crepe Blend,high,
 Denim,Denim,28,Denim,high,
 Denim Cotton,Denim,7,Denim Cotton,medium,

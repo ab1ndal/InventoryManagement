@@ -12,9 +12,17 @@ const INITIAL_FILTERS = {
   priceMax: null,
 };
 
+// The fabric filter operates on families ("Group Name"), but products store the
+// trade-name code. Expand selected families to their member codes for the query.
+// Sentinel keeps an empty expansion from matching every row (Supabase `.in([])`).
+function fabricCodesFor(families, familyToCodes) {
+  const codes = families.flatMap((f) => familyToCodes[f] || []);
+  return codes.length ? codes : ["__no_match__"];
+}
+
 // Returns product IDs matching all filters except the excluded dimension.
 // Mirrors the runQuery join logic so results are always consistent.
-async function getMatchingPids(filters, excludeDim) {
+async function getMatchingPids(filters, excludeDim, fabricIndex) {
   const colors = excludeDim === "colors" ? [] : filters.colors;
   const sizes = excludeDim === "sizes" ? [] : filters.sizes;
   const categories = excludeDim === "categories" ? [] : filters.categories;
@@ -35,18 +43,19 @@ async function getMatchingPids(filters, excludeDim) {
   if (productIds !== null) q = q.in("productid", productIds);
   if (filters.priceMin !== null) q = q.gte("retailprice", filters.priceMin);
   if (filters.priceMax !== null) q = q.lte("retailprice", filters.priceMax);
-  if (fabrics.length > 0) q = q.in("fabric", fabrics);
+  if (fabrics.length > 0)
+    q = q.in("fabric", fabricCodesFor(fabrics, fabricIndex.familyToCodes));
 
   const { data } = await q;
   return (data || []).map((r) => r.productid);
 }
 
-async function fetchAvailableOptionsFromDB(filters) {
+async function fetchAvailableOptionsFromDB(filters, fabricIndex) {
   const [catPids, colorPids, sizePids, fabricPids] = await Promise.all([
-    getMatchingPids(filters, "categories"),
-    getMatchingPids(filters, "colors"),
-    getMatchingPids(filters, "sizes"),
-    getMatchingPids(filters, "fabrics"),
+    getMatchingPids(filters, "categories", fabricIndex),
+    getMatchingPids(filters, "colors", fabricIndex),
+    getMatchingPids(filters, "sizes", fabricIndex),
+    getMatchingPids(filters, "fabrics", fabricIndex),
   ]);
 
   const [cats, colorRows, sizeRows, fabRows] = await Promise.all([
@@ -78,7 +87,13 @@ async function fetchAvailableOptionsFromDB(filters) {
     categories: new Set((cats.data || []).map((r) => r.categoryid).filter(Boolean)),
     colors: new Set((colorRows.data || []).map((r) => r.color).filter(Boolean)),
     sizes: new Set((sizeRows.data || []).map((r) => r.size).filter(Boolean)),
-    fabrics: new Set((fabRows.data || []).map((r) => r.fabric).filter(Boolean)),
+    // Availability is expressed in the filter's own vocabulary — families, not
+    // codes — so map each product's fabric code back up to its family.
+    fabrics: new Set(
+      (fabRows.data || [])
+        .map((r) => fabricIndex.codeToFamily[r.fabric])
+        .filter(Boolean)
+    ),
   };
 }
 
@@ -100,13 +115,16 @@ export default function useShopFilters() {
 
   const [availableOptions, setAvailableOptions] = useState(null);
   const debounceRef = useRef(null);
+  // fabric family <-> code maps, loaded once from the `fabrics` lookup. A ref
+  // (not state) so the query callbacks read the latest without re-subscribing.
+  const fabricIndexRef = useRef({ familyToCodes: {}, codeToFamily: {} });
 
   useEffect(() => {
     async function fetchOptions() {
       const [cats, variants, fabrics, priceRange, distinctSizes, sizeDefs] = await Promise.all([
         supabase.from("categories").select("categoryid, name").order("name"),
         supabase.from("productsizecolors").select("color").limit(50000),
-        supabase.from("products").select("fabric").not("fabric", "is", null).limit(10000),
+        supabase.from("fabrics").select("code, family, sort_order").order("sort_order"),
         supabase
           .from("products")
           .select("retailprice")
@@ -143,8 +161,24 @@ export default function useShopFilters() {
       }
 
       if (fabrics.data) {
+        // Build family<->code maps; the filter lists families ("Group Name"),
+        // ordered by each family's lowest sort_order (i.e. by total volume).
+        const familyToCodes = {};
+        const codeToFamily = {};
+        const familyOrder = {};
+        fabrics.data.forEach(({ code, family, sort_order }) => {
+          (familyToCodes[family] ||= []).push(code);
+          codeToFamily[code] = family;
+          familyOrder[family] = Math.min(
+            familyOrder[family] ?? Infinity,
+            sort_order
+          );
+        });
+        fabricIndexRef.current = { familyToCodes, codeToFamily };
         setFabricOptions(
-          [...new Set(fabrics.data.map((r) => r.fabric).filter(Boolean))].sort()
+          Object.keys(familyToCodes).sort(
+            (a, b) => familyOrder[a] - familyOrder[b]
+          )
         );
       }
 
@@ -173,7 +207,7 @@ export default function useShopFilters() {
 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const available = await fetchAvailableOptionsFromDB(filters);
+      const available = await fetchAvailableOptionsFromDB(filters, fabricIndexRef.current);
       setAvailableOptions(available);
     }, 200);
 
@@ -216,7 +250,10 @@ export default function useShopFilters() {
       if (currentFilters.priceMax !== null)
         query = query.lte("retailprice", currentFilters.priceMax);
       if (currentFilters.fabrics.length > 0)
-        query = query.in("fabric", currentFilters.fabrics);
+        query = query.in(
+          "fabric",
+          fabricCodesFor(currentFilters.fabrics, fabricIndexRef.current.familyToCodes)
+        );
 
       query = query
         .order("productid", { ascending: false })
