@@ -23,6 +23,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import CustomDropdown from "../../components/CustomDropdown";
 import AddSizeDialog from "./AddSizeDialog";
 import AddFabricDialog from "./AddFabricDialog";
+import AddColorDialog from "./AddColorDialog";
 import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatINR } from "../../utility/formatCurrency";
@@ -117,15 +118,35 @@ export default function ProductEditDialog({
     setFabrics(data || []);
   }, []);
 
+  // Color is a controlled vocabulary too (FK to `colors`). New codes enter via
+  // AddColorDialog (name only — family assignment is a separate manager).
+  const [colors, setColors] = useState([]);
+  // { code, onSelect } while the add-new dialog is open, null otherwise
+  const [addColor, setAddColor] = useState(null);
+
+  const fetchColors = React.useCallback(async () => {
+    const { data, error } = await supabase
+      .from("colors")
+      .select("code")
+      .order("code");
+    if (error) {
+      console.error("Failed to load color options:", error.message);
+      return;
+    }
+    setColors(data || []);
+  }, []);
+
   useEffect(() => {
     if (open) {
       fetchSizes();
       fetchFabrics();
+      fetchColors();
     }
-  }, [open, fetchSizes, fetchFabrics]);
+  }, [open, fetchSizes, fetchFabrics, fetchColors]);
 
   const sizeOptions = sizes.map((s) => ({ value: s.code, label: s.label }));
   const fabricOptions = fabrics.map((f) => ({ value: f.code, label: f.code }));
+  const colorOptions = colors.map((c) => ({ value: c.code, label: c.code }));
 
   useEffect(() => {
     if (product) {
@@ -589,7 +610,16 @@ export default function ProductEditDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Color" {...field} className={dim} />
+                          <CustomDropdown
+                            value={field.value}
+                            onChange={field.onChange}
+                            options={colorOptions}
+                            placeholder="Color"
+                            className={dim}
+                            onAddNew={(term) =>
+                              setAddColor({ code: term, onSelect: field.onChange })
+                            }
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -652,6 +682,17 @@ export default function ProductEditDialog({
           onAdded={async (newCode) => {
             await fetchFabrics();
             addFabric?.onSelect(newCode);
+          }}
+        />
+
+        <AddColorDialog
+          open={!!addColor}
+          initialCode={addColor?.code || ""}
+          existingColors={colors}
+          onClose={() => setAddColor(null)}
+          onAdded={async (newCode) => {
+            await fetchColors();
+            addColor?.onSelect(newCode);
           }}
         />
       </DialogContent>
