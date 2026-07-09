@@ -88,7 +88,7 @@ export default function SizesManager() {
                 <TableCell>
                   <CustomDropdown
                     value={s.size_type}
-                    onChange={(v) => patch(s.code, "size_type", v)}
+                    onChange={(v) => v !== s.size_type && patch(s.code, "size_type", v)}
                     options={SIZE_TYPES}
                     placeholder="Type"
                   />
@@ -108,6 +108,11 @@ export default function SizesManager() {
                     type="number"
                     defaultValue={s.sort_order}
                     onBlur={(e) => {
+                      // Ignore a cleared field so a blur can't silently set order to 0
+                      if (e.target.value === "") {
+                        e.target.value = s.sort_order;
+                        return;
+                      }
                       const v = Number(e.target.value);
                       if (v !== s.sort_order) patch(s.code, "sort_order", v);
                     }}
