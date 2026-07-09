@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "lib/supabaseClient";
+import { buildFamilyIndex } from "../../utility/attributeFamilies";
 
 const PAGE_SIZE = 24;
 
@@ -16,7 +17,7 @@ const INITIAL_FILTERS = {
 // trade-name code. Expand selected families to their member codes for the query.
 // Sentinel keeps an empty expansion from matching every row (Supabase `.in([])`).
 function fabricCodesFor(families, familyToCodes) {
-  const codes = families.flatMap((f) => familyToCodes[f] || []);
+  const codes = [...new Set(families.flatMap((f) => familyToCodes[f] || []))];
   return codes.length ? codes : ["__no_match__"];
 }
 
@@ -103,7 +104,7 @@ async function fetchAvailableOptionsFromDB(filters, fabricIndex, colorIndex) {
     // codes — so map each product's fabric code back up to its family.
     fabrics: new Set(
       (fabRows.data || [])
-        .map((r) => fabricIndex.codeToFamily[r.fabric])
+        .flatMap((r) => fabricIndex.codeToFamilies[r.fabric] || [])
         .filter(Boolean)
     ),
   };
@@ -130,7 +131,7 @@ export default function useShopFilters() {
   const debounceRef = useRef(null);
   // fabric family <-> code maps, loaded once from the `fabrics` lookup. A ref
   // (not state) so the query callbacks read the latest without re-subscribing.
-  const fabricIndexRef = useRef({ familyToCodes: {}, codeToFamily: {} });
+  const fabricIndexRef = useRef({ familyToCodes: {}, codeToFamilies: {} });
   // color maps: family -> [codes] (multi-family), code -> [families].
   const colorIndexRef = useRef({ familyToCodes: {}, codeToFamilies: {} });
 
@@ -140,7 +141,7 @@ export default function useShopFilters() {
         supabase.from("categories").select("categoryid, name").order("name"),
         supabase.from("colors").select("code, families"),
         supabase.from("color_families").select("family, hex, sort_order").order("sort_order"),
-        supabase.from("fabrics").select("code, family, sort_order").order("sort_order"),
+        supabase.from("fabrics").select("code, families"),
         supabase
           .from("products")
           .select("retailprice")
@@ -193,25 +194,12 @@ export default function useShopFilters() {
       }
 
       if (fabrics.data) {
-        // Build family<->code maps; the filter lists families ("Group Name"),
-        // ordered by each family's lowest sort_order (i.e. by total volume).
-        const familyToCodes = {};
-        const codeToFamily = {};
-        const familyOrder = {};
-        fabrics.data.forEach(({ code, family, sort_order }) => {
-          (familyToCodes[family] ||= []).push(code);
-          codeToFamily[code] = family;
-          familyOrder[family] = Math.min(
-            familyOrder[family] ?? Infinity,
-            sort_order
-          );
-        });
-        fabricIndexRef.current = { familyToCodes, codeToFamily };
-        setFabricOptions(
-          Object.keys(familyToCodes).sort(
-            (a, b) => familyOrder[a] - familyOrder[b]
-          )
-        );
+        // Multi-family: a fabric code lists 1..n families. Shared index builder;
+        // the filter lists families ordered by member-code count (proxy volume).
+        const { familyToCodes, codeToFamilies, orderedFamilies } =
+          buildFamilyIndex(fabrics.data);
+        fabricIndexRef.current = { familyToCodes, codeToFamilies };
+        setFabricOptions(orderedFamilies);
       }
 
       if (priceRange.data?.[0]) {
