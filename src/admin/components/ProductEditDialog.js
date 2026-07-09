@@ -109,7 +109,7 @@ export default function ProductEditDialog({
   const fetchFabrics = React.useCallback(async () => {
     const { data, error } = await supabase
       .from("fabrics")
-      .select("code, family, sort_order")
+      .select("code, families, sort_order")
       .order("sort_order");
     if (error) {
       console.error("Failed to load fabric options:", error.message);
