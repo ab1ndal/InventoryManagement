@@ -156,24 +156,32 @@ Merge step (the 2 groups above) runs **before** renames inside the same transact
 ### Layer 2 — Lookup tables (extend the existing `sizes` pattern)
 
 ```
-colors   (code text PK, family text NOT NULL, hex text, sort_order int)
-fabrics  (code text PK, family text NOT NULL, sort_order int)
+colors   (code text PK, families text[] NOT NULL, hex text, sort_order int)
+fabrics  (code text PK, family text NOT NULL, sort_order int)   -- SHIPPED 2026-07-08
 sizes    (exists — backfill numeric/kids/infant/universal rows)
 ```
 
-**Core idea: canonical name ≠ filter value.** `code` is the display/storage value (keeps trade names); `family` is the filter vocabulary.
+**Core idea: canonical name ≠ filter value.** `code` is the display/storage value (keeps trade names); the family column is the filter vocabulary.
+
+> **Colors use `families text[]` (array), not a single `family` — owner decision 2026-07-08.**
+> A two-tone color (`Blue-Green`, `Peacock Green`) maps to MULTIPLE families so filtering
+> *either* surfaces it (`Blue-Green → {Blue, Green}`). Fabric kept single `family` (blends
+> have one dominant material); colors are genuinely two-tone. Filter expands
+> `family → codes WHERE family = ANY(colors.families)` — same client-side pattern fabric
+> uses, array membership instead of equality. Full rationale, plus swatch/accessibility/
+> filter-depth research, in **`docs/COLOR-FILTER-RESEARCH.md`**.
 
 Color mapping examples:
 
-| code (display, stays on PDP) | family (filter) | hex (swatch) |
+| code (display, stays on PDP) | families (filter) | hex (swatch) |
 |---|---|---|
-| Firozi | Blue | `#3FA8B8` (turquoise) |
-| Gazari | Pink | `#F28C6B` (carrot pink) |
-| Fawn | Brown/Beige | `#D9C2A6` |
-| Mehndi | Green | `#7A8450` |
-| Rama Green | Green | `#0F7F6E` |
-| Wine | Maroon/Wine | `#722F37` |
-| Printed | Multi/Printed | *(null — render multi-dot swatch)* |
+| Firozi | `{Blue}` | `#3FA8B8` (turquoise) |
+| Gazari | `{Pink}` | `#F28C6B` (carrot pink) |
+| Fawn | `{Brown/Beige}` | `#D9C2A6` |
+| Mehndi | `{Green}` | `#7A8450` |
+| Peacock Green | `{Blue, Green}` | `#1F6F78` *(two-tone → both families)* |
+| Wine | `{Maroon/Wine}` | `#722F37` |
+| Printed | `{Multi/Printed}` | *(null — render multi-dot swatch)* |
 
 Fabric mapping examples:
 
@@ -186,7 +194,7 @@ Fabric mapping examples:
 | Jimmy Choo, Shimmer | Shimmer/Party |
 | Cotton Silk, Chanderi Georgette *(blends)* | dominant material — owner call in review |
 
-Target family counts: ~15 colors (Red, Pink, Orange, Yellow, Green, Blue, Purple, Brown/Beige, Black, White/Cream, Grey, Gold/Metallic, Maroon/Wine, Peach, Multi/Printed), ~12 fabrics.
+Target family counts: **~12 colors** (Red, Pink, Orange, Yellow, Green, Blue, Purple, Brown/Beige, Black, White/Cream, Grey, Maroon/Wine, Gold/Metallic, Multi/Printed — Peach folds into Pink/Orange; trimmed from 15 per `COLOR-FILTER-RESEARCH.md` §2.2), 14 fabrics (shipped). A single color may carry several of these in `families` (§ multi-family note above).
 
 **Size display rules** (why the `XL|42` merge loses nothing — the physical garment tag may say either "XL" or "42"):
 
@@ -242,7 +250,7 @@ Justified choices:
 How to review:
 
 - **`canonical_name` / `canonical_code`** — proposed final value. Edit freely; rows sharing a canonical merge into one.
-- **`family`** — proposed filter family (closed list). `medium` rows are mostly two-color combos filed under their first color — flip to `Multi/Printed` where the garment is genuinely two-tone.
+- **`families`** — proposed filter families (closed list, now **one or more** per color). `medium` rows are mostly two-color combos filed under their first color — a genuine two-tone (`Blue-Green`, `Peacock`) gets **both** families (`{Blue, Green}`) so filtering either surfaces it; reserve `Multi/Printed` for true prints/many-color. `colors.csv` needs its single `family` column widened to a comma-separated `families` list before seeding (regenerate via the classify script).
 - **Rows marked `REVIEW`** need a human call: unknown terms (`Melody`, `Oricletic`, `Lachka`, `Fendi`), non-colors in the color field (`Kurta Pajama`, `Cotton`, `Gwalior Boss/Combo`), guesses flagged as such (`Mus`→Mustard?, `Mahendra`→Mehndi?, `Peacock`→Green or Blue?), kids-size assumption (values 1–16), and every proposed semantic merge (`MERGE X -> Y (needs approval)` in notes).
 - **`hex`** — approximate swatch colors, correct at will; only used for filter UI dots.
 
