@@ -113,7 +113,7 @@ export default function useShopFilters() {
           .order("retailprice", { ascending: false })
           .limit(1),
         supabase.rpc("get_distinct_sizes"),
-        supabase.from("sizes").select("code, label, size_type, numeric_in, sort_order"),
+        supabase.from("sizes").select("code, label, sort_order"),
       ]);
 
       setCategoryOptions(cats.data || []);
@@ -124,26 +124,11 @@ export default function useShopFilters() {
       }
 
       if (sizeDefs.data) {
-        // Build letter↔numeric cross-reference for display
-        const letterByNumeric = {};
-        const numericByLetter = {};
-        sizeDefs.data.forEach((s) => {
-          if (s.size_type === "letter" && s.numeric_in) {
-            letterByNumeric[s.numeric_in] = s.code;
-            numericByLetter[s.code] = s.numeric_in;
-          }
-        });
-
-        // Build display label map
+        // `sizes.label` is the canonical display string — the stored code
+        // already encodes letter+numeric (e.g. "S|36"), so use label directly.
         const displayMap = {};
         sizeDefs.data.forEach((s) => {
-          if (s.size_type === "letter" && numericByLetter[s.code]) {
-            displayMap[s.code] = `${s.code} / ${numericByLetter[s.code]}`;
-          } else if ((s.size_type === "chest" || s.size_type === "waist") && letterByNumeric[s.numeric_in]) {
-            displayMap[s.code] = `${s.code} / ${letterByNumeric[s.numeric_in]}`;
-          } else {
-            displayMap[s.code] = s.label;
-          }
+          displayMap[s.code] = s.label;
         });
         setSizeDisplayMap(displayMap);
 
