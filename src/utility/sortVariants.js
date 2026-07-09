@@ -4,6 +4,7 @@
 // like "FREE-SIZE" / "Free-Size".
 const SIZE_ORDER = [
   "XXS",
+  "2XS",
   "XS",
   "S",
   "M",

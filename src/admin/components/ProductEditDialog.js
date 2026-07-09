@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,8 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 //import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
+import AddSizeDialog from "./AddSizeDialog";
+import { supabase } from "../../lib/supabaseClient";
 import { formatINR } from "../../utility/formatCurrency";
 import { encodePriceToZCode, decodeZCodeToPrice } from "../../utility/zCode";
 import { sortVariantsBySizeColor } from "../../utility/sortVariants";
@@ -74,6 +76,32 @@ export default function ProductEditDialog({
 
   const originalVariantsRef = React.useRef([]);
   const originalNamePartsRef = React.useRef({ fabric: "", categoryid: "" });
+
+  // Size is a controlled vocabulary (FK to `sizes` lookup) — options come from
+  // the DB, never free text. Empty list on fetch failure keeps entry blocked
+  // rather than degrading to a text input. New codes enter only through the
+  // deliberate add-new flow (AddSizeDialog).
+  const [sizes, setSizes] = useState([]);
+  // { code, onSelect } while the add-new dialog is open, null otherwise
+  const [addSize, setAddSize] = useState(null);
+
+  const fetchSizes = React.useCallback(async () => {
+    const { data, error } = await supabase
+      .from("sizes")
+      .select("code, label, size_type, sort_order")
+      .order("sort_order");
+    if (error) {
+      console.error("Failed to load size options:", error.message);
+      return;
+    }
+    setSizes(data || []);
+  }, []);
+
+  useEffect(() => {
+    if (open) fetchSizes();
+  }, [open, fetchSizes]);
+
+  const sizeOptions = sizes.map((s) => ({ value: s.code, label: s.label }));
 
   useEffect(() => {
     if (product) {
@@ -470,7 +498,16 @@ export default function ProductEditDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Size" {...field} />
+                          <CustomDropdown
+                            value={field.value}
+                            onChange={field.onChange}
+                            onBlur={field.onBlur}
+                            options={sizeOptions}
+                            placeholder="Size"
+                            onAddNew={(term) =>
+                              setAddSize({ code: term, onSelect: field.onChange })
+                            }
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -526,7 +563,7 @@ export default function ProductEditDialog({
                   append({
                     variantid: crypto.randomUUID(),
                     size: presetCategories.includes(categoryName)
-                      ? "Free-Size"
+                      ? "FREE-SIZE"
                       : "",
                     color: "",
                     stock: 0,
@@ -545,6 +582,17 @@ export default function ProductEditDialog({
             </div>
           </form>
         </Form>
+
+        <AddSizeDialog
+          open={!!addSize}
+          initialCode={addSize?.code || ""}
+          existingSizes={sizes}
+          onClose={() => setAddSize(null)}
+          onAdded={async (newCode) => {
+            await fetchSizes();
+            addSize?.onSelect(newCode);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

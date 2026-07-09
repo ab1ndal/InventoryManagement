@@ -8,6 +8,7 @@ export default function CustomDropdown({
   options = [],
   placeholder = "Select an option",
   className = "",
+  onAddNew, // optional: (searchTerm) => void — shows an explicit "+ Add …" action when the typed value matches no option
 }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -39,6 +40,16 @@ export default function CustomDropdown({
   const filteredOptions = options.filter((opt) =>
     opt.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const trimmedSearch = searchTerm.trim();
+  const showAddNew =
+    onAddNew &&
+    trimmedSearch &&
+    !options.some(
+      (opt) =>
+        opt.label.toLowerCase() === trimmedSearch.toLowerCase() ||
+        String(opt.value).toLowerCase() === trimmedSearch.toLowerCase()
+    );
 
   return (
     <div className={`w-full ${className}`} ref={containerRef}>
@@ -79,7 +90,21 @@ export default function CustomDropdown({
                   </li>
                 ))
               ) : (
-                <li className="px-3 py-2 text-gray-400">No options found</li>
+                !showAddNew && (
+                  <li className="px-3 py-2 text-gray-400">No options found</li>
+                )
+              )}
+              {showAddNew && (
+                <li
+                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-blue-600 border-t"
+                  onClick={() => {
+                    setOpen(false);
+                    setSearchTerm("");
+                    onAddNew(trimmedSearch);
+                  }}
+                >
+                  + Add “{trimmedSearch}”…
+                </li>
               )}
             </ul>
           </div>
