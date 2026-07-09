@@ -22,6 +22,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 //import { toast } from "../../components/hooks/use-toast";
 import CustomDropdown from "../../components/CustomDropdown";
 import AddSizeDialog from "./AddSizeDialog";
+import { Plus, Trash2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { formatINR } from "../../utility/formatCurrency";
 import { encodePriceToZCode, decodeZCodeToPrice } from "../../utility/zCode";
@@ -479,14 +480,48 @@ export default function ProductEditDialog({
             />
 
             <div className="space-y-2">
-              <Label className="text-md">Variants</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-md">Variants</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const selectedCategoryId = form.getValues("categoryid");
+                    const selectedCategory = categories.find(
+                      (c) => c.categoryid === selectedCategoryId
+                    );
+                    const categoryName =
+                      selectedCategory?.name?.toLowerCase() || "";
+
+                    const presetCategories = ["saree"]; // lowercased for case-insensitive match
+
+                    append({
+                      variantid: crypto.randomUUID(),
+                      size: presetCategories.includes(categoryName)
+                        ? "FREE-SIZE"
+                        : "",
+                      color: "",
+                      stock: 0,
+                    });
+                  }}
+                >
+                  <Plus />
+                  Add Variant
+                </Button>
+              </div>
               {fields.map((field, index) => {
                 const stockValue = form.watch(`variants.${index}.stock`);
                 const isDepleted = (Number(stockValue) || 0) === 0;
+                // Depleted rows are dimmed for scanability, but the dim is applied
+                // per-cell — NOT on the row — so an open Size dropdown (which lives
+                // inside the size cell) stays fully opaque. CSS `opacity` on an
+                // ancestor would composite the whole popover subtree at 50%.
+                const dim = isDepleted ? "opacity-50" : undefined;
                 return (
                 <div
                   key={field.id}
-                  className={`grid grid-cols-4 gap-2 items-end${isDepleted ? " opacity-50" : ""}`}
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_6rem_2.25rem] gap-2 items-end"
                 >
                   <input
                     type="hidden"
@@ -520,7 +555,7 @@ export default function ProductEditDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormControl>
-                          <Input placeholder="Color" {...field} />
+                          <Input placeholder="Color" {...field} className={dim} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -532,6 +567,7 @@ export default function ProductEditDialog({
                     placeholder={isMeter ? "Stock (m)" : "Stock"}
                     step={isMeter ? "0.001" : "1"}
                     min="0"
+                    className={dim}
                     {...form.register(`variants.${index}.stock`, {
                       valueAsNumber: true,
                     })}
@@ -539,39 +575,19 @@ export default function ProductEditDialog({
 
                   <Button
                     type="button"
-                    variant="destructive"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Delete variant"
                     onClick={() => remove(index)}
+                    className={`text-destructive hover:bg-destructive/10 hover:text-destructive${
+                      isDepleted ? " opacity-50" : ""
+                    }`}
                   >
-                    Delete
+                    <Trash2 />
                   </Button>
                 </div>
                 );
               })}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const selectedCategoryId = form.getValues("categoryid");
-                  const selectedCategory = categories.find(
-                    (c) => c.categoryid === selectedCategoryId
-                  );
-                  const categoryName =
-                    selectedCategory?.name?.toLowerCase() || "";
-
-                  const presetCategories = ["saree"]; // lowercased for case-insensitive match
-
-                  append({
-                    variantid: crypto.randomUUID(),
-                    size: presetCategories.includes(categoryName)
-                      ? "FREE-SIZE"
-                      : "",
-                    color: "",
-                    stock: 0,
-                  });
-                }}
-              >
-                + Add Variant
-              </Button>
             </div>
 
             <div className="flex justify-end gap-2">

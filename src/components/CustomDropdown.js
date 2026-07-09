@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Check, ChevronsUpDown, Search, Plus } from "lucide-react";
 
 export default function CustomDropdown({
   label,
@@ -12,12 +13,17 @@ export default function CustomDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [highlight, setHighlight] = useState(0);
   const containerRef = useRef(null);
+
+  const close = () => {
+    setOpen(false);
+    setSearchTerm("");
+  };
 
   const handleSelect = (selectedValue) => {
     onChange(selectedValue);
-    setOpen(false);
-    setSearchTerm(""); // clear search after selection
+    close();
   };
 
   useEffect(() => {
@@ -26,8 +32,7 @@ export default function CustomDropdown({
         containerRef.current &&
         !containerRef.current.contains(event.target)
       ) {
-        setOpen(false);
-        setSearchTerm("");
+        close();
         if (onBlur) onBlur();
       }
     };
@@ -51,6 +56,42 @@ export default function CustomDropdown({
         String(opt.value).toLowerCase() === trimmedSearch.toLowerCase()
     );
 
+  // Flat list of keyboard-navigable rows: every filtered option, then the
+  // optional "+ Add …" action as the final row.
+  const rowCount = filteredOptions.length + (showAddNew ? 1 : 0);
+
+  // Keep the highlight in range as the filter narrows the list.
+  useEffect(() => {
+    setHighlight(0);
+  }, [searchTerm, open]);
+
+  const commitHighlight = () => {
+    if (highlight < filteredOptions.length) {
+      handleSelect(filteredOptions[highlight].value);
+    } else if (showAddNew) {
+      close();
+      onAddNew(trimmedSearch);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlight((i) => (rowCount ? (i + 1) % rowCount : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((i) => (rowCount ? (i - 1 + rowCount) % rowCount : 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      commitHighlight();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    }
+  };
+
+  const addNewIndex = filteredOptions.length;
+
   return (
     <div className={`w-full ${className}`} ref={containerRef}>
       {label && (
@@ -60,50 +101,74 @@ export default function CustomDropdown({
       <div className="relative">
         <button
           type="button"
-          className="w-full border rounded px-2 py-2 bg-white text-sm text-left"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="flex w-full items-center justify-between gap-2 rounded-md border border-input bg-white px-3 py-2 text-sm text-left shadow-xs transition-colors hover:border-ring/60 focus:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
           onClick={() => setOpen((prev) => !prev)}
         >
-          {selectedLabel || (
-            <span className="text-gray-400">{placeholder}</span>
-          )}
+          <span className={selectedLabel ? "truncate" : "truncate text-muted-foreground"}>
+            {selectedLabel || placeholder}
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
         </button>
 
         {open && (
-          <div className="absolute z-10 w-full mt-1 border bg-white shadow rounded">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-              className="w-full px-3 py-2 text-sm border-b focus:outline-none"
-              placeholder="Search..."
-            />
-            <ul className="max-h-48 overflow-y-auto text-sm">
+          <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-input bg-white shadow-lg ring-1 ring-black/5">
+            <div className="relative border-b">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                className="w-full bg-transparent py-2.5 pl-8 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none"
+                placeholder="Search…"
+              />
+            </div>
+            <ul role="listbox" className="max-h-56 overflow-y-auto p-1 text-sm">
               {filteredOptions.length > 0 ? (
-                filteredOptions.map((opt) => (
-                  <li
-                    key={opt.value}
-                    className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                    onClick={() => handleSelect(opt.value)}
-                  >
-                    {opt.label}
-                  </li>
-                ))
+                filteredOptions.map((opt, i) => {
+                  const isSelected = opt.value === value;
+                  const isActive = i === highlight;
+                  return (
+                    <li
+                      key={opt.value}
+                      role="option"
+                      aria-selected={isSelected}
+                      onMouseEnter={() => setHighlight(i)}
+                      onClick={() => handleSelect(opt.value)}
+                      className={`flex cursor-pointer items-center justify-between gap-2 rounded-sm px-2 py-1.5 ${
+                        isActive ? "bg-accent text-accent-foreground" : ""
+                      } ${isSelected ? "font-medium" : ""}`}
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      {isSelected && <Check className="size-4 shrink-0 text-primary" />}
+                    </li>
+                  );
+                })
               ) : (
                 !showAddNew && (
-                  <li className="px-3 py-2 text-gray-400">No options found</li>
+                  <li className="px-2 py-1.5 text-muted-foreground">
+                    No options found
+                  </li>
                 )
               )}
               {showAddNew && (
                 <li
-                  className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-blue-600 border-t"
+                  role="option"
+                  aria-selected={false}
+                  onMouseEnter={() => setHighlight(addNewIndex)}
                   onClick={() => {
-                    setOpen(false);
-                    setSearchTerm("");
+                    close();
                     onAddNew(trimmedSearch);
                   }}
+                  className={`mt-1 flex cursor-pointer items-center gap-2 rounded-sm border-t px-2 py-1.5 text-primary ${
+                    highlight === addNewIndex ? "bg-accent" : ""
+                  }`}
                 >
-                  + Add “{trimmedSearch}”…
+                  <Plus className="size-4 shrink-0" />
+                  <span className="truncate">Add “{trimmedSearch}”…</span>
                 </li>
               )}
             </ul>
