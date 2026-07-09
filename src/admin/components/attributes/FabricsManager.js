@@ -17,7 +17,7 @@ export default function FabricsManager() {
   const [search, setSearch] = useState("");
   const [newFamily, setNewFamily] = useState("");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function load() {
     setLoading(true);
     const { data, error } = await supabase

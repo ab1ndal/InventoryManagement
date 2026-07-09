@@ -16,7 +16,7 @@ export default function SizesManager() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function load() {
     setLoading(true);
     const { data, error } = await supabase

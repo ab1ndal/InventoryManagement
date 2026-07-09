@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import CategoriesPage from "./CategoriesPage";
 import SalespersonsPage from "./SalespersonsPage";
+import AttributesTab from "../components/attributes/AttributesTab";
 import {
   Table,
   TableBody,
@@ -399,6 +400,9 @@ export default function AdminPage() {
           {isSuperAdmin && (
             <TabsTrigger value="monthly-sales">Monthly Sales</TabsTrigger>
           )}
+          {isSuperAdmin && (
+            <TabsTrigger value="attributes">Attributes</TabsTrigger>
+          )}
         </TabsList>
         <TabsContent value="users">
           <UsersTab isSuperAdmin={isSuperAdmin} />
@@ -416,6 +420,11 @@ export default function AdminPage() {
         {isSuperAdmin && (
           <TabsContent value="monthly-sales">
             <MonthlySales />
+          </TabsContent>
+        )}
+        {isSuperAdmin && (
+          <TabsContent value="attributes">
+            <AttributesTab />
           </TabsContent>
         )}
       </Tabs>

@@ -22,7 +22,7 @@ export default function ColorsManager() {
   const [newFamily, setNewFamily] = useState("");
   const [newHex, setNewHex] = useState("#888888");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function load() {
     setLoading(true);
     const [c, f] = await Promise.all([
