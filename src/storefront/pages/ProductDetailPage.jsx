@@ -7,6 +7,9 @@ import { getProductImagePaths, imageUrl } from "../lib/productImage";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
 import { useCart } from "../context/CartContext";
+import Seo from "../components/Seo";
+import { buildProductJsonLd } from "../lib/seo";
+import { DELIVERY_ESTIMATE, stockNote } from "../lib/deliveryEstimate";
 
 // Descriptions are stored with lightweight Markdown (**bold**). Render the
 // bold spans as <strong> instead of printing literal asterisks.
@@ -170,6 +173,7 @@ export default function ProductDetailPage() {
   if (error || !product) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
+        <Seo title="Product not found" noindex />
         <p className="font-sans text-storefront-muted text-sm mb-4">
           Product not found.
         </p>
@@ -184,14 +188,13 @@ export default function ProductDetailPage() {
   }
 
   const categoryName = product.categories?.name;
+  const productLd = buildProductJsonLd({ product, variants, imagePaths, productid, categoryName });
+  const ogImage = imagePaths.length
+    ? imageUrl(imagePaths[0], { width: 1200, quality: 80 })
+    : undefined;
   const maxQty = selectedVariant?.stock ?? 0;
   const canAddToCart = selectedVariant !== null && maxQty > 0;
-  const stockLabel =
-    selectedVariant && selectedVariant.stock <= 3
-      ? `Only ${selectedVariant.stock} left`
-      : selectedVariant
-      ? "In stock"
-      : null;
+  const stockLabel = selectedVariant ? stockNote(selectedVariant.stock) : null;
 
   function handleVariantSelect(variant) {
     setSelectedVariant(variant);
@@ -223,6 +226,17 @@ export default function ProductDetailPage() {
 
   return (
     <>
+      <Seo
+        title={product.name}
+        description={
+          product.description
+            ? product.description.replace(/\*\*/g, "").slice(0, 160)
+            : `${product.name}${categoryName ? ` — ${categoryName}` : ""} · ₹${Number(product.retailprice).toLocaleString("en-IN")}`
+        }
+        type="product"
+        image={ogImage}
+        jsonLd={productLd}
+      />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
         {/* Breadcrumb */}
         <Link
@@ -265,6 +279,10 @@ export default function ProductDetailPage() {
                 {product.fabric}
               </p>
             )}
+
+            <p className="text-xs text-storefront-muted font-sans tracking-wide mb-3">
+              {DELIVERY_ESTIMATE}
+            </p>
 
             {product.description && (
               <p className="text-sm text-storefront-charcoal font-sans leading-relaxed mb-6 whitespace-pre-line">

@@ -20,7 +20,7 @@ export default function StorefrontFooter() {
             </p>
             <div className="flex gap-4">
               <a
-                href="https://instagram.com"
+                href="https://instagram.com/bindals_creation_shop"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram"
@@ -29,7 +29,7 @@ export default function StorefrontFooter() {
                 <Instagram size={20} />
               </a>
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/profile.php?id=61579168104897"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Facebook"
@@ -69,6 +69,7 @@ export default function StorefrontFooter() {
             <ul className="space-y-2.5 text-sm text-storefront-cream/70">
               {[
                 { label: "Shop All", to: "/shop" },
+                { label: "FAQ", to: "/faq" },
               ].map(({ label, to }) => (
                 <li key={label}>
                   <Link
@@ -90,16 +91,16 @@ export default function StorefrontFooter() {
             <ul className="space-y-3 text-sm text-storefront-cream/70">
               <li className="flex items-start gap-2.5">
                 <Phone size={15} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
-                <span>+91 98765 43210</span>
+                <span>+91 98108 73280</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <Mail size={15} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
-                <span>hello@bindalscreations.com</span>
+                <span>bindalscreations@gmail.com</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <MessageCircle size={15} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
                 <a
-                  href="https://wa.me/919876543210"
+                  href="https://wa.me/919810873280?text=Hi,%20I%20have%20a%20question%20about%20a%20product"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-storefront-gold transition-colors"
@@ -108,6 +109,13 @@ export default function StorefrontFooter() {
                 </a>
               </li>
             </ul>
+          </div>
+        </div>
+
+        {/* Business legitimacy */}
+        <div className="border-t border-white/10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-[11px] text-storefront-cream/40 leading-relaxed">
+            BINDAL'S CREATION · 58 Sihani Gate Market, Ghaziabad 201001 · GSTIN 09ABVPB4203A1Z4
           </div>
         </div>
 
@@ -127,7 +135,7 @@ export default function StorefrontFooter() {
 
       {/* WhatsApp FAB */}
       <a
-        href="https://wa.me/919876543210"
+        href="https://wa.me/919810873280?text=Hi,%20I%20have%20a%20question%20about%20a%20product"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat on WhatsApp"
