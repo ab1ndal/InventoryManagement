@@ -9,4 +9,9 @@ describe("TrustBar", () => {
     expect(screen.getByText(/In-store exchange within 7 days/i)).toBeInTheDocument();
     expect(screen.queryByText(/returns/i)).toBeNull();
   });
+
+  it("does not claim Secure Checkout before checkout ships", () => {
+    render(<TrustBar />);
+    expect(screen.queryByText(/secure checkout/i)).toBeNull();
+  });
 });
