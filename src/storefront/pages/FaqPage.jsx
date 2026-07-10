@@ -1,5 +1,5 @@
 import React from "react";
-import Seo from "../components/Seo";
+import StaticPage from "../components/StaticPage";
 import { FAQ_ITEMS } from "./faqContent";
 
 function FaqItem({ q, a }) {
@@ -20,27 +20,17 @@ function FaqItem({ q, a }) {
 
 export default function FaqPage() {
   return (
-    <div className="min-h-[60vh] bg-storefront-cream">
-      <Seo
-        title="FAQ"
-        description="Answers to common questions about delivery, exchanges, payments, sizing, and visiting Bindal's Creations."
-      />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-          <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold">
-            Help
-          </span>
-        </div>
-        <h1 className="font-display font-semibold text-4xl sm:text-5xl text-storefront-charcoal leading-none mb-10">
-          Frequently Asked Questions
-        </h1>
-        <div>
-          {FAQ_ITEMS.map((item) => (
-            <FaqItem key={item.q} q={item.q} a={item.a} />
-          ))}
-        </div>
+    <StaticPage
+      eyebrow="Help"
+      title="Frequently Asked Questions"
+      seoTitle="FAQ"
+      seoDescription="Answers to common questions about delivery, exchanges, payments, sizing, and visiting Bindal's Creations."
+    >
+      <div>
+        {FAQ_ITEMS.map((item) => (
+          <FaqItem key={item.q} q={item.q} a={item.a} />
+        ))}
       </div>
-    </div>
+    </StaticPage>
   );
 }
