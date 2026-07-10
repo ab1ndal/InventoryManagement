@@ -7,7 +7,7 @@ export default function StorefrontFooter() {
     <>
       <footer className="bg-storefront-charcoal text-storefront-cream font-sans">
         {/* Main footer */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand */}
           <div className="lg:col-span-1">
             <img
@@ -69,7 +69,34 @@ export default function StorefrontFooter() {
             <ul className="space-y-2.5 text-sm text-storefront-cream/70">
               {[
                 { label: "Shop All", to: "/shop" },
+                { label: "About", to: "/about" },
+                { label: "Contact", to: "/contact" },
                 { label: "FAQ", to: "/faq" },
+                { label: "Size Guide", to: "/size-guide" },
+              ].map(({ label, to }) => (
+                <li key={label}>
+                  <Link
+                    to={to}
+                    className="hover:text-storefront-gold transition-colors"
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Policies */}
+          <div>
+            <h4 className="font-display text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
+              Policies
+            </h4>
+            <ul className="space-y-2.5 text-sm text-storefront-cream/70">
+              {[
+                { label: "Shipping Policy", to: "/policies/shipping" },
+                { label: "Returns & Exchange", to: "/policies/returns" },
+                { label: "Privacy Policy", to: "/policies/privacy" },
+                { label: "Terms of Service", to: "/policies/terms" },
               ].map(({ label, to }) => (
                 <li key={label}>
                   <Link
