@@ -51,7 +51,8 @@ async function main() {
     if (batch.length < PAGE) break;
   }
 
-  const staticPaths = ["/", "/shop", "/faq"];
+  // Policy pages excluded intentionally: copy is still placeholder pending legal review.
+  const staticPaths = ["/", "/shop", "/faq", "/about", "/contact", "/size-guide"];
   const urls = [
     ...staticPaths.map((p) => `${SITE_URL}${p}`),
     ...products.map((p) => `${SITE_URL}/product/${p.productid}`),

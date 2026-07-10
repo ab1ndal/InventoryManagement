@@ -31,7 +31,7 @@ export default function BrandStory() {
             to="/about"
             className="group inline-flex items-center gap-2 text-storefront-charcoal font-sans text-sm font-medium tracking-widest uppercase border-b border-storefront-charcoal/30 hover:border-storefront-gold hover:text-storefront-gold pb-1 transition-colors"
           >
-            Our Story
+            Read our story
             <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
           </Link>
         </div>

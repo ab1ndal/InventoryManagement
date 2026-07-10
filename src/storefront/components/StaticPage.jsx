@@ -1,11 +1,18 @@
 import React from "react";
 import Seo from "./Seo";
 
-export default function StaticPage({ eyebrow, title, seoTitle, seoDescription, children }) {
+export default function StaticPage({
+  eyebrow,
+  title,
+  seoTitle,
+  seoDescription,
+  containerClassName = "max-w-3xl",
+  children,
+}) {
   return (
     <div className="min-h-[60vh] bg-storefront-cream">
       <Seo title={seoTitle || title} description={seoDescription} />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+      <div className={`${containerClassName} mx-auto px-4 sm:px-6 lg:px-8 py-14`}>
         {eyebrow && (
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
