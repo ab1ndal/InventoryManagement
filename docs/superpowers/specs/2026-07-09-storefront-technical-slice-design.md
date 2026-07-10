@@ -31,9 +31,9 @@ Six independent units. Each has one purpose, its own files, and can be built/ver
 **What:** Per-page document metadata + structured data + sitemap for a CRA SPA.
 **Caveat:** Client-rendered meta (Googlebot executes JS; other crawlers may not). True SSR/prerender stays deferred to the Vite-migration decision — this is the interim, honest improvement, not the final fix.
 
-- Add dependency `react-helmet-async`.
-- Wrap the app once in `<HelmetProvider>` (in `src/App.js`, outermost storefront-affecting scope — placing at app root is fine, admin pages simply won't add `<Helmet>`).
-- Per-page `<Helmet>` with `<title>`, `<meta name="description">`, Open Graph (`og:title`, `og:description`, `og:type`, `og:image`, `og:url`), `twitter:card`:
+- **No dependency.** React 19.1 has native document metadata: rendering `<title>`, `<meta>`, `<link>` anywhere in the tree hoists + dedupes them into `<head>`, and updates correctly on SPA route changes. Use it directly — no `react-helmet-async`.
+- Thin reusable `src/storefront/components/Seo.jsx` that renders the native tags given `title`/`description`/`image`/`type`/`url`/`jsonLd` props (keeps per-page call sites DRY). JSON-LD is a `<script type="application/ld+json">` rendered in place (valid anywhere for crawlers).
+- Per-page `<Seo>` producing `<title>`, `<meta name="description">`, Open Graph (`og:title`, `og:description`, `og:type`, `og:image`, `og:url`), `twitter:card`:
   - Home — brand title + tagline; `og:type=website`.
   - Shop — "Shop — Bindal's Creations" + collection description.
   - PDP — product name + category + price in title/description; `og:type=product`; `og:image` = first product image URL (via `getProductImagePaths` + `imageUrl`); falls back to a static brand OG image when the product has no image.
@@ -43,7 +43,7 @@ Six independent units. Each has one purpose, its own files, and can be built/ver
 
 **Edge cases:** product with no image → OG image falls back to brand default; missing description → title-only description; JSON-LD price is the single `retailprice` (no per-variant pricing in schema).
 
-**Files:** `package.json` (+dep), `src/App.js` (HelmetProvider), `HomePage.jsx`, `ShopPage.jsx`, `ProductDetailPage.jsx`, `NotFoundPage.jsx`, new `scripts/generate-sitemap.js`, `public/robots.txt`, `public/sitemap.xml` (generated).
+**Files:** new `src/storefront/components/Seo.jsx`, `HomePage.jsx`, `ShopPage.jsx`, `ProductDetailPage.jsx`, `NotFoundPage.jsx`, new `scripts/generate-sitemap.js`, `public/robots.txt`, `public/sitemap.xml` (generated). No `package.json` change.
 
 ### U2 — 404 page
 **What:** Branded not-found within storefront chrome.
@@ -127,7 +127,7 @@ Changes in `StorefrontFooter.jsx`:
 
 | Decision | Choice | Why |
 |---|---|---|
-| SEO library | `react-helmet-async` | Standard for CRA SPA; no build change; only unmaintained-but-stable option that fits. Real fix (SSR) deferred per parent plan. |
+| SEO metadata | React 19 native document metadata (no library) | React 19.1 hoists `<title>`/`<meta>`/`<link>` to `<head>` natively, incl. SPA route changes — zero deps, future-proof. Real fix (SSR) deferred per parent plan. |
 | Sitemap generation | Standalone `scripts/generate-sitemap.js`, run on demand | Keeps CRA `npm run build` untouched; regenerate when catalog changes. |
 | 404 placement | `*` child of `StorefrontLayout` | Inherits header/footer/WhatsApp; admin routes unaffected. |
 | Low-stock threshold | Keep ≤3 trigger, reframe copy to uniqueness | Data reality (1–2/code) makes urgency dishonest; uniqueness is on-brand + true. |
@@ -141,7 +141,7 @@ Match existing storefront test style (`src/storefront/__tests__/*`, jest + RTL).
 - 404 route: unknown storefront path renders `NotFoundPage` (router render test).
 - Low-stock/delivery: PDP renders "Limited piece — only N in stock" for low stock and the delivery line (component test with a mocked product/variant).
 - FAQ: page renders all question headings (smoke test).
-- No test for sitemap script (side-effecting node util) beyond a manual run; SEO `<Helmet>` output is not unit-tested (helmet-async renders async into head).
+- No test for sitemap script (side-effecting node util) beyond a manual run. `Seo` component: a light render test asserting `document.title` updates (React 19 hoists metadata synchronously in the test renderer) is worthwhile; deep OG/meta assertions are covered by manual verification.
 
 **Note:** `CartDrawer.test.jsx` currently fails pre-existing (react-router-dom module resolution, unrelated) — do not let it block this slice; do not "fix" it here.
 
