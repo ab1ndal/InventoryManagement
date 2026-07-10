@@ -11,6 +11,13 @@ import ShopPage from "./storefront/pages/ShopPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
 import FaqPage from "./storefront/pages/FaqPage";
 import NotFoundPage from "./storefront/pages/NotFoundPage";
+import ShippingPolicyPage from "./storefront/pages/policies/ShippingPolicyPage";
+import ReturnsPolicyPage from "./storefront/pages/policies/ReturnsPolicyPage";
+import PrivacyPolicyPage from "./storefront/pages/policies/PrivacyPolicyPage";
+import TermsPage from "./storefront/pages/policies/TermsPage";
+import AboutPage from "./storefront/pages/AboutPage";
+import ContactPage from "./storefront/pages/ContactPage";
+import SizeGuidePage from "./storefront/pages/SizeGuidePage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -46,6 +53,13 @@ function App() {
             <Route path="shop" element={<ShopPage />} />
             <Route path="product/:productid" element={<ProductDetailPage />} />
             <Route path="faq" element={<FaqPage />} />
+            <Route path="policies/shipping" element={<ShippingPolicyPage />} />
+            <Route path="policies/returns" element={<ReturnsPolicyPage />} />
+            <Route path="policies/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="policies/terms" element={<TermsPage />} />
+            <Route path="about" element={<AboutPage />} />
+            <Route path="contact" element={<ContactPage />} />
+            <Route path="size-guide" element={<SizeGuidePage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ShoppingBag, Search, Menu, X } from "lucide-react";
+import { ShoppingBag, Menu, X } from "lucide-react";
 import { useCart } from "../context/CartContext";
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
   { label: "Shop", to: "/shop" },
+  { label: "About", to: "/about" },
+  { label: "Contact", to: "/contact" },
 ];
 
 export default function StorefrontHeader() {
@@ -73,12 +75,6 @@ export default function StorefrontHeader() {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
-            <button
-              aria-label="Search"
-              className="hidden sm:flex p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors cursor-pointer"
-            >
-              <Search size={20} />
-            </button>
             <button
               aria-label="Cart"
               onClick={openCart}

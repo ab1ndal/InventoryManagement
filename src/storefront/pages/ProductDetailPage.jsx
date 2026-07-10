@@ -301,6 +301,12 @@ export default function ProductDetailPage() {
                   No variants available.
                 </p>
               )}
+              <Link
+                to="/size-guide"
+                className="inline-block mt-4 text-xs font-sans tracking-wide text-storefront-muted hover:text-storefront-gold underline underline-offset-2 transition-colors"
+              >
+                Size guide
+              </Link>
             </div>
 
             {/* Quantity selector */}
