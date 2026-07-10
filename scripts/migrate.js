@@ -23,10 +23,10 @@ function loadEnv() {
 async function main() {
   const env = { ...loadEnv(), ...process.env };
   const url = env.REACT_APP_SUPABASE_URL;
-  const key = env.REACT_APP_SUPABASE_SERVICE_ROLE_KEY;
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
-    console.error("Missing REACT_APP_SUPABASE_URL or REACT_APP_SUPABASE_SERVICE_ROLE_KEY in .env");
+    console.error("Missing REACT_APP_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
     process.exit(1);
   }
 

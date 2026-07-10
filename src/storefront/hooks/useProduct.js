@@ -19,7 +19,7 @@ export function useProduct(productId) {
       const [productRes, variantsRes] = await Promise.all([
         supabase
           .from("products")
-          .select("*, categories(name)")
+          .select("productid, name, description, categoryid, fabric, retailprice, producturl, unit_type, categories(name)")
           .eq("productid", productId)
           .single(),
         supabase

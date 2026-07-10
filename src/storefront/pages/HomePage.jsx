@@ -5,8 +5,6 @@ import NewArrivals from "../components/home/NewArrivals";
 import FeaturedCollection from "../components/home/FeaturedCollection";
 import BestsellerGrid from "../components/home/BestsellerGrid";
 import TrustBar from "../components/home/TrustBar";
-import ReviewsSection from "../components/home/ReviewsSection";
-import NewsletterSignup from "../components/home/NewsletterSignup";
 
 export default function HomePage() {
   return (
@@ -17,8 +15,6 @@ export default function HomePage() {
       <NewArrivals />
       <FeaturedCollection />
       <BestsellerGrid />
-      <ReviewsSection />
-      <NewsletterSignup />
     </>
   );
 }

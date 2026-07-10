@@ -86,8 +86,8 @@ Before writing any migration or DB query, fetch live schema from Supabase:
 
 ```bash
 source .env && curl -s \
-  -H "apikey: $REACT_APP_SUPABASE_SERVICE_ROLE_KEY" \
-  -H "Authorization: Bearer $REACT_APP_SUPABASE_SERVICE_ROLE_KEY" \
+  -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
   "$REACT_APP_SUPABASE_URL/rest/v1/rpc/get_schema_info" | \
   node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const rows=JSON.parse(d); const tables={}; rows.forEach(r=>{if(!tables[r.table_name])tables[r.table_name]=[]; tables[r.table_name].push(r.column_name+' '+r.udt_name+(r.is_nullable==='NO'?' NOT NULL':'')+(r.column_default?' DEFAULT '+r.column_default:'')); }); Object.entries(tables).forEach(([t,cols])=>console.log(t+':\n  '+cols.join('\n  ')));"
 ```

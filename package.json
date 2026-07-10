@@ -47,7 +47,8 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
+    "probe:anon": "node scripts/probe-anon-access.js"
   },
   "eslintConfig": {
     "extends": [

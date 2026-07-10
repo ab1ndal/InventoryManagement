@@ -68,10 +68,7 @@ export default function StorefrontFooter() {
             </h4>
             <ul className="space-y-2.5 text-sm text-storefront-cream/70">
               {[
-                { label: "About Us", to: "/about" },
-                { label: "Contact Us", to: "/contact" },
-                { label: "Shipping Policy", to: "/contact" },
-                { label: "Returns & Exchanges", to: "/contact" },
+                { label: "Shop All", to: "/shop" },
               ].map(({ label, to }) => (
                 <li key={label}>
                   <Link

@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ShoppingBag, Search, Heart, Menu, X } from "lucide-react";
+import { ShoppingBag, Search, Menu, X } from "lucide-react";
 import { useCart } from "../context/CartContext";
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
   { label: "Shop", to: "/shop" },
-  { label: "About", to: "/about" },
-  { label: "Contact", to: "/contact" },
 ];
 
 export default function StorefrontHeader() {
@@ -34,7 +32,7 @@ export default function StorefrontHeader() {
     >
       {/* Announcement bar */}
       <div className="bg-storefront-charcoal text-storefront-cream text-center text-xs py-2 px-4 tracking-widest uppercase">
-        Free shipping on orders above ₹5,000 &nbsp;·&nbsp; Worldwide delivery
+        Free shipping on orders above ₹5,000
       </div>
 
       {/* Main header */}
@@ -80,12 +78,6 @@ export default function StorefrontHeader() {
               className="hidden sm:flex p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors cursor-pointer"
             >
               <Search size={20} />
-            </button>
-            <button
-              aria-label="Wishlist"
-              className="hidden sm:flex p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors cursor-pointer"
-            >
-              <Heart size={20} />
             </button>
             <button
               aria-label="Cart"

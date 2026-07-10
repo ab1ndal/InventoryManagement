@@ -2,7 +2,7 @@ import React from "react";
 import { Globe, ShieldCheck, RefreshCw, Lock } from "lucide-react";
 
 const SIGNALS = [
-  { icon: Globe, title: "Worldwide Shipping", desc: "Free on orders above ₹5,000" },
+  { icon: Globe, title: "Pan-India Shipping", desc: "Free on orders above ₹5,000" },
   { icon: ShieldCheck, title: "100% Authentic", desc: "Sourced directly from artisans" },
   { icon: RefreshCw, title: "Easy Returns", desc: "Hassle-free 7-day returns" },
   { icon: Lock, title: "Secure Checkout", desc: "Encrypted & safe payments" },
