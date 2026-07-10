@@ -9,6 +9,7 @@ import VariantPicker from "../components/product/VariantPicker";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { buildProductJsonLd } from "../lib/seo";
+import { DELIVERY_ESTIMATE, stockNote } from "../lib/deliveryEstimate";
 
 // Descriptions are stored with lightweight Markdown (**bold**). Render the
 // bold spans as <strong> instead of printing literal asterisks.
@@ -193,12 +194,7 @@ export default function ProductDetailPage() {
     : undefined;
   const maxQty = selectedVariant?.stock ?? 0;
   const canAddToCart = selectedVariant !== null && maxQty > 0;
-  const stockLabel =
-    selectedVariant && selectedVariant.stock <= 3
-      ? `Only ${selectedVariant.stock} left`
-      : selectedVariant
-      ? "In stock"
-      : null;
+  const stockLabel = selectedVariant ? stockNote(selectedVariant.stock) : null;
 
   function handleVariantSelect(variant) {
     setSelectedVariant(variant);
@@ -283,6 +279,10 @@ export default function ProductDetailPage() {
                 {product.fabric}
               </p>
             )}
+
+            <p className="text-xs text-storefront-muted font-sans tracking-wide mb-3">
+              {DELIVERY_ESTIMATE}
+            </p>
 
             {product.description && (
               <p className="text-sm text-storefront-charcoal font-sans leading-relaxed mb-6 whitespace-pre-line">
