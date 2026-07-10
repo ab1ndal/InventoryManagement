@@ -222,6 +222,10 @@ export default function BillTable({ onEdit }) {
 
   const handleSendSms = async (bill) => {
     const { billid: billId, bill_number, pdf_url, net_amount, payment_amount, customers } = bill;
+    // Open a blank tab synchronously inside the click gesture, then redirect it
+    // once the phone + signed URL are ready. Opening after the awaits below would
+    // be blocked by the browser's popup blocker (gesture no longer "active").
+    const waWindow = window.open("", "_blank");
     setSendingSms((prev) => new Set(prev).add(billId));
     try {
       // Customer phone — fetch only what we need
@@ -239,6 +243,7 @@ export default function BillTable({ onEdit }) {
       }
 
       if (!customerPhone) {
+        waWindow?.close();
         toast({ title: "No phone number", description: "Customer has no phone on record.", variant: "destructive" });
         return;
       }
@@ -257,15 +262,21 @@ export default function BillTable({ onEdit }) {
 
       const amount = Math.round(Number(net_amount ?? payment_amount ?? 0));
 
-      const { data: fnData, error: fnErr } = await supabase.functions.invoke("send-bill-sms", {
-        body: { phone: customerPhone, customerName, billNumber: bill_number || billId, amount, pdfUrl: signedUrl },
-      });
+      // Free, backend-less WhatsApp: open a click-to-chat link with the bill
+      // pre-filled. Staff reviews and taps send in WhatsApp.
+      const message =
+        `Hi ${customerName || "there"}, here is your bill #${bill_number || billId} from Bindal's Creations.\n` +
+        `Amount: ₹${amount}` +
+        (signedUrl ? `\nView bill: ${signedUrl}` : "");
+      const waUrl = `https://wa.me/${customerPhone}?text=${encodeURIComponent(message)}`;
 
-      if (fnErr || fnData?.error) throw new Error(fnErr?.message || fnData?.error);
+      if (waWindow) waWindow.location.href = waUrl;
+      else window.open(waUrl, "_blank", "noopener,noreferrer");
 
-      toast({ title: "WhatsApp sent", description: `Bill #${bill_number || billId} sent to ${customerPhone}` });
+      toast({ title: "WhatsApp opened", description: `Review the message and tap send for bill #${bill_number || billId}.` });
     } catch (e) {
-      toast({ title: "SMS failed", description: e.message, variant: "destructive" });
+      waWindow?.close();
+      toast({ title: "Couldn't open WhatsApp", description: e.message, variant: "destructive" });
     } finally {
       setSendingSms((prev) => { const s = new Set(prev); s.delete(billId); return s; });
     }
