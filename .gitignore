@@ -28,3 +28,5 @@ credentials.json
 .superpowers
 # graphify knowledge-graph output (generated; rebuild locally)
 graphify-out/
+.vercel
+.env*

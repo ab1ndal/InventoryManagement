@@ -262,12 +262,28 @@ export default function BillTable({ onEdit }) {
 
       const amount = Math.round(Number(net_amount ?? payment_amount ?? 0));
 
+      // Shorten the long signed URL for a cleaner WhatsApp message (best-effort;
+      // TinyURL is free/keyless and sends CORS headers. Falls back to the full
+      // URL if the shortener is unreachable, so a send never fails on it).
+      let shareUrl = signedUrl;
+      if (signedUrl) {
+        try {
+          const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(signedUrl)}`);
+          if (res.ok) {
+            const short = (await res.text()).trim();
+            if (short.startsWith("http")) shareUrl = short;
+          }
+        } catch {
+          // shortener down — keep the full URL
+        }
+      }
+
       // Free, backend-less WhatsApp: open a click-to-chat link with the bill
       // pre-filled. Staff reviews and taps send in WhatsApp.
       const message =
         `Hi ${customerName || "there"}, here is your bill #${bill_number || billId} from Bindal's Creations.\n` +
         `Amount: ₹${amount}` +
-        (signedUrl ? `\nView bill: ${signedUrl}` : "");
+        (shareUrl ? `\nView bill: ${shareUrl}` : "");
       const waUrl = `https://wa.me/${customerPhone}?text=${encodeURIComponent(message)}`;
 
       if (waWindow) waWindow.location.href = waUrl;
