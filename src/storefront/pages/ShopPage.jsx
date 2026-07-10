@@ -4,6 +4,7 @@ import useShopFilters from "../hooks/useShopFilters";
 import FilterBar from "../components/shop/FilterBar";
 import AllFiltersPanel from "../components/shop/AllFiltersPanel";
 import ProductGrid from "../components/shop/ProductGrid";
+import SortControl from "../components/shop/SortControl";
 import Seo from "../components/Seo";
 
 function ActiveChips({ filters, categoryOptions, sizeDisplayMap, onClearOne, onClearAll }) {
@@ -59,6 +60,8 @@ export default function ShopPage() {
     hasMore,
     totalCount,
     fetchNextPage,
+    sortBy,
+    setSortBy,
     toggle,
     setPrice,
     clearAll,
@@ -161,6 +164,9 @@ export default function ShopPage() {
 
       {/* Product grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex items-center justify-end mb-6">
+          <SortControl value={sortBy} onChange={setSortBy} />
+        </div>
         <ProductGrid
           products={products}
           loading={loading}

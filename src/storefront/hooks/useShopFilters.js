@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "lib/supabaseClient";
 import { buildFamilyIndex } from "../../utility/attributeFamilies";
+import { sortOrderClause } from "./sortOptions";
 
 const PAGE_SIZE = 24;
 
@@ -118,6 +119,7 @@ export default function useShopFilters() {
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
+  const [sortBy, setSortBy] = useState("newest");
 
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [colorOptions, setColorOptions] = useState([]); // family names (filter buckets)
@@ -238,7 +240,7 @@ export default function useShopFilters() {
     return () => clearTimeout(debounceRef.current);
   }, [filters]);
 
-  const runQuery = useCallback(async (currentFilters, currentOffset, append) => {
+  const runQuery = useCallback(async (currentFilters, currentOffset, append, currentSort) => {
     append ? setLoadingMore(true) : setLoading(true);
 
     try {
@@ -280,8 +282,9 @@ export default function useShopFilters() {
           fabricCodesFor(currentFilters.fabrics, fabricIndexRef.current.familyToCodes)
         );
 
+      const { column, ascending } = sortOrderClause(currentSort);
       query = query
-        .order("productid", { ascending: false })
+        .order(column, { ascending })
         .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
       const { data, count } = await query;
@@ -298,14 +301,14 @@ export default function useShopFilters() {
 
   useEffect(() => {
     setOffset(0);
-    runQuery(filters, 0, false);
-  }, [filters, runQuery]);
+    runQuery(filters, 0, false, sortBy);
+  }, [filters, sortBy, runQuery]);
 
   const fetchNextPage = useCallback(() => {
     const next = offset + PAGE_SIZE;
     setOffset(next);
-    runQuery(filters, next, true);
-  }, [filters, offset, runQuery]);
+    runQuery(filters, next, true, sortBy);
+  }, [filters, offset, runQuery, sortBy]);
 
   const toggle = useCallback((field, value) => {
     setFilters((prev) => {
@@ -357,6 +360,8 @@ export default function useShopFilters() {
     hasMore,
     totalCount,
     fetchNextPage,
+    sortBy,
+    setSortBy,
     toggle,
     setPrice,
     clearAll,
