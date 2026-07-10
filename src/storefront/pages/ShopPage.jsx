@@ -4,6 +4,7 @@ import useShopFilters from "../hooks/useShopFilters";
 import FilterBar from "../components/shop/FilterBar";
 import AllFiltersPanel from "../components/shop/AllFiltersPanel";
 import ProductGrid from "../components/shop/ProductGrid";
+import Seo from "../components/Seo";
 
 function ActiveChips({ filters, categoryOptions, sizeDisplayMap, onClearOne, onClearAll }) {
   const chips = [];
@@ -93,6 +94,7 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-storefront-cream">
+      <Seo title="Shop" description="Browse the full collection of handcrafted sarees, lehengas, suits, and ethnic wear." />
       {/* Page header */}
       <div className="border-b border-storefront-border bg-storefront-cream">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-10">
