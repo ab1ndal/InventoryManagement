@@ -9,6 +9,7 @@ import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
+import NotFoundPage from "./storefront/pages/NotFoundPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -43,6 +44,7 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="shop" element={<ShopPage />} />
             <Route path="product/:productid" element={<ProductDetailPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Public Pages */}
