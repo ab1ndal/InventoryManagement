@@ -1028,7 +1028,7 @@ git commit -m "Storefront: FAQ page + route + footer link"
 - Consumes: `.env` (`REACT_APP_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
 - Produces: `public/sitemap.xml` on run.
 
-> **Site domain:** the canonical storefront domain is not yet confirmed. The script and robots.txt use `SITE_URL` (env override, default `https://bindalscreations.com`). Before the sitemap/robots are truthful, set the real domain (edit the default or pass `SITE_URL=...`). This is an owner input, not a code blocker.
+> **Site domain:** the canonical storefront domain is `https://bindalscreations.com` (confirmed real). The script and robots.txt use it (env override via `SITE_URL` supported but not needed).
 
 - [ ] **Step 1: Write the sitemap script**
 
@@ -1152,6 +1152,5 @@ Expected: all pass except the pre-existing `CartDrawer.test.jsx` react-router-do
 
 ## Notes / deferred (not blockers)
 
-- **Site domain** for sitemap/robots is a placeholder until confirmed (Task 8 note).
 - FAQ answers 4, 5, 8, 10 are "draft" wording — owner may polish; all are factually true as written.
 - Other TrustBar claims (free shipping above ₹5,000, secure checkout) become true in Phase 2 — left to the Home-restructure slice, not touched here.
