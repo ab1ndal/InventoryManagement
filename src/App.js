@@ -16,6 +16,7 @@ import ReturnsPolicyPage from "./storefront/pages/policies/ReturnsPolicyPage";
 import PrivacyPolicyPage from "./storefront/pages/policies/PrivacyPolicyPage";
 import TermsPage from "./storefront/pages/policies/TermsPage";
 import AboutPage from "./storefront/pages/AboutPage";
+import ContactPage from "./storefront/pages/ContactPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -56,6 +57,7 @@ function App() {
             <Route path="policies/privacy" element={<PrivacyPolicyPage />} />
             <Route path="policies/terms" element={<TermsPage />} />
             <Route path="about" element={<AboutPage />} />
+            <Route path="contact" element={<ContactPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 
