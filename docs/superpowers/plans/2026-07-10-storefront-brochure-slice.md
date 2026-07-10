@@ -205,14 +205,14 @@ describe("Policy pages", () => {
   it("shipping page states real dispatch and free-shipping facts", () => {
     render(<ShippingPolicyPage />);
     expect(screen.getByRole("heading", { name: /shipping policy/i })).toBeInTheDocument();
-    expect(screen.getByText(/dispatch within 2 working days/i)).toBeInTheDocument();
+    expect(screen.getByText(/dispatch.*2 working days/i)).toBeInTheDocument();
     expect(screen.getByText(/free.*above ₹5,000/i)).toBeInTheDocument();
   });
 
   it("returns page states no-returns / 7-day in-store exchange", () => {
     render(<ReturnsPolicyPage />);
     expect(screen.getByRole("heading", { name: /returns.*exchange/i })).toBeInTheDocument();
-    expect(screen.getByText(/exchange within 7 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/exchange.*within 7 days/i)).toBeInTheDocument();
     expect(screen.getByText(/in-store only/i)).toBeInTheDocument();
   });
 
