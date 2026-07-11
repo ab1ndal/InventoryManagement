@@ -18,5 +18,7 @@ begin
          'authenticated must execute resolve_my_customer';
   assert not (select has_function_privilege('anon','resolve_my_customer()','execute')),
          'anon must NOT execute resolve_my_customer';
+  assert not (select has_function_privilege('anon','update_my_customer(text,text,text,text,text)','execute')),
+         'anon must NOT execute update_my_customer';
 end $$;
 select 'customer-auth assertions passed' as result;

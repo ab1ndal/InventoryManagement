@@ -13,9 +13,11 @@ function subtotalOf(items) {
 function whatsappHref(items, subtotal) {
   const lines = items
     .map((i) => `• ${i.name} (${i.size}/${i.color}) ×${i.quantity} — ₹${(i.price * i.quantity).toLocaleString("en-IN")}`)
-    .join("%0A");
-  const text = `Hi, I’d like to order:%0A${lines}%0A%0ASubtotal: ₹${subtotal.toLocaleString("en-IN")}`;
-  return `https://wa.me/${WHATSAPP}?text=${text}`;
+    .join("\n");
+  const text = `Hi, I’d like to order:\n${lines}\n\nSubtotal: ₹${subtotal.toLocaleString("en-IN")}`;
+  // encodeURIComponent so product names containing &, #, + etc. don't corrupt
+  // or truncate the prefilled message (newlines become %0A).
+  return `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(text)}`;
 }
 
 export default function CartPage() {

@@ -92,6 +92,7 @@ declare
   v_row public.customers;
   v_target public.customers;
   v_reclaim_count int;
+  v_row_is_placeholder boolean;
   v_needs_review boolean := false;
 begin
   if v_uid is null then
@@ -105,9 +106,21 @@ begin
     select * into v_row from public.customers where auth_user_id = v_uid limit 1;
   end if;
 
-  -- Guarded phone reclaim (only from a fresh row, only to a safe target).
-  if p_phone is not null and p_phone <> ''
-     and coalesce(v_row.store_credit, 0) = 0 and (v_row.phone is null or v_row.phone = '') then
+  -- The caller's row is safe to detach for a phone reclaim only if it is a
+  -- dependency-free placeholder: no purchase/credit history. A real in-store
+  -- record (with bills/exchanges/vouchers/discount_usage) can also have
+  -- store_credit=0 and no phone, so those conditions alone are NOT sufficient
+  -- and must never trigger a destructive move.
+  v_row_is_placeholder :=
+    coalesce(v_row.store_credit, 0) = 0
+    and (v_row.phone is null or v_row.phone = '')
+    and not exists (select 1 from public.bills b where b.customerid = v_row.customerid)
+    and not exists (select 1 from public.exchanges e where e.customerid = v_row.customerid)
+    and not exists (select 1 from public.vouchers vc where vc.customerid = v_row.customerid)
+    and not exists (select 1 from public.discount_usage du where du.customerid = v_row.customerid);
+
+  -- Guarded phone reclaim (only from a placeholder, only to a safe target).
+  if p_phone is not null and p_phone <> '' and v_row_is_placeholder then
     select count(*) into v_reclaim_count from public.customers t
       where t.phone = p_phone and t.auth_user_id is null
         and (t.email is null or t.email = '') and coalesce(t.store_credit,0) = 0
@@ -117,20 +130,18 @@ begin
         where t.phone = p_phone and t.auth_user_id is null
           and (t.email is null or t.email = '') and coalesce(t.store_credit,0) = 0
           and t.customerid <> v_row.customerid limit 1;
-      -- auth_user_id is UNIQUE, so the just-created placeholder must be removed
-      -- before the in-store record can take the caller's identity. The
-      -- placeholder is fresh with no dependents (cart_items FK auth.users, not
-      -- customers; orders table does not exist yet), so deleting it is safe.
-      delete from public.customers where customerid = v_row.customerid;
+      -- auth_user_id is UNIQUE, so free the placeholder's slot before the
+      -- in-store record takes the caller's identity. UNLINK (not delete): the
+      -- placeholder has no FK dependents but unlinking is unconditionally safe
+      -- and leaves the empty row for an admin cleanup sweep.
+      update public.customers set auth_user_id = null where customerid = v_row.customerid;
       update public.customers set auth_user_id = v_uid, email = v_email
         where customerid = v_target.customerid returning * into v_row;
-    else
+    elsif exists (select 1 from public.customers t where t.phone = p_phone
+                  and (coalesce(t.store_credit,0) > 0 or t.email is not null)
+                  and t.customerid <> v_row.customerid) then
       -- A matching record exists but is not safe to auto-claim.
-      if exists (select 1 from public.customers t where t.phone = p_phone
-                 and (coalesce(t.store_credit,0) > 0 or t.email is not null)
-                 and t.customerid <> v_row.customerid) then
-        v_needs_review := true;
-      end if;
+      v_needs_review := true;
     end if;
   end if;
 
