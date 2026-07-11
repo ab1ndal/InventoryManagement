@@ -18,6 +18,7 @@ import TermsPage from "./storefront/pages/policies/TermsPage";
 import AboutPage from "./storefront/pages/AboutPage";
 import ContactPage from "./storefront/pages/ContactPage";
 import SizeGuidePage from "./storefront/pages/SizeGuidePage";
+import LoginPage from "./storefront/pages/LoginPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -31,7 +32,7 @@ const DiscountPage = lazy(() => import("./admin/pages/DiscountPage"));
 const ExchangePage = lazy(() => import("./admin/pages/ExchangePage"));
 const CustomersPage = lazy(() => import("./admin/pages/CustomersPage"));
 const SuppliersPage = lazy(() => import("./admin/pages/SuppliersPage"));
-const LoginPage = lazy(() => import("./admin/pages/LoginPage"));
+const AdminLoginPage = lazy(() => import("./admin/pages/LoginPage"));
 const RequireAdminAuth = lazy(() => import("./admin/components/RequireAdminAuth"));
 const AdminPage = lazy(() => import("./admin/pages/AdminPage"));
 const SignupPage = lazy(() => import("./admin/pages/SignupPage"));
@@ -60,12 +61,13 @@ function App() {
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="size-guide" element={<SizeGuidePage />} />
+            <Route path="login" element={<LoginPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Public Pages */}
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
-          <Route path="/admin/login" element={<LoginPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/signup" element={<SignupPage />} />
           <Route
             path="/admin/forgot-password"
