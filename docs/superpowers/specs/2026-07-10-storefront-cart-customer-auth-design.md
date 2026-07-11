@@ -75,7 +75,7 @@ Ambiguous email (multiple matches) → do **not** auto-link; return the freshly 
 
 `CartContext` becomes auth-aware:
 - **Guest** (no session): localStorage only, exactly as today.
-- **On login** (`onAuthStateChange` → SIGNED_IN): `mergeCarts(localItems, serverItems)` → union by `variant_id`, sum quantities, cap each at live stock; write merged deltas to server; `setItems(merged)`; mirror to localStorage.
+- **On genuine login** (`onAuthStateChange` event === `SIGNED_IN` only): `mergeCarts(localItems, serverItems)` → union by `variant_id`, take the **max** quantity for variants present in both, cap each at live stock; write merged deltas to server; `setItems(merged)`; mirror to localStorage. Max (not sum) because the local cart is usually a stale mirror of the server — summing would double-count on re-login. Merge runs only on `SIGNED_IN`; on `INITIAL_SESSION`/`TOKEN_REFRESHED` (app reload while already authed) the cart is loaded from the server **without** merging.
 - **Authed mutation** (add/remove/updateQty): optimistic local update + async `cartApi` call; on failure keep local state and toast "Couldn't sync your cart"; localStorage mirror means nothing is lost.
 - **On logout** (SIGNED_OUT): clear items + localStorage.
 - `mergeCarts` and the revalidation flagger are **pure functions** in `lib/cartLogic.js`, unit-tested.
@@ -92,9 +92,12 @@ Ambiguous email (multiple matches) → do **not** auto-link; return the freshly 
 ```
 Guest:   UI → CartContext → localStorage
 Login:   email → signInWithOtp → emailed link → session set
-           → onAuthStateChange(SIGNED_IN)
+           → onAuthStateChange(event=SIGNED_IN)   // NOT on INITIAL_SESSION/TOKEN_REFRESHED
            → resolve_my_customer()  (identity)
-           → mergeCarts(local, server) → write deltas → setItems → mirror localStorage
+           → mergeCarts(local, server)  // max per variant, cap at stock
+           → write deltas → setItems → mirror localStorage
+Reload:  onAuthStateChange(event=INITIAL_SESSION, user present)
+           → load server cart only (no merge)
 Authed:  UI → CartContext (optimistic) → cartApi upsert/remove ; toast on failure
 Logout:  signOut → clear items + localStorage
 ```
