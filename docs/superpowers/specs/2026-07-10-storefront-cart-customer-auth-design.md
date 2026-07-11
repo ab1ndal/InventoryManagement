@@ -111,6 +111,7 @@ Logout:  signOut → clear items + localStorage
 - `cart_items` RLS already restricts every op to `auth.uid() = user_id`; storefront stays on the anon key, auth issues a user JWT so RLS applies. No anon cart access.
 - `customers` RLS stays `admin_only`; customer access flows solely through the two `SECURITY DEFINER` RPCs, which trust only the verified session identity. Unverified phone can never claim a record holding `store_credit` or an email.
 - No new admin surface: magic-link users are `role='user'`, denied by RequireAdminAuth.
+- **Customers never see admin access.** Storefront and admin are separate layouts with no shared navigation; the new storefront account menu links only to `/account`, `/account/orders`, and sign-out — never to any `/admin/*` route. A `role='user'` session hitting `/admin/*` directly is redirected to `/unauthorized` by the existing RequireAdminAuth. No admin links, buttons, or pages are rendered for customer sessions.
 - No secrets client-side.
 
 ## Testing
