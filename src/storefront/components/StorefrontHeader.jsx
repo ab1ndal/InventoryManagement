@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ShoppingBag, Menu, X, Search } from "lucide-react";
+import { ShoppingBag, Menu, X, Search, User } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import { useStorefrontAuth } from "../context/StorefrontAuthContext";
 import SearchOverlay from "./SearchOverlay";
 
 const NAV_LINKS = [
@@ -17,6 +18,7 @@ export default function StorefrontHeader() {
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const { itemCount, openCart } = useCart();
+  const { user } = useStorefrontAuth();
 
   useEffect(() => {
     setMenuOpen(false);
@@ -99,6 +101,14 @@ export default function StorefrontHeader() {
             >
               <Search size={20} />
             </button>
+
+            <Link
+              to={user ? "/account" : "/login"}
+              aria-label={user ? "Account" : "Sign in"}
+              className="p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors"
+            >
+              <User size={20} />
+            </Link>
 
             <button
               aria-label="Cart"

@@ -4,6 +4,20 @@ import { MemoryRouter } from "react-router-dom";
 import { CartProvider } from "../context/CartContext";
 import StorefrontHeader from "../components/StorefrontHeader";
 
+jest.mock("../context/StorefrontAuthContext", () => ({
+  useStorefrontAuth: () => ({ user: null }),
+}));
+
+jest.mock("lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      getSession: () => Promise.resolve({ data: { session: null } }),
+      getUser: () => Promise.resolve({ data: { user: null } }),
+    },
+  },
+}));
+
 function renderHeader() {
   render(
     <MemoryRouter>
@@ -27,5 +41,10 @@ describe("StorefrontHeader", () => {
     expect(screen.queryByRole("dialog", { name: /search products/i })).toBeNull();
     fireEvent.click(searchBtn);
     expect(screen.getByRole("dialog", { name: /search products/i })).toBeInTheDocument();
+  });
+
+  it("shows an account link for signed-out visitors", () => {
+    renderHeader();
+    expect(screen.getByRole("link", { name: /account|sign in/i })).toHaveAttribute("href", "/login");
   });
 });
