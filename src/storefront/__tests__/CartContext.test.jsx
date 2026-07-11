@@ -1,6 +1,29 @@
+const mockUpsert = jest.fn(async () => {});
+jest.mock("../lib/cartApi", () => ({
+  fetchServerCart: jest.fn(async () => []),
+  upsertItem: (...a) => mockUpsert(...a),
+  removeServerItem: jest.fn(async () => {}),
+  clearServerCart: jest.fn(async () => {}),
+  fetchLiveVariantData: jest.fn(async () => ({})),
+}));
+let authCb;
+jest.mock("lib/supabaseClient", () => ({
+  supabase: {
+    auth: {
+      onAuthStateChange: (cb) => {
+        authCb = cb;
+        return { data: { subscription: { unsubscribe: jest.fn() } } };
+      },
+    },
+  },
+}));
+
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { CartProvider, useCart } from "../context/CartContext";
+import {
+  fetchServerCart, removeServerItem, clearServerCart, fetchLiveVariantData,
+} from "../lib/cartApi";
 
 const ITEM_V1 = {
   variant_id: "v1",
@@ -157,5 +180,40 @@ describe("CartContext — localStorage persistence", () => {
     fireEvent.click(screen.getByRole("button", { name: "clear" }));
     const stored = JSON.parse(localStorage.getItem("bc_cart"));
     expect(stored).toEqual([]);
+  });
+});
+
+describe("CartContext — auth-aware write-through", () => {
+  function Probe() {
+    const { addItem, itemCount } = useCart();
+    return (
+      <>
+        <span data-testid="count">{itemCount}</span>
+        <button onClick={() => addItem({ variant_id: "v1", product_id: "BC1", quantity: 1, name: "X", size: "F", color: "R", price: 10, image_url: null })}>add</button>
+      </>
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    mockUpsert.mockImplementation(async () => {});
+    fetchServerCart.mockResolvedValue([]);
+    removeServerItem.mockResolvedValue();
+    clearServerCart.mockResolvedValue();
+    fetchLiveVariantData.mockResolvedValue({});
+  });
+
+  it("writes through to the server when a user is signed in", async () => {
+    render(<CartProvider><Probe /></CartProvider>);
+    await act(async () => { authCb("SIGNED_IN", { user: { id: "u1" } }); });
+    await act(async () => { screen.getByText("add").click(); });
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    expect(mockUpsert).toHaveBeenCalledWith({ variant_id: "v1", product_id: "BC1", quantity: 1 });
+  });
+
+  it("does not write through as a guest", async () => {
+    render(<CartProvider><Probe /></CartProvider>);
+    await act(async () => { screen.getByText("add").click(); });
+    expect(mockUpsert).not.toHaveBeenCalled();
   });
 });
