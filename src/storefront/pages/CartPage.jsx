@@ -86,9 +86,12 @@ export default function CartPage() {
           Subtotal <span className="font-semibold tabular-nums">₹{subtotal.toLocaleString("en-IN")}</span>
         </p>
         <p className="text-xs text-storefront-muted font-sans">Shipping calculated at checkout.</p>
-        <button disabled className="w-full sm:w-auto bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 opacity-40 cursor-not-allowed">
-          Online checkout launching soon
-        </button>
+        <Link
+          to="/checkout"
+          className="w-full sm:w-auto text-center bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"
+        >
+          Checkout
+        </Link>
         <a
           href={whatsappHref(items, subtotal)}
           target="_blank"

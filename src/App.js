@@ -9,6 +9,7 @@ import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
 import CartPage from "./storefront/pages/CartPage";
+import CheckoutPage from "./storefront/pages/CheckoutPage";
 import WishlistPage from "./storefront/pages/WishlistPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
 import FaqPage from "./storefront/pages/FaqPage";
@@ -60,6 +61,7 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="shop" element={<ShopPage />} />
             <Route path="cart" element={<CartPage />} />
+            <Route path="checkout" element={<CheckoutPage />} />
             <Route path="wishlist" element={<WishlistPage />} />
             <Route path="product/:productid" element={<ProductDetailPage />} />
             <Route path="faq" element={<FaqPage />} />

@@ -73,7 +73,8 @@
       "^@/(.*)$": "<rootDir>/src/$1",
       "^react-router/dom$": "<rootDir>/node_modules/react-router/dist/development/dom-export.js",
       "^react-router$": "<rootDir>/node_modules/react-router/dist/development/index.js",
-      "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js"
+      "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js",
+      "^zod/v4/core$": "<rootDir>/node_modules/zod/dist/cjs/v4/core/index.js"
     }
   },
   "devDependencies": {
