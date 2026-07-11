@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CartProvider } from "../context/CartContext";
 import StorefrontHeader from "../components/StorefrontHeader";
@@ -21,8 +21,11 @@ describe("StorefrontHeader", () => {
     expect(screen.getAllByRole("link", { name: "Contact" })[0]).toHaveAttribute("href", "/contact");
   });
 
-  it("has no Search button", () => {
+  it("opens the search overlay from the Search button", () => {
     renderHeader();
-    expect(screen.queryByRole("button", { name: /search/i })).toBeNull();
+    const searchBtn = screen.getByRole("button", { name: "Search" });
+    expect(screen.queryByRole("dialog", { name: /search products/i })).toBeNull();
+    fireEvent.click(searchBtn);
+    expect(screen.getByRole("dialog", { name: /search products/i })).toBeInTheDocument();
   });
 });

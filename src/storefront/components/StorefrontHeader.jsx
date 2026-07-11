@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ShoppingBag, Menu, X } from "lucide-react";
+import { ShoppingBag, Menu, X, Search } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import SearchOverlay from "./SearchOverlay";
 
 const NAV_LINKS = [
   { label: "Home", to: "/" },
@@ -12,18 +13,32 @@ const NAV_LINKS = [
 
 export default function StorefrontHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const { itemCount, openCart } = useCart();
 
   useEffect(() => {
     setMenuOpen(false);
+    setSearchOpen(false);
   }, [location]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Cmd/Ctrl-K toggles search, command-palette style.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   return (
@@ -76,6 +91,14 @@ export default function StorefrontHeader() {
           {/* Actions */}
           <div className="flex items-center gap-3">
             <button
+              aria-label="Search"
+              onClick={() => setSearchOpen(true)}
+              className="p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors cursor-pointer"
+            >
+              <Search size={20} />
+            </button>
+
+            <button
               aria-label="Cart"
               onClick={openCart}
               className="relative p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors cursor-pointer"
@@ -123,6 +146,8 @@ export default function StorefrontHeader() {
           </nav>
         </div>
       )}
+
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   );
 }
