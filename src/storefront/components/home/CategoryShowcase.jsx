@@ -52,6 +52,8 @@ function CategoryCard({ category, index }) {
         <img
           src={imageUrl}
           alt={category.name}
+          loading="lazy"
+          decoding="async"
           onError={() => setImgFailed(true)}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.06] transition-transform duration-700 ease-out"
         />

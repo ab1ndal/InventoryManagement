@@ -36,7 +36,7 @@ export const FAQ_ITEMS = [
   },
   {
     q: "Can I visit your store and buy in person?",
-    a: "Yes — visit us at 58 Sihani Gate Market, Ghaziabad 201001. You're welcome to browse and buy in person.",
+    a: "Yes — visit us at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001. You're welcome to browse and buy in person.",
   },
   {
     q: "Are the colours true to the photos?",

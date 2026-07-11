@@ -6,6 +6,7 @@ import { useProduct } from "../hooks/useProduct";
 import { getProductImagePaths, imageUrl } from "../lib/productImage";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
+import ProductSpecs from "../components/product/ProductSpecs";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { buildProductJsonLd } from "../lib/seo";
@@ -274,12 +275,6 @@ export default function ProductDetailPage() {
               ₹{Number(product.retailprice).toLocaleString("en-IN")}
             </p>
 
-            {product.fabric && (
-              <p className="text-xs text-storefront-muted font-sans tracking-wide mb-3">
-                {product.fabric}
-              </p>
-            )}
-
             <p className="text-xs text-storefront-muted font-sans tracking-wide mb-3">
               {DELIVERY_ESTIMATE}
             </p>
@@ -289,6 +284,8 @@ export default function ProductDetailPage() {
                 {renderDescription(product.description)}
               </p>
             )}
+
+            <ProductSpecs fabric={product.fabric} category={categoryName} />
 
             <div className="border-t border-storefront-border pt-6 mb-6">
               {variants.length > 0 ? (

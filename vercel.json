@@ -1,0 +1,15 @@
+{
+  "images": {
+    "sizes": [48, 150, 400, 600, 1000, 1200],
+    "qualities": [30, 55, 70, 75, 80],
+    "formats": ["image/avif", "image/webp"],
+    "minimumCacheTTL": 2678400,
+    "remotePatterns": [
+      {
+        "protocol": "https",
+        "hostname": "epotsxdugwfhyeiudjox.supabase.co",
+        "pathname": "/storage/v1/object/public/**"
+      }
+    ]
+  }
+}
