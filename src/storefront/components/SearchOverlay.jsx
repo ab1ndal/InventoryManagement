@@ -120,6 +120,7 @@ export default function SearchOverlay({ open, onClose }) {
           )}
 
           {!loading &&
+            results.length > 0 &&
             results.map((product, i) => (
               <button
                 key={product.productid}
@@ -146,6 +147,21 @@ export default function SearchOverlay({ open, onClose }) {
               </button>
             ))}
         </div>
+
+        {!loading && results.length > 0 && (
+          <div className="border-t border-storefront-border px-4 py-3">
+            <button
+              type="button"
+              onClick={() => {
+                navigate(`/search?q=${encodeURIComponent(clean)}`);
+                onClose();
+              }}
+              className="text-xs font-sans text-storefront-charcoal hover:text-storefront-warm underline underline-offset-2 transition-colors"
+            >
+              See all results for “{clean}”
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
