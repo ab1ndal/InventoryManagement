@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { ShoppingBag, Menu, X, Search, User } from "lucide-react";
+import { ShoppingBag, Menu, X, Search, User, Heart } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import { useWishlist } from "../context/WishlistContext";
 import { useStorefrontAuth } from "../context/StorefrontAuthContext";
 import SearchOverlay from "./SearchOverlay";
 
@@ -18,6 +19,7 @@ export default function StorefrontHeader() {
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const { itemCount, openCart } = useCart();
+  const { count: wishlistCount } = useWishlist();
   const { user } = useStorefrontAuth();
 
   useEffect(() => {
@@ -101,6 +103,19 @@ export default function StorefrontHeader() {
             >
               <Search size={20} />
             </button>
+
+            <Link
+              to="/wishlist"
+              aria-label="Wishlist"
+              className="relative p-2 text-storefront-charcoal hover:text-storefront-gold transition-colors"
+            >
+              <Heart size={20} />
+              {wishlistCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-storefront-gold text-storefront-cream text-[9px] font-sans font-semibold rounded-full px-1 leading-none">
+                  {wishlistCount > 99 ? "99+" : wishlistCount}
+                </span>
+              )}
+            </Link>
 
             <Link
               to={user ? "/account" : "/login"}
