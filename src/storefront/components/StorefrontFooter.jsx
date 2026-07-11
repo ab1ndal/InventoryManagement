@@ -81,6 +81,7 @@ export default function StorefrontFooter() {
                 { label: "Contact", to: "/contact" },
                 { label: "FAQ", to: "/faq" },
                 { label: "Size Guide", to: "/size-guide" },
+                { label: "Track order", to: "/track" },
               ].map(({ label, to }) => (
                 <li key={label}>
                   <Link
