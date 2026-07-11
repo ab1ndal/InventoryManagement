@@ -28,7 +28,7 @@ export default function SearchResultsPage() {
       <Seo title={`Search: ${q}`} noindex />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <h1 className="font-display font-semibold text-3xl sm:text-4xl text-storefront-charcoal leading-none mb-2">
-          Results for “{q}”
+          {clean.length < SEARCH_MIN_CHARS ? "Search" : `Results for “${q}”`}
         </h1>
 
         {clean.length < SEARCH_MIN_CHARS ? (

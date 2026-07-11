@@ -16,7 +16,9 @@ export function initAnalytics() {
     window.dataLayer.push(arguments);
   };
   window.gtag("js", new Date());
-  window.gtag("config", GA4_ID);
+  // send_page_view:false — page views are sent manually via trackPageView on
+  // route change, so the config call must not also auto-fire one (double-count).
+  window.gtag("config", GA4_ID, { send_page_view: false });
 
   const script = document.createElement("script");
   script.async = true;
