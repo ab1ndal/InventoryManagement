@@ -217,3 +217,34 @@ describe("CartContext — auth-aware write-through", () => {
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 });
+
+describe("CartContext — guest cart survives INITIAL_SESSION with no session", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockUpsert.mockImplementation(async () => {});
+    fetchServerCart.mockResolvedValue([]);
+    removeServerItem.mockResolvedValue();
+    clearServerCart.mockResolvedValue();
+    fetchLiveVariantData.mockResolvedValue({});
+  });
+
+  it("does not wipe the guest cart when INITIAL_SESSION fires with a null session", async () => {
+    localStorage.setItem("bc_cart", JSON.stringify([ITEM_V1]));
+    renderHarness();
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    await act(async () => { authCb("INITIAL_SESSION", null); });
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    const items = JSON.parse(screen.getByTestId("items").textContent);
+    expect(items).toHaveLength(1);
+    expect(items[0].variant_id).toBe("v1");
+  });
+
+  it("clears the cart on a genuine SIGNED_OUT event", async () => {
+    localStorage.setItem("bc_cart", JSON.stringify([ITEM_V1]));
+    renderHarness();
+    expect(screen.getByTestId("count").textContent).toBe("1");
+    await act(async () => { authCb("SIGNED_OUT", null); });
+    expect(screen.getByTestId("count").textContent).toBe("0");
+    expect(JSON.parse(screen.getByTestId("items").textContent)).toEqual([]);
+  });
+});

@@ -37,9 +37,8 @@ export function CartProvider({ children }) {
       const uid = session?.user?.id ?? null;
       userIdRef.current = uid;
 
-      if (event === "SIGNED_OUT" || !uid) {
-        userIdRef.current = null;
-        setItems([]);
+      if (!uid) {
+        if (event === "SIGNED_OUT") setItems([]);
         return;
       }
       setSyncing(true);
@@ -78,15 +77,15 @@ export function CartProvider({ children }) {
     (payload) => {
       const { variant_id, product_id, quantity } = payload;
       if (!quantity || quantity <= 0) return;
+      const existing = itemsRef.current.find((i) => i.variant_id === variant_id);
+      const nextQuantity = existing ? existing.quantity + quantity : quantity;
       setItems((prev) => {
-        const existing = prev.find((i) => i.variant_id === variant_id);
-        const next = existing
+        const exists = prev.find((i) => i.variant_id === variant_id);
+        return exists
           ? prev.map((i) => (i.variant_id === variant_id ? { ...i, quantity: i.quantity + quantity } : i))
           : [...prev, { ...payload }];
-        const row = next.find((i) => i.variant_id === variant_id);
-        persist(variant_id, { product_id, quantity: row.quantity });
-        return next;
       });
+      persist(variant_id, { product_id, quantity: nextQuantity });
     },
     [persist]
   );
@@ -106,12 +105,9 @@ export function CartProvider({ children }) {
         persist(variant_id, null);
         return;
       }
-      setItems((prev) => {
-        const next = prev.map((i) => (i.variant_id === variant_id ? { ...i, quantity } : i));
-        const row = next.find((i) => i.variant_id === variant_id);
-        if (row) persist(variant_id, { product_id: row.product_id, quantity });
-        return next;
-      });
+      const row = itemsRef.current.find((i) => i.variant_id === variant_id);
+      setItems((prev) => prev.map((i) => (i.variant_id === variant_id ? { ...i, quantity } : i)));
+      if (row) persist(variant_id, { product_id: row.product_id, quantity });
     },
     [persist]
   );
