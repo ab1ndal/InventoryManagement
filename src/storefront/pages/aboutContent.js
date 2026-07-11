@@ -1,24 +1,23 @@
-// Placeholder brand-story copy — owner to replace with the real family/city/
-// since-when story and photography before launch.
-const REVIEW = "[PLACEHOLDER — needs owner/legal review]";
+// Brand story — owner-supplied 2026-07-11. Photography still to be provided by
+// the owner (image slots remain placeholders until real photos are uploaded).
 
 export const ABOUT = {
   eyebrow: "Our Story",
   title: "Our Story",
-  lede: `${REVIEW} One or two sentences on who Bindal's Creations is — a family-run ethnic-wear house rooted in Ghaziabad.`,
+  lede: "Bindal's Creations is a family-run ethnic-wear house in Ghaziabad, offering a curated, hand-selected collection of sarees, lehengas, suits and more — since 2018.",
   story: [
-    `${REVIEW} The founding story: which family, which city, since when, and why sarees and lehengas.`,
-    `${REVIEW} What the store stands for today, and the relationship with the customers who visit in person.`,
+    "We started in 2018 with a simple belief: every garment we offer should be chosen with care. Each piece in our collection is curated and hand-selected, not picked in bulk from a catalogue.",
+    "We take great pride in our collection and in the customers who visit us. If you're looking for something specific, tell us — we can often source it especially for you.",
   ],
   craftsmanship: {
-    title: "Craftsmanship",
+    title: "Curated with care",
     body: [
-      `${REVIEW} How pieces are sourced directly from artisans, and the work/embroidery traditions behind them.`,
+      "Every piece is chosen for its fabric, work and finish. Have a particular occasion, colour or embroidery in mind? Ask us and we'll help you find — or source — the right piece.",
     ],
   },
   values: [
-    { title: "Sourced with care", desc: `${REVIEW} Short line on sourcing.` },
-    { title: "A real store", desc: "Visit us in person at Sihani Gate Market, Ghaziabad." },
+    { title: "Hand-selected", desc: "Every garment chosen with care, not picked in bulk." },
+    { title: "A real store", desc: "Visit us in person at Sihani Gate, Ghaziabad." },
     { title: "Here to help", desc: "Message us on WhatsApp anytime before you buy." },
   ],
 };

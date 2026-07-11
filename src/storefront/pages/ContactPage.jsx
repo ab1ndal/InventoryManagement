@@ -2,7 +2,7 @@ import React from "react";
 import StaticPage from "../components/StaticPage";
 import { MapPin, Phone, Mail, MessageCircle, Clock } from "lucide-react";
 
-const ADDRESS = "58 Sihani Gate Market, Ghaziabad 201001";
+const ADDRESS = "58 Sihani Gate, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001";
 const MAP_SRC = `https://www.google.com/maps?q=${encodeURIComponent(ADDRESS)}&output=embed`;
 
 export default function ContactPage() {
@@ -11,7 +11,7 @@ export default function ContactPage() {
       eyebrow="Visit"
       title="Visit Us"
       seoTitle="Contact & Store"
-      seoDescription="Visit Bindal's Creations at 58 Sihani Gate Market, Ghaziabad. Call or WhatsApp us any day 8 AM–8 PM (closed Tuesdays)."
+      seoDescription="Visit Bindal's Creations at 58 Sihani Gate, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us any day 8 AM–8 PM (closed Tuesdays)."
       containerClassName="max-w-6xl"
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-14">

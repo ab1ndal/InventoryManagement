@@ -7,6 +7,6 @@ describe("SizeGuidePage", () => {
     render(<SizeGuidePage />);
     expect(screen.getByRole("heading", { name: /size guide/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "M" })).toBeInTheDocument();
-    expect(screen.getByText(/bust/i)).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Bust" })).toBeInTheDocument();
   });
 });

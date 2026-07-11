@@ -142,7 +142,7 @@ export default function StorefrontFooter() {
         {/* Business legitimacy */}
         <div className="border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-[11px] text-storefront-cream/40 leading-relaxed">
-            BINDAL'S CREATION · 58 Sihani Gate Market, Ghaziabad 201001 · GSTIN 09ABVPB4203A1Z4
+            BINDAL'S CREATION · 58 Sihani Gate, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 · GSTIN 09ABVPB4203A1Z4
           </div>
         </div>
 

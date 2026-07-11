@@ -33,14 +33,22 @@ export const RETURNS = [
   {
     heading: "Exchanges",
     body: [
-      "Exchanges are accepted within 7 days of purchase, in-store only.",
-      "The garment must be unworn and in original condition with tags intact.",
+      "Exchanges are accepted within 7 days of purchase, in-store only, with the original bill.",
+      "The garment must be unworn, unwashed and in original condition with tags intact.",
+    ],
+  },
+  {
+    heading: "Exchange conditions",
+    body: [
+      "Exchange or store credit is limited to the amount paid on the original bill.",
+      "Colours may vary slightly from what appears on screen and are not guaranteed.",
+      "Please report any damage within 24 hours of purchase.",
     ],
   },
   {
     heading: "How to exchange",
     body: [
-      "Visit us at 58 Sihani Gate Market, Ghaziabad 201001 with the garment and your proof of purchase. Message us on WhatsApp at +91 98108 73280 before visiting if you have any questions.",
+      "Visit us at 58 Sihani Gate, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 with the garment and your proof of purchase. Message us on WhatsApp at +91 98108 73280 before visiting if you have any questions.",
     ],
   },
 ];
