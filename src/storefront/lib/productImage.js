@@ -28,16 +28,26 @@ async function resolve(productid) {
 }
 
 /**
- * Build a public URL for a storage object path, optionally with on-the-fly
- * Supabase image transforms (resize + WebP re-encode). Requires the Pro plan.
+ * Build a public URL for a storage object path, optionally resized + re-encoded
+ * (WebP/AVIF) via Vercel Image Optimization (`/_vercel/image`). Any requested
+ * `width`/`quality` must be whitelisted in `vercel.json` `images.sizes`/
+ * `qualities`. In dev (`npm start`) the `/_vercel/image` endpoint does not
+ * exist, so the raw original is served instead.
  * @param {string} path  object path, e.g. "BC25013/lavender.png"
- * @param {{width?:number,height?:number,quality?:number,resize?:string}} [transform]
+ * @param {{width?:number,quality?:number}} [transform]
  * @returns {string|null}
  */
 export function imageUrl(path, transform) {
   if (!path) return null;
-  const opts = transform ? { transform } : undefined;
-  return supabase.storage.from(BUCKET).getPublicUrl(path, opts).data?.publicUrl ?? null;
+  const raw = supabase.storage.from(BUCKET).getPublicUrl(path).data?.publicUrl ?? null;
+  if (!raw || !transform) return raw;
+  // No /_vercel/image endpoint under CRA's dev server — serve the original.
+  if (process.env.NODE_ENV !== "production") return raw;
+
+  const params = new URLSearchParams({ url: raw });
+  if (transform.width) params.set("w", String(transform.width));
+  params.set("q", String(transform.quality ?? 75));
+  return `/_vercel/image?${params.toString()}`;
 }
 
 /**

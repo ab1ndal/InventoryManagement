@@ -4,7 +4,7 @@ import { ArrowRight } from "lucide-react";
 
 export default function HeroBanner() {
   return (
-    <section className="relative min-h-[88vh] flex items-center justify-center overflow-hidden bg-storefront-charcoal">
+    <section className="relative min-h-[88dvh] flex items-center justify-center overflow-hidden bg-storefront-charcoal">
       {/* Subtle gold geometric pattern overlay */}
       <div
         className="absolute inset-0 opacity-[0.04]"

@@ -8,6 +8,7 @@ import {
 import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
+import CartPage from "./storefront/pages/CartPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
 import FaqPage from "./storefront/pages/FaqPage";
 import NotFoundPage from "./storefront/pages/NotFoundPage";
@@ -18,6 +19,9 @@ import TermsPage from "./storefront/pages/policies/TermsPage";
 import AboutPage from "./storefront/pages/AboutPage";
 import ContactPage from "./storefront/pages/ContactPage";
 import SizeGuidePage from "./storefront/pages/SizeGuidePage";
+import LoginPage from "./storefront/pages/LoginPage";
+import AccountPage from "./storefront/pages/AccountPage";
+import AccountOrdersPage from "./storefront/pages/AccountOrdersPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -31,7 +35,7 @@ const DiscountPage = lazy(() => import("./admin/pages/DiscountPage"));
 const ExchangePage = lazy(() => import("./admin/pages/ExchangePage"));
 const CustomersPage = lazy(() => import("./admin/pages/CustomersPage"));
 const SuppliersPage = lazy(() => import("./admin/pages/SuppliersPage"));
-const LoginPage = lazy(() => import("./admin/pages/LoginPage"));
+const AdminLoginPage = lazy(() => import("./admin/pages/LoginPage"));
 const RequireAdminAuth = lazy(() => import("./admin/components/RequireAdminAuth"));
 const AdminPage = lazy(() => import("./admin/pages/AdminPage"));
 const SignupPage = lazy(() => import("./admin/pages/SignupPage"));
@@ -51,6 +55,7 @@ function App() {
           <Route path="/" element={<StorefrontLayout />}>
             <Route index element={<HomePage />} />
             <Route path="shop" element={<ShopPage />} />
+            <Route path="cart" element={<CartPage />} />
             <Route path="product/:productid" element={<ProductDetailPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="policies/shipping" element={<ShippingPolicyPage />} />
@@ -60,12 +65,15 @@ function App() {
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="size-guide" element={<SizeGuidePage />} />
+            <Route path="login" element={<LoginPage />} />
+            <Route path="account" element={<AccountPage />} />
+            <Route path="account/orders" element={<AccountOrdersPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 
           {/* Public Pages */}
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
-          <Route path="/admin/login" element={<LoginPage />} />
+          <Route path="/admin/login" element={<AdminLoginPage />} />
           <Route path="/admin/signup" element={<SignupPage />} />
           <Route
             path="/admin/forgot-password"
