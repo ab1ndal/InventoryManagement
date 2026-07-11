@@ -19,6 +19,8 @@ import AboutPage from "./storefront/pages/AboutPage";
 import ContactPage from "./storefront/pages/ContactPage";
 import SizeGuidePage from "./storefront/pages/SizeGuidePage";
 import LoginPage from "./storefront/pages/LoginPage";
+import AccountPage from "./storefront/pages/AccountPage";
+import AccountOrdersPage from "./storefront/pages/AccountOrdersPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -62,6 +64,8 @@ function App() {
             <Route path="contact" element={<ContactPage />} />
             <Route path="size-guide" element={<SizeGuidePage />} />
             <Route path="login" element={<LoginPage />} />
+            <Route path="account" element={<AccountPage />} />
+            <Route path="account/orders" element={<AccountOrdersPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 
