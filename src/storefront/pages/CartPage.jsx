@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import Seo from "../components/Seo";
 import { useCart } from "../context/CartContext";
+import { trackEvent } from "../lib/analytics";
 
 const WHATSAPP = "919810873280";
 
@@ -85,13 +86,23 @@ export default function CartPage() {
           Subtotal <span className="font-semibold tabular-nums">₹{subtotal.toLocaleString("en-IN")}</span>
         </p>
         <p className="text-xs text-storefront-muted font-sans">Shipping calculated at checkout.</p>
-        <button disabled className="w-full sm:w-auto bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 opacity-40 cursor-not-allowed">
-          Online checkout launching soon
-        </button>
+        <Link
+          to="/checkout"
+          className="w-full sm:w-auto text-center bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"
+        >
+          Checkout
+        </Link>
         <a
           href={whatsappHref(items, subtotal)}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() =>
+            trackEvent("begin_checkout", {
+              value: subtotal,
+              items: items.length,
+              quantity: items.reduce((s, i) => s + i.quantity, 0),
+            })
+          }
           className="w-full sm:w-auto text-center bg-[#25D366] text-white font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"
         >
           Order on WhatsApp

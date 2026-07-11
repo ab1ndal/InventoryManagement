@@ -9,6 +9,8 @@ import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
 import CartPage from "./storefront/pages/CartPage";
+import CheckoutPage from "./storefront/pages/CheckoutPage";
+import WishlistPage from "./storefront/pages/WishlistPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
 import FaqPage from "./storefront/pages/FaqPage";
 import NotFoundPage from "./storefront/pages/NotFoundPage";
@@ -22,6 +24,10 @@ import SizeGuidePage from "./storefront/pages/SizeGuidePage";
 import LoginPage from "./storefront/pages/LoginPage";
 import AccountPage from "./storefront/pages/AccountPage";
 import AccountOrdersPage from "./storefront/pages/AccountOrdersPage";
+import SearchResultsPage from "./storefront/pages/SearchResultsPage";
+import CollectionsIndexPage from "./storefront/pages/CollectionsIndexPage";
+import CollectionPage from "./storefront/pages/CollectionPage";
+import TrackOrderPage from "./storefront/pages/TrackOrderPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -56,6 +62,8 @@ function App() {
             <Route index element={<HomePage />} />
             <Route path="shop" element={<ShopPage />} />
             <Route path="cart" element={<CartPage />} />
+            <Route path="checkout" element={<CheckoutPage />} />
+            <Route path="wishlist" element={<WishlistPage />} />
             <Route path="product/:productid" element={<ProductDetailPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="policies/shipping" element={<ShippingPolicyPage />} />
@@ -68,6 +76,10 @@ function App() {
             <Route path="login" element={<LoginPage />} />
             <Route path="account" element={<AccountPage />} />
             <Route path="account/orders" element={<AccountOrdersPage />} />
+            <Route path="search" element={<SearchResultsPage />} />
+            <Route path="collections" element={<CollectionsIndexPage />} />
+            <Route path="collections/:slug" element={<CollectionPage />} />
+            <Route path="track" element={<TrackOrderPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 

@@ -6,6 +6,7 @@ import { mergeCarts, revalidateItems } from "../lib/cartLogic";
 import {
   fetchServerCart, upsertItem, removeServerItem, clearServerCart, fetchLiveVariantData,
 } from "../lib/cartApi";
+import { trackEvent } from "../lib/analytics";
 
 const STORAGE_KEY = "bc_cart";
 
@@ -86,6 +87,7 @@ export function CartProvider({ children }) {
           : [...prev, { ...payload }];
       });
       persist(variant_id, { product_id, quantity: nextQuantity });
+      trackEvent("add_to_cart", { product_id, variant_id, quantity });
     },
     [persist]
   );

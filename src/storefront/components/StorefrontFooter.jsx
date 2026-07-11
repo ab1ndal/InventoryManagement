@@ -58,6 +58,14 @@ export default function StorefrontFooter() {
                   </li>
                 )
               )}
+              <li>
+                <Link
+                  to="/collections"
+                  className="hover:text-storefront-gold transition-colors"
+                >
+                  Collections
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -73,6 +81,7 @@ export default function StorefrontFooter() {
                 { label: "Contact", to: "/contact" },
                 { label: "FAQ", to: "/faq" },
                 { label: "Size Guide", to: "/size-guide" },
+                { label: "Track order", to: "/track" },
               ].map(({ label, to }) => (
                 <li key={label}>
                   <Link

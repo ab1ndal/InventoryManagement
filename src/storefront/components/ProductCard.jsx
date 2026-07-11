@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Heart, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImagePaths } from "../lib/productImage";
+import { useWishlist } from "../context/WishlistContext";
 import BlurFillImage from "./BlurFillImage";
 
 function PlaceholderImage({ name }) {
@@ -29,6 +30,8 @@ export default function ProductCard({ product, priority = false }) {
   const [images, setImages] = useState([]); // storage object paths
   const [index, setIndex] = useState(0);
   const touchX = useRef(null);
+  const { has, toggle } = useWishlist();
+  const wishlisted = has(product.productid);
 
   useEffect(() => {
     let active = true;
@@ -154,11 +157,20 @@ export default function ProductCard({ product, priority = false }) {
         {/* Wishlist */}
         <button
           type="button"
-          aria-label={`Add ${product.name} to wishlist`}
-          onClick={(e) => e.preventDefault()}
-          className="absolute top-3 right-3 z-10 p-2 bg-white/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-[opacity,background-color] duration-200 hover:bg-white cursor-pointer"
+          aria-label={wishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggle(product);
+          }}
+          className={`absolute top-3 right-3 z-10 p-2 bg-white/80 backdrop-blur-sm transition-[opacity,background-color] duration-200 hover:bg-white cursor-pointer ${
+            wishlisted ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          }`}
         >
-          <Heart size={14} className="text-storefront-charcoal" />
+          <Heart
+            size={14}
+            className={wishlisted ? "text-storefront-gold fill-storefront-gold" : "text-storefront-charcoal"}
+          />
         </button>
 
         {/* Category badge */}

@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { CartProvider } from "../context/CartContext";
+import { WishlistProvider } from "../context/WishlistContext";
 import StorefrontHeader from "../components/StorefrontHeader";
 
 jest.mock("../context/StorefrontAuthContext", () => ({
@@ -22,7 +23,9 @@ function renderHeader() {
   render(
     <MemoryRouter>
       <CartProvider>
-        <StorefrontHeader />
+        <WishlistProvider>
+          <StorefrontHeader />
+        </WishlistProvider>
       </CartProvider>
     </MemoryRouter>
   );

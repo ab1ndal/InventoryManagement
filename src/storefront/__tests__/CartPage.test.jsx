@@ -28,4 +28,5 @@ it("lists items, shows subtotal, and revalidates on mount", async () => {
   expect(screen.getAllByText(/₹3,000/).length).toBeGreaterThan(0);
   await waitFor(() => expect(mockRevalidate).toHaveBeenCalled());
   expect(screen.getByRole("link", { name: /order on whatsapp/i })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /^checkout$/i })).toHaveAttribute("href", "/checkout");
 });
