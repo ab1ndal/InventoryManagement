@@ -48,7 +48,7 @@ export const RETURNS = [
   {
     heading: "How to exchange",
     body: [
-      "Visit us at 58 Sihani Gate, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 with the garment and your proof of purchase. Message us on WhatsApp at +91 98108 73280 before visiting if you have any questions.",
+      "Visit us at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 with the garment and your proof of purchase. Message us on WhatsApp at +91 98108 73280 before visiting if you have any questions.",
     ],
   },
 ];

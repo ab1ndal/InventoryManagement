@@ -17,7 +17,7 @@ export const ABOUT = {
   },
   values: [
     { title: "Hand-selected", desc: "Every garment chosen with care, not picked in bulk." },
-    { title: "A real store", desc: "Visit us in person at Sihani Gate, Ghaziabad." },
+    { title: "A real store", desc: "Visit us in person at Sihani Gate Market, Ghaziabad." },
     { title: "Here to help", desc: "Message us on WhatsApp anytime before you buy." },
   ],
 };
