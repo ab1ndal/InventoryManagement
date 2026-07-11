@@ -58,6 +58,14 @@ export default function StorefrontFooter() {
                   </li>
                 )
               )}
+              <li>
+                <Link
+                  to="/collections"
+                  className="hover:text-storefront-gold transition-colors"
+                >
+                  Collections
+                </Link>
+              </li>
             </ul>
           </div>
 
