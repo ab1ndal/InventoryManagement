@@ -60,7 +60,9 @@ export default function StorefrontHeader() {
             <img
               src="/LOGO-BindalsCreation.png"
               alt="Bindal's Creations"
-              className="h-10 w-auto object-contain"
+              width={40}
+              height={40}
+              className="h-10 w-10 object-contain"
             />
             <span className="hidden sm:block font-display font-semibold text-xl text-storefront-charcoal leading-tight">
               Bindal's<br />
