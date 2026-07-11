@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "../../context/CartContext";
@@ -72,8 +72,12 @@ function CartItem({ item }) {
 }
 
 export default function CartDrawer() {
-  const { items, itemCount, isOpen, closeCart } = useCart();
+  const { items, itemCount, isOpen, closeCart, revalidateCart } = useCart();
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+
+  useEffect(() => {
+    if (isOpen) revalidateCart?.();
+  }, [isOpen, revalidateCart]);
 
   return (
     <>
@@ -149,7 +153,7 @@ export default function CartDrawer() {
               </span>
             </div>
             <Link
-              to="/checkout"
+              to="/cart"
               onClick={closeCart}
               className="block w-full text-center bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors"
             >

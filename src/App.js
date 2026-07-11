@@ -8,6 +8,7 @@ import {
 import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
+import CartPage from "./storefront/pages/CartPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
 import FaqPage from "./storefront/pages/FaqPage";
 import NotFoundPage from "./storefront/pages/NotFoundPage";
@@ -54,6 +55,7 @@ function App() {
           <Route path="/" element={<StorefrontLayout />}>
             <Route index element={<HomePage />} />
             <Route path="shop" element={<ShopPage />} />
+            <Route path="cart" element={<CartPage />} />
             <Route path="product/:productid" element={<ProductDetailPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="policies/shipping" element={<ShippingPolicyPage />} />
