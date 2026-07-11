@@ -37,6 +37,7 @@ function makeCtx(overrides = {}) {
     removeItem: jest.fn(),
     updateQty: jest.fn(),
     clearCart: jest.fn(),
+    revalidateCart: jest.fn(),
     ...overrides,
   };
 }
@@ -92,9 +93,9 @@ describe("CartDrawer — with items", () => {
     expect(screen.getByText("₹3,800")).toBeInTheDocument();
   });
 
-  it("renders Checkout link", () => {
+  it("renders View cart link", () => {
     renderDrawer({ items: [ITEM_A], itemCount: 2 });
-    expect(screen.getByRole("link", { name: /checkout/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /view cart/i })).toBeInTheDocument();
   });
 });
 
@@ -132,5 +133,17 @@ describe("CartDrawer — interactions", () => {
     const ctx = renderDrawer();
     fireEvent.click(screen.getByTestId("cart-backdrop"));
     expect(ctx.closeCart).toHaveBeenCalled();
+  });
+});
+
+describe("CartDrawer — revalidate on open", () => {
+  it("calls revalidateCart when drawer is open", () => {
+    const ctx = renderDrawer({ isOpen: true });
+    expect(ctx.revalidateCart).toHaveBeenCalled();
+  });
+
+  it("does not call revalidateCart when drawer is closed", () => {
+    const ctx = renderDrawer({ isOpen: false });
+    expect(ctx.revalidateCart).not.toHaveBeenCalled();
   });
 });

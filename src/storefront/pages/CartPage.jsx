@@ -28,7 +28,7 @@ export default function CartPage() {
         if (c.type === "capped") toast.warning(`${c.name}: quantity reduced to available stock.`);
         if (c.type === "repriced") toast.info(`${c.name}: price updated.`);
       });
-    });
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -76,7 +76,7 @@ export default function CartDrawer() {
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   useEffect(() => {
-    if (isOpen) revalidateCart?.();
+    if (isOpen) revalidateCart();
   }, [isOpen, revalidateCart]);
 
   return (
@@ -157,7 +157,7 @@ export default function CartDrawer() {
               onClick={closeCart}
               className="block w-full text-center bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors"
             >
-              Checkout
+              View cart
             </Link>
             <p className="text-[10px] text-storefront-muted font-sans text-center mt-3">
               Shipping calculated at checkout
