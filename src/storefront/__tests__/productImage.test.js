@@ -10,14 +10,16 @@ import {
   getProductImageUrl,
 } from "../lib/productImage";
 
-// Build a chainable mock for supabase.from(...).select(...).eq(...).order(...)
-// that resolves to { data, error }. Returns the order spy so callers can assert.
+// Build a chainable mock for the batched query:
+//   supabase.from(...).select(...).in(...).order(...).order(...)
+// that resolves to { data, error }. Returns the spies so callers can assert.
 function mockTable({ data = null, error = null } = {}) {
-  const order = jest.fn(async () => ({ data, error }));
-  const eq = jest.fn(() => ({ order }));
-  const select = jest.fn(() => ({ eq }));
-  supabase.from.mockReturnValue({ select, eq, order });
-  return { select, eq, order };
+  const orderInner = jest.fn(async () => ({ data, error }));
+  const orderOuter = jest.fn(() => ({ order: orderInner }));
+  const inFn = jest.fn(() => ({ order: orderOuter }));
+  const select = jest.fn(() => ({ in: inFn }));
+  supabase.from.mockReturnValue({ select });
+  return { select, in: inFn, orderOuter, orderInner };
 }
 
 beforeEach(() => {
@@ -71,26 +73,44 @@ describe("getProductImagePaths", () => {
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("queries productimages by productid ordered by displayorder", async () => {
-    const { select, eq, order } = mockTable({
+  it("batches by productid via in(...) ordered by displayorder", async () => {
+    const { select, in: inFn, orderOuter, orderInner } = mockTable({
       data: [
-        { imageurl: "https://x/a.png", displayorder: 0 },
-        { imageurl: "https://x/b.png", displayorder: 1 },
+        { productid: "PIMG_ORDER", imageurl: "https://x/a.png", displayorder: 0 },
+        { productid: "PIMG_ORDER", imageurl: "https://x/b.png", displayorder: 1 },
       ],
     });
     const paths = await getProductImagePaths("PIMG_ORDER");
     expect(supabase.from).toHaveBeenCalledWith("productimages");
-    expect(select).toHaveBeenCalledWith("imageurl,displayorder");
-    expect(eq).toHaveBeenCalledWith("productid", "PIMG_ORDER");
-    expect(order).toHaveBeenCalledWith("displayorder", { ascending: true });
+    expect(select).toHaveBeenCalledWith("productid,imageurl,displayorder");
+    expect(inFn).toHaveBeenCalledWith("productid", ["PIMG_ORDER"]);
+    expect(orderOuter).toHaveBeenCalledWith("productid", { ascending: true });
+    expect(orderInner).toHaveBeenCalledWith("displayorder", { ascending: true });
     expect(paths).toEqual(["https://x/a.png", "https://x/b.png"]);
+  });
+
+  it("folds multiple productids requested in one tick into a single query", async () => {
+    const { in: inFn } = mockTable({
+      data: [
+        { productid: "PIMG_A", imageurl: "https://x/a.png", displayorder: 0 },
+        { productid: "PIMG_B", imageurl: "https://x/b.png", displayorder: 0 },
+      ],
+    });
+    const [a, b] = await Promise.all([
+      getProductImagePaths("PIMG_A"),
+      getProductImagePaths("PIMG_B"),
+    ]);
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(inFn).toHaveBeenCalledWith("productid", ["PIMG_A", "PIMG_B"]);
+    expect(a).toEqual(["https://x/a.png"]);
+    expect(b).toEqual(["https://x/b.png"]);
   });
 
   it("filters out rows with a null imageurl", async () => {
     mockTable({
       data: [
-        { imageurl: "https://x/a.png", displayorder: 0 },
-        { imageurl: null, displayorder: 1 },
+        { productid: "PIMG_NULL", imageurl: "https://x/a.png", displayorder: 0 },
+        { productid: "PIMG_NULL", imageurl: null, displayorder: 1 },
       ],
     });
     expect(await getProductImagePaths("PIMG_NULL")).toEqual(["https://x/a.png"]);
@@ -102,7 +122,11 @@ describe("getProductImagePaths", () => {
   });
 
   it("caches per productid — a second call does not re-query", async () => {
-    mockTable({ data: [{ imageurl: "https://x/a.png", displayorder: 0 }] });
+    mockTable({
+      data: [
+        { productid: "PIMG_CACHE", imageurl: "https://x/a.png", displayorder: 0 },
+      ],
+    });
     await getProductImagePaths("PIMG_CACHE");
     await getProductImagePaths("PIMG_CACHE");
     expect(supabase.from).toHaveBeenCalledTimes(1);
@@ -113,8 +137,8 @@ describe("getProductImages / getProductImageUrl", () => {
   it("maps every path through imageUrl", async () => {
     mockTable({
       data: [
-        { imageurl: "https://x/a.png", displayorder: 0 },
-        { imageurl: "https://x/b.png", displayorder: 1 },
+        { productid: "PIMG_MAP", imageurl: "https://x/a.png", displayorder: 0 },
+        { productid: "PIMG_MAP", imageurl: "https://x/b.png", displayorder: 1 },
       ],
     });
     expect(await getProductImages("PIMG_MAP")).toEqual([
@@ -126,8 +150,8 @@ describe("getProductImages / getProductImageUrl", () => {
   it("returns the first image url", async () => {
     mockTable({
       data: [
-        { imageurl: "https://x/first.png", displayorder: 0 },
-        { imageurl: "https://x/second.png", displayorder: 1 },
+        { productid: "PIMG_FIRST", imageurl: "https://x/first.png", displayorder: 0 },
+        { productid: "PIMG_FIRST", imageurl: "https://x/second.png", displayorder: 1 },
       ],
     });
     expect(await getProductImageUrl("PIMG_FIRST")).toBe("https://x/first.png");

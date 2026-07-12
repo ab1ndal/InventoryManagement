@@ -2,24 +2,75 @@ import { supabase } from "lib/supabaseClient";
 
 // Product images are indexed in the public-readable `productimages` table:
 // one row per image with `imageurl` (a full public URL into the `mockups`
-// storage bucket), `displayorder` (sequence) and `productcolor`. We query the
-// table per product and cache the resolved URLs, ordered by `displayorder`.
-// The `producturl` column on `products` holds dead Google Drive links and is
-// NOT a usable image source.
+// storage bucket), `displayorder` (sequence) and `productcolor`. Requests are
+// batched per microtask into a single `in(...)` query and the resolved URLs
+// are cached per product, ordered by `displayorder`. The `producturl` column
+// on `products` holds dead Google Drive links and is NOT a usable image source.
 
 // productid -> Promise<string[]> of full image URLs, in displayorder.
 // Cached so a product rendered in multiple places is queried only once.
 const cache = new Map();
 
-async function resolve(productid) {
+// A grid renders one <ProductCard> per product, each asking for its images in
+// its own effect. Querying per product is an N+1 flood: ~140 requests contend
+// for the browser's 6-connections-per-host budget and stall the whole page on
+// higher-latency links. Instead we batch: every productid requested within the
+// same microtask is folded into a single `in(...)` query. Max ~1 query per tick
+// regardless of grid size.
+let pendingIds = [];
+let pendingResolvers = new Map(); // productid -> resolve(string[])
+let flushScheduled = false;
+
+// Cap ids per request so the query URL can't grow unbounded on huge grids.
+const BATCH_SIZE = 100;
+
+async function fetchChunk(ids) {
+  const grouped = new Map(ids.map((id) => [id, []]));
   const { data, error } = await supabase
     .from("productimages")
-    .select("imageurl,displayorder")
-    .eq("productid", productid)
+    .select("productid,imageurl,displayorder")
+    .in("productid", ids)
+    .order("productid", { ascending: true })
     .order("displayorder", { ascending: true });
 
-  if (error || !data) return [];
-  return data.map((r) => r.imageurl).filter(Boolean);
+  if (!error && data) {
+    for (const row of data) {
+      const bucket = grouped.get(row.productid);
+      if (bucket && row.imageurl) bucket.push(row.imageurl);
+    }
+  }
+  return grouped;
+}
+
+async function flush() {
+  const ids = pendingIds;
+  const resolvers = pendingResolvers;
+  pendingIds = [];
+  pendingResolvers = new Map();
+  flushScheduled = false;
+
+  try {
+    for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      const chunk = ids.slice(i, i + BATCH_SIZE);
+      // eslint-disable-next-line no-await-in-loop
+      const grouped = await fetchChunk(chunk);
+      for (const id of chunk) resolvers.get(id)(grouped.get(id) || []);
+    }
+  } catch {
+    // Never leave a caller hanging: resolve everything still pending to [].
+    for (const resolve of resolvers.values()) resolve([]);
+  }
+}
+
+function resolve(productid) {
+  return new Promise((res) => {
+    pendingResolvers.set(productid, res);
+    pendingIds.push(productid);
+    if (!flushScheduled) {
+      flushScheduled = true;
+      queueMicrotask(flush);
+    }
+  });
 }
 
 /**
