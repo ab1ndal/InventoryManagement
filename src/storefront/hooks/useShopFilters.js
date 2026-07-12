@@ -139,18 +139,25 @@ export default function useShopFilters() {
 
   useEffect(() => {
     async function fetchOptions() {
+      // Each option query is independent: one failing (e.g. a dropped fetch on
+      // a flaky/high-latency connection, which throws rather than resolving with
+      // an error) must not wipe every other filter. Isolate failures so a single
+      // dropped request only empties its own dimension.
+      const settle = (q) => q.then((r) => r).catch(() => ({ data: null }));
       const [cats, colorRows, colorFams, fabrics, priceRange, distinctSizes, sizeDefs] = await Promise.all([
-        supabase.from("categories").select("categoryid, name").order("name"),
-        supabase.from("colors").select("code, families"),
-        supabase.from("color_families").select("family, hex, sort_order").order("sort_order"),
-        supabase.from("fabrics").select("code, families"),
-        supabase
-          .from("products")
-          .select("retailprice")
-          .order("retailprice", { ascending: false })
-          .limit(1),
-        supabase.rpc("get_distinct_sizes"),
-        supabase.from("sizes").select("code, label, sort_order"),
+        settle(supabase.from("categories").select("categoryid, name").order("name")),
+        settle(supabase.from("colors").select("code, families")),
+        settle(supabase.from("color_families").select("family, hex, sort_order").order("sort_order")),
+        settle(supabase.from("fabrics").select("code, families")),
+        settle(
+          supabase
+            .from("products")
+            .select("retailprice")
+            .order("retailprice", { ascending: false })
+            .limit(1)
+        ),
+        settle(supabase.rpc("get_distinct_sizes")),
+        settle(supabase.from("sizes").select("code, label, sort_order")),
       ]);
 
       setCategoryOptions(cats.data || []);
