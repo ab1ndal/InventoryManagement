@@ -2,6 +2,31 @@
 
 Engineering lessons learned while working this repo. Newest first. Each entry: what surprised us, why it matters, how to act next time.
 
+## 2026-07-11 — Storefront blank-store debug (Cloudflare cookie + N+1)
+
+### A "works-for-me, broken-for-them" bug: get the USER's Network/Console FIRST
+- Spent many turns probing the live site from my own machine (headless Playwright, curl) — everything worked, so I kept concluding "your browser / stale cache." The user had to push repeatedly ("same after hard refresh", "broke after normalization", "cleared cookies helped") before the real cause surfaced. The single most decisive clue — their DevTools Network showing **zero requests to `supabase.co`** — I should have asked for on turn 1.
+- **Why it matters:** when a failure reproduces only in the user's environment, my own environment can't diagnose it. Hours went into confirming the site works (which was never in question) instead of capturing the client-side evidence that localizes the fault.
+- **Next time:** for any bug that reproduces for the user but not for me, request the user's **Network tab (any requests? status? blocked?) and Console** before running my own probes. "Zero requests in Network" instantly rules out code/CORS/CSP and points at client/network/CDN.
+
+### Don't deflect to "it's your cache/extensions" — prove each layer, in order
+- I asserted "stale cache," then "extension," then "service worker" — each plausible, each wrong, stated too confidently. The user disproved them one by one (hard-refresh didn't help; disabling extensions didn't help; no SW ever existed).
+- **Why it matters:** confident wrong diagnoses erode trust and send the user on pointless UI hunts.
+- **Next time:** enumerate the normal-vs-incognito differences (extensions, localStorage, cookies, cache, service worker) and eliminate them with a **test each**, not an assertion. Incognito-works + extensions-off-still-broken cleanly isolated it to cookies — that comparison should have come early.
+
+### Supabase is Cloudflare-fronted → `__cf_bm` bot cookie can silently block all requests
+- Root cause of the blank store: a stale `__cf_bm` (Cloudflare Bot Management) cookie on `supabase.co`. HttpOnly, app can't touch it. When invalid it blocks requests with **no console error and nothing in Network**. Clearing cookies fixed it. The app sets no cookies itself (`createClient` default = localStorage sessions).
+- **Why it matters:** a whole class of "blank page, no errors, no requests" bugs on a Supabase/Cloudflare stack trace to this, not to app code.
+- **Next time:** `curl -D - <supabase-url>` — if `server: cloudflare` + `set-cookie: __cf_bm`, suspect the CDN cookie for silent-block symptoms. See memory `project_supabase_cloudflare_cookie`.
+
+### N+1 has a second failure mode beyond latency: it looks like a bot
+- The ~140-requests-per-load N+1 wasn't just slow — the burst is what tripped Cloudflare's bot protection into the challenge state that set the bad cookie. Fixing the N+1 (140→13) removed both the latency AND the trigger.
+- **Next time:** treat request-count blowups as a rate-limit/WAF risk, not only a performance one. Batch aggressively; a burst against a CDN-fronted API can get you challenged/blocked.
+
+### Verify visually (screenshot), not just by DOM node counts
+- I reported "filters render" from `locator().count()` while the user's screenshot showed empty panels. The user had to explicitly say "use playwright and verify." A screenshot I actually looked at would have grounded the conversation sooner.
+- **Next time:** for any UI-state claim, capture and read a screenshot — counts can be true while the visible result differs (mid-load, off-screen, wrong element).
+
 ## 2026-07-09 — Storefront Phase 0 security work
 
 ### Supabase RLS is ROW-level, not column-level
