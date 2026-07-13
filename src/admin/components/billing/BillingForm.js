@@ -600,6 +600,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     selectedCodes,
     allDiscounts,
     appliedVoucher,
+    docType,
   ]);
 
   const visibleDiscounts = useMemo(() => {
