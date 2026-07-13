@@ -1922,6 +1922,32 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Document type */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Document:</span>
+                <div className="inline-flex rounded-md border overflow-hidden">
+                  <button
+                    type="button"
+                    disabled={docTypeLocked}
+                    className={`px-3 py-1 text-sm ${docType === 'bos' ? 'bg-primary text-white' : 'bg-white text-gray-700'} ${docTypeLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => setDocType('bos')}
+                  >
+                    Bill of Supply
+                  </button>
+                  <button
+                    type="button"
+                    disabled={docTypeLocked}
+                    className={`px-3 py-1 text-sm ${docType === 'invoice' ? 'bg-primary text-white' : 'bg-white text-gray-700'} ${docTypeLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => setDocType('invoice')}
+                  >
+                    Tax Invoice
+                  </button>
+                </div>
+                {docTypeLocked && (
+                  <span className="text-xs text-muted-foreground">Locked after creation</span>
+                )}
+              </div>
+
               {/* Customer */}
               <section className="grid gap-3">
                 <Label>Customer</Label>
@@ -2232,31 +2258,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   </button>
                 </div>
               )}
-
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-medium">Document:</span>
-                <div className="inline-flex rounded-md border overflow-hidden">
-                  <button
-                    type="button"
-                    disabled={docTypeLocked}
-                    className={`px-3 py-1 text-sm ${docType === 'bos' ? 'bg-primary text-white' : 'bg-white text-gray-700'} ${docTypeLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={() => setDocType('bos')}
-                  >
-                    Bill of Supply
-                  </button>
-                  <button
-                    type="button"
-                    disabled={docTypeLocked}
-                    className={`px-3 py-1 text-sm ${docType === 'invoice' ? 'bg-primary text-white' : 'bg-white text-gray-700'} ${docTypeLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    onClick={() => setDocType('invoice')}
-                  >
-                    Tax Invoice
-                  </button>
-                </div>
-                {docTypeLocked && (
-                  <span className="text-xs text-muted-foreground">Locked after creation</span>
-                )}
-              </div>
 
               {/* Summary */}
               <Summary
