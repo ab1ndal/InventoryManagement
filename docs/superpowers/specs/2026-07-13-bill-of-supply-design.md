@@ -127,12 +127,13 @@ Not built now. Recorded here so Phase 1 leaves room for it.
 - General (alteration-safe) form: `discount = Σmrp + alteration − total`, `gst = 0`,
   **total unchanged**. This is algebraically the same as `oldDiscount − gst` for the 206
   no-alteration bills.
-- **Alteration bills need the anchor-to-cash form.** Alteration was entered GST-inclusive,
-  so its GST is bundled inside stored `gst_amount`. Removing *all* GST from the discount
-  while showing gross alteration would drift the total by that alteration-GST (e.g. bill
-  220 drifts 9.52). Using `discount = Σmrp + alteration − total` ties the total back to
-  cash and keeps alteration a clean line.
-- Alteration stays visible (from stored `alteration_charge`, gross).
+- **Alteration bills need the anchor-to-cash form.** `alteration_charge` is the *actual
+  amount paid* for alteration — not a GST-inclusive figure. But `billUtils` wrongly
+  treats it as 5%-inclusive and computes a **phantom alteration-GST** into stored
+  `gst_amount`. Zeroing all GST (correct — no tax exists) while showing the actual
+  alteration would otherwise drift the total by that phantom amount (bill 220: 9.52).
+  `discount = Σmrp + alteration − total` absorbs the residue and ties the total to cash.
+- Alteration stays visible at its **actual paid amount** (stored `alteration_charge`).
 - **Immutable backup** of original rows (212 rows — cheap) before any mutation; reversible.
 - **No renumbering** — existing `FY26-000NNN` numbers are already the BoS series.
 - Regenerate the 212 stored PDFs as Bill of Supply documents.
