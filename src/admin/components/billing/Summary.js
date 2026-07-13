@@ -15,6 +15,7 @@ export default function Summary({
   onSetExchangeBalanceMode,
   exchangeBalanceAcknowledged = false,
   onAcknowledgeExchangeBalance,
+  docType = 'invoice',
 }) {
   // voucher is pre-tax (baked into computed.grandTotal via computeBillTotals)
   const voucherApplied = Number(computed.voucherPreTax ?? 0);
@@ -83,10 +84,12 @@ export default function Summary({
         </div>
       )}
 
-      <div className="flex justify-between text-muted-foreground">
-        <span>GST</span>
-        <span className="tabular-nums">+{money(computed.gstTotal)}</span>
-      </div>
+      {docType !== 'bos' && (
+        <div className="flex justify-between text-muted-foreground">
+          <span>GST</span>
+          <span className="tabular-nums">+{money(computed.gstTotal)}</span>
+        </div>
+      )}
 
       {totalPreTaxDiscount > 0 && (
         <div className="flex justify-between text-xs text-muted-foreground border-t pt-1 mt-1">
