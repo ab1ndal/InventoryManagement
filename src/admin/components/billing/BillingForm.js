@@ -119,6 +119,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [categoryMap, setCategoryMap] = useState({});
   const [loadedNetAmount, setLoadedNetAmount] = useState(null); // net_amount from DB for loaded bills
 
+  // Document type is immutable once the bill row exists: the bill number
+  // series (BoS vs invoice) is assigned by a DB trigger on first insert and
+  // never reassigned. Lock the toggle so an in-session edit can't silently
+  // desync document_type/bill_number from the (now re-typed) totals.
+  const docTypeLocked = Boolean(billId || effectiveBillId);
+
   // Reset all form state when the dialog closes. Must NOT include `items` in
   // its dependency array — doing so would cause setItems([]) to create a new
   // array reference on every render, triggering the effect again infinitely.
@@ -2231,19 +2237,24 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 <div className="inline-flex rounded-md border overflow-hidden">
                   <button
                     type="button"
-                    className={`px-3 py-1 text-sm ${docType === 'bos' ? 'bg-primary text-white' : 'bg-white text-gray-700'}`}
+                    disabled={docTypeLocked}
+                    className={`px-3 py-1 text-sm ${docType === 'bos' ? 'bg-primary text-white' : 'bg-white text-gray-700'} ${docTypeLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={() => setDocType('bos')}
                   >
                     Bill of Supply
                   </button>
                   <button
                     type="button"
-                    className={`px-3 py-1 text-sm ${docType === 'invoice' ? 'bg-primary text-white' : 'bg-white text-gray-700'}`}
+                    disabled={docTypeLocked}
+                    className={`px-3 py-1 text-sm ${docType === 'invoice' ? 'bg-primary text-white' : 'bg-white text-gray-700'} ${docTypeLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                     onClick={() => setDocType('invoice')}
                   >
                     Tax Invoice
                   </button>
                 </div>
+                {docTypeLocked && (
+                  <span className="text-xs text-muted-foreground">Locked after creation</span>
+                )}
               </div>
 
               {/* Summary */}

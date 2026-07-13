@@ -49,3 +49,12 @@ test("Summary GST line follows the docType toggle", () => {
   // switching to Tax Invoice reveals the GST summary line
   expect(screen.getByText("GST")).toBeInTheDocument();
 });
+
+test("document-type toggle is locked when editing an existing bill", () => {
+  render(<BillingForm billId={123} open onOpenChange={() => {}} />);
+  const bos = screen.getByRole("button", { name: "Bill of Supply" });
+  const inv = screen.getByRole("button", { name: "Tax Invoice" });
+  expect(bos).toBeDisabled();
+  expect(inv).toBeDisabled();
+  expect(screen.getByText("Locked after creation")).toBeInTheDocument();
+});
