@@ -822,18 +822,16 @@ export default function BillTable({ onEdit }) {
                     {b.amount_received != null
                       ? formatINR(b.amount_received, 2)
                       : "—"}
-                    {(() => {
-                      const parts = [];
-                      if (Number(b.exchange_credit_used) > 0)
-                        parts.push(`${formatINR(b.exchange_credit_used, 0)} exchange`);
-                      if (Number(b.store_credit_used) > 0)
-                        parts.push(`${formatINR(b.store_credit_used, 0)} store`);
-                      return parts.length > 0 ? (
-                        <div className="text-xs text-muted-foreground mt-0.5 tabular-nums">
-                          ({parts.join(" + ")} credit)
-                        </div>
-                      ) : null;
-                    })()}
+                    {Number(b.exchange_credit_used) > 0 && (
+                      <div className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+                        Exchange: {formatINR(b.exchange_credit_used, 0)}
+                      </div>
+                    )}
+                    {Number(b.store_credit_used) > 0 && (
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        Credit: {formatINR(b.store_credit_used, 0)}
+                      </div>
+                    )}
                   </td>
                   <td className="p-2 text-center">
                     <Badge
