@@ -57,7 +57,7 @@ export function priceItem(it) {
   };
 }
 
-export function computePreTaxBalanceDiscount(computed, targetGrandTotal, items = null, selectedCodes = null, allDiscounts = null, voucherPreTax = 0) {
+export function computePreTaxBalanceDiscount(computed, targetGrandTotal, items = null, selectedCodes = null, allDiscounts = null, voucherPreTax = 0, docType = 'invoice') {
   if (targetGrandTotal >= computed.grandTotal || computed.taxableTotal <= 0) return 0;
   const reduction = computed.grandTotal - targetGrandTotal;
 
@@ -74,7 +74,7 @@ export function computePreTaxBalanceDiscount(computed, targetGrandTotal, items =
   let hi = computed.taxableTotal;
   for (let i = 0; i < 40; i++) {
     const mid = (lo + hi) / 2;
-    const trial = computeBillTotals(items, selectedCodes, allDiscounts, mid, voucherPreTax);
+    const trial = computeBillTotals(items, selectedCodes, allDiscounts, mid, voucherPreTax, docType);
     if (trial.grandTotal > targetGrandTotal) {
       lo = mid;
     } else {
@@ -84,7 +84,7 @@ export function computePreTaxBalanceDiscount(computed, targetGrandTotal, items =
   return round2(Math.max(0, hi));
 }
 
-export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0, voucherPreTax = 0) {
+export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0, voucherPreTax = 0, docType = 'invoice') {
   const pricedItems = items.map(priceItem);
 
   // Face value: MRP total + quoted alteration charges (both as entered by user)
@@ -132,8 +132,14 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
     }, 0)
   );
 
-  const gstTotal = rawGst;
-  const grandTotal = round2(taxableTotal + rawGst);
+  const alterGstTotal = round2(pricedItems.reduce((s, p) => s + p.alterGst, 0));
+
+  // Bill of Supply: no GST on goods, but alteration is charged at its full
+  // (entered) amount. grandTotal = goods-after-discount pre-tax + full alteration.
+  const gstTotal = docType === 'bos' ? 0 : rawGst;
+  const grandTotal = docType === 'bos'
+    ? round2(taxableTotal + alterGstTotal)
+    : round2(taxableTotal + rawGst);
 
   return {
     itemsSubtotal,

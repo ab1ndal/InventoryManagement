@@ -137,6 +137,26 @@ describe("backCalcDiscountPct", () => {
   });
 });
 
+describe("computeBillTotals docType", () => {
+  const items = [
+    { mrp: 1000, quantity: 1, alteration_charge: 105, stitchType: "unstitched" },
+  ];
+
+  test("invoice path adds item GST on top (default)", () => {
+    const r = computeBillTotals(items, [], []);
+    // goods 1000 @5% = 50 GST; alteration 105 gross (100 pre-tax + 5 GST)
+    expect(r.gstTotal).toBeCloseTo(55, 2);
+    expect(r.grandTotal).toBeCloseTo(1155, 2);
+  });
+
+  test("bos path drops item GST, counts full alteration, zero GST", () => {
+    const r = computeBillTotals(items, [], [], 0, 0, "bos");
+    expect(r.gstTotal).toBe(0);
+    // 1000 goods (no GST) + 105 full alteration
+    expect(r.grandTotal).toBeCloseTo(1105, 2);
+  });
+});
+
 describe("computeAlterationDeposit", () => {
   it("returns 0 when no items have alteration charges", () => {
     const items = [
