@@ -121,9 +121,18 @@ New `BillOfSupplyView` + PDF generator:
 
 Not built now. Recorded here so Phase 1 leaves room for it.
 
-- For each of the 212 FY26 bills: set `document_type = 'bos'`, `gst_amount/gst_total = 0`,
-  recompute `discount = Σmrp + alteration − total`. **Total unchanged.**
-- Alteration stays visible (from stored `alteration_charge`).
+- Core mechanic: **strip the fabricated GST back out of the discount and set GST to 0**,
+  keeping the received total unchanged. For a bill with no alteration this is literally
+  `newDiscount = oldDiscount − gst`.
+- General (alteration-safe) form: `discount = Σmrp + alteration − total`, `gst = 0`,
+  **total unchanged**. This is algebraically the same as `oldDiscount − gst` for the 206
+  no-alteration bills.
+- **Alteration bills need the anchor-to-cash form.** Alteration was entered GST-inclusive,
+  so its GST is bundled inside stored `gst_amount`. Removing *all* GST from the discount
+  while showing gross alteration would drift the total by that alteration-GST (e.g. bill
+  220 drifts 9.52). Using `discount = Σmrp + alteration − total` ties the total back to
+  cash and keeps alteration a clean line.
+- Alteration stays visible (from stored `alteration_charge`, gross).
 - **Immutable backup** of original rows (212 rows — cheap) before any mutation; reversible.
 - **No renumbering** — existing `FY26-000NNN` numbers are already the BoS series.
 - Regenerate the 212 stored PDFs as Bill of Supply documents.
