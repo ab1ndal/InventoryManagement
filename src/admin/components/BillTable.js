@@ -355,7 +355,34 @@ export default function BillTable({ onEdit }) {
         });
       } else {
         const hasNext = (data || []).length > ROWS_PER_PAGE;
-        setBills((data || []).slice(0, ROWS_PER_PAGE));
+        const pageBills = (data || []).slice(0, ROWS_PER_PAGE);
+
+        // Amount Received = sum of every staged payment for the bill.
+        // bills.payment_amount only stores the first payment, so it undercounts
+        // bills paid off over multiple stages — bill_payments is the source of truth.
+        const billIds = pageBills.map((b) => b.billid);
+        const receivedByBill = new Map();
+        if (billIds.length > 0) {
+          const { data: payRows } = await supabase
+            .from("bill_payments")
+            .select("billid, amount")
+            .in("billid", billIds);
+          for (const p of payRows || []) {
+            receivedByBill.set(
+              p.billid,
+              (receivedByBill.get(p.billid) || 0) + Number(p.amount)
+            );
+          }
+        }
+
+        setBills(
+          pageBills.map((b) => ({
+            ...b,
+            amount_received: receivedByBill.has(b.billid)
+              ? receivedByBill.get(b.billid)
+              : null,
+          }))
+        );
         setHasNextPage(hasNext);
       }
       setLoading(false);
@@ -742,6 +769,7 @@ export default function BillTable({ onEdit }) {
                 >
                   Discount{sortIndicator("discount_total")}
                 </th>
+                <th className="p-2 text-right">Amount Received</th>
                 <th
                   className="p-2 text-center cursor-pointer select-none hover:bg-muted-foreground/10"
                   onClick={() => handleSortClick("paymentstatus")}
@@ -784,6 +812,11 @@ export default function BillTable({ onEdit }) {
                   <td className="p-2 text-right">
                     {b.discount_total != null && b.discount_total > 0
                       ? formatINR(b.discount_total, 2)
+                      : "—"}
+                  </td>
+                  <td className="p-2 text-right">
+                    {b.amount_received != null
+                      ? formatINR(b.amount_received, 2)
                       : "—"}
                   </td>
                   <td className="p-2 text-center">
@@ -903,7 +936,7 @@ export default function BillTable({ onEdit }) {
               {bills.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="p-4 text-center text-muted-foreground"
                   >
                     No bills found
