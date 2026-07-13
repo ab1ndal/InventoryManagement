@@ -357,9 +357,11 @@ export default function BillTable({ onEdit }) {
         const hasNext = (data || []).length > ROWS_PER_PAGE;
         const pageBills = (data || []).slice(0, ROWS_PER_PAGE);
 
-        // Amount Received = sum of every staged payment for the bill.
-        // bills.payment_amount only stores the first payment, so it undercounts
-        // bills paid off over multiple stages — bill_payments is the source of truth.
+        // Amount Received = total cash collected for the bill.
+        // Multi-stage bills record each installment in bill_payments (and
+        // bills.payment_amount holds only the first), so their sum is the truth.
+        // Bills paid in full in one go store the amount in bills.payment_amount
+        // with no bill_payments rows — fall back to that when no rows exist.
         const billIds = pageBills.map((b) => b.billid);
         const receivedByBill = new Map();
         if (billIds.length > 0) {
@@ -380,7 +382,9 @@ export default function BillTable({ onEdit }) {
             ...b,
             amount_received: receivedByBill.has(b.billid)
               ? receivedByBill.get(b.billid)
-              : null,
+              : b.payment_amount != null
+                ? Number(b.payment_amount)
+                : null,
           }))
         );
         setHasNextPage(hasNext);
