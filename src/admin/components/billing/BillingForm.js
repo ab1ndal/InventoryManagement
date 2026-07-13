@@ -70,6 +70,7 @@ function isAutoApplyEligible(d, items, today) {
 
 export default function BillingForm({ billId, open, onOpenChange, onSubmit, exchangeCredit: exchangeCreditProp = null, prefilledCustomerId = null }) {
   const [items, setItems] = useState([]);
+  const [docType, setDocType] = useState('bos'); // 'bos' (default) | 'invoice'
   const [isFinalizedBill, setIsFinalizedBill] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [notes, setNotes] = useState("");
@@ -257,12 +258,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const { data: bill, error: billErr } = await supabase
           .from("bills")
           .select(
-            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, exchange_credit_used, exchange_source_bill",
+            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, exchange_credit_used, exchange_source_bill, document_type",
           )
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
         setEffectiveBillNumber(bill.bill_number || null);
+        setDocType(bill.document_type || 'bos');
         setIsFinalizedBill(!!bill.finalized);
         setBillPaymentStatus(bill.paymentstatus || "draft");
         if (bill.net_amount != null) {
@@ -550,8 +552,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         allDiscounts,
         0,
         Number(appliedVoucher?.value ?? 0),
+        docType,
       ),
-    [items, selectedCodes, allDiscounts, appliedVoucher],
+    [items, selectedCodes, allDiscounts, appliedVoucher, docType],
   );
 
   // When payment is less than the effective total, compute a pre-tax balance discount
@@ -576,6 +579,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       selectedCodes,
       allDiscounts,
       Number(appliedVoucher?.value ?? 0),
+      docType,
     );
     if (preDisc <= 0) return computed;
     return computeBillTotals(
@@ -584,6 +588,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       allDiscounts,
       preDisc,
       Number(appliedVoucher?.value ?? 0),
+      docType,
     );
   }, [
     computed,
@@ -791,6 +796,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           items,
           isFinalizedBill ? (totalsForItems.balanceDiscount || 0) : 0,
           totalsForItems.overallDiscount,
+          docType,
         );
         const { error: insErr } = await supabase
           .from("bill_items")
@@ -926,6 +932,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         .insert({
           customerid: selectedCustomerId || null,
           notes: notes || null,
+          document_type: docType,
           totalamount: computed.grandTotal,
           gst_total: computed.gstTotal,
           discount_total:
@@ -951,6 +958,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         items,
         0,
         computed.overallDiscount,
+        docType,
       );
       const { error: itemsError } = await supabase
         .from("bill_items")
@@ -1168,6 +1176,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .insert({
             customerid: selectedCustomerId || null,
             notes: notes || null,
+            document_type: docType,
             totalamount: balanceAdjustedComputed.grandTotal,
             gst_total: balanceAdjustedComputed.gstTotal,
             discount_total:
@@ -1209,6 +1218,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           items,
           balanceAdjustedComputed.balanceDiscount || 0,
           balanceAdjustedComputed.overallDiscount,
+          docType,
         );
         const { error: itemsError } = await supabase
           .from("bill_items")
@@ -1346,6 +1356,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           items,
           balanceAdjustedComputed.balanceDiscount || 0,
           balanceAdjustedComputed.overallDiscount,
+          docType,
         );
         const { error: insErr } = await supabase.from("bill_items").insert(updatedPayload);
         if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
@@ -1550,6 +1561,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .insert({
             customerid: selectedCustomerId || null,
             notes: notes || null,
+            document_type: docType,
             totalamount: billComputed.grandTotal,
             gst_total: billComputed.gstTotal,
             discount_total: billComputed.itemLevelDiscountTotal + billComputed.overallDiscount + billComputed.balanceDiscount,
@@ -1586,6 +1598,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           items,
           billComputed.balanceDiscount || 0,
           billComputed.overallDiscount,
+          docType,
         );
         const { error: itemsError } = await supabase
           .from("bill_items")
@@ -1679,6 +1692,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           items,
           billComputed.balanceDiscount || 0,
           billComputed.overallDiscount,
+          docType,
         );
         const { error: insErr } = await supabase.from("bill_items").insert(updatedPayload);
         if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
@@ -2211,8 +2225,29 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 </div>
               )}
 
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-medium">Document:</span>
+                <div className="inline-flex rounded-md border overflow-hidden">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-sm ${docType === 'bos' ? 'bg-primary text-white' : 'bg-white text-gray-700'}`}
+                    onClick={() => setDocType('bos')}
+                  >
+                    Bill of Supply
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-sm ${docType === 'invoice' ? 'bg-primary text-white' : 'bg-white text-gray-700'}`}
+                    onClick={() => setDocType('invoice')}
+                  >
+                    Tax Invoice
+                  </button>
+                </div>
+              </div>
+
               {/* Summary */}
               <Summary
+                docType={docType}
                 computed={balanceAdjustedComputed}
                 appliedStoreCredit={appliedStoreCredit}
                 appliedVoucher={appliedVoucher}
@@ -2270,6 +2305,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         >
           <InvoiceView
             ref={invoiceRef}
+            docType={docType}
             billId={effectiveBillId ?? billId}
             billNumber={effectiveBillNumber}
             billDate={new Date(backdatedDate)}
