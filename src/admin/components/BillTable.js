@@ -306,7 +306,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, paymentstatus, finalized, pdf_url, document_type"
+          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
@@ -822,6 +822,18 @@ export default function BillTable({ onEdit }) {
                     {b.amount_received != null
                       ? formatINR(b.amount_received, 2)
                       : "—"}
+                    {(() => {
+                      const parts = [];
+                      if (Number(b.exchange_credit_used) > 0)
+                        parts.push(`${formatINR(b.exchange_credit_used, 0)} exchange`);
+                      if (Number(b.store_credit_used) > 0)
+                        parts.push(`${formatINR(b.store_credit_used, 0)} store`);
+                      return parts.length > 0 ? (
+                        <div className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+                          ({parts.join(" + ")} credit)
+                        </div>
+                      ) : null;
+                    })()}
                   </td>
                   <td className="p-2 text-center">
                     <Badge
