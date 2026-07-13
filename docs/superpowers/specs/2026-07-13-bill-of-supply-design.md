@@ -1,7 +1,7 @@
 # Bill of Supply — Design Spec
 
 **Date:** 2026-07-13
-**Status:** Approved design, pre-implementation
+**Status:** Phase 1 implemented (branch feat/bill-of-supply-phase1, 2026-07-13). Phase 2 (historical relabel) still pending.
 
 ## Background & Problem
 
