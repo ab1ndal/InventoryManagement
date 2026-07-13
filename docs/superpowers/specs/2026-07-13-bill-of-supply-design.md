@@ -52,6 +52,37 @@ alteration absorbed.
 
 ---
 
+## Database Blast Radius (mapped 2026-07-13)
+
+Objects that reference `bills` / `bill_items` / `bill_number`:
+
+**FK children of `bills` (by `billid`):** `bill_items`, `bill_payments`,
+`bill_salespersons`, `discount_usage`, `exchanges` (`new_billid`), `vouchers`
+(`redeemed_billid`). **FK children of `bill_items`:** `exchanges`
+(`original_bill_item_id`).
+
+- **All FK children are document-type-agnostic** — they key on `billid` /
+  `bill_item_id`. Phase 1 needs **no schema change** to any of them. Phase 2 does
+  **not** delete or renumber, so all FKs stay intact.
+
+**Functions:** `set_bill_number` (the trigger we rewrite), `generate_bill_number`
+(**DEAD** — no trigger/function/client caller; stale pre-`FY` version; **drop it** in
+the migration to remove the collision hazard), `sync_bill_salesperson_ids`
+(bill_items→bills salesperson sync, unaffected), `update_my_customer` (incidental
+substring match, unrelated).
+
+**Triggers on bills:** only `trg_set_bill_number`. `bill_items` has
+`bill_items_sync_salespersons`. `bill_sequences` has none.
+
+**Views/matviews:** none reference bills.
+
+**Net DB changes for Phase 1:** `bills` (+column), `bill_sequences` (+column, PK),
+`set_bill_number` (rewrite), drop `generate_bill_number`. Nothing else.
+
+**Phase 2 note:** `discount_usage` rows for the 212 bills are tied to the fudged
+discount codes; recomputing the discount *amount* does not require touching
+`discount_usage`, but confirm during Phase 2 planning.
+
 ## Phase 1 — Forward-looking Bill of Supply
 
 ### Schema (`schema/migration_*.sql`)
@@ -65,6 +96,8 @@ alteration absorbed.
   document_type)` and format by type:
   - `bos` → `FY{YY}-{LPAD(seq,6,'0')}` — e.g. `FY26-000217` (existing series continues).
   - `invoice` → `FY{YY}-SG{LPAD(seq,4,'0')}` — e.g. `FY26-SG0001`.
+- **Drop the dead `generate_bill_number()`** function (unused, stale format, collision
+  hazard).
 
 ### Pricing (BoS)
 
