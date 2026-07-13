@@ -45,7 +45,7 @@ export function computeStockDelta(existingBillItems, newInventoryItems) {
  * @param {number} overallDiscount - Pre-tax overall discount to distribute
  * @returns {Array} Array of bill_items insert objects ready for Supabase insert
  */
-export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overallDiscount = 0) {
+export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overallDiscount = 0, docType = 'invoice') {
   const pricedItems = items.map(priceItem);
   const totalWithCharges = pricedItems.reduce((s, p) => s + p.withCharges, 0);
 
@@ -99,6 +99,9 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
     const alterGst = round2(adjustedAlterPreTax * 0.05);
     const adjustedGst = round2(itemGst + alterGst);
 
+    const alterFull = Number(it.alteration_charge || it.stitching_charge || 0);
+    const bosTotal = round2(adjustedItemPreTax + alterFull); // goods pre-tax (post all discounts) + full alteration, no GST
+
     return {
       billid,
       quantity: it.quantity,
@@ -113,9 +116,9 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
         priced.itemDisc + itemOverallDisc + itemBalanceDisc,
       ),
       subtotal: adjustedSubtotal,
-      gst_rate: gstRate,
-      gst_amount: adjustedGst,
-      total: round2(adjustedSubtotal + adjustedGst),
+      gst_rate: docType === 'bos' ? null : gstRate,
+      gst_amount: docType === 'bos' ? 0 : adjustedGst,
+      total: docType === 'bos' ? bosTotal : round2(adjustedSubtotal + adjustedGst),
       stitch_type: stitchType,
       unit_type: it.unit_type || "piece",
       salesperson_id: it.salesperson_id || null,
