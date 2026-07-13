@@ -11,8 +11,9 @@ import { Button } from "../../../components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { priceItem, money, round2 } from "./billUtils";
 
-export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {} }) {
+export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {}, docType = 'bos' }) {
   const pricing = priceItem(item);
+  const isBos = docType === 'bos';
   const [discountRaw, setDiscountRaw] = useState(null);
   const [discountUnit, setDiscountUnit] = useState("pct"); // "pct" | "amt"
   const base = Number(item.mrp || 0) * Number(item.quantity || 1);
@@ -116,29 +117,33 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
       <td className="px-2 py-1 text-center">
         {money(item.alteration_charge) || 0}
       </td>
-      <td className="px-2 py-1 text-center">
-        <Select
-          value={String(pricing.gstRate ?? item.gstRate ?? 18)}
-          onValueChange={(v) => onUpdate(item._id, { gstRate: Number(v) })}
-        >
-          <SelectTrigger className="h-7 w-16 mx-auto">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[5, 18].map((r) => (
-              <SelectItem key={r} value={String(r)}>
-                {r}%
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </td>
+      {!isBos && (
+        <td className="px-2 py-1 text-center">
+          <Select
+            value={String(pricing.gstRate ?? item.gstRate ?? 18)}
+            onValueChange={(v) => onUpdate(item._id, { gstRate: Number(v) })}
+          >
+            <SelectTrigger className="h-7 w-16 mx-auto">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 18].map((r) => (
+                <SelectItem key={r} value={String(r)}>
+                  {r}%
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </td>
+      )}
       <td className="px-2 py-1 text-center tabular-nums">
         {money(pricing.subtotal)}
       </td>
-      <td className="px-2 py-1 text-center tabular-nums">
-        {money(pricing.gst_amount)}
-      </td>
+      {!isBos && (
+        <td className="px-2 py-1 text-center tabular-nums">
+          {money(pricing.gst_amount)}
+        </td>
+      )}
       <td className="px-2 py-1 text-center font-medium tabular-nums">
         {money(pricing.total)}
       </td>

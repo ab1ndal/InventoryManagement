@@ -1,6 +1,7 @@
 import ItemRow from "./ItemRow";
 
-export default function ItemTable({ items, setItems, onEdit, salespersonMap = {} }) {
+export default function ItemTable({ items, setItems, onEdit, salespersonMap = {}, docType = 'bos' }) {
+  const isBos = docType === 'bos';
   const updateItem = (id, patch) => {
     setItems((prev) =>
       prev.map((it) => (it._id === id ? { ...it, ...patch } : it)),
@@ -22,9 +23,13 @@ export default function ItemTable({ items, setItems, onEdit, salespersonMap = {}
               <th className="px-2 py-1.5 text-center font-medium">MRP</th>
               <th className="px-2 py-1.5 text-center font-medium">Discount</th>
               <th className="px-2 py-1.5 text-center font-medium">Alt. Amt</th>
-              <th className="px-2 py-1.5 text-center font-medium">GST%</th>
+              {!isBos && (
+                <th className="px-2 py-1.5 text-center font-medium">GST%</th>
+              )}
               <th className="px-2 py-1.5 text-center font-medium">Subtotal</th>
-              <th className="px-2 py-1.5 text-center font-medium">GST Amt</th>
+              {!isBos && (
+                <th className="px-2 py-1.5 text-center font-medium">GST Amt</th>
+              )}
               <th className="px-2 py-1.5 text-center font-medium">Total</th>
               <th className="px-2 py-1.5 text-center font-medium">Actions</th>
             </tr>
@@ -38,11 +43,12 @@ export default function ItemTable({ items, setItems, onEdit, salespersonMap = {}
                 onRemove={removeItem}
                 onEdit={onEdit}
                 salespersonMap={salespersonMap}
+                docType={docType}
               />
             ))}
             {items.length === 0 && (
               <tr>
-                <td className="p-3 text-muted-foreground" colSpan={11}>
+                <td className="p-3 text-muted-foreground" colSpan={isBos ? 9 : 11}>
                   No items yet. Click "Add item".
                 </td>
               </tr>

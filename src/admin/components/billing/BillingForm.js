@@ -1986,6 +1986,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     setEditingItem(items.find((it) => it._id === id) ?? null)
                   }
                   salespersonMap={salespersonMap}
+                  docType={docType}
                 />
               </section>
 
