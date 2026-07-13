@@ -19,6 +19,9 @@ test("bos: title, declaration, no tax columns", () => {
 
 test("invoice: keeps tax columns, no declaration", () => {
   render(<InvoiceView {...base} computed={{ ...base.computed, gstTotal: 55, grandTotal: 1155 }} />);
+  expect(screen.getByText("GST%")).toBeInTheDocument();
+  expect(screen.getByText("Taxable (₹)")).toBeInTheDocument();
   expect(screen.getByText("CGST (₹)")).toBeInTheDocument();
+  expect(screen.getByText("SGST (₹)")).toBeInTheDocument();
   expect(screen.queryByText(/Composition taxable person/i)).not.toBeInTheDocument();
 });

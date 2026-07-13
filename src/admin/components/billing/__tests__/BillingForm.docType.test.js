@@ -37,3 +37,15 @@ test("defaults to Bill of Supply and can switch to Tax Invoice", () => {
   fireEvent.click(inv);
   expect(inv.className).toMatch(/bg-primary/);
 });
+
+test("Summary GST line follows the docType toggle", () => {
+  render(<BillingForm open onOpenChange={() => {}} />);
+  // default docType is 'bos' — no GST line in the Summary
+  expect(screen.queryByText("GST")).not.toBeInTheDocument();
+
+  const inv = screen.getByRole("button", { name: "Tax Invoice" });
+  fireEvent.click(inv);
+
+  // switching to Tax Invoice reveals the GST summary line
+  expect(screen.getByText("GST")).toBeInTheDocument();
+});
