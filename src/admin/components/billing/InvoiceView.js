@@ -39,9 +39,11 @@ const InvoiceView = forwardRef(function InvoiceView(
     exchangeCashRefund = 0,
     billPayments = [],
     paymentStatus = "finalized",
+    docType = "invoice",
   },
   ref,
 ) {
+  const isBos = docType === "bos";
   // Distribute overall + balance + voucher discounts proportionally (mirrors buildBillItemsPayload)
   const overallDiscount = Number(computed?.overallDiscount ?? 0);
   const balanceDiscount = Number(computed?.balanceDiscount ?? 0);
@@ -118,6 +120,7 @@ const InvoiceView = forwardRef(function InvoiceView(
       taxable: garmentTaxable + alteration / 1.05,
       cgst,
       sgst,
+      bosAmount: adjustedTaxable, // value + full alteration, no GST
     };
   });
 
@@ -269,6 +272,9 @@ const InvoiceView = forwardRef(function InvoiceView(
       >
         <div>
           <div>
+            <strong>{isBos ? "Bill of Supply" : "Tax Invoice"}</strong>
+          </div>
+          <div>
             <strong>Bill No:</strong> {billNumber || billId}
           </div>
           <div>
@@ -297,10 +303,10 @@ const InvoiceView = forwardRef(function InvoiceView(
             <th style={thRight}>Qty</th>
             <th style={thRight}>Rate (₹)</th>
             <th style={thRight}>Disc (₹)</th>
-            <th style={thRight}>GST%</th>
-            <th style={thRight}>Taxable (₹)</th>
-            <th style={thRight}>CGST (₹)</th>
-            <th style={thRight}>SGST (₹)</th>
+            {!isBos && <th style={thRight}>GST%</th>}
+            {!isBos && <th style={thRight}>Taxable (₹)</th>}
+            {!isBos && <th style={thRight}>CGST (₹)</th>}
+            {!isBos && <th style={thRight}>SGST (₹)</th>}
             <th style={thRight}>Amount (₹)</th>
           </tr>
         </thead>
@@ -318,6 +324,7 @@ const InvoiceView = forwardRef(function InvoiceView(
               taxable,
               cgst,
               sgst,
+              bosAmount,
             }) => {
               const rowBg = idx % 2 === 0 ? "#ffffff" : "#fafafa";
               return (
@@ -368,11 +375,11 @@ const InvoiceView = forwardRef(function InvoiceView(
                     )}
                   </td>
                   <td style={tdRight}>₹{disc.toFixed(2)}</td>
-                  <td style={tdRight}>{gstRate}%</td>
-                  <td style={tdRight}>₹{taxable.toFixed(2)}</td>
-                  <td style={tdRight}>₹{cgst.toFixed(2)}</td>
-                  <td style={tdRight}>₹{sgst.toFixed(2)}</td>
-                  <td style={tdRight}>₹{lineGross.toFixed(2)}</td>
+                  {!isBos && <td style={tdRight}>{gstRate}%</td>}
+                  {!isBos && <td style={tdRight}>₹{taxable.toFixed(2)}</td>}
+                  {!isBos && <td style={tdRight}>₹{cgst.toFixed(2)}</td>}
+                  {!isBos && <td style={tdRight}>₹{sgst.toFixed(2)}</td>}
+                  <td style={tdRight}>₹{(isBos ? bosAmount : lineGross).toFixed(2)}</td>
                 </tr>
               );
             },
@@ -400,9 +407,11 @@ const InvoiceView = forwardRef(function InvoiceView(
             {Number(computed.balanceDiscount).toFixed(2)}
           </div>
         )}
-        <div style={{ color: "#6b7280", fontSize: "10px", marginTop: 2 }}>
-          {`CGST: ₹${totalCgst.toFixed(2)} | SGST: ₹${totalSgst.toFixed(2)}`}
-        </div>
+        {!isBos && (
+          <div style={{ color: "#6b7280", fontSize: "10px", marginTop: 2 }}>
+            {`CGST: ₹${totalCgst.toFixed(2)} | SGST: ₹${totalSgst.toFixed(2)}`}
+          </div>
+        )}
         <div style={{ fontSize: "14px", fontWeight: 600, marginTop: 4 }}>
           Grand Total: ₹{grandTotal.toFixed(2)}
         </div>
@@ -595,6 +604,22 @@ const InvoiceView = forwardRef(function InvoiceView(
         >
           You saved ₹{totalSaved.toFixed(2)} today ({savingsPct.toFixed(1)}% off
           MRP)!
+        </div>
+      )}
+
+      {isBos && (
+        <div
+          style={{
+            marginTop: "8px",
+            padding: "6px 10px",
+            border: "1px solid #d1d5db",
+            borderRadius: "4px",
+            fontSize: "10px",
+            fontStyle: "italic",
+            color: "#374151",
+          }}
+        >
+          Composition taxable person, not eligible to collect tax on supplies.
         </div>
       )}
 
