@@ -38,6 +38,7 @@ export default function BillTable({ onEdit }) {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "" });
+  const [typeFilter, setTypeFilter] = useState("all"); // 'all' | 'bos' | 'invoice'
   const [sort, setSort] = useState({ key: "bill_number", dir: "desc" });
   const [cancelBill, setCancelBill] = useState(null);
   const [resolveOpen, setResolveOpen] = useState(false);
@@ -56,7 +57,7 @@ export default function BillTable({ onEdit }) {
       // Fetch bill core data
       const { data: billRow, error: billErr } = await supabase
         .from("bills")
-        .select("applied_codes, payment_amount, net_amount, paymentstatus, saleslocationid, salesmethodid, store_credit_used, exchange_credit_used, exchange_source_bill, orderdate, customerid, bill_number")
+        .select("applied_codes, payment_amount, net_amount, paymentstatus, saleslocationid, salesmethodid, store_credit_used, exchange_credit_used, exchange_source_bill, orderdate, customerid, bill_number, document_type")
         .eq("billid", billId)
         .single();
       if (billErr) throw billErr;
@@ -158,7 +159,7 @@ export default function BillTable({ onEdit }) {
         ? { amount: Number(billRow.exchange_credit_used), sourceBillNumber: billRow.exchange_source_bill }
         : null;
 
-      const computed = computeBillTotals(items, appliedCodes, allDiscounts);
+      const computed = computeBillTotals(items, appliedCodes, allDiscounts, 0, 0, billRow.document_type || 'bos');
 
       flushSync(() => setRegenBillData({
         billId,
@@ -177,6 +178,7 @@ export default function BillTable({ onEdit }) {
         exchangeCredit,
         billPayments,
         paymentStatus: billRow.paymentstatus || "finalized",
+        docType: billRow.document_type || 'bos',
       }));
 
       if (!regenRef.current) throw new Error("Invoice ref missing");
@@ -304,13 +306,15 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, paymentstatus, finalized, pdf_url"
+          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, paymentstatus, finalized, pdf_url, document_type"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
           nullsFirst: false,
         })
         .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE); // fetch 51 to detect next page
+
+      if (typeFilter !== "all") query = query.eq("document_type", typeFilter);
 
       const term = filters.search.trim();
       if (term) {
@@ -358,7 +362,7 @@ export default function BillTable({ onEdit }) {
     };
 
     loadBills();
-  }, [page, filters, sort, toast]);
+  }, [page, filters, sort, toast, typeFilter]);
 
   // Cycle a column header through ascending → descending → no-sort (back to default: Bill Number desc).
   const handleSortClick = (key) => {
@@ -685,6 +689,15 @@ export default function BillTable({ onEdit }) {
         <Button variant="outline" onClick={() => setPage(1)}>
           Apply
         </Button>
+        <select
+          value={typeFilter}
+          onChange={(e) => { setPage(1); setTypeFilter(e.target.value); }}
+          className="border rounded px-2 py-1 text-sm"
+        >
+          <option value="all">All types</option>
+          <option value="bos">Bill of Supply</option>
+          <option value="invoice">Tax Invoice</option>
+        </select>
       </div>
 
       {/* Table */}
@@ -704,6 +717,7 @@ export default function BillTable({ onEdit }) {
                   Bill ID{sortIndicator("bill_number")}
                 </th>
                 <th className="p-2 text-left">Customer</th>
+                <th className="p-2 text-left">Type</th>
                 <th
                   className="p-2 text-left cursor-pointer select-none hover:bg-muted-foreground/10"
                   onClick={() => handleSortClick("orderdate")}
@@ -752,6 +766,11 @@ export default function BillTable({ onEdit }) {
                     {b.customers
                       ? `${b.customers.first_name} ${b.customers.last_name || ""}`.trim()
                       : "—"}
+                  </td>
+                  <td className="p-2">
+                    <Badge variant={b.document_type === "invoice" ? "default" : "secondary"}>
+                      {b.document_type === "invoice" ? "Tax Invoice" : "Bill of Supply"}
+                    </Badge>
                   </td>
                   <td className="p-2">
                     {b.orderdate ? formatDate(b.orderdate) : "—"}
@@ -884,7 +903,7 @@ export default function BillTable({ onEdit }) {
               {bills.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="p-4 text-center text-muted-foreground"
                   >
                     No bills found
@@ -1081,6 +1100,7 @@ export default function BillTable({ onEdit }) {
             exchangeCredit={regenBillData.exchangeCredit}
             billPayments={regenBillData.billPayments}
             paymentStatus={regenBillData.paymentStatus}
+            docType={regenBillData.docType}
           />
         </div>
       )}
