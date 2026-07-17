@@ -9,10 +9,10 @@ const base = {
   paymentMethod: "Cash", paymentAmount: 1105, appliedCodes: [], allDiscounts: [],
 };
 
-test("bos: title, declaration, no tax columns", () => {
+test("bos: title, no declaration, no tax columns", () => {
   render(<InvoiceView {...base} docType="bos" />);
   expect(screen.getByText("Bill of Supply")).toBeInTheDocument();
-  expect(screen.getByText(/Composition taxable person, not eligible to collect tax/i)).toBeInTheDocument();
+  expect(screen.queryByText(/Composition taxable person/i)).not.toBeInTheDocument();
   expect(screen.queryByText("CGST (₹)")).not.toBeInTheDocument();
   expect(screen.queryByText("Taxable (₹)")).not.toBeInTheDocument();
 });

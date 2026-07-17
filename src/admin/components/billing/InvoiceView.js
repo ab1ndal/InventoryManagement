@@ -607,22 +607,6 @@ const InvoiceView = forwardRef(function InvoiceView(
         </div>
       )}
 
-      {isBos && (
-        <div
-          style={{
-            marginTop: "8px",
-            padding: "6px 10px",
-            border: "1px solid #d1d5db",
-            borderRadius: "4px",
-            fontSize: "10px",
-            fontStyle: "italic",
-            color: "#374151",
-          }}
-        >
-          Composition taxable person, not eligible to collect tax on supplies.
-        </div>
-      )}
-
       {/* 6. Notes Footer */}
       <div
         style={{
