@@ -22,6 +22,23 @@ test("invoice: keeps GST% and GST Amt columns", () => {
   expect(screen.getByText("GST Amt")).toBeInTheDocument();
 });
 
+test("bos: subtotal equals total when no alteration", () => {
+  render(<ItemTable items={items} setItems={noop} docType="bos" />);
+  expect(screen.getAllByText("₹1,000")).toHaveLength(3); // MRP, Subtotal, Total
+  expect(screen.queryByText("₹1,050")).not.toBeInTheDocument();
+});
+
+test("bos: total adds full alteration charge to subtotal", () => {
+  const withAlt = [{ ...items[0], alteration_charge: 105 }];
+  render(<ItemTable items={withAlt} setItems={noop} docType="bos" />);
+  expect(screen.getByText("₹1,105")).toBeInTheDocument();
+});
+
+test("invoice: total includes GST", () => {
+  render(<ItemTable items={items} setItems={noop} docType="invoice" />);
+  expect(screen.getByText("₹1,050")).toBeInTheDocument();
+});
+
 test("defaults to bos when docType omitted", () => {
   render(<ItemTable items={items} setItems={noop} />);
   expect(screen.queryByText("GST%")).not.toBeInTheDocument();

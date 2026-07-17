@@ -18,6 +18,13 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
   const [discountUnit, setDiscountUnit] = useState("pct"); // "pct" | "amt"
   const base = Number(item.mrp || 0) * Number(item.quantity || 1);
 
+  // Bill of Supply carries no GST: subtotal is goods after discount, and total
+  // adds the full (as-entered) alteration charge. Mirrors buildBillItemsPayload.
+  const subtotal = isBos ? round2(pricing.afterDisc) : pricing.subtotal;
+  const total = isBos
+    ? round2(pricing.afterDisc + pricing.alteration + pricing.alterGst)
+    : pricing.total;
+
   return (
     <tr className="border-t text-xs">
       <td className="px-2 py-1">
@@ -137,7 +144,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
         </td>
       )}
       <td className="px-2 py-1 text-center tabular-nums">
-        {money(pricing.subtotal)}
+        {money(subtotal)}
       </td>
       {!isBos && (
         <td className="px-2 py-1 text-center tabular-nums">
@@ -145,7 +152,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
         </td>
       )}
       <td className="px-2 py-1 text-center font-medium tabular-nums">
-        {money(pricing.total)}
+        {money(total)}
       </td>
       <td className="px-2 py-1 text-center">
         <div className="flex justify-center gap-1">
