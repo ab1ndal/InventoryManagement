@@ -54,9 +54,7 @@ const InvoiceView = forwardRef(function InvoiceView(
     const mrp = Number(item.mrp) || 0;
     const qty = Number(item.qty || item.quantity) || 0;
     const disc = mrp * qty * ((Number(item.quickDiscountPct) || 0) / 100);
-    const alteration = Number(
-      item.alteration_charge || item.stitching_charge || 0,
-    );
+    const alteration = Number(item.alteration_charge || 0);
     return s + (mrp * qty - disc + alteration);
   }, 0);
   // clamp voucher to what's actually deductible pre-tax
@@ -70,9 +68,7 @@ const InvoiceView = forwardRef(function InvoiceView(
     const mrp = Number(item.mrp) || 0;
     const qty = Number(item.qty || item.quantity) || 0;
     const disc = mrp * qty * ((Number(item.quickDiscountPct) || 0) / 100);
-    const alteration = Number(
-      item.alteration_charge || item.stitching_charge || 0,
-    );
+    const alteration = Number(item.alteration_charge || 0);
     const withCharges = mrp * qty - disc + alteration;
 
     const proportion =

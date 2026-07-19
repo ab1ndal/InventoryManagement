@@ -47,7 +47,7 @@ export function generateBillText({
     const qty = Number(item.qty || item.quantity) || 0;
     const discPct = Number(item.quickDiscountPct) || 0;
     const disc = mrp * qty * (discPct / 100);
-    const alteration = Number(item.alteration_charge || item.stitching_charge || 0);
+    const alteration = Number(item.alteration_charge || 0);
     const lineTotal = mrp * qty - disc + alteration;
 
     const variant = [item.size, item.color].filter(Boolean).join("|");

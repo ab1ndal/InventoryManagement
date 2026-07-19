@@ -99,7 +99,7 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
     const alterGst = round2(adjustedAlterPreTax * 0.05);
     const adjustedGst = round2(itemGst + alterGst);
 
-    const alterFull = Number(it.alteration_charge || it.stitching_charge || 0);
+    const alterFull = Number(it.alteration_charge || 0);
     const bosTotal = round2(adjustedItemPreTax + alterFull); // goods pre-tax (post all discounts) + full alteration, no GST
 
     return {
