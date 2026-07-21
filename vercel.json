@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/sb-rest/:path*",
+      "destination": "https://epotsxdugwfhyeiudjox.supabase.co/rest/v1/:path*"
+    }
+  ],
   "images": {
     "sizes": [48, 150, 400, 600, 1000, 1200],
     "qualities": [30, 55, 70, 75, 80],

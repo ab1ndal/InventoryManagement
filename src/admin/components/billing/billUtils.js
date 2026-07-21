@@ -9,7 +9,7 @@ export function money(n) {
 }
 
 export function normalizeItem(it) {
-  const alterGross = Number(it.alteration_charge || it.stitching_charge || 0);
+  const alterGross = Number(it.alteration_charge || 0);
   const alterPreTax = alterGross / 1.05; // alteration is always 5% GST-inclusive
   return {
     qty: Number(it.quantity || 1),
@@ -90,7 +90,7 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
   // Face value: MRP total + quoted alteration charges (both as entered by user)
   const itemsSubtotal = round2(items.reduce((s, it) => {
     return s + Number(it.mrp || 0) * Number(it.quantity || 1)
-             + Number(it.alteration_charge || it.stitching_charge || 0);
+             + Number(it.alteration_charge || 0);
   }, 0));
 
   const itemLevelDiscountTotal = round2(pricedItems.reduce((s, p) => s + p.itemDisc, 0));
@@ -158,7 +158,7 @@ export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTa
 export function computeAlterationDeposit(items) {
   return round2(
     items
-      .filter((it) => Number(it.alteration_charge || it.stitching_charge || 0) > 0)
+      .filter((it) => Number(it.alteration_charge || 0) > 0)
       .reduce((s, it) => s + priceItem(it).total, 0)
   );
 }

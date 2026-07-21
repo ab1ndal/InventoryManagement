@@ -139,43 +139,30 @@ export default function useShopFilters() {
 
   useEffect(() => {
     async function fetchOptions() {
-      // Each option query is independent: one failing (e.g. a dropped fetch on
-      // a flaky/high-latency connection, which throws rather than resolving with
-      // an error) must not wipe every other filter. Isolate failures so a single
-      // dropped request only empties its own dimension.
-      const settle = (q) => q.then((r) => r).catch(() => ({ data: null }));
-      const [cats, colorRows, colorFams, fabrics, priceRange, distinctSizes, sizeDefs] = await Promise.all([
-        settle(supabase.from("categories").select("categoryid, name").order("name")),
-        settle(supabase.from("colors").select("code, families")),
-        settle(supabase.from("color_families").select("family, hex, sort_order").order("sort_order")),
-        settle(supabase.from("fabrics").select("code, families")),
-        settle(
-          supabase
-            .from("products")
-            .select("retailprice")
-            .order("retailprice", { ascending: false })
-            .limit(1)
-        ),
-        settle(supabase.rpc("get_distinct_sizes")),
-        settle(supabase.from("sizes").select("code, label, sort_order")),
-      ]);
+      // All filter vocabularies come from one RPC (get_shop_filter_options) in
+      // a single round-trip. This replaces seven parallel anon queries whose
+      // concurrent burst was what triggered Cloudflare's `__cf_bm` bot cookie.
+      // The fetch layer (src/lib/supabaseFetch.js) adds timeout + retry; on
+      // failure the filters simply stay at their defaults.
+      const { data, error } = await supabase.rpc("get_shop_filter_options");
+      if (error || !data) return;
 
-      setCategoryOptions(cats.data || []);
+      setCategoryOptions(data.categories || []);
 
-      if (colorFams.data) {
+      const colorFams = data.color_families || [];
+      if (colorFams.length) {
         // Filter buckets = families, ordered by color_families.sort_order.
-        setColorOptions(colorFams.data.map((f) => f.family));
-        setColorFamilyHex(
-          Object.fromEntries(colorFams.data.map((f) => [f.family, f.hex]))
-        );
+        setColorOptions(colorFams.map((f) => f.family));
+        setColorFamilyHex(Object.fromEntries(colorFams.map((f) => [f.family, f.hex])));
       }
 
-      if (colorRows.data) {
+      const colorRows = data.colors || [];
+      if (colorRows.length) {
         // Multi-family maps: a code lists 1..n families; each family gathers
         // every code that includes it, so filtering any family surfaces it.
         const familyToCodes = {};
         const codeToFamilies = {};
-        colorRows.data.forEach(({ code, families }) => {
+        colorRows.forEach(({ code, families }) => {
           const fams = families || [];
           codeToFamilies[code] = fams;
           fams.forEach((fam) => (familyToCodes[fam] ||= []).push(code));
@@ -183,36 +170,36 @@ export default function useShopFilters() {
         colorIndexRef.current = { familyToCodes, codeToFamilies };
       }
 
-      if (sizeDefs.data) {
+      // Distinct in-stock size codes, sorted by the reference table order.
+      const rawSizes = (data.distinct_sizes || []).filter(Boolean);
+      const sizeDefs = data.sizes || [];
+      if (sizeDefs.length) {
         // `sizes.label` is the canonical display string — the stored code
         // already encodes letter+numeric (e.g. "S|36"), so use label directly.
         const displayMap = {};
-        sizeDefs.data.forEach((s) => {
+        sizeDefs.forEach((s) => {
           displayMap[s.code] = s.label;
         });
         setSizeDisplayMap(displayMap);
 
-        // Use RPC distinct sizes; sort by reference table order, unknowns last
-        const rawSizes = (distinctSizes.data || []).map((r) => r.size).filter(Boolean);
-        const orderMap = Object.fromEntries(sizeDefs.data.map((s) => [s.code, s.sort_order]));
-        setSizeOptions(rawSizes.sort((a, b) => (orderMap[a] ?? 9999) - (orderMap[b] ?? 9999)));
+        const orderMap = Object.fromEntries(sizeDefs.map((s) => [s.code, s.sort_order]));
+        setSizeOptions([...rawSizes].sort((a, b) => (orderMap[a] ?? 9999) - (orderMap[b] ?? 9999)));
       } else {
-        // Fallback if sizes table unavailable
-        const rawSizes = (distinctSizes.data || []).map((r) => r.size).filter(Boolean);
-        setSizeOptions(rawSizes.sort());
+        // Fallback if sizes reference table is empty
+        setSizeOptions([...rawSizes].sort());
       }
 
-      if (fabrics.data) {
+      const fabrics = data.fabrics || [];
+      if (fabrics.length) {
         // Multi-family: a fabric code lists 1..n families. Shared index builder;
         // the filter lists families ordered by member-code count (proxy volume).
-        const { familyToCodes, codeToFamilies, orderedFamilies } =
-          buildFamilyIndex(fabrics.data);
+        const { familyToCodes, codeToFamilies, orderedFamilies } = buildFamilyIndex(fabrics);
         fabricIndexRef.current = { familyToCodes, codeToFamilies };
         setFabricOptions(orderedFamilies);
       }
 
-      if (priceRange.data?.[0]) {
-        const max = Math.ceil(Number(priceRange.data[0].retailprice) / 500) * 500;
+      if (data.price_max != null) {
+        const max = Math.ceil(Number(data.price_max) / 500) * 500;
         setPriceBounds({ min: 0, max: max || 25000 });
       }
     }
