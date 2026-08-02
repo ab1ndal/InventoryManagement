@@ -30,3 +30,7 @@ credentials.json
 graphify-out/
 .vercel
 .env*
+
+# vCard exports contain customer names and phone numbers — never commit
+vcf-export/
+*.vcf
