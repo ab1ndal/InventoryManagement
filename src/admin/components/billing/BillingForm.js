@@ -118,6 +118,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [salespersonsList, setSalespersonsList] = useState([]);
   const [categoryMap, setCategoryMap] = useState({});
   const [loadedNetAmount, setLoadedNetAmount] = useState(null); // net_amount from DB for loaded bills
+  const [loadedTotalAmount, setLoadedTotalAmount] = useState(null); // totalamount from DB — used to detect unsaved item edits before recording a payment
 
   // Document type is immutable once the bill row exists: the bill number
   // series (BoS vs invoice) is assigned by a DB trigger on first insert and
@@ -264,7 +265,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const { data: bill, error: billErr } = await supabase
           .from("bills")
           .select(
-            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, exchange_credit_used, exchange_source_bill, document_type",
+            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, totalamount, exchange_credit_used, exchange_source_bill, document_type",
           )
           .eq("billid", billId)
           .single();
@@ -276,17 +277,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (bill.net_amount != null) {
           setLoadedNetAmount(Number(bill.net_amount));
         }
+        setLoadedTotalAmount(bill.totalamount != null ? Number(bill.totalamount) : null);
 
-        if (bill.paymentstatus === "partial") {
-          const { data: payments } = await supabase
-            .from("bill_payments")
-            .select(
-              "payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)"
-            )
-            .eq("billid", billId)
-            .order("recorded_at", { ascending: true });
-          setBillPayments(payments || []);
-        }
+        // Fetch installment history regardless of current paymentstatus — a bill that
+        // started "partial" flips to "finalized" once fully paid (handleAddPayment), but
+        // its bill_payments rows still exist and must stay visible on reopen.
+        const { data: payments } = await supabase
+          .from("bill_payments")
+          .select(
+            "payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)"
+          )
+          .eq("billid", billId)
+          .order("recorded_at", { ascending: true });
+        setBillPayments(payments || []);
 
         // Fetch applied_codes separately — column may not exist if migration not yet run
         const { data: codesRow } = await supabase
@@ -797,12 +800,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           throw new Error("Failed to remove old items: " + delErr.message);
 
         // Step G: Insert new bill_items
-        const totalsForItems = isFinalizedBill ? balanceAdjustedComputed : computed;
+        // NOTE: routine edits never re-run the balance-forcing math (balanceAdjustedComputed) —
+        // that mechanism exists only for the explicit "confirm partial finalize" action
+        // (handleConfirmPartialFinalize). Reusing it here silently discounted away the cost of
+        // any item added after a bill's finalAmount/paymentAmount was locked in.
         const billItemsPayload = buildBillItemsPayload(
           billId,
           items,
-          isFinalizedBill ? (totalsForItems.balanceDiscount || 0) : 0,
-          totalsForItems.overallDiscount,
+          0,
+          computed.overallDiscount,
           docType,
         );
         const { error: insErr } = await supabase
@@ -812,10 +818,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           throw new Error("Failed to save updated items: " + insErr.message);
 
         // Step H: Update bills row
-        const totalsToUse = isFinalizedBill
-          ? balanceAdjustedComputed
-          : computed;
-        
+        const totalsToUse = computed;
+        const { effectiveTotal: editEffectiveTotal } = computeCreditsApplied(
+          totalsToUse.grandTotal,
+          appliedStoreCredit,
+          exchangeCredit?.amount,
+        );
+
         const { error: updErr } = await supabase
           .from("bills")
           .update({
@@ -824,10 +833,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             totalamount: totalsToUse.grandTotal,
             gst_total: totalsToUse.gstTotal,
             discount_total:
-              totalsToUse.itemLevelDiscountTotal +
-              totalsToUse.overallDiscount +
-              (isFinalizedBill ? Number(totalsToUse.balanceDiscount || 0) : 0),
+              totalsToUse.itemLevelDiscountTotal + totalsToUse.overallDiscount,
             taxable_total: totalsToUse.taxableTotal,
+            net_amount: editEffectiveTotal,
             applied_codes: selectedCodes,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
             final_amount: finalAmount !== "" ? Number(finalAmount) : null,
@@ -1826,6 +1834,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const handleAddPayment = async () => {
+    // Guard against recording a payment (and regenerating the customer-facing PDF) off
+    // unsaved item edits: this handler renders the PDF from live in-memory `items`/`computed`
+    // state, not from bill_items in the DB. If items were changed here but "Save Draft" was
+    // never clicked, the PDF would show items/totals that were never persisted.
+    if (loadedTotalAmount != null && Math.abs(computed.grandTotal - loadedTotalAmount) > 0.01) {
+      toast.error("Unsaved item changes", {
+        description: "Save the bill before recording a payment — item edits haven't been saved yet.",
+      });
+      return;
+    }
     const amt = Number(addPaymentAmount);
     if (!amt || amt <= 0) {
       toast.error("Enter a valid amount");
@@ -2170,8 +2188,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 </section>
               )}
 
-              {/* Payment — show add-payment UI for partial bills, otherwise standard input */}
-              {billPaymentStatus === "partial" ? (
+              {/* Payment — show installment history whenever any bill_payments rows exist
+                  (a bill flips from "partial" to "finalized" once fully paid, but its
+                  payment history must stay visible), otherwise standard single-amount input */}
+              {billPaymentStatus === "partial" || billPayments.length > 0 ? (
                 <section className="space-y-3">
                   <PaymentHistory
                     payments={billPayments}
@@ -2184,44 +2204,46 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                       return effectiveTotal;
                     })()}
                   />
-                  <div className="space-y-2">
-                    <Label>Record Additional Payment</Label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
-                          ₹
-                        </span>
-                        <Input
-                          type="number"
-                          placeholder="Amount"
-                          className="pl-7"
-                          value={addPaymentAmount}
-                          onChange={(e) => setAddPaymentAmount(e.target.value)}
-                        />
+                  {billPaymentStatus === "partial" && (
+                    <div className="space-y-2">
+                      <Label>Record Additional Payment</Label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                            ₹
+                          </span>
+                          <Input
+                            type="number"
+                            placeholder="Amount"
+                            className="pl-7"
+                            value={addPaymentAmount}
+                            onChange={(e) => setAddPaymentAmount(e.target.value)}
+                          />
+                        </div>
+                        <Select
+                          value={addPaymentMethodId ? String(addPaymentMethodId) : ""}
+                          onValueChange={(v) => setAddPaymentMethodId(Number(v))}
+                        >
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {salesMethods.map((m) => (
+                              <SelectItem key={m.salesmethodid} value={String(m.salesmethodid)}>
+                                {m.methodname}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          disabled={isAddingPayment}
+                          onClick={handleAddPayment}
+                        >
+                          {isAddingPayment ? "Saving..." : "Record"}
+                        </Button>
                       </div>
-                      <Select
-                        value={addPaymentMethodId ? String(addPaymentMethodId) : ""}
-                        onValueChange={(v) => setAddPaymentMethodId(Number(v))}
-                      >
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder="Method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {salesMethods.map((m) => (
-                            <SelectItem key={m.salesmethodid} value={String(m.salesmethodid)}>
-                              {m.methodname}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        disabled={isAddingPayment}
-                        onClick={handleAddPayment}
-                      >
-                        {isAddingPayment ? "Saving..." : "Record"}
-                      </Button>
                     </div>
-                  </div>
+                  )}
                 </section>
               ) : (
                 <section className="space-y-2">
@@ -2259,10 +2281,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 </div>
               )}
 
-              {/* Summary */}
+              {/* Summary — a finalized bill's routine "Save Draft" edit no longer force-fits the
+                  total to the (possibly stale) finalAmount, so show the honest `computed` total
+                  here to match what will actually be saved (see handleSaveDraft) */}
               <Summary
                 docType={docType}
-                computed={balanceAdjustedComputed}
+                computed={isFinalizedBill ? computed : balanceAdjustedComputed}
                 appliedStoreCredit={appliedStoreCredit}
                 appliedVoucher={appliedVoucher}
                 customerStoreCreditBalance={customerStoreCreditBalance}
