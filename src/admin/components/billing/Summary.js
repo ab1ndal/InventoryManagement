@@ -79,7 +79,7 @@ export default function Summary({
 
       {computed.balanceDiscount > 0 && (
         <div className="flex justify-between text-orange-600">
-          <span>Balance Discount (pre-tax)</span>
+          <span>{computed.isAutoRounded ? "Rounding Discount" : "Balance Discount"} (pre-tax)</span>
           <span className="tabular-nums">−{money(computed.balanceDiscount)}</span>
         </div>
       )}

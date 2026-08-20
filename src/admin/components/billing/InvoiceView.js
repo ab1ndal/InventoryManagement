@@ -1,6 +1,6 @@
 import React, { forwardRef } from "react";
 import logo from "../../../assets/LOGO-Bill.png";
-import { getFreeItems, valueOfDiscount } from './billUtils';
+import { getFreeItems, valueOfDiscount, round2 } from './billUtils';
 import { computeCreditsApplied } from './exchangeHelpers';
 
 const STORE = {
@@ -64,12 +64,15 @@ const InvoiceView = forwardRef(function InvoiceView(
   );
 
   // Compute per-line GST breakdown
+  const isAutoRounded = !!computed?.isAutoRounded;
+  let sumRoundingDisc = 0;
   const lineItems = (items || []).map((item, idx) => {
     const mrp = Number(item.mrp) || 0;
     const qty = Number(item.qty || item.quantity) || 0;
     const disc = mrp * qty * ((Number(item.quickDiscountPct) || 0) / 100);
     const alteration = Number(item.alteration_charge || 0);
     const withCharges = mrp * qty - disc + alteration;
+    const isLastItem = idx === (items || []).length - 1;
 
     const proportion =
       totalWithCharges > 0
@@ -77,8 +80,20 @@ const InvoiceView = forwardRef(function InvoiceView(
         : 1 / Math.max((items || []).length, 1);
     const itemOverallDisc =
       overallDiscount > 0 ? overallDiscount * proportion : 0;
-    const itemBalanceDisc =
-      balanceDiscount > 0 ? balanceDiscount * proportion : 0;
+    // Bill Rounding discount is always distributed in whole rupees (mirrors
+    // buildBillItemsPayload) so the printed per-line amounts match bill_items exactly;
+    // the manual "balance waiver" case keeps the plain proportional split.
+    let itemBalanceDisc = 0;
+    if (balanceDiscount > 0) {
+      if (isAutoRounded) {
+        itemBalanceDisc = isLastItem
+          ? round2(balanceDiscount - sumRoundingDisc)
+          : Math.round(balanceDiscount * proportion);
+        if (!isLastItem) sumRoundingDisc += itemBalanceDisc;
+      } else {
+        itemBalanceDisc = balanceDiscount * proportion;
+      }
+    }
     const itemVoucherDisc =
       effectiveVoucher > 0 ? effectiveVoucher * proportion : 0;
     const adjustedTaxable = Math.max(
@@ -399,7 +414,7 @@ const InvoiceView = forwardRef(function InvoiceView(
         ))}
         {Number(computed?.balanceDiscount ?? 0) > 0 && (
           <div style={{ color: "#dc2626" }}>
-            Additional Store Discount: −₹
+            {computed?.isAutoRounded ? "Rounding Discount" : "Additional Store Discount"}: −₹
             {Number(computed.balanceDiscount).toFixed(2)}
           </div>
         )}

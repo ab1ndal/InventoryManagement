@@ -41,16 +41,19 @@ export function computeStockDelta(existingBillItems, newInventoryItems) {
  *
  * @param {number} billid - The bill ID to associate items with
  * @param {Array} items - BillingForm item objects (must include stitchType)
- * @param {number} balanceDiscount - Pre-tax balance discount to distribute
+ * @param {number} balanceDiscount - Pre-tax balance discount to distribute (explicit partial-finalize waiver)
  * @param {number} overallDiscount - Pre-tax overall discount to distribute
+ * @param {string} docType
+ * @param {number} roundingDiscount - Pre-tax "round to nearest ₹5" discount to distribute, in whole rupees per item
  * @returns {Array} Array of bill_items insert objects ready for Supabase insert
  */
-export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overallDiscount = 0, docType = 'invoice') {
+export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overallDiscount = 0, docType = 'invoice', roundingDiscount = 0) {
   const pricedItems = items.map(priceItem);
   const totalWithCharges = pricedItems.reduce((s, p) => s + p.withCharges, 0);
 
   let sumOverallDisc = 0;
   let sumBalanceDisc = 0;
+  let sumRoundingDisc = 0;
 
   return items.map((it, idx) => {
     const priced = pricedItems[idx];
@@ -60,18 +63,25 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
         ? priced.withCharges / totalWithCharges
         : 1 / Math.max(items.length, 1);
 
-    let itemOverallDisc, itemBalanceDisc;
+    let itemOverallDisc, itemBalanceDisc, itemRoundingDisc;
     if (isLast) {
       itemOverallDisc = overallDiscount > 0 ? round2(overallDiscount - sumOverallDisc) : 0;
       itemBalanceDisc = balanceDiscount > 0 ? round2(balanceDiscount - sumBalanceDisc) : 0;
+      itemRoundingDisc = roundingDiscount > 0 ? round2(roundingDiscount - sumRoundingDisc) : 0;
     } else {
       itemOverallDisc = overallDiscount > 0 ? round2(overallDiscount * proportion) : 0;
       itemBalanceDisc = balanceDiscount > 0 ? round2(balanceDiscount * proportion) : 0;
+      // Whole rupees only — this is the "make change easy" rounding discount, so
+      // individual item shares shouldn't carry paisa. The last item absorbs whatever's
+      // left to keep the sum exact (see rounding docType note below for the small
+      // GST-driven remainder that can land there).
+      itemRoundingDisc = roundingDiscount > 0 ? Math.round(roundingDiscount * proportion) : 0;
       sumOverallDisc += itemOverallDisc;
       sumBalanceDisc += itemBalanceDisc;
+      sumRoundingDisc += itemRoundingDisc;
     }
     const adjustedSubtotal = round2(
-      priced.withCharges - itemOverallDisc - itemBalanceDisc,
+      priced.withCharges - itemOverallDisc - itemBalanceDisc - itemRoundingDisc,
     );
 
     // Split adjustedSubtotal into item and alteration pre-tax portions
@@ -113,7 +123,7 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
       cost_price: it.cost_price ?? null,
       alteration_charge: Number(it.alteration_charge || 0),
       discount_total: round2(
-        priced.itemDisc + itemOverallDisc + itemBalanceDisc,
+        priced.itemDisc + itemOverallDisc + itemBalanceDisc + itemRoundingDisc,
       ),
       subtotal: adjustedSubtotal,
       gst_rate: docType === 'bos' ? null : gstRate,

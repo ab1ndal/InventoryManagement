@@ -566,20 +566,55 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     [items, selectedCodes, allDiscounts, appliedVoucher, docType],
   );
 
+  // Bill Rounding discount: when nothing else is forcing the total down (see
+  // balanceAdjustedComputed below), round the grand total down to the nearest ₹5 so the
+  // bill settles on a cash-friendly number, instead of staff typing a manual finalAmount
+  // override to fake the same result. Distributed across items in whole rupees — see
+  // buildBillItemsPayload's roundingDiscount param.
+  const BILL_ROUNDING_UNIT = 5;
+  const autoRoundedComputed = useMemo(() => {
+    if (computed.grandTotal <= 0) return computed;
+    const roundTarget =
+      Math.floor(computed.grandTotal / BILL_ROUNDING_UNIT) * BILL_ROUNDING_UNIT;
+    if (roundTarget >= computed.grandTotal) return computed; // already a clean multiple
+    const preDisc = computePreTaxBalanceDiscount(
+      computed,
+      roundTarget,
+      items,
+      selectedCodes,
+      allDiscounts,
+      Number(appliedVoucher?.value ?? 0),
+      docType,
+    );
+    if (preDisc <= 0) return computed;
+    return {
+      ...computeBillTotals(
+        items,
+        selectedCodes,
+        allDiscounts,
+        preDisc,
+        Number(appliedVoucher?.value ?? 0),
+        docType,
+      ),
+      isAutoRounded: true,
+    };
+  }, [computed, items, selectedCodes, allDiscounts, appliedVoucher, docType]);
+
   // When payment is less than the effective total, compute a pre-tax balance discount
-  // so the final bill total exactly matches what the customer paid.
+  // so the final bill total exactly matches what the customer paid. Falls back to the
+  // automatic ₹5 rounding above when nothing is explicitly forcing a lower total.
   const balanceAdjustedComputed = useMemo(() => {
     const hasFinalAmount = Number(finalAmount) > 0;
     const targetAmt = hasFinalAmount ? Number(finalAmount) : Number(paymentAmount);
-    if (!targetAmt || targetAmt <= 0 || computed.grandTotal <= 0) return computed;
+    if (!targetAmt || targetAmt <= 0 || computed.grandTotal <= 0) return autoRoundedComputed;
     const { effectiveTotal: effectiveGrandTotal } = computeCreditsApplied(
       computed.grandTotal,
       appliedStoreCredit,
       exchangeCredit?.amount,
     );
-    if (targetAmt >= effectiveGrandTotal) return computed;
+    if (targetAmt >= effectiveGrandTotal) return autoRoundedComputed;
     // In partial scenario (shortfall > ₹100) without explicit finalAmount, don't auto-discount
-    if (!hasFinalAmount && effectiveGrandTotal - targetAmt > 100) return computed;
+    if (!hasFinalAmount && effectiveGrandTotal - targetAmt > 100) return autoRoundedComputed;
     const shortfall = effectiveGrandTotal - targetAmt;
     const preDisc = computePreTaxBalanceDiscount(
       computed,
@@ -590,7 +625,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       Number(appliedVoucher?.value ?? 0),
       docType,
     );
-    if (preDisc <= 0) return computed;
+    if (preDisc <= 0) return autoRoundedComputed;
     return computeBillTotals(
       items,
       selectedCodes,
@@ -601,6 +636,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     );
   }, [
     computed,
+    autoRoundedComputed,
     finalAmount,
     paymentAmount,
     appliedStoreCredit,
@@ -803,13 +839,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         // NOTE: routine edits never re-run the balance-forcing math (balanceAdjustedComputed) —
         // that mechanism exists only for the explicit "confirm partial finalize" action
         // (handleConfirmPartialFinalize). Reusing it here silently discounted away the cost of
-        // any item added after a bill's finalAmount/paymentAmount was locked in.
+        // any item added after a bill's finalAmount/paymentAmount was locked in. autoRoundedComputed
+        // is safe here — it ignores finalAmount/paymentAmount entirely, it only rounds the honest
+        // current total down to the nearest ₹5.
+        const totalsToUse = autoRoundedComputed;
         const billItemsPayload = buildBillItemsPayload(
           billId,
           items,
           0,
-          computed.overallDiscount,
+          totalsToUse.overallDiscount,
           docType,
+          totalsToUse.isAutoRounded ? (totalsToUse.balanceDiscount || 0) : 0,
         );
         const { error: insErr } = await supabase
           .from("bill_items")
@@ -818,7 +858,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           throw new Error("Failed to save updated items: " + insErr.message);
 
         // Step H: Update bills row
-        const totalsToUse = computed;
         const { effectiveTotal: editEffectiveTotal } = computeCreditsApplied(
           totalsToUse.grandTotal,
           appliedStoreCredit,
@@ -833,7 +872,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             totalamount: totalsToUse.grandTotal,
             gst_total: totalsToUse.gstTotal,
             discount_total:
-              totalsToUse.itemLevelDiscountTotal + totalsToUse.overallDiscount,
+              totalsToUse.itemLevelDiscountTotal +
+              totalsToUse.overallDiscount +
+              (totalsToUse.isAutoRounded ? Number(totalsToUse.balanceDiscount || 0) : 0),
             taxable_total: totalsToUse.taxableTotal,
             net_amount: editEffectiveTotal,
             applied_codes: selectedCodes,
@@ -1227,13 +1268,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             .in("exchangeid", exchangeCredit.exchangeIds);
         }
 
-        // Insert bill_items with balance discount distributed proportionally
+        // Insert bill_items with balance/rounding discount distributed proportionally.
+        // balanceAdjustedComputed.isAutoRounded means nothing explicitly forced the total
+        // (no finalAmount/paymentAmount shortfall) — the ₹5 auto-rounding kicked in instead,
+        // which distributes in whole rupees rather than the balance-waiver's round2 shares.
         const billItemsPayload = buildBillItemsPayload(
           activeBillId,
           items,
-          balanceAdjustedComputed.balanceDiscount || 0,
+          balanceAdjustedComputed.isAutoRounded ? 0 : (balanceAdjustedComputed.balanceDiscount || 0),
           balanceAdjustedComputed.overallDiscount,
           docType,
+          balanceAdjustedComputed.isAutoRounded ? (balanceAdjustedComputed.balanceDiscount || 0) : 0,
         );
         const { error: itemsError } = await supabase
           .from("bill_items")
@@ -1369,9 +1414,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const updatedPayload = buildBillItemsPayload(
           activeBillId,
           items,
-          balanceAdjustedComputed.balanceDiscount || 0,
+          balanceAdjustedComputed.isAutoRounded ? 0 : (balanceAdjustedComputed.balanceDiscount || 0),
           balanceAdjustedComputed.overallDiscount,
           docType,
+          balanceAdjustedComputed.isAutoRounded ? (balanceAdjustedComputed.balanceDiscount || 0) : 0,
         );
         const { error: insErr } = await supabase.from("bill_items").insert(updatedPayload);
         if (insErr) throw new Error("Failed to save updated items: " + insErr.message);
@@ -2286,7 +2332,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   here to match what will actually be saved (see handleSaveDraft) */}
               <Summary
                 docType={docType}
-                computed={isFinalizedBill ? computed : balanceAdjustedComputed}
+                computed={isFinalizedBill ? autoRoundedComputed : balanceAdjustedComputed}
                 appliedStoreCredit={appliedStoreCredit}
                 appliedVoucher={appliedVoucher}
                 customerStoreCreditBalance={customerStoreCreditBalance}
@@ -2406,7 +2452,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             {balanceAdjustedComputed.balanceDiscount > 0 && (
               <div>
                 <span className="font-semibold">
-                  Balance Discount (pre-tax):
+                  {balanceAdjustedComputed.isAutoRounded ? "Rounding Discount" : "Balance Discount"} (pre-tax):
                 </span>{" "}
                 −₹{balanceAdjustedComputed.balanceDiscount.toFixed(2)}
               </div>

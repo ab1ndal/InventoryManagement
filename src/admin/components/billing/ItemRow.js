@@ -15,7 +15,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
   const pricing = priceItem(item);
   const isBos = docType === 'bos';
   const [discountRaw, setDiscountRaw] = useState(null);
-  const [discountUnit, setDiscountUnit] = useState("pct"); // "pct" | "amt"
+  const [discountUnit, setDiscountUnit] = useState("amt"); // "pct" | "amt" — defaults to ₹ at entry time, per-item toggle stays available
   const base = Number(item.mrp || 0) * Number(item.quantity || 1);
 
   // Bill of Supply carries no GST: subtotal is goods after discount, and total
@@ -108,6 +108,13 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
             }}
             className="h-7 w-20 text-center"
           />
+          {/* Entry-time only: show the complementary unit in brackets next to whichever
+              one is being typed, so ₹-first entry still shows the % at a glance. */}
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {discountUnit === "amt"
+              ? `(${item.quickDiscountPct ?? 0}%)`
+              : `(₹${round2((base * Number(item.quickDiscountPct || 0)) / 100)})`}
+          </span>
           <button
             type="button"
             onClick={() => {

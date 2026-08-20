@@ -1,4 +1,4 @@
-import { priceItem, normalizeItem, computeBillTotals, computeAlterationDeposit } from "../billUtils";
+import { priceItem, normalizeItem, computeBillTotals, computeAlterationDeposit, computePreTaxBalanceDiscount } from "../billUtils";
 import { backCalcDiscountPct } from "../stockHelpers";
 
 describe("normalizeItem", () => {
@@ -190,5 +190,33 @@ describe("computeAlterationDeposit", () => {
     ];
     const individual = items.map((it) => computeAlterationDeposit([it]));
     expect(computeAlterationDeposit(items)).toBeCloseTo(individual[0] + individual[1], 2);
+  });
+});
+
+describe("computePreTaxBalanceDiscount — Bill Rounding to nearest ₹5", () => {
+  const items = [
+    { quantity: 1, mrp: 1995, quickDiscountPct: 25, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+    { quantity: 1, mrp: 1195, quickDiscountPct: 25, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+    { quantity: 1, mrp: 600, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+  ];
+
+  it("hitting an arbitrary ₹5-aligned target lands the grand total exactly on it", () => {
+    const base = computeBillTotals(items, [], [], 0, 0, "bos");
+    const target = Math.floor(base.grandTotal / 5) * 5;
+    if (target === base.grandTotal) return; // already aligned, nothing to round
+    const preDisc = computePreTaxBalanceDiscount(base, target, items, [], [], 0, "bos");
+    const rounded = computeBillTotals(items, [], [], preDisc, 0, "bos");
+    expect(rounded.grandTotal).toBeCloseTo(target, 2);
+  });
+
+  it("does nothing when the grand total is already a clean multiple of ₹5", () => {
+    // MRP totals to exactly 3790, no discount, unstitched (no GST in BoS) → already round
+    const cleanItems = [
+      { quantity: 1, mrp: 1000, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+      { quantity: 1, mrp: 2790, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
+    ];
+    const base = computeBillTotals(cleanItems, [], [], 0, 0, "bos");
+    const target = Math.floor(base.grandTotal / 5) * 5;
+    expect(target).toBe(base.grandTotal);
   });
 });
