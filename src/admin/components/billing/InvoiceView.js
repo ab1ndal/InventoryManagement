@@ -1,6 +1,6 @@
 import React, { forwardRef } from "react";
 import logo from "../../../assets/LOGO-Bill.png";
-import { getFreeItems, valueOfDiscount, round2 } from './billUtils';
+import { getFreeItems, valueOfDiscount } from './billUtils';
 import { computeCreditsApplied } from './exchangeHelpers';
 
 const STORE = {
@@ -40,6 +40,10 @@ const InvoiceView = forwardRef(function InvoiceView(
     billPayments = [],
     paymentStatus = "finalized",
     docType = "invoice",
+    // Reprint of a finalized bill: per-line numbers and discount breakdown come
+    // from what was persisted (see rehydrateBill.js) instead of being re-derived.
+    lines: storedLines = null,
+    discountLines: storedDiscountLines = null,
   },
   ref,
 ) {
@@ -64,15 +68,12 @@ const InvoiceView = forwardRef(function InvoiceView(
   );
 
   // Compute per-line GST breakdown
-  const isAutoRounded = !!computed?.isAutoRounded;
-  let sumRoundingDisc = 0;
-  const lineItems = (items || []).map((item, idx) => {
+  const derivedLineItems = (items || []).map((item, idx) => {
     const mrp = Number(item.mrp) || 0;
     const qty = Number(item.qty || item.quantity) || 0;
     const disc = mrp * qty * ((Number(item.quickDiscountPct) || 0) / 100);
     const alteration = Number(item.alteration_charge || 0);
     const withCharges = mrp * qty - disc + alteration;
-    const isLastItem = idx === (items || []).length - 1;
 
     const proportion =
       totalWithCharges > 0
@@ -80,20 +81,7 @@ const InvoiceView = forwardRef(function InvoiceView(
         : 1 / Math.max((items || []).length, 1);
     const itemOverallDisc =
       overallDiscount > 0 ? overallDiscount * proportion : 0;
-    // Bill Rounding discount is always distributed in whole rupees (mirrors
-    // buildBillItemsPayload) so the printed per-line amounts match bill_items exactly;
-    // the manual "balance waiver" case keeps the plain proportional split.
-    let itemBalanceDisc = 0;
-    if (balanceDiscount > 0) {
-      if (isAutoRounded) {
-        itemBalanceDisc = isLastItem
-          ? round2(balanceDiscount - sumRoundingDisc)
-          : Math.round(balanceDiscount * proportion);
-        if (!isLastItem) sumRoundingDisc += itemBalanceDisc;
-      } else {
-        itemBalanceDisc = balanceDiscount * proportion;
-      }
-    }
+    const itemBalanceDisc = balanceDiscount > 0 ? balanceDiscount * proportion : 0;
     const itemVoucherDisc =
       effectiveVoucher > 0 ? effectiveVoucher * proportion : 0;
     const adjustedTaxable = Math.max(
@@ -134,6 +122,8 @@ const InvoiceView = forwardRef(function InvoiceView(
       bosAmount: adjustedTaxable, // value + full alteration, no GST
     };
   });
+
+  const lineItems = storedLines ?? derivedLineItems;
 
   // Identify items that are free via buy_x_get_y discounts (D-10)
   const freeItemIndices = new Set();
@@ -189,9 +179,11 @@ const InvoiceView = forwardRef(function InvoiceView(
   const itemsSubtotal = Number(computed?.itemsSubtotal ?? 0);
   const totalSaved =
     itemsSubtotal > 0
-      ? Number(computed?.itemLevelDiscountTotal ?? 0) +
-        Number(computed?.overallDiscount ?? 0) +
-        Number(computed?.balanceDiscount ?? 0) +
+      ? (storedDiscountLines
+          ? Number(computed?.discountTotal ?? 0)
+          : Number(computed?.itemLevelDiscountTotal ?? 0) +
+            Number(computed?.overallDiscount ?? 0) +
+            Number(computed?.balanceDiscount ?? 0)) +
         effectiveVoucher +
         additionalDiscount
       : 0;
@@ -401,22 +393,32 @@ const InvoiceView = forwardRef(function InvoiceView(
       {/* 4. Totals Section */}
       <div style={{ textAlign: "right", marginBottom: "12px" }}>
         <div>Item Subtotal: ₹{itemsSubtotal.toFixed(2)}</div>
-        {Number(computed?.itemLevelDiscountTotal ?? 0) > 0 && (
-          <div style={{ color: "#dc2626" }}>
-            Item Discounts: −₹
-            {Number(computed.itemLevelDiscountTotal).toFixed(2)}
-          </div>
-        )}
-        {appliedDiscountDetails.map(({ code, amount, pct }) => (
-          <div key={code} style={{ color: "#dc2626" }}>
-            {code} ({pct}% off): −₹{amount.toFixed(2)}
-          </div>
-        ))}
-        {Number(computed?.balanceDiscount ?? 0) > 0 && (
-          <div style={{ color: "#dc2626" }}>
-            {computed?.isAutoRounded ? "Rounding Discount" : "Additional Store Discount"}: −₹
-            {Number(computed.balanceDiscount).toFixed(2)}
-          </div>
+        {storedDiscountLines ? (
+          storedDiscountLines.map(({ label, amount }) => (
+            <div key={label} style={{ color: "#dc2626" }}>
+              {label}: −₹{Number(amount).toFixed(2)}
+            </div>
+          ))
+        ) : (
+          <>
+            {Number(computed?.itemLevelDiscountTotal ?? 0) > 0 && (
+              <div style={{ color: "#dc2626" }}>
+                Item Discounts: −₹
+                {Number(computed.itemLevelDiscountTotal).toFixed(2)}
+              </div>
+            )}
+            {appliedDiscountDetails.map(({ code, amount, pct }) => (
+              <div key={code} style={{ color: "#dc2626" }}>
+                {code} ({pct}% off): −₹{amount.toFixed(2)}
+              </div>
+            ))}
+            {Number(computed?.balanceDiscount ?? 0) > 0 && (
+              <div style={{ color: "#dc2626" }}>
+                Additional Store Discount: −₹
+                {Number(computed.balanceDiscount).toFixed(2)}
+              </div>
+            )}
+          </>
         )}
         {!isBos && (
           <div style={{ color: "#6b7280", fontSize: "10px", marginTop: 2 }}>

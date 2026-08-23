@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import ReturnReceiptView from "./billing/ReturnReceiptView";
 import InvoiceView from "./billing/InvoiceView";
 import { generateInvoicePdf } from "./billing/generateInvoicePdf";
-import { computeBillTotals } from "./billing/billUtils";
+import { rehydrateBillTotals } from "./billing/rehydrateBill";
 import { backCalcDiscountPct } from "./billing/stockHelpers";
 import { formatDate } from "../../utility/dateFormat";
 import { formatINR } from "../../utility/formatCurrency";
@@ -57,13 +57,14 @@ export default function BillTable({ onEdit }) {
       // Fetch bill core data
       const { data: billRow, error: billErr } = await supabase
         .from("bills")
-        .select("applied_codes, payment_amount, net_amount, paymentstatus, saleslocationid, salesmethodid, store_credit_used, exchange_credit_used, exchange_source_bill, orderdate, customerid, bill_number, document_type")
+        .select("applied_codes, payment_amount, net_amount, paymentstatus, saleslocationid, salesmethodid, store_credit_used, exchange_credit_used, exchange_source_bill, orderdate, customerid, bill_number, document_type, totalamount, gst_total, discount_total, taxable_total")
         .eq("billid", billId)
         .single();
       if (billErr) throw billErr;
 
       // Fetch bill items
-      const { data: billItems } = await supabase.from("bill_items").select("*").eq("billid", billId);
+      // Stable order so the reprint lines up with what was printed originally
+      const { data: billItems } = await supabase.from("bill_items").select("*").eq("billid", billId).order("bill_item_id");
 
       // Fetch variants
       const inventoryItems = (billItems || []).filter(bi => bi.variantid);
@@ -159,9 +160,18 @@ export default function BillTable({ onEdit }) {
         ? { amount: Number(billRow.exchange_credit_used), sourceBillNumber: billRow.exchange_source_bill }
         : null;
 
-      const computed = computeBillTotals(items, appliedCodes, allDiscounts, 0, 0, billRow.document_type || 'bos');
+      // A reprint must reproduce what the customer was charged, so read the stored
+      // numbers rather than re-pricing the items (see rehydrateBill.js).
+      const { computed, lines, discountLines } = rehydrateBillTotals(
+        billRow,
+        billItems || [],
+        allDiscounts,
+        items,
+      );
 
       flushSync(() => setRegenBillData({
+        lines,
+        discountLines,
         billId,
         billNumber: billRow.bill_number || null,
         billDate: new Date(billRow.orderdate),
@@ -1148,6 +1158,8 @@ export default function BillTable({ onEdit }) {
             billPayments={regenBillData.billPayments}
             paymentStatus={regenBillData.paymentStatus}
             docType={regenBillData.docType}
+            lines={regenBillData.lines}
+            discountLines={regenBillData.discountLines}
           />
         </div>
       )}

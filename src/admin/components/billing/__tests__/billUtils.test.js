@@ -1,4 +1,4 @@
-import { priceItem, normalizeItem, computeBillTotals, computeAlterationDeposit, computePreTaxBalanceDiscount } from "../billUtils";
+import { priceItem, normalizeItem, computeBillTotals, computeAlterationDeposit, computePreTaxBalanceDiscount, round2 } from "../billUtils";
 import { backCalcDiscountPct } from "../stockHelpers";
 
 describe("normalizeItem", () => {
@@ -193,30 +193,25 @@ describe("computeAlterationDeposit", () => {
   });
 });
 
-describe("computePreTaxBalanceDiscount — Bill Rounding to nearest ₹5", () => {
+describe("computePreTaxBalanceDiscount — forcing the grand total to an agreed amount", () => {
   const items = [
     { quantity: 1, mrp: 1995, quickDiscountPct: 25, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
     { quantity: 1, mrp: 1195, quickDiscountPct: 25, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
     { quantity: 1, mrp: 600, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
   ];
 
-  it("hitting an arbitrary ₹5-aligned target lands the grand total exactly on it", () => {
+  it("hitting an arbitrary lower target lands the grand total exactly on it", () => {
     const base = computeBillTotals(items, [], [], 0, 0, "bos");
-    const target = Math.floor(base.grandTotal / 5) * 5;
-    if (target === base.grandTotal) return; // already aligned, nothing to round
+    const target = round2(base.grandTotal - 137.5);
     const preDisc = computePreTaxBalanceDiscount(base, target, items, [], [], 0, "bos");
-    const rounded = computeBillTotals(items, [], [], preDisc, 0, "bos");
-    expect(rounded.grandTotal).toBeCloseTo(target, 2);
+    const forced = computeBillTotals(items, [], [], preDisc, 0, "bos");
+    expect(forced.grandTotal).toBeCloseTo(target, 2);
   });
 
-  it("does nothing when the grand total is already a clean multiple of ₹5", () => {
-    // MRP totals to exactly 3790, no discount, unstitched (no GST in BoS) → already round
-    const cleanItems = [
-      { quantity: 1, mrp: 1000, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
-      { quantity: 1, mrp: 2790, quickDiscountPct: 0, alteration_charge: 0, gstRate: 5, stitchType: "unstitched" },
-    ];
-    const base = computeBillTotals(cleanItems, [], [], 0, 0, "bos");
-    const target = Math.floor(base.grandTotal / 5) * 5;
-    expect(target).toBe(base.grandTotal);
+  it("returns 0 when the target is at or above the current grand total", () => {
+    const base = computeBillTotals(items, [], [], 0, 0, "bos");
+    expect(
+      computePreTaxBalanceDiscount(base, base.grandTotal, items, [], [], 0, "bos"),
+    ).toBe(0);
   });
 });
