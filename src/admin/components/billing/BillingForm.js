@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computePreTaxBalanceDiscount, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
+import { tallyPayment } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -1873,19 +1874,24 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       if (payErr) throw new Error("Failed to record payment: " + payErr.message);
 
       const updatedPayments = [...billPayments, newPayment];
-      const totalPaid = updatedPayments.reduce((s, p) => s + Number(p.amount), 0);
+      const { totalPaid, remaining, isFullyPaid, paymentStatus } = tallyPayment(
+        billPayments,
+        amt,
+        netAmount,
+      );
       setBillPayments(updatedPayments);
       setAddPaymentAmount("");
       setAddPaymentMethodId(null);
 
-      if (totalPaid >= netAmount) {
-        // Fully paid — flip bill to finalized
-        const { error: updErr } = await supabase
-          .from("bills")
-          .update({ paymentstatus: "finalized" })
-          .eq("billid", billId);
-        if (updErr) throw updErr;
+      // payment_amount is the running total received, so it moves with every payment
+      const { error: updErr } = await supabase
+        .from("bills")
+        .update({ payment_amount: totalPaid, paymentstatus: paymentStatus })
+        .eq("billid", billId);
+      if (updErr) throw updErr;
+      setPaymentAmount(String(totalPaid));
 
+      if (isFullyPaid) {
         // Flush finalized state into InvoiceView before PDF capture
         flushSync(() => {
           setBillPaymentStatus("finalized");
@@ -1908,13 +1914,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         toast.success("Bill fully paid — finalized!");
         onSubmit?.();
       } else {
-        const remaining = netAmount - totalPaid;
+        setBillPaymentStatus("partial");
         toast.success(
           `₹${amt.toFixed(2)} recorded. Balance remaining: ₹${remaining.toFixed(2)}`
         );
       }
-      const bill_status_now = totalPaid >= netAmount ? "finalized" : "partial";
-      logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Recorded payment of ${money(amt)} on bill #${effectiveBillNumber || "(no number)"}${bill_status_now === "finalized" ? " (now fully paid)" : ""}` });
+      logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Recorded payment of ${money(amt)} on bill #${effectiveBillNumber || "(no number)"}${isFullyPaid ? " (now fully paid)" : ""}` });
     } catch (e) {
       toast.error(e.message);
     } finally {

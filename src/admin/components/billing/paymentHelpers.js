@@ -1,0 +1,35 @@
+// Payment-tally helpers.
+//
+// bills.payment_amount holds the TOTAL received for the bill and is kept in step with
+// bill_payments on every payment. bill_payments remains the ledger of record (it carries
+// the method and timestamp of each installment); payment_amount is the running total
+// derived from it, so readers can get "amount received" without a second query.
+
+import { round2 } from "./billUtils";
+
+/** Total received across a bill's payment rows. */
+export function sumPayments(payments) {
+  return round2(
+    (payments || []).reduce((s, p) => s + Number(p?.amount || 0), 0),
+  );
+}
+
+/**
+ * Where a bill stands after recording one more payment.
+ *
+ * @param {Array} existingPayments - bill_payments rows already recorded
+ * @param {number} newAmount - the payment being added
+ * @param {number} netAmount - amount payable after store/exchange credit
+ * @returns {{ totalPaid: number, remaining: number, isFullyPaid: boolean, paymentStatus: string }}
+ */
+export function tallyPayment(existingPayments, newAmount, netAmount) {
+  const totalPaid = round2(sumPayments(existingPayments) + Number(newAmount || 0));
+  const net = round2(Number(netAmount || 0));
+  const isFullyPaid = totalPaid >= net;
+  return {
+    totalPaid,
+    remaining: round2(Math.max(0, net - totalPaid)),
+    isFullyPaid,
+    paymentStatus: isFullyPaid ? "finalized" : "partial",
+  };
+}

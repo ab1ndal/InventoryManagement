@@ -368,10 +368,9 @@ export default function BillTable({ onEdit }) {
         const pageBills = (data || []).slice(0, ROWS_PER_PAGE);
 
         // Amount Received = total cash collected for the bill.
-        // Multi-stage bills record each installment in bill_payments (and
-        // bills.payment_amount holds only the first), so their sum is the truth.
-        // Bills paid in full in one go store the amount in bills.payment_amount
-        // with no bill_payments rows — fall back to that when no rows exist.
+        // bills.payment_amount tracks that running total, but bill_payments is the
+        // ledger of record, so sum it when rows exist and fall back to payment_amount
+        // for bills paid in one go (which write no bill_payments row).
         const billIds = pageBills.map((b) => b.billid);
         const receivedByBill = new Map();
         if (billIds.length > 0) {
