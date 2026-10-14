@@ -2,7 +2,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "lib/supabaseClient";
 import { buildFamilyIndex } from "../../utility/attributeFamilies";
 import { sortOrderClause } from "./sortOptions";
-import { colorCodesFor, fabricCodesFor } from "./shopAvailability";
+import {
+  buildAvailabilityArgs,
+  colorCodesFor,
+  fabricCodesFor,
+  mapAvailability,
+} from "./shopAvailability";
 
 const PAGE_SIZE = 24;
 
@@ -15,86 +20,18 @@ const INITIAL_FILTERS = {
   priceMax: null,
 };
 
-// Returns product IDs matching all filters except the excluded dimension.
-// Mirrors the runQuery join logic so results are always consistent.
-async function getMatchingPids(filters, excludeDim, fabricIndex, colorIndex) {
-  const colors = excludeDim === "colors" ? [] : filters.colors;
-  const sizes = excludeDim === "sizes" ? [] : filters.sizes;
-  const categories = excludeDim === "categories" ? [] : filters.categories;
-  const fabrics = excludeDim === "fabrics" ? [] : filters.fabrics;
-
-  let productIds = null;
-  if (colors.length > 0 || sizes.length > 0) {
-    let q = supabase.from("productsizecolors").select("productid");
-    if (colors.length > 0) q = q.in("color", colorCodesFor(colors, colorIndex.familyToCodes));
-    if (sizes.length > 0) q = q.in("size", sizes);
-    const { data } = await q;
-    productIds = [...new Set((data || []).map((r) => r.productid))];
-    if (productIds.length === 0) return [];
+// Which filter options still have matching products, per dimension, computed
+// in SQL by get_shop_available_options (each dimension ignores its own filter
+// so selecting a colour never greys out other colours). Returns family-level
+// Sets, or null on failure so the UI fails open (nothing greyed or hidden).
+async function fetchAvailableOptions(filters, fabricIndex, colorIndex) {
+  const args = buildAvailabilityArgs(filters, colorIndex.familyToCodes, fabricIndex.familyToCodes);
+  const { data, error } = await supabase.rpc("get_shop_available_options", args);
+  if (error || !data) {
+    console.error("useShopFilters: get_shop_available_options failed", { error, args });
+    return null;
   }
-
-  let q = supabase.from("products").select("productid");
-  if (categories.length > 0) q = q.in("categoryid", categories);
-  if (productIds !== null) q = q.in("productid", productIds);
-  if (filters.priceMin !== null) q = q.gte("retailprice", filters.priceMin);
-  if (filters.priceMax !== null) q = q.lte("retailprice", filters.priceMax);
-  if (fabrics.length > 0)
-    q = q.in("fabric", fabricCodesFor(fabrics, fabricIndex.familyToCodes));
-
-  const { data } = await q;
-  return (data || []).map((r) => r.productid);
-}
-
-async function fetchAvailableOptionsFromDB(filters, fabricIndex, colorIndex) {
-  const [catPids, colorPids, sizePids, fabricPids] = await Promise.all([
-    getMatchingPids(filters, "categories", fabricIndex, colorIndex),
-    getMatchingPids(filters, "colors", fabricIndex, colorIndex),
-    getMatchingPids(filters, "sizes", fabricIndex, colorIndex),
-    getMatchingPids(filters, "fabrics", fabricIndex, colorIndex),
-  ]);
-
-  const [cats, colorRows, sizeRows, fabRows] = await Promise.all([
-    catPids.length
-      ? supabase.from("products").select("categoryid").in("productid", catPids)
-      : Promise.resolve({ data: [] }),
-    // Apply active size filter so colors returned co-occur with selected sizes
-    colorPids.length
-      ? (() => {
-          let q = supabase.from("productsizecolors").select("color").in("productid", colorPids);
-          if (filters.sizes.length) q = q.in("size", filters.sizes);
-          return q;
-        })()
-      : Promise.resolve({ data: [] }),
-    // Apply active color filter so sizes returned co-occur with selected colors
-    sizePids.length
-      ? (() => {
-          let q = supabase.from("productsizecolors").select("size").in("productid", sizePids);
-          if (filters.colors.length)
-            q = q.in("color", colorCodesFor(filters.colors, colorIndex.familyToCodes));
-          return q;
-        })()
-      : Promise.resolve({ data: [] }),
-    fabricPids.length
-      ? supabase.from("products").select("fabric").in("productid", fabricPids).not("fabric", "is", null)
-      : Promise.resolve({ data: [] }),
-  ]);
-
-  return {
-    categories: new Set((cats.data || []).map((r) => r.categoryid).filter(Boolean)),
-    // Color availability is in the filter's vocabulary — families — so map each
-    // product color code up to every family it belongs to (multi-family).
-    colors: new Set(
-      (colorRows.data || []).flatMap((r) => colorIndex.codeToFamilies[r.color] || [])
-    ),
-    sizes: new Set((sizeRows.data || []).map((r) => r.size).filter(Boolean)),
-    // Availability is expressed in the filter's own vocabulary — families, not
-    // codes — so map each product's fabric code back up to its family.
-    fabrics: new Set(
-      (fabRows.data || [])
-        .flatMap((r) => fabricIndex.codeToFamilies[r.fabric] || [])
-        .filter(Boolean)
-    ),
-  };
+  return mapAvailability(data, colorIndex.codeToFamilies, fabricIndex.codeToFamilies);
 }
 
 export default function useShopFilters() {
@@ -117,7 +54,10 @@ export default function useShopFilters() {
   const [priceBounds, setPriceBounds] = useState({ min: 0, max: 25000 });
 
   const [availableOptions, setAvailableOptions] = useState(null);
+  const [baseOptions, setBaseOptions] = useState(null);
   const debounceRef = useRef(null);
+  // Incremented per filter change; responses carrying an older id are stale.
+  const availabilityRequestRef = useRef(0);
   // fabric family <-> code maps, loaded once from the `fabrics` lookup. A ref
   // (not state) so the query callbacks read the latest without re-subscribing.
   const fabricIndexRef = useRef({ familyToCodes: {}, codeToFamilies: {} });
@@ -157,7 +97,9 @@ export default function useShopFilters() {
         colorIndexRef.current = { familyToCodes, codeToFamilies };
       }
 
-      // Distinct in-stock size codes, sorted by the reference table order.
+      // Every distinct size code on any variant (no stock or storefront
+      // visibility filter; baseOptions hides the ones no shop product has),
+      // sorted by the reference table order.
       const rawSizes = (data.distinct_sizes || []).filter(Boolean);
       const sizeDefs = data.sizes || [];
       if (sizeDefs.length) {
@@ -189,12 +131,23 @@ export default function useShopFilters() {
         const max = Math.ceil(Number(data.price_max) / 500) * 500;
         setPriceBounds({ min: 0, max: max || 25000 });
       }
+
+      // Base availability (no filters) hides options no shop product has, e.g.
+      // reference sizes never stocked. Runs after the indices above are set
+      // because code -> family mapping depends on them.
+      setBaseOptions(
+        await fetchAvailableOptions(INITIAL_FILTERS, fabricIndexRef.current, colorIndexRef.current)
+      );
     }
     fetchOptions();
   }, []);
 
   // Debounced server-side available options — fires only when filters are active
   useEffect(() => {
+    // Any filter change invalidates in-flight requests, including the switch
+    // back to "no filters" below, so a slow older response can't overwrite.
+    const requestId = ++availabilityRequestRef.current;
+
     const hasActiveFilters =
       filters.categories.length > 0 ||
       filters.colors.length > 0 ||
@@ -210,11 +163,12 @@ export default function useShopFilters() {
 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const available = await fetchAvailableOptionsFromDB(
+      const available = await fetchAvailableOptions(
         filters,
         fabricIndexRef.current,
         colorIndexRef.current
       );
+      if (requestId !== availabilityRequestRef.current) return;
       setAvailableOptions(available);
     }, 200);
 
@@ -341,10 +295,6 @@ export default function useShopFilters() {
     }
   }, []);
 
-  const clearPrice = useCallback(() => {
-    setFilters((prev) => ({ ...prev, priceMin: null, priceMax: null }));
-  }, []);
-
   const activeCount =
     filters.categories.length +
     filters.colors.length +
@@ -366,7 +316,6 @@ export default function useShopFilters() {
     setPrice,
     clearAll,
     clearOne,
-    clearPrice,
     clearField,
     activeCount,
     categoryOptions,
@@ -377,6 +326,7 @@ export default function useShopFilters() {
     fabricOptions,
     priceBounds,
     availableOptions,
+    baseOptions,
     error,
     retry,
   };
