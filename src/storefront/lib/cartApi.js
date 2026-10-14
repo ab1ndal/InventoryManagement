@@ -57,6 +57,9 @@ export async function clearServerCart() {
 }
 
 // Live stock (per variant) + price (per product) for the given cart items.
+// Variants whose product is no longer readable (RLS hides products without
+// photos) are left out, so revalidateItems drops them instead of keeping a
+// stale price for a product the shop no longer shows.
 export async function fetchLiveVariantData(items) {
   if (!items.length) return {};
   const variantIds = items.map((i) => i.variant_id);
@@ -70,7 +73,9 @@ export async function fetchLiveVariantData(items) {
   const out = {};
   (variants || []).forEach((v) => {
     const item = items.find((i) => i.variant_id === v.variantid);
-    out[v.variantid] = { stock: Number(v.stock), price: item ? priceByProduct[item.product_id] : undefined };
+    const price = item ? priceByProduct[item.product_id] : undefined;
+    if (price === undefined) return;
+    out[v.variantid] = { stock: Number(v.stock), price };
   });
   return out;
 }
