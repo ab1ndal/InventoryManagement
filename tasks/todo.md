@@ -20,7 +20,7 @@ plus `create index productimages_productid_idx on productimages (productid)`
 `get_shop_filter_options` RPC (security invoker). Admin unaffected (`admin_only`
 policy via `is_admin()`).
 
-- [ ] Owner decision (open): also hide out-of-stock (745)? Shipped images-only (787).
+- [x] Owner decision 2026-10-13: keep out-of-stock products visible (787, images-only).
 - [x] Write `schema/migration_storefront_products_with_images.sql`
 - [x] Apply to prod, verify anon count = 787 and admin count = 3,676
 - [ ] Side effects to check: imageless product URL becomes "not found"; cart items for
