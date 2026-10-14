@@ -5,7 +5,7 @@ import Seo from "../components/Seo";
 import ProductCard from "../components/ProductCard";
 import { getCollection } from "../lib/collections";
 
-const PRODUCT_COLUMNS = "productid, name, retailprice, producturl, fabric, categoryid, categories(name)";
+const PRODUCT_COLUMNS = "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
 
 export default function CollectionPage() {
   const { slug } = useParams();

@@ -258,7 +258,7 @@ export default function useShopFilters() {
       let query = supabase
         .from("products")
         .select(
-          "productid, name, retailprice, producturl, fabric, categoryid, categories(name)",
+          "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)",
           { count: "exact" }
         );
 
