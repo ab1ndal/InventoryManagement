@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "lib/supabaseClient";
 import { buildFamilyIndex } from "../../utility/attributeFamilies";
 import { sortOrderClause } from "./sortOptions";
+import { formatSize } from "../lib/sizes";
 import {
   buildAvailabilityArgs,
   colorCodesFor,
@@ -108,11 +109,11 @@ export default function useShopFilters() {
       const rawSizes = (data.distinct_sizes || []).filter(Boolean);
       const sizeDefs = data.sizes || [];
       if (sizeDefs.length) {
-        // `sizes.label` is the canonical display string — the stored code
-        // already encodes letter+numeric (e.g. "S|36"), so use label directly.
+        // Labels that are still raw codes ("XL|42") get the shared
+        // customer-facing format; worded ones ("28 (Waist)") are kept.
         const displayMap = {};
         sizeDefs.forEach((s) => {
-          displayMap[s.code] = s.label;
+          displayMap[s.code] = s.label.includes("|") ? formatSize(s.code) : s.label;
         });
         setSizeDisplayMap(displayMap);
 

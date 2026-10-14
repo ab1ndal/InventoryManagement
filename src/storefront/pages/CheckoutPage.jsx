@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Seo from "../components/Seo";
 import { useCart } from "../context/CartContext";
+import { formatSize } from "../lib/sizes";
 import { addressSchema, shippingFee, INDIAN_STATES } from "../lib/checkout";
 
 const WHATSAPP = "919810873280";
@@ -16,7 +17,7 @@ function subtotalOf(items) {
 // entered, so the store can act on it without any order being created here.
 function whatsappHref(items, subtotal, shipping, address) {
   const lines = items
-    .map((i) => `• ${i.name} (${i.size}/${i.color}) ×${i.quantity} — ₹${(i.price * i.quantity).toLocaleString("en-IN")}`)
+    .map((i) => `• ${i.name} (${formatSize(i.size)}/${i.color}) ×${i.quantity} — ₹${(i.price * i.quantity).toLocaleString("en-IN")}`)
     .join("\n");
   const addressLines = [
     address.name,
@@ -182,7 +183,7 @@ export default function CheckoutPage() {
           <ul className="divide-y divide-storefront-border border-t border-storefront-border">
             {items.map((i) => (
               <li key={i.variant_id} className="flex justify-between py-3 text-sm font-sans text-storefront-charcoal">
-                <span>{i.name} ({i.size}/{i.color}) ×{i.quantity}</span>
+                <span>{i.name} ({formatSize(i.size)}/{i.color}) ×{i.quantity}</span>
                 <span className="tabular-nums">₹{(i.price * i.quantity).toLocaleString("en-IN")}</span>
               </li>
             ))}

@@ -147,3 +147,22 @@ describe("CartDrawer — revalidate on open", () => {
     expect(ctx.revalidateCart).not.toHaveBeenCalled();
   });
 });
+
+describe("CartDrawer — closed", () => {
+  it("is inert when closed so its controls are not keyboard-reachable", () => {
+    renderDrawer({ isOpen: false });
+    expect(screen.getByRole("dialog", { hidden: true })).toHaveAttribute("inert");
+  });
+
+  it("is not inert when open", () => {
+    renderDrawer({ isOpen: true });
+    expect(screen.getByRole("dialog")).not.toHaveAttribute("inert");
+  });
+});
+
+describe("CartDrawer — size label", () => {
+  it("shows a customer-facing size instead of the raw code", () => {
+    renderDrawer({ items: [{ ...ITEM_A, size: "XL|42" }], itemCount: 2 });
+    expect(screen.getByText("XL · Red")).toBeInTheDocument();
+  });
+});

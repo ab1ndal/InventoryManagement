@@ -119,7 +119,7 @@ describe("ProductDetailPage", () => {
     expect(within(details).getByText("Lehenga")).toBeInTheDocument();
     expect(within(details).getByText("Silk")).toBeInTheDocument();
     expect(within(details).getByText("Green, Peach")).toBeInTheDocument();
-    expect(within(details).getByText("UNSTITCHED")).toBeInTheDocument();
+    expect(within(details).getByText("Unstitched")).toBeInTheDocument();
   });
 
   it("shows the tax and shipping line and the trust row", () => {

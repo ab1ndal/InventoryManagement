@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "../../context/CartContext";
+import { formatSize } from "../../lib/sizes";
 
 function CartItem({ item }) {
   const { removeItem, updateQty } = useCart();
@@ -31,7 +32,7 @@ function CartItem({ item }) {
           {item.name}
         </p>
         <p className="text-[10px] text-storefront-muted font-sans mb-2">
-          {item.size} · {item.color}
+          {formatSize(item.size)} · {item.color}
         </p>
         <div className="flex items-center justify-between">
           <div className="flex items-center border border-storefront-border">
@@ -95,7 +96,7 @@ export default function CartDrawer() {
         aria-label="Shopping cart"
         aria-modal={isOpen}
         aria-hidden={!isOpen}
-        {...(!isOpen && { inert: "" })}
+        inert={!isOpen}
         className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 flex flex-col shadow-xl transition-transform duration-300 ease-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
