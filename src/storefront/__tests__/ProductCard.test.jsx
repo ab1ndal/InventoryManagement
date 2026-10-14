@@ -40,9 +40,12 @@ describe("ProductCard", () => {
     expect(screen.queryByText(/left/i)).not.toBeInTheDocument();
   });
 
-  it("shows Only N left when total stock is 3 or fewer", () => {
-    renderCard({ ...base, productsizecolors: [{ stock: 2 }, { stock: 1 }] });
-    expect(screen.getByText("Only 3 left")).toBeInTheDocument();
+  it("shows no low-stock badge even when only one piece is left", () => {
+    // Most items are single pieces (stock 1-3), so a low-stock badge would sit
+    // on ~80% of cards: noise that reads as false scarcity.
+    renderCard({ ...base, productsizecolors: [{ stock: 1 }] });
+    expect(screen.queryByText(/left/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sold out/i)).not.toBeInTheDocument();
   });
 
   it("shows no stock badge when stock is ample", () => {

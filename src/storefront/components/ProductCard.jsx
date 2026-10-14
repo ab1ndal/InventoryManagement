@@ -26,17 +26,15 @@ function PlaceholderImage({ name }) {
   );
 }
 
-const LOW_STOCK_THRESHOLD = 3;
-
 // Badge from the product's real variant stock. Some card sources (wishlist
 // snapshots, the home rail) don't load `productsizecolors`; without variant
-// data the stock is unknown, so show nothing rather than guess.
+// data the stock is unknown, so show nothing rather than guess. No low-stock
+// badge: ~78% of visible products have only 1-3 pieces, so it would sit on
+// most cards and read as false scarcity (see deliveryEstimate.js history).
 function stockBadge(variants) {
   if (!Array.isArray(variants) || variants.length === 0) return null;
   const total = variants.reduce((sum, v) => sum + Math.max(0, Number(v.stock) || 0), 0);
-  if (total === 0) return { label: "Sold out", soldOut: true };
-  if (total <= LOW_STOCK_THRESHOLD) return { label: `Only ${total} left`, soldOut: false };
-  return null;
+  return total === 0 ? { label: "Sold out", soldOut: true } : null;
 }
 
 export default function ProductCard({ product, priority = false }) {
@@ -193,11 +191,7 @@ export default function ProductCard({ product, priority = false }) {
             )}
             {badge && (
               <span
-                className={`text-[9px] tracking-[0.14em] uppercase px-2 sm:px-2.5 py-1 font-sans font-semibold ${
-                  badge.soldOut
-                    ? "bg-storefront-charcoal text-storefront-cream"
-                    : "bg-storefront-gold text-white"
-                }`}
+                className="text-[9px] tracking-[0.14em] uppercase px-2 sm:px-2.5 py-1 font-sans font-semibold bg-storefront-charcoal text-storefront-cream"
               >
                 {badge.label}
               </span>
