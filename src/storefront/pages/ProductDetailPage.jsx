@@ -18,6 +18,7 @@ import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
 import ProductSpecs from "../components/product/ProductSpecs";
 import SizeGuideDialog from "../components/product/SizeGuideDialog";
+import { formatSize, compareSizes } from "../lib/sizes";
 import ImageLightbox from "../components/product/ImageLightbox";
 import StickyAddToCart from "../components/product/StickyAddToCart";
 import MoreLikeThis from "../components/product/MoreLikeThis";
@@ -188,7 +189,10 @@ function ProductDetail({ productid }) {
   const { addItem, openCart } = useCart();
 
   const colours = useMemo(() => unique(variants.map((v) => v.color)), [variants]);
-  const sizes = useMemo(() => unique(variants.map((v) => v.size)), [variants]);
+  const sizes = useMemo(
+    () => unique(variants.map((v) => v.size)).sort(compareSizes).map(formatSize),
+    [variants]
+  );
 
   useEffect(() => {
     let active = true;

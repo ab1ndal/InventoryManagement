@@ -33,3 +33,14 @@ describe("StorefrontFooter", () => {
     expect(document.body.textContent).not.toMatch(/crafted/i);
   });
 });
+
+describe("StorefrontFooter — shop links", () => {
+  it("lists the header categories, linking to their collection pages", () => {
+    renderFooter();
+    expect(screen.getByRole("link", { name: "Sarees" })).toHaveAttribute("href", "/collections/sarees");
+    expect(screen.getByRole("link", { name: "Suits" })).toHaveAttribute("href", "/collections/suits");
+    expect(screen.getByRole("link", { name: "Diwali Edit" })).toHaveAttribute("href", "/collections/diwali");
+    expect(screen.queryByRole("link", { name: /dupattas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /salwar suits/i })).not.toBeInTheDocument();
+  });
+});

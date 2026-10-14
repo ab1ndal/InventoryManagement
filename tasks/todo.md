@@ -1,5 +1,19 @@
 # Todo
 
+## DONE: storefront fixes batch (2026-10-14, branch fix/storefront-sizes-auth-footer)
+- [x] Signed-in customers saw empty shop (no `authenticated` read policy) — migration
+      `schema/migration_storefront_authenticated_read.sql` APPLIED to prod 2026-10-14; non-admin
+      authenticated = 787 products / 0 bills, admin = 3,676
+- [x] Sizes: `lib/sizes.js` formatSize/compareSizes; PDP, cart, checkout, WhatsApp text, shop filter
+      show "XS, S, M, L, XL, 2XL…" in that order. Letter sizes drop the "|42" number because it
+      disagrees with the size guide (guide XL bust 40 vs code XL|42) — owner may want guide fixed.
+- [x] Footer shop links reuse NAV_LINKS; CartDrawer `inert` fixed; guest cart drops hidden products
+- [x] Plus sizes up to 6XL: promo line + trust row (5 signals)
+- [x] Imageless side effects checked: PDP shows "Product not found"; 0 server cart rows affected;
+      home band uses fixed collections (all populated), so the ">=10 products" worry is obsolete
+- Open: TrustBar still says "Delivered across India" — conflicts with held PR #14 (UP-only).
+- Open: shop size filter "View more (47)" lists sizes no visible product stocks (pre-existing).
+
 ## DONE: Andaaz-style left filter sidebar on /shop (2026-10-14, PR #24 merged 5861d50)
 Spec `docs/superpowers/specs/2026-10-14-shop-filter-sidebar-design.md`, plan
 `docs/superpowers/plans/2026-10-14-shop-filter-sidebar.md`, branch `feat/shop-filter-sidebar`.
@@ -66,7 +80,7 @@ policy via `is_admin()`).
 - [x] Owner decision 2026-10-13: keep out-of-stock products visible (787, images-only).
 - [x] Write `schema/migration_storefront_products_with_images.sql`
 - [x] Apply to prod, verify anon count = 787 and admin count = 3,676
-- [ ] Side effects to check: imageless product URL becomes "not found"; cart items for
+- [x] Side effects checked 2026-10-14 (see top); imageless product URL becomes "not found"; cart items for
       imageless products lose price in `cartApi.fetchLiveVariantData`; home category
       tiles need >=10 products, so some categories may disappear
 

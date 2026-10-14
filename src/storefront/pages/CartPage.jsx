@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import Seo from "../components/Seo";
 import { useCart } from "../context/CartContext";
+import { formatSize } from "../lib/sizes";
 import { trackEvent } from "../lib/analytics";
 
 const WHATSAPP = "919810873280";
@@ -13,7 +14,7 @@ function subtotalOf(items) {
 
 function whatsappHref(items, subtotal) {
   const lines = items
-    .map((i) => `• ${i.name} (${i.size}/${i.color}) ×${i.quantity} — ₹${(i.price * i.quantity).toLocaleString("en-IN")}`)
+    .map((i) => `• ${i.name} (${formatSize(i.size)}/${i.color}) ×${i.quantity} — ₹${(i.price * i.quantity).toLocaleString("en-IN")}`)
     .join("\n");
   const text = `Hi, I’d like to order:\n${lines}\n\nSubtotal: ₹${subtotal.toLocaleString("en-IN")}`;
   // encodeURIComponent so product names containing &, #, + etc. don't corrupt
@@ -62,7 +63,7 @@ export default function CartPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-sans text-sm text-storefront-charcoal">{i.name}</p>
-              <p className="text-xs text-storefront-muted font-sans">{i.size} · {i.color}</p>
+              <p className="text-xs text-storefront-muted font-sans">{formatSize(i.size)} · {i.color}</p>
               <div className="flex items-center gap-3 mt-2">
                 <div className="flex items-center border border-storefront-border">
                   <button aria-label="Decrease" onClick={() => updateQty(i.variant_id, i.quantity - 1)} className="w-8 h-8">−</button>

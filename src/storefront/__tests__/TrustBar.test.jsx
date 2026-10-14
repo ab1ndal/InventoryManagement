@@ -11,6 +11,11 @@ describe("TrustBar", () => {
     expect(screen.getByText(/free shipping over ₹5,000/i)).toBeInTheDocument();
   });
 
+  it("calls out plus sizes", () => {
+    render(<TrustBar />);
+    expect(screen.getByText(/plus sizes up to 6xl/i)).toBeInTheDocument();
+  });
+
   it("advertises in-store exchange within 7 days, not returns", () => {
     render(<TrustBar />);
     expect(screen.getByText(/exchange within 7 days/i)).toBeInTheDocument();

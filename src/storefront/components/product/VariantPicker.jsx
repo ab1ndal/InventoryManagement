@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { formatSize, compareSizes } from "../../lib/sizes";
 
 // Shared look for size and colour options: square-cornered boxes, charcoal
 // when selected, struck through when out of stock.
@@ -23,10 +24,12 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
     for (const v of variants) {
       totals[v.size] = (totals[v.size] ?? 0) + v.stock;
     }
-    return Object.entries(totals).map(([size, totalStock]) => ({
-      size,
-      available: totalStock > 0,
-    }));
+    return Object.entries(totals)
+      .sort(([a], [b]) => compareSizes(a, b))
+      .map(([size, totalStock]) => ({
+        size,
+        available: totalStock > 0,
+      }));
   }, [variants]);
 
   const colors = useMemo(() => {
@@ -78,7 +81,7 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
             Size
             {selectedSize && (
               <span className="font-normal text-storefront-muted ml-2 normal-case tracking-normal">
-                — {selectedSize}
+                — {formatSize(selectedSize)}
               </span>
             )}
           </p>
@@ -92,7 +95,7 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
               disabled={!available}
               className={optionClass(selectedSize === size, available)}
             >
-              {size}
+              {formatSize(size)}
             </button>
           ))}
         </div>

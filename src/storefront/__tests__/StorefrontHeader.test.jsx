@@ -116,6 +116,8 @@ describe("StorefrontHeader promo line", () => {
       "https://wa.me/919810873280"
     );
     act(() => jest.advanceTimersByTime(4000));
+    expect(promo()).toHaveTextContent(PROMO_MESSAGES[3].text);
+    act(() => jest.advanceTimersByTime(4000));
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[0].text);
   });
 
