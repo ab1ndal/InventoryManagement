@@ -97,21 +97,15 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-storefront-cream">
-      <Seo title="Shop" description="Browse the full collection of handcrafted sarees, lehengas, suits, and ethnic wear." />
+      <Seo title="Shop" description="Browse our handpicked sarees, lehengas, suits, and ethnic wear." />
       {/* Page header */}
       <div className="border-b border-storefront-border bg-storefront-cream">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-px w-8 bg-storefront-gold/50" aria-hidden="true" />
-            <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold">
-              Collection
-            </span>
-          </div>
-          <h1 className="font-display font-semibold text-5xl sm:text-6xl text-storefront-charcoal leading-none">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <h1 className="font-display font-semibold text-3xl sm:text-4xl text-storefront-charcoal leading-none">
             Shop
           </h1>
-          <p className="font-sans text-sm text-storefront-muted mt-3">
-            Handcrafted garments, thoughtfully made.
+          <p className="font-sans text-sm text-storefront-muted">
+            Handpicked with love, for every occasion.
           </p>
         </div>
       </div>
@@ -163,8 +157,8 @@ export default function ShopPage() {
       />
 
       {/* Product grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="flex items-center justify-end mb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+        <div className="flex items-center justify-end mb-4">
           <SortControl value={sortBy} onChange={setSortBy} />
         </div>
         <ProductGrid

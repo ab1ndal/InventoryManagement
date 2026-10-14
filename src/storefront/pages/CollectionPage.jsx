@@ -5,7 +5,7 @@ import Seo from "../components/Seo";
 import ProductCard from "../components/ProductCard";
 import { getCollection } from "../lib/collections";
 
-const PRODUCT_COLUMNS = "productid, name, retailprice, producturl, fabric, categoryid, categories(name)";
+const PRODUCT_COLUMNS = "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
 
 export default function CollectionPage() {
   const { slug } = useParams();
@@ -91,9 +91,9 @@ export default function CollectionPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
             {products.map((p, i) => (
-              <ProductCard key={p.productid} product={p} priority={i < 3} />
+              <ProductCard key={p.productid} product={p} priority={i < 4} />
             ))}
           </div>
         )}

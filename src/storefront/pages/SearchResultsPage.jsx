@@ -44,8 +44,8 @@ export default function SearchResultsPage() {
             )}
 
             {loading && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                {Array.from({ length: 6 }).map((_, i) => (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+                {Array.from({ length: 8 }).map((_, i) => (
                   <ProductSkeleton key={i} />
                 ))}
               </div>
@@ -58,9 +58,9 @@ export default function SearchResultsPage() {
             )}
 
             {!loading && results.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
                 {results.map((p, i) => (
-                  <ProductCard key={p.productid} product={p} priority={i < 3} />
+                  <ProductCard key={p.productid} product={p} priority={i < 4} />
                 ))}
               </div>
             )}

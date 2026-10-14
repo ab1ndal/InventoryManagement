@@ -39,7 +39,7 @@ export function useProductSearch(query) {
 
       const { data } = await supabase
         .from("products")
-        .select("productid, name, retailprice, categoryid, categories(name)")
+        .select("productid, name, retailprice, categoryid, categories(name), productsizecolors(stock)")
         .or(buildNameCategoryOr(clean, categoryIds))
         .order("name")
         .limit(LIMIT);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Heart, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImagePaths } from "../lib/productImage";
 import { useWishlist } from "../context/WishlistContext";
 import BlurFillImage from "./BlurFillImage";
@@ -24,6 +24,17 @@ function PlaceholderImage({ name }) {
       </span>
     </div>
   );
+}
+
+// Badge from the product's real variant stock. Some card sources (wishlist
+// snapshots, the home rail) don't load `productsizecolors`; without variant
+// data the stock is unknown, so show nothing rather than guess. No low-stock
+// badge: ~78% of visible products have only 1-3 pieces, so it would sit on
+// most cards and read as false scarcity (see deliveryEstimate.js history).
+function stockBadge(variants) {
+  if (!Array.isArray(variants) || variants.length === 0) return null;
+  const total = variants.reduce((sum, v) => sum + Math.max(0, Number(v.stock) || 0), 0);
+  return total === 0 ? { label: "Sold out", soldOut: true } : null;
 }
 
 export default function ProductCard({ product, priority = false }) {
@@ -73,11 +84,12 @@ export default function ProductCard({ product, priority = false }) {
   };
 
   const categoryName = product.categories?.name || product.category_name || null;
+  const badge = stockBadge(product.productsizecolors);
 
   return (
     <Link
       to={`/product/${product.productid}`}
-      className="group block bg-white overflow-hidden border border-storefront-border/70 hover:border-storefront-gold/60 transition-[border-color,box-shadow] duration-300 hover:shadow-[0_12px_40px_-12px_rgba(28,25,23,0.25)]"
+      className="group block bg-white overflow-hidden border border-storefront-border/60 hover:border-storefront-gold/60 transition-colors duration-200"
     >
       {/* Image / carousel */}
       <div
@@ -87,7 +99,9 @@ export default function ProductCard({ product, priority = false }) {
       >
         {count > 0 ? (
           <div
-            className="flex h-full w-full transition-transform duration-500 ease-out"
+            className={`flex h-full w-full transition-transform duration-500 ease-out ${
+              badge?.soldOut ? "opacity-60" : ""
+            }`}
             style={{ transform: `translateX(-${index * 100}%)` }}
           >
             {images.map((path, i) => (
@@ -148,13 +162,6 @@ export default function ProductCard({ product, priority = false }) {
           </div>
         )}
 
-        {/* Hover veil + CTA (non-interactive so controls stay clickable) */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-storefront-charcoal/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-7">
-          <span className="inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-sm text-storefront-charcoal font-sans text-[10px] font-medium tracking-[0.18em] uppercase px-4 py-2 translate-y-3 group-hover:translate-y-0 transition-transform duration-300 ease-out">
-            View <ArrowRight size={11} />
-          </span>
-        </div>
-
         {/* Wishlist */}
         <button
           type="button"
@@ -164,8 +171,8 @@ export default function ProductCard({ product, priority = false }) {
             e.stopPropagation();
             toggle(product);
           }}
-          className={`absolute top-3 right-3 z-10 p-2 bg-white/80 backdrop-blur-sm transition-[opacity,background-color] duration-200 hover:bg-white cursor-pointer ${
-            wishlisted ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          className={`absolute top-2 right-2 sm:top-3 sm:right-3 z-10 p-2 bg-white/80 backdrop-blur-sm transition-[opacity,background-color] duration-200 hover:bg-white cursor-pointer ${
+            wishlisted ? "opacity-100" : "sm:opacity-0 sm:group-hover:opacity-100"
           }`}
         >
           <Heart
@@ -174,21 +181,29 @@ export default function ProductCard({ product, priority = false }) {
           />
         </button>
 
-        {/* Category badge */}
-        {categoryName && (
-          <span className="absolute top-3 left-3 z-10 bg-white/85 backdrop-blur-sm text-storefront-charcoal text-[9px] tracking-[0.18em] uppercase px-2.5 py-1 font-sans font-medium">
-            {categoryName}
-          </span>
+        {/* Category + stock badges */}
+        {(categoryName || badge) && (
+          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 max-w-[calc(100%-3.5rem)] flex flex-col items-start gap-1">
+            {categoryName && (
+              <span className="max-w-full truncate bg-white/85 backdrop-blur-sm text-storefront-charcoal text-[9px] tracking-[0.18em] uppercase px-2 sm:px-2.5 py-1 font-sans font-medium">
+                {categoryName}
+              </span>
+            )}
+            {badge && (
+              <span
+                className="text-[9px] tracking-[0.14em] uppercase px-2 sm:px-2.5 py-1 font-sans font-semibold bg-storefront-charcoal text-storefront-cream"
+              >
+                {badge.label}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="p-4 pt-3.5">
-        <h3 className="font-display text-[15px] font-medium text-storefront-charcoal leading-snug line-clamp-1 mb-2 tracking-[0.01em]">
-          {product.name?.replace(/-/g, " ")}
-        </h3>
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="font-sans text-[15px] font-semibold text-storefront-charcoal tabular-nums">
+      <div className="p-3 sm:px-4">
+        <div className="flex items-baseline justify-between gap-2 mb-1">
+          <span className="font-sans text-base font-semibold text-storefront-charcoal tabular-nums">
             ₹{Number(product.retailprice).toLocaleString("en-IN")}
           </span>
           {product.fabric && (
@@ -197,6 +212,9 @@ export default function ProductCard({ product, priority = false }) {
             </span>
           )}
         </div>
+        <h3 className="font-sans text-[13px] sm:text-sm text-storefront-warm leading-5 line-clamp-2 min-h-[2.5rem]">
+          {product.name?.replace(/-/g, " ")}
+        </h3>
       </div>
     </Link>
   );
