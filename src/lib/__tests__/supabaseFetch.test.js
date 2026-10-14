@@ -28,9 +28,18 @@ describe("toProxyUrl", () => {
     expect(toProxyUrl(u, { isProd: false, origin: ORIGIN })).toBe(u);
   });
 
-  test("never proxies auth URLs, even in production", () => {
+  test("rewrites auth API URL to same-origin proxy in production", () => {
+    expect(
+      toProxyUrl(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        isProd: true,
+        origin: ORIGIN,
+      })
+    ).toBe(`${ORIGIN}/sb-auth/token?grant_type=refresh_token`);
+  });
+
+  test("passes auth URL through untouched in dev", () => {
     const u = `${SUPABASE_URL}/auth/v1/token?grant_type=otp`;
-    expect(toProxyUrl(u, { isProd: true, origin: ORIGIN })).toBe(u);
+    expect(toProxyUrl(u, { isProd: false, origin: ORIGIN })).toBe(u);
   });
 
   test("never proxies storage URLs", () => {
@@ -52,14 +61,34 @@ describe("makeSupabaseFetch", () => {
     );
   });
 
-  test("passes auth requests through unchanged (no proxy, no timeout signal)", async () => {
+  test("routes auth requests through the proxy with a timeout signal", async () => {
     const spy = jest.fn(ok);
     const f = makeSupabaseFetch({ isProd: true, origin: ORIGIN, fetchImpl: spy });
-    const authUrl = `${SUPABASE_URL}/auth/v1/token?grant_type=otp`;
-    await f(authUrl, { method: "POST" });
+    await f(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+    });
     const [calledUrl, calledInit] = spy.mock.calls[0];
-    expect(calledUrl).toBe(authUrl);
-    expect(calledInit.signal).toBeUndefined();
+    expect(calledUrl).toBe(`${ORIGIN}/sb-auth/token?grant_type=refresh_token`);
+    expect(calledInit.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  test("aborts a hung auth request after the timeout", async () => {
+    // Never resolves on its own; only settles when our signal aborts it.
+    const hang = (_url, init) =>
+      new Promise((_res, rej) =>
+        init.signal.addEventListener("abort", () => rej(new Error("aborted")))
+      );
+    const f = makeSupabaseFetch({
+      isProd: true,
+      origin: ORIGIN,
+      timeoutMs: 10,
+      fetchImpl: hang,
+    });
+    await expect(
+      f(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+        method: "POST",
+      })
+    ).rejects.toThrow("aborted");
   });
 
   test("does not add a timeout signal to REST writes (non-idempotent)", async () => {
