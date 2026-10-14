@@ -26,7 +26,9 @@ export default function CollectionPage() {
         .select(PRODUCT_COLUMNS)
         .in("productid", productIds)
         .then(({ data }) => {
-          setProducts(data || []);
+          // `in` returns rows in database order; show them in the curated order.
+          const rank = new Map(productIds.map((id, i) => [id, i]));
+          setProducts((data || []).slice().sort((a, b) => rank.get(a.productid) - rank.get(b.productid)));
           setLoading(false);
         });
     } else if (categoryIds?.length) {
