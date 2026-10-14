@@ -5,7 +5,11 @@ Rules: merge only code PRs that pass tests + screenshot checks (each revertable 
 Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
 - [x] PR #11 plans merged; PR #12 Diwali Edit collection (/collections/diwali, 50 Jev picks) merged
 - [x] Supplier names/codes stripped from 9 descriptions (backup in session scratchpad)
-- [ ] Parallel worktree streams (agents commit; main loop pushes/merges): grid, header, home, pdp
+- [x] Header: rotating promo line + category row + mobile drawer — PR #16 merged
+- [x] Header categories → collection pages (sarees/lehengas/suits/kurtis/gowns/men) — PR #17 merged
+- [x] 4-col grid, flatter cards, Sold out badge (low-stock badge dropped: 78% of items have 1-3 pcs) — PR #18 merged
+- [x] Diwali 50 description rewrites drafted: `tasks/diwali-description-drafts.md` (owner approval; 25 have notes)
+- [ ] Home page stream, PDP stream (running)
 - [x] ₹99 shipping policy wording fixed — PR #13 merged
 - [x] UP-only checkout validation — PR #14 open, HOLD until CA confirms
 - [x] Terms/Privacy drafts: `tasks/legal-drafts.md` (owner/legal review, not on site)
