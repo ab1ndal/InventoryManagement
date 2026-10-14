@@ -1,20 +1,18 @@
 # Todo
 
-## NEXT (fresh session): Andaaz-style left filter sidebar on /shop
-Not started (2026-10-14). Owner asked for it; review of overnight work deferred.
-- Reference: andaazfashion.com listing, a ~180px left sidebar with fully expanded
-  sections (price ranges + min/max, Size with search, Colour, Fabric, then others) and "View more"
-  on long lists; toolbar with count + sort; 4-col grid stays visible while filtering.
-- Current code: `pages/ShopPage.jsx` renders `FilterBar` (dropdown chips) + `AllFiltersPanel`
-  (overlay) + `ActiveChips` + `SortControl` + `ProductGrid`. All state/logic in
-  `hooks/useShopFilters.js` (375 lines; toggle/setPrice/clearOne/clearField, availableOptions).
-  Components in `components/shop/` (FilterDropdown, PriceInputs, CategoryRow reusable).
-- Meeting asks: keep products visible while refining (no blur/overlay), few clean filters,
-  customer-facing category groups (see `lib/collections.js` groups), separate size groups
-  (kids by age / adult letter / waist), Apply-button vs instant to decide (recommend instant).
-- Known bugs that the sidebar will expose: fabric filter returns wrong results; picking one
-  option greys out others that still have matches (`fetchAvailableOptionsFromDB`).
-- Mobile: keep a filter drawer/sheet, not the sidebar.
+## IN PROGRESS: Andaaz-style left filter sidebar on /shop (2026-10-14, owner: auto-approve)
+Spec `docs/superpowers/specs/2026-10-14-shop-filter-sidebar-design.md`, plan
+`docs/superpowers/plans/2026-10-14-shop-filter-sidebar.md`, branch `feat/shop-filter-sidebar`.
+- [x] Root cause: un-paged productsizecolors queries hit PostgREST 1000-row cap (fabric mapping fine)
+- [x] RPC `get_shop_available_options` applied to prod 2026-10-14 + verified as anon
+- [x] Track A (hook) + Track B (sidebar UI) merged; product-query race fixed (owner asked)
+- [x] Tests (only baseline 6 fail), build, Playwright: 787 → Blue 210 → +XL 50 → <₹2k 29 = SQL truth
+- [ ] PR → merge → live smoke
+- Follow-ups: size labels show raw codes ("XL|42") on shop AND product page — pick a display
+  format site-wide; CartDrawer passes `inert=""` (React 19 ignores it, closed drawer keyboard-reachable).
+- Pre-existing, NOT fixed: no read policy on products/productsizecolors/categories for
+  `authenticated` role → a magic-link-signed-in customer would see an empty shop.
+Resume: `git worktree list`; branch `feat/shop-filter-sidebar`; check plan checkboxes.
 
 ## Overnight run 2026-10-13 → 14 (owner said "auto approve and implement overnight")
 Rules: merge only code PRs that pass tests + screenshot checks (each revertable with one revert).

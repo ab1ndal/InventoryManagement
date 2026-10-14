@@ -4,7 +4,7 @@ import { SORT_OPTIONS } from "../../hooks/sortOptions";
 export default function SortControl({ value, onChange }) {
   return (
     <label className="flex items-center gap-2">
-      <span className="text-[11px] font-sans tracking-[0.12em] uppercase text-storefront-muted">
+      <span className="hidden sm:inline text-[11px] font-sans tracking-[0.12em] uppercase text-storefront-muted">
         Sort
       </span>
       <select

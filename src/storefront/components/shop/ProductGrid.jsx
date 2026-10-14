@@ -39,7 +39,7 @@ export default function ProductGrid({
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
         {Array.from({ length: 8 }).map((_, i) => (
           <ProductSkeleton key={i} />
         ))}
@@ -62,7 +62,7 @@ export default function ProductGrid({
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
         {products.map((p, i) => (
           <ProductCard key={p.productid} product={p} priority={i < 4} />
         ))}
@@ -72,7 +72,7 @@ export default function ProductGrid({
       <div ref={sentinelRef} className="h-1" aria-hidden="true" />
 
       {loadingMore && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5 mt-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5 mt-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <ProductSkeleton key={i} />
           ))}
