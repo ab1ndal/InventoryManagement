@@ -25,6 +25,21 @@ export const COLLECTIONS = [
     subtitle: "Handpicked festive pieces for Diwali",
     productIds: DIWALI_PRODUCT_IDS,
   },
+  // Header category pages. Raw categories are grouped into the few labels
+  // shoppers look for (2026-10-13 meeting: fewer, cleaner categories).
+  // "Suit (3 Pc)" is left out of Men: it mixes men's coat-pant suits with
+  // women's kurta suits.
+  { slug: "sarees", title: "Sarees", subtitle: "Handpicked sarees for every celebration", categoryIds: ["SA"] },
+  { slug: "lehengas", title: "Lehengas", subtitle: "Festive and bridal lehengas", categoryIds: ["LE"] },
+  { slug: "suits", title: "Suits", subtitle: "Suits and readymade suits", categoryIds: ["ST", "RMS"] },
+  { slug: "kurtis", title: "Kurtis", subtitle: "Everyday to festive kurtis", categoryIds: ["KUR", "SK"] },
+  { slug: "gowns", title: "Gowns & Dresses", subtitle: "Gowns and dresses for every occasion", categoryIds: ["GWN", "DRS"] },
+  {
+    slug: "men",
+    title: "Men",
+    subtitle: "Sherwanis, kurta pajamas, jackets, suits and shirts",
+    categoryIds: ["SW", "KP", "NHJ", "IW", "SJ-2P", "S2P", "S5P", "BLZ", "SHT", "T-SHT", "FRMP", "PNT"],
+  },
   { slug: "wedding", title: "Wedding", subtitle: "Lehengas & statement sarees", categoryIds: [] },
   { slug: "festive", title: "Festive", subtitle: "Bright, celebratory pieces", categoryIds: [] },
   { slug: "everyday", title: "Everyday", subtitle: "Easy, elegant daily wear", categoryIds: [] },

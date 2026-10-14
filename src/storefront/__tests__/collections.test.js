@@ -16,6 +16,17 @@ describe("collections config", () => {
     diwali.productIds.forEach((id) => expect(id).toMatch(/^BC\d+$/));
   });
 
+  it("backs every header category link with a category collection", () => {
+    const { NAV_LINKS } = require("../lib/siteConfig");
+    NAV_LINKS.filter((l) => l.to.startsWith("/collections/")).forEach((link) => {
+      const collection = getCollection(link.to.replace("/collections/", ""));
+      expect(collection).not.toBeNull();
+      expect((collection.productIds || collection.categoryIds).length).toBeGreaterThan(0);
+    });
+    const categoryLinks = NAV_LINKS.filter((l) => !["Diwali Edit", "Shop All"].includes(l.label));
+    categoryLinks.forEach((l) => expect(l.to).toMatch(/^\/collections\//));
+  });
+
   it("returns null for an unknown slug", () => {
     expect(getCollection("nope")).toBeNull();
   });

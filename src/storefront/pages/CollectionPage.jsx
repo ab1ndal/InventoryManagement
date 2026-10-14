@@ -36,6 +36,7 @@ export default function CollectionPage() {
         .from("products")
         .select(PRODUCT_COLUMNS)
         .in("categoryid", categoryIds)
+        .order("productid", { ascending: false })
         .then(({ data }) => {
           setProducts(data || []);
           setLoading(false);

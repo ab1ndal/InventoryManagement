@@ -11,15 +11,15 @@ export const PROMO_MESSAGES = [
 ];
 
 // Desktop category row and mobile drawer. `highlight` marks the seasonal tab.
-// Category links point at /shop until the shop page accepts URL filters.
+// Category links open category collections (lib/collections.js).
 export const NAV_LINKS = [
   { label: "Diwali Edit", to: "/collections/diwali", highlight: true },
-  { label: "Sarees", to: "/shop" },
-  { label: "Lehengas", to: "/shop" },
-  { label: "Suits", to: "/shop" },
-  { label: "Kurtis", to: "/shop" },
-  { label: "Gowns", to: "/shop" },
-  { label: "Men", to: "/shop" },
+  { label: "Sarees", to: "/collections/sarees" },
+  { label: "Lehengas", to: "/collections/lehengas" },
+  { label: "Suits", to: "/collections/suits" },
+  { label: "Kurtis", to: "/collections/kurtis" },
+  { label: "Gowns", to: "/collections/gowns" },
+  { label: "Men", to: "/collections/men" },
   { label: "Shop All", to: "/shop" },
 ];
 
