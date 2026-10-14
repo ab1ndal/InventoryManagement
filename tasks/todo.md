@@ -9,7 +9,22 @@ Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
 - [x] Header categories → collection pages (sarees/lehengas/suits/kurtis/gowns/men) — PR #17 merged
 - [x] 4-col grid, flatter cards, Sold out badge (low-stock badge dropped: 78% of items have 1-3 pcs) — PR #18 merged
 - [x] Diwali 50 description rewrites drafted: `tasks/diwali-description-drafts.md` (owner approval; 25 have notes)
-- [ ] Home page stream, PDP stream (running)
+- [x] Product page: size guide modal, lightbox, details table, sticky bar, WhatsApp ask, more like this, single-option auto-select — PR #20 merged
+- [x] Home: category band → hero slider (product photos) → Diwali/New/category rails → trust row → brand story — PR #21 merged
+- [x] Live smoke test after deploy 7f33c74: /, /shop, /collections/diwali, /collections/men, /product/BC252742, /size-guide, /cart, /checkout, /policies/shipping — no page errors
+
+### Waiting on owner (morning)
+1. Review the Diwali 50 (`tasks/diwali-pick-sheet.html`), send back IDs if you change any.
+2. Approve description drafts (`tasks/diwali-description-drafts.md`; 25 flagged).
+3. CA questions (`tasks/accounts-setup.md` §1) → then merge PR #14 (UP-only checkout).
+4. Start Razorpay + Delhivery One KYC (`tasks/accounts-setup.md`).
+5. Review `tasks/legal-drafts.md` (Terms/Privacy).
+6. First-order discount terms (amount + how to claim) before adding it to the promo line.
+
+### Next build items (action plan)
+- Filters cleanup (fabric bug, greyed options, size groups) — after Diwali.
+- Shop page left sidebar; `/shop` URL filters (category links currently use collections instead).
+- Footer still lists old category names (Salwar Suits, Dupattas); align with NAV_LINKS.
 - [x] ₹99 shipping policy wording fixed — PR #13 merged
 - [x] UP-only checkout validation — PR #14 open, HOLD until CA confirms
 - [x] Terms/Privacy drafts: `tasks/legal-drafts.md` (owner/legal review, not on site)
