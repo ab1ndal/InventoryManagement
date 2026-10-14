@@ -98,6 +98,7 @@ export default function ProductCard({ product, priority = false }) {
                   width={600}
                   quality={70}
                   eager={priority && i === 0}
+                  fit="cover"
                 />
               </div>
             ))}
