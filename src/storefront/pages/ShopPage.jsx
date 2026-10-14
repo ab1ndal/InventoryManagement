@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from "react";
-import { X } from "lucide-react";
+import { X, SlidersHorizontal } from "lucide-react";
 import useShopFilters from "../hooks/useShopFilters";
-import FilterBar from "../components/shop/FilterBar";
-import AllFiltersPanel from "../components/shop/AllFiltersPanel";
+import FilterSidebar from "../components/shop/FilterSidebar";
+import FilterDrawer from "../components/shop/FilterDrawer";
 import ProductGrid from "../components/shop/ProductGrid";
 import SortControl from "../components/shop/SortControl";
 import Seo from "../components/Seo";
@@ -26,27 +26,50 @@ function ActiveChips({ filters, categoryOptions, sizeDisplayMap, onClearOne, onC
   if (chips.length === 0) return null;
 
   return (
-    <div className="border-b border-storefront-border bg-storefront-cream">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
-        <div className="flex items-center gap-2 flex-wrap">
-          {chips.map((chip, i) => (
-            <button
-              key={i}
-              onClick={() => onClearOne(chip.field, chip.value)}
-              className="flex items-center gap-1.5 bg-storefront-charcoal text-storefront-cream font-sans text-[10px] tracking-wide px-3 py-1 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer"
-            >
-              {chip.label}
-              <X size={10} className="opacity-70" />
-            </button>
-          ))}
-          <button
-            onClick={onClearAll}
-            className="text-[10px] font-sans text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 transition-colors duration-150 cursor-pointer ml-1 tracking-wide"
-          >
-            Clear all
-          </button>
-        </div>
-      </div>
+    <div className="flex items-center gap-2 flex-wrap mt-3">
+      {chips.map((chip, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onClearOne(chip.field, chip.value)}
+          aria-label={`Remove filter ${chip.label}`}
+          className="flex items-center gap-1.5 bg-storefront-charcoal text-storefront-cream font-sans text-[10px] tracking-wide px-3 py-1 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-storefront-charcoal focus-visible:ring-offset-2"
+        >
+          {chip.label}
+          <X size={10} className="opacity-70" aria-hidden="true" />
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={onClearAll}
+        className="text-[10px] font-sans text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 transition-colors duration-150 cursor-pointer ml-1 tracking-wide"
+      >
+        Clear all
+      </button>
+    </div>
+  );
+}
+
+function productCountLabel(n) {
+  return `${n.toLocaleString("en-IN")} ${n === 1 ? "product" : "products"}`;
+}
+
+function LoadError({ message, onRetry }) {
+  return (
+    <div role="alert" className="py-24 text-center">
+      <p className="font-display text-2xl text-storefront-charcoal mb-2">
+        Couldn't load products
+      </p>
+      <p className="font-sans text-sm text-storefront-muted mb-6">{message}</p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="bg-storefront-charcoal text-storefront-cream font-sans text-[11px] font-medium tracking-widest uppercase px-8 py-2.5 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-storefront-gold focus-visible:ring-offset-2"
+        >
+          Retry
+        </button>
+      )}
     </div>
   );
 }
@@ -74,26 +97,35 @@ export default function ShopPage() {
     sizeOptions,
     sizeDisplayMap,
     fabricOptions,
-    priceBounds,
     availableOptions,
+    baseOptions,
+    error,
+    retry,
   } = useShopFilters();
 
-  const [openDropdown, setOpenDropdown] = useState(null);
-  const [showAllFilters, setShowAllFilters] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Stable so the drawer's open effect (focus, scroll lock) runs once per open.
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  const handleToggleDropdown = useCallback((type) => {
-    setShowAllFilters(false);
-    setOpenDropdown(type);
-  }, []);
-
-  const handleAllFilters = useCallback(() => {
-    setOpenDropdown(null);
-    setShowAllFilters((prev) => !prev);
-  }, []);
-
-  const clearCategories = useCallback(() => {
-    clearField("categories");
-  }, [clearField]);
+  // Mounted twice: desktop column and mobile drawer. Each is display:none at
+  // the other breakpoint, so only one is ever interactive.
+  const sidebar = (
+    <FilterSidebar
+      filters={filters}
+      categoryOptions={categoryOptions}
+      colorOptions={colorOptions}
+      colorFamilyHex={colorFamilyHex}
+      sizeOptions={sizeOptions}
+      sizeDisplayMap={sizeDisplayMap}
+      fabricOptions={fabricOptions}
+      availableOptions={availableOptions}
+      baseOptions={baseOptions}
+      toggle={toggle}
+      setPrice={setPrice}
+      clearField={clearField}
+      clearOne={clearOne}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-storefront-cream">
@@ -110,65 +142,68 @@ export default function ShopPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <FilterBar
-        filters={filters}
-        openDropdown={openDropdown}
-        onToggleDropdown={handleToggleDropdown}
-        onAllFilters={handleAllFilters}
-        onToggle={toggle}
-        onSetPrice={setPrice}
-        activeCount={activeCount}
-        totalCount={totalCount}
-        loading={loading}
-        categoryOptions={categoryOptions}
-        colorOptions={colorOptions}
-        colorFamilyHex={colorFamilyHex}
-        sizeOptions={sizeOptions}
-        sizeDisplayMap={sizeDisplayMap}
-        fabricOptions={fabricOptions}
-        availableOptions={availableOptions}
-      />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:flex lg:gap-10">
+        {/* Desktop sidebar: sticks below the site header, scrolls on its own */}
+        <aside aria-label="Product filters" className="hidden lg:block w-[220px] flex-shrink-0">
+          <div className="sticky top-[174px] max-h-[calc(100vh-198px)] overflow-y-auto overscroll-contain pr-4 pb-6">
+            {sidebar}
+          </div>
+        </aside>
 
-      <AllFiltersPanel
-        open={showAllFilters}
-        filters={filters}
-        categoryOptions={categoryOptions}
-        colorOptions={colorOptions}
-        colorFamilyHex={colorFamilyHex}
-        sizeOptions={sizeOptions}
-        sizeDisplayMap={sizeDisplayMap}
-        fabricOptions={fabricOptions}
-        priceBounds={priceBounds}
-        onToggle={toggle}
-        onClearCategories={clearCategories}
-        onSetPrice={setPrice}
-        onClearAll={clearAll}
-        onClose={() => setShowAllFilters(false)}
-        availableOptions={availableOptions}
-      />
+        <div className="flex-1 min-w-0">
+          {/* Toolbar: filters (mobile) · count · sort, then active chips */}
+          <div className="mb-5 pb-4 border-b border-storefront-border">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-expanded={drawerOpen}
+                  className="lg:hidden flex items-center gap-2 border border-storefront-border px-3 py-1.5 font-sans text-xs tracking-wide text-storefront-charcoal hover:border-storefront-charcoal transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-storefront-charcoal"
+                >
+                  <SlidersHorizontal size={14} aria-hidden="true" />
+                  Filters{activeCount > 0 && ` (${activeCount})`}
+                </button>
+                <p
+                  aria-live="polite"
+                  className="font-sans text-xs tracking-wide text-storefront-muted tabular-nums"
+                >
+                  {loading ? "Loading…" : productCountLabel(totalCount)}
+                </p>
+              </div>
+              <SortControl value={sortBy} onChange={setSortBy} />
+            </div>
+            <ActiveChips
+              filters={filters}
+              categoryOptions={categoryOptions}
+              sizeDisplayMap={sizeDisplayMap}
+              onClearOne={clearOne}
+              onClearAll={clearAll}
+            />
+          </div>
 
-      <ActiveChips
-        filters={filters}
-        categoryOptions={categoryOptions}
-        sizeDisplayMap={sizeDisplayMap}
-        onClearOne={clearOne}
-        onClearAll={clearAll}
-      />
-
-      {/* Product grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
-        <div className="flex items-center justify-end mb-4">
-          <SortControl value={sortBy} onChange={setSortBy} />
+          {error ? (
+            <LoadError message={error} onRetry={retry} />
+          ) : (
+            <ProductGrid
+              products={products}
+              loading={loading}
+              loadingMore={loadingMore}
+              hasMore={hasMore}
+              fetchNextPage={fetchNextPage}
+            />
+          )}
         </div>
-        <ProductGrid
-          products={products}
-          loading={loading}
-          loadingMore={loadingMore}
-          hasMore={hasMore}
-          fetchNextPage={fetchNextPage}
-        />
       </div>
+
+      <FilterDrawer
+        open={drawerOpen}
+        onClose={closeDrawer}
+        footerLabel={loading ? "Show products" : `Show ${productCountLabel(totalCount)}`}
+      >
+        {sidebar}
+      </FilterDrawer>
     </div>
   );
 }
