@@ -84,7 +84,7 @@ describe("ProductDetailPage", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /size guide/i })).toBeInTheDocument();
     expect(within(dialog).getByText(MEASURE_INTRO[0])).toBeInTheDocument();
-    expect(within(dialog).getByRole("columnheader", { name: "M" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("row", { name: "XL 42" })).toBeInTheDocument();
     // Still on the product page underneath.
     expect(
       screen.getByRole("heading", { level: 1, name: "Silk-Lehenga", hidden: true })
