@@ -58,6 +58,11 @@ export default function useShopFilters() {
   const debounceRef = useRef(null);
   // Incremented per filter change; responses carrying an older id are stale.
   const availabilityRequestRef = useRef(0);
+  // Product-list generation: bumped by every fresh (non-append) query. A
+  // response from an older generation (superseded filters/sort, or a next
+  // page requested before they changed) is discarded so it can't overwrite
+  // or append to newer results.
+  const queryGenerationRef = useRef(0);
   // fabric family <-> code maps, loaded once from the `fabrics` lookup. A ref
   // (not state) so the query callbacks read the latest without re-subscribing.
   const fabricIndexRef = useRef({ familyToCodes: {}, codeToFamilies: {} });
@@ -176,6 +181,8 @@ export default function useShopFilters() {
   }, [filters]);
 
   const runQuery = useCallback(async (currentFilters, currentOffset, append, currentSort) => {
+    const generation = append ? queryGenerationRef.current : ++queryGenerationRef.current;
+    const isStale = () => generation !== queryGenerationRef.current;
     append ? setLoadingMore(true) : setLoading(true);
 
     try {
@@ -218,6 +225,7 @@ export default function useShopFilters() {
         .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
       const { data, count, error: queryError } = await query;
+      if (isStale()) return;
       if (queryError) {
         console.error("useShopFilters: product query failed", {
           error: queryError,
@@ -242,8 +250,11 @@ export default function useShopFilters() {
       setTotalCount(count || 0);
       setHasMore(fetched.length === PAGE_SIZE);
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      // A superseded query leaves the loading flags to the current one.
+      if (!isStale()) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
