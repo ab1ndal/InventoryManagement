@@ -21,3 +21,8 @@
 ## Storefront: Supabase / Cloudflare (see also memory project_supabase_cloudflare_cookie)
 
 - `supabase.co` REST is behind Cloudflare, which sets a `__cf_bm` bot cookie. A stale `__cf_bm` makes background `fetch`/XHR hang forever (Cloudflare answers with a managed challenge a non-navigational request can't satisfy) → storefront stuck on skeletons, filters empty. Signature: healthy from curl + instant in a fresh/incognito browser, minutes-long hang in the afflicted browser. Fix shipped 2026-07-21: proxy the PostgREST data plane through a same-origin Vercel rewrite (`/sb-rest/* → supabase.co/rest/v1/*`) via a custom `global.fetch` in `src/lib/supabaseFetch.js`, so the browser never holds `__cf_bm`. Auth/storage left direct (low volume). Same wrapper adds timeout+retry to REST GETs.
+
+## Storefront: PostgREST queries
+
+- **PostgREST caps every response at 1000 rows, silently.** An un-ranged `select` on a big table (e.g. `productsizecolors`, 10.6k rows, open to anon for ALL products not just image-backed ones) returns the first 1000 with no error — Content-Range `0-999/10637`. Never build ID lists client-side from such a query. Filter child rows inside PostgREST with an aliased inner embed (`match:productsizecolors!inner(productid)` + `.in("match.color", ...)`), and do distinct/aggregate work in a SECURITY INVOKER RPC. Paging the rows instead overflows the GET URL (~3.7k IDs → 39k chars → HTTP 400).
+- Playwright on the storefront: header promo line is also `aria-live`; target the product count by text (`/\d+ products?$/`).

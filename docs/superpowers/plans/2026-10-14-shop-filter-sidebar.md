@@ -26,4 +26,4 @@ Existing return fields unchanged, plus:
 ## Integrate
 - [x] Merge tracks, `CI=true npx react-scripts test --watchAll=false` vs 6-test baseline, `npm run build`
 - [x] Playwright screenshots desktop 1440 + mobile 390 (dev server), filter clicks, counts match spec
-- [ ] PR → merge → live smoke test; update todo/memory
+- [x] PR → merge → live smoke test; update todo/memory
