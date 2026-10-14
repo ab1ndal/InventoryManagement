@@ -1,5 +1,32 @@
 # Todo
 
+## Storefront revamp (plan: `tasks/storefront-revamp-plan.md`, awaiting owner decisions)
+
+The image filter below is Phase 0 of that plan.
+
+## Storefront: show only products with storage images (DONE 2026-10-13)
+
+Applied to prod 2026-10-13. Verified: anon REST count 787, service role 3,676,
+`get_shop_filter_options` still works, policy EXISTS executes in ~28 ms.
+
+Live data (2026-10-13): 3,676 products, 787 with `productimages` rows, every
+row a valid object in storage (0 dangling), 745 of the 787 in stock.
+
+Proposed: one migration, no client changes. Replace anon policy
+`storefront anon read products` (`using (true)`) with
+`using (exists (select 1 from productimages pi where pi.productid = products.productid))`
+plus `create index productimages_productid_idx on productimages (productid)`
+(none exists today). Covers all ~8 storefront product queries and the
+`get_shop_filter_options` RPC (security invoker). Admin unaffected (`admin_only`
+policy via `is_admin()`).
+
+- [ ] Owner decision (open): also hide out-of-stock (745)? Shipped images-only (787).
+- [x] Write `schema/migration_storefront_products_with_images.sql`
+- [x] Apply to prod, verify anon count = 787 and admin count = 3,676
+- [ ] Side effects to check: imageless product URL becomes "not found"; cart items for
+      imageless products lose price in `cartApi.fetchLiveVariantData`; home category
+      tiles need >=10 products, so some categories may disappear
+
 ## Event promo copy — Festive Pop-Up, Day 2
 
 Written 2026-08-01 for Day 2 on **Sunday 2 August 2026, 12 Noon – 6 PM**,
