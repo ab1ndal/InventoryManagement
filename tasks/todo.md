@@ -1,9 +1,13 @@
 # Todo
 
 ## Online seller = regular-scheme company (owner decision 2026-10-14)
-Online orders will be sold by the owner's parallel distribution company (regular GST), not the
-composition shop. Delivery across India; PR #14 (UP-only) closed.
-- [ ] Owner: new company's legal name, GSTIN, registered address (state), PAN, contact email.
+Online orders will be sold by SANTOSH GLOBAL LLP (GSTIN 09AFKFS5575H1ZC, regular, UP; PAN AFKFS5575H;
+registered at the shop address; same owner). Delivery across India; PR #14 (UP-only) closed.
+Fallback if CA finds the LLP route too heavy: UP-only via the composition shop (reopen PR #14), later
+move the shop to the regular scheme. CA questions doc: https://claude.ai/code/artifact/342df0ee-b022-4959-86c6-dc0367787dfa
+- [ ] LLP current bank account in the LLP's name (GST Rule 10A; Amazon penny-drop failed on the personal
+      joint account 2026-07-24, see ../amazon_listing/tasks/todo.md). Needed before Razorpay KYC.
+- [ ] After CA picks option A/B/C: swap seller identity on the site (or reopen PR #14 for B).
 - [ ] Swap seller identity on the site: footer line (`StorefrontFooter.jsx:156`, currently the shop's
       composition GSTIN), Terms/Privacy drafts, shipping/returns policy pages, Contact page.
 - [ ] Razorpay + Delhivery KYC in the new company's name (not the shop's).
@@ -25,7 +29,6 @@ composition shop. Delivery across India; PR #14 (UP-only) closed.
 - [x] Plus sizes up to 6XL: promo line + trust row (5 signals)
 - [x] Imageless side effects checked: PDP shows "Product not found"; 0 server cart rows affected;
       home band uses fixed collections (all populated), so the ">=10 products" worry is obsolete
-- Open: TrustBar still says "Delivered across India" — conflicts with held PR #14 (UP-only).
 - Open: shop size filter "View more (47)" lists sizes no visible product stocks (pre-existing).
 
 ## DONE: Andaaz-style left filter sidebar on /shop (2026-10-14, PR #24 merged 5861d50)
