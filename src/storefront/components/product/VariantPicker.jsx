@@ -1,6 +1,20 @@
 import React, { useState, useMemo } from "react";
 
-export default function VariantPicker({ variants, onVariantSelect }) {
+// Shared look for size and colour options: square-cornered boxes, charcoal
+// when selected, struck through when out of stock.
+function optionClass(selected, available) {
+  return `min-w-[3rem] h-10 px-3.5 text-xs border font-sans tracking-wide transition-colors duration-150 ${
+    selected
+      ? "border-storefront-charcoal bg-storefront-charcoal text-storefront-cream"
+      : available
+      ? "border-storefront-border bg-white text-storefront-charcoal hover:border-storefront-charcoal cursor-pointer"
+      : "border-storefront-border text-storefront-muted line-through cursor-not-allowed opacity-40"
+  }`;
+}
+
+// `sizeAction` renders beside the Size label (the PDP puts its size-guide
+// trigger there, next to the options it explains).
+export default function VariantPicker({ variants, onVariantSelect, sizeAction = null }) {
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
 
@@ -42,27 +56,24 @@ export default function VariantPicker({ variants, onVariantSelect }) {
     <div className="space-y-5">
       {/* Sizes */}
       <div>
-        <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal mb-2.5 font-sans">
-          Size
-          {selectedSize && (
-            <span className="font-normal text-storefront-muted ml-2 normal-case tracking-normal">
-              — {selectedSize}
-            </span>
-          )}
-        </p>
+        <div className="flex items-center justify-between gap-4 mb-2.5">
+          <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal font-sans">
+            Size
+            {selectedSize && (
+              <span className="font-normal text-storefront-muted ml-2 normal-case tracking-normal">
+                — {selectedSize}
+              </span>
+            )}
+          </p>
+          {sizeAction}
+        </div>
         <div className="flex flex-wrap gap-2">
           {sizes.map(({ size, available }) => (
             <button
               key={size}
               onClick={() => handleSizeClick(size, available)}
               disabled={!available}
-              className={`px-3.5 py-1.5 text-xs border font-sans tracking-wide transition-colors duration-150 ${
-                selectedSize === size
-                  ? "border-storefront-charcoal bg-storefront-charcoal text-storefront-cream"
-                  : available
-                  ? "border-storefront-border text-storefront-charcoal hover:border-storefront-charcoal cursor-pointer"
-                  : "border-storefront-border text-storefront-muted line-through cursor-not-allowed opacity-40"
-              }`}
+              className={optionClass(selectedSize === size, available)}
             >
               {size}
             </button>
@@ -87,13 +98,10 @@ export default function VariantPicker({ variants, onVariantSelect }) {
                 key={variantOption.id}
                 onClick={() => handleColorClick(variantOption)}
                 disabled={!variantOption.available}
-                className={`px-3.5 py-1.5 text-xs border font-sans tracking-wide transition-colors duration-150 ${
-                  selectedColor === variantOption.color
-                    ? "border-storefront-charcoal bg-storefront-charcoal text-storefront-cream"
-                    : variantOption.available
-                    ? "border-storefront-border text-storefront-charcoal hover:border-storefront-charcoal cursor-pointer"
-                    : "border-storefront-border text-storefront-muted line-through cursor-not-allowed opacity-40"
-                }`}
+                className={optionClass(
+                  selectedColor === variantOption.color,
+                  variantOption.available
+                )}
               >
                 {variantOption.color}
               </button>

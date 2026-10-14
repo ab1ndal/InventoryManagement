@@ -1,28 +1,37 @@
 import React from "react";
 import { CARE_NOTE, COLOUR_NOTE } from "../../lib/deliveryEstimate";
 
-// Consolidated "Details" block for the PDP. Only fabric + category are real
-// per-product data (no care/work columns exist), so specifics come from the
-// product row and everything else is honest, universal microcopy.
-export default function ProductSpecs({ fabric, category }) {
+// Structured "Details" table for the PDP, built only from real per-product
+// data (product row + its variants). There are no care/work columns, so the
+// notes below the table stay honest, universal microcopy.
+export default function ProductSpecs({ productId, fabric, category, colours = [], sizes = [] }) {
   const rows = [
-    fabric && { label: "Fabric", value: fabric },
     category && { label: "Category", value: category },
+    fabric && { label: "Fabric", value: fabric },
+    colours.length > 0 && { label: colours.length > 1 ? "Colours" : "Colour", value: colours.join(", ") },
+    sizes.length > 0 && { label: sizes.length > 1 ? "Sizes" : "Size", value: sizes.join(", ") },
+    productId && { label: "Product code", value: productId },
   ].filter(Boolean);
 
   return (
-    <div className="mb-6">
-      <h2 className="text-[10px] font-medium tracking-[0.2em] uppercase text-storefront-charcoal font-sans mb-3">
+    <section aria-labelledby="product-details" className="mb-6">
+      <h2
+        id="product-details"
+        className="text-[10px] font-medium tracking-[0.2em] uppercase text-storefront-charcoal font-sans mb-3"
+      >
         Details
       </h2>
 
       {rows.length > 0 && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 mb-4">
+        <dl className="mb-4 border-t border-storefront-border/70">
           {rows.map((r) => (
-            <React.Fragment key={r.label}>
+            <div
+              key={r.label}
+              className="grid grid-cols-[8rem_1fr] gap-4 py-2.5 border-b border-storefront-border/70"
+            >
               <dt className="text-xs text-storefront-muted font-sans">{r.label}</dt>
               <dd className="text-xs text-storefront-charcoal font-sans">{r.value}</dd>
-            </React.Fragment>
+            </div>
           ))}
         </dl>
       )}
@@ -33,6 +42,6 @@ export default function ProductSpecs({ fabric, category }) {
       <p className="text-[11px] text-storefront-muted/80 font-sans leading-relaxed">
         {COLOUR_NOTE}
       </p>
-    </div>
+    </section>
   );
 }
