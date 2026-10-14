@@ -154,20 +154,20 @@ export default function ShopPage() {
           {/* Toolbar: filters (mobile) · count · sort, then active chips */}
           <div className="mb-5 pb-4 border-b border-storefront-border">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
                   aria-haspopup="dialog"
                   aria-expanded={drawerOpen}
-                  className="lg:hidden flex items-center gap-2 border border-storefront-border px-3 py-1.5 font-sans text-xs tracking-wide text-storefront-charcoal hover:border-storefront-charcoal transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-storefront-charcoal"
+                  className="lg:hidden flex items-center gap-2 whitespace-nowrap border border-storefront-border px-3 py-1.5 font-sans text-xs tracking-wide text-storefront-charcoal hover:border-storefront-charcoal transition-colors duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-storefront-charcoal"
                 >
                   <SlidersHorizontal size={14} aria-hidden="true" />
                   Filters{activeCount > 0 && ` (${activeCount})`}
                 </button>
                 <p
                   aria-live="polite"
-                  className="font-sans text-xs tracking-wide text-storefront-muted tabular-nums"
+                  className="font-sans text-xs tracking-wide text-storefront-muted tabular-nums whitespace-nowrap"
                 >
                   {loading ? "Loading…" : productCountLabel(totalCount)}
                 </p>

@@ -41,7 +41,7 @@ export default function FilterDrawer({ open, onClose, footerLabel, children }) {
         aria-label="Filters"
         aria-modal={open}
         aria-hidden={!open}
-        {...(!open && { inert: "" })}
+        inert={!open}
         className={`fixed top-0 left-0 h-full w-[88%] max-w-sm bg-storefront-cream z-[70] flex flex-col shadow-xl transition-transform duration-300 ease-out lg:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
