@@ -2,37 +2,37 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import { getProductImageUrl } from "../../lib/productImage";
-import { getCollection } from "../../lib/collections";
+import { COLLECTIONS, getCollection } from "../../lib/collections";
+import { NAV_LINKS } from "../../lib/siteConfig";
 
-// A category earns an icon once it has this many listed products.
-const MIN_PRODUCTS = 10;
 // Icons render at 72px; 150 is the nearest whitelisted width for 2x screens.
 const ICON_TRANSFORM = { width: 150, quality: 70 };
 
 const DIWALI = getCollection("diwali");
 
 /**
- * Pick the categories to show and the product whose photo represents each.
- * @param {{categoryid:string,name:string}[]} categories
+ * The band mirrors the header's category links (same labels, same collection
+ * pages), each illustrated by the newest product in that collection.
+ * @param {{label:string,to:string}[]} links  header nav links, in display order
+ * @param {{slug:string,categoryIds?:string[]}[]} collections
  * @param {{productid:string,categoryid:string}[]} products  newest first
- * @param {number} minCount
- * @returns {{categoryid:string,name:string,newestProductId:string}[]} most stocked first
+ * @returns {{label:string,to:string,newestProductId:string}[]} links with at least one product
  */
-export function pickBandCategories(categories, products, minCount) {
-  const counts = new Map();
-  const newest = new Map();
+export function pickBandEntries(links, collections, products) {
+  const newestByCategory = new Map();
   for (const { productid, categoryid } of products) {
-    counts.set(categoryid, (counts.get(categoryid) || 0) + 1);
-    if (!newest.has(categoryid)) newest.set(categoryid, productid);
+    if (!newestByCategory.has(categoryid)) newestByCategory.set(categoryid, productid);
   }
-  return categories
-    .filter((c) => (counts.get(c.categoryid) || 0) >= minCount)
-    .sort((a, b) => counts.get(b.categoryid) - counts.get(a.categoryid))
-    .map((c) => ({
-      categoryid: c.categoryid,
-      name: c.name,
-      newestProductId: newest.get(c.categoryid),
-    }));
+  const bySlug = new Map(collections.map((c) => [c.slug, c]));
+  return links.flatMap(({ label, to }) => {
+    const collection = bySlug.get(to.replace("/collections/", ""));
+    if (!to.startsWith("/collections/") || !collection?.categoryIds?.length) return [];
+    // Newest across the collection's categories: products are newest first,
+    // so the first product in any of its categories wins.
+    const ids = new Set(collection.categoryIds);
+    const newest = products.find((p) => ids.has(p.categoryid));
+    return newest ? [{ label, to, newestProductId: newest.productid }] : [];
+  });
 }
 
 function BandIcon({ to, label, src }) {
@@ -65,32 +65,33 @@ function IconSkeleton() {
 }
 
 export default function CategoryBand() {
-  const [categories, setCategories] = useState(null); // null = loading
+  const [entries, setEntries] = useState(null); // null = loading
   const [images, setImages] = useState({}); // productid -> url
 
   useEffect(() => {
     let active = true;
-    // Two queries for the whole band: names, plus every listed product's
-    // category (newest first) to count stock and pick each icon's photo.
-    Promise.all([
-      supabase.from("categories").select("categoryid, name"),
-      supabase.from("products").select("productid, categoryid").order("productid", { ascending: false }),
-    ]).then(([catRes, prodRes]) => {
-      if (!active) return;
-      const picked = pickBandCategories(catRes.data || [], prodRes.data || [], MIN_PRODUCTS);
-      setCategories(picked);
+    // One query for the whole band: every listed product's category, newest
+    // first, to pick each icon's photo.
+    supabase
+      .from("products")
+      .select("productid, categoryid")
+      .order("productid", { ascending: false })
+      .then(({ data }) => {
+        if (!active) return;
+        const picked = pickBandEntries(NAV_LINKS, COLLECTIONS, data || []);
+        setEntries(picked);
 
-      const ids = [DIWALI.productIds[0], ...picked.map((c) => c.newestProductId)];
-      Promise.all(ids.map((id) => getProductImageUrl(id, ICON_TRANSFORM))).then((urls) => {
-        if (active) setImages(Object.fromEntries(ids.map((id, i) => [id, urls[i]])));
+        const ids = [DIWALI.productIds[0], ...picked.map((e) => e.newestProductId)];
+        Promise.all(ids.map((id) => getProductImageUrl(id, ICON_TRANSFORM))).then((urls) => {
+          if (active) setImages(Object.fromEntries(ids.map((id, i) => [id, urls[i]])));
+        });
       });
-    });
     return () => {
       active = false;
     };
   }, []);
 
-  if (categories && categories.length === 0) return null;
+  if (entries && entries.length === 0) return null;
 
   return (
     <nav aria-label="Shop by category" className="border-b border-storefront-border/70 bg-white">
@@ -98,7 +99,7 @@ export default function CategoryBand() {
         {/* w-max + mx-auto: centred when the row fits, scrollable from the start when it doesn't. */}
         <div className="scrollbar-hide overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">
           <div className="mx-auto flex w-max gap-3 sm:gap-4">
-            {categories === null ? (
+            {entries === null ? (
               Array.from({ length: 10 }).map((_, i) => <IconSkeleton key={i} />)
             ) : (
               <>
@@ -107,9 +108,8 @@ export default function CategoryBand() {
                   label={DIWALI.title}
                   src={images[DIWALI.productIds[0]]}
                 />
-                {/* /shop has no URL category filter yet, so icons open the full shop. */}
-                {categories.map((c) => (
-                  <BandIcon key={c.categoryid} to="/shop" label={c.name} src={images[c.newestProductId]} />
+                {entries.map((e) => (
+                  <BandIcon key={e.to} to={e.to} label={e.label} src={images[e.newestProductId]} />
                 ))}
               </>
             )}

@@ -11,9 +11,9 @@ import Seo from "../components/Seo";
 // Products first: category shortcuts and the hero, then product rails;
 // reassurance and the brand story come after the products.
 const CATEGORY_RAILS = [
-  { categoryid: "SA", title: "Sarees" },
-  { categoryid: "LE", title: "Lehengas" },
-  { categoryid: "KUR", title: "Kurtis" },
+  { slug: "sarees", title: "Sarees" },
+  { slug: "lehengas", title: "Lehengas" },
+  { slug: "kurtis", title: "Kurtis" },
 ];
 
 export default function HomePage() {
@@ -27,8 +27,8 @@ export default function HomePage() {
       <NewArrivals />
       {CATEGORY_RAILS.map((rail, i) => (
         <CategoryRail
-          key={rail.categoryid}
-          categoryid={rail.categoryid}
+          key={rail.slug}
+          slug={rail.slug}
           title={rail.title}
           tone={i % 2 === 0 ? "white" : "cream"}
         />

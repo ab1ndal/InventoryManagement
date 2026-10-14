@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "lib/supabaseClient";
 import ProductRail, { RAIL_PRODUCT_COLUMNS, RAIL_SIZE } from "./ProductRail";
+import { getCollection } from "../../lib/collections";
 
-/** Newest products in one category. `/shop` has no URL category filter yet, so "View all" opens the full shop. */
-export default function CategoryRail({ categoryid, title, tone }) {
+/** Newest products in a category collection; "View all" opens that collection. */
+export default function CategoryRail({ slug, title, tone }) {
+  const { categoryIds } = getCollection(slug);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -11,16 +13,16 @@ export default function CategoryRail({ categoryid, title, tone }) {
     supabase
       .from("products")
       .select(RAIL_PRODUCT_COLUMNS)
-      .eq("categoryid", categoryid)
+      .in("categoryid", categoryIds)
       .order("productid", { ascending: false })
       .limit(RAIL_SIZE)
       .then(({ data }) => {
         setProducts(data || []);
         setLoading(false);
       });
-  }, [categoryid]);
+  }, [categoryIds]);
 
   return (
-    <ProductRail title={title} products={products} loading={loading} viewAllHref="/shop" tone={tone} />
+    <ProductRail title={title} products={products} loading={loading} viewAllHref={`/collections/${slug}`} tone={tone} />
   );
 }

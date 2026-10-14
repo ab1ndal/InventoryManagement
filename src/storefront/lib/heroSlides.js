@@ -7,9 +7,6 @@
 // a single image renders it full-bleed, which is what a lifestyle photo wants.
 // Mobile always shows the first image. Swapping in lifestyle photos later is
 // a config-only change: replace `images` with [{ url }].
-//
-// `/shop` does not read category filters from the URL yet, so category slides
-// link to the full shop for now.
 export const HERO_SLIDES = [
   {
     id: "diwali",
@@ -26,7 +23,7 @@ export const HERO_SLIDES = [
     headline: "Sarees for every celebration",
     subline: "Rich weaves and festive reds, curated with care.",
     cta: "Shop sarees",
-    href: "/shop",
+    href: "/collections/sarees",
     images: [{ productid: "BC252089" }, { productid: "BC251584" }, { productid: "BC252090" }],
   },
   {
@@ -35,7 +32,7 @@ export const HERO_SLIDES = [
     headline: "Lehengas & gowns",
     subline: "Statement silhouettes, handpicked with love.",
     cta: "Shop lehengas",
-    href: "/shop",
+    href: "/collections/lehengas",
     images: [{ productid: "BC252736" }, { productid: "BC251460" }, { productid: "BC252745" }],
   },
   {
@@ -44,7 +41,7 @@ export const HERO_SLIDES = [
     headline: "Men's festive",
     subline: "Sherwanis and kurta pajamas for pujas, weddings and everything between.",
     cta: "Shop menswear",
-    href: "/shop",
+    href: "/collections/men",
     images: [{ productid: "BC251259" }, { productid: "BC25810" }, { productid: "BC251243" }],
   },
 ];
