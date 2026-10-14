@@ -5,10 +5,12 @@ export const DELIVERY_ESTIMATE = "Dispatches in 2 days · Delivered in 5–7 day
 export const CARE_NOTE =
   "Dry clean recommended for silk and embroidered pieces. Store folded in a cool, dry place, away from direct sunlight.";
 
-// Handcrafted-goods honesty: sets expectations so a slight real-vs-photo
-// difference doesn't read as a bait-and-switch.
+// Photo honesty: sets expectations so a slight real-vs-photo difference
+// doesn't read as a bait-and-switch.
 export const COLOUR_NOTE =
-  "Handcrafted piece — slight variation in colour and finish is natural. On-screen colours may differ marginally from the actual fabric.";
+  "Slight variation in colour and finish is natural in ethnic wear. On-screen colours may differ marginally from the actual fabric.";
+
+export const PRICE_NOTE = "Inclusive of all taxes · Free shipping above ₹5,000";
 
 // Most designs are stocked 1-2 deep, so "Only N left" would fire on nearly
 // every product and read as false scarcity. Frame low stock as uniqueness,
