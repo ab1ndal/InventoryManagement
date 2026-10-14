@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 
 // Shared look for size and colour options: square-cornered boxes, charcoal
 // when selected, struck through when out of stock.
@@ -39,9 +39,26 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
   function handleSizeClick(size, available) {
     if (!available) return;
     setSelectedSize(size);
-    setSelectedColor(null);
-    onVariantSelect(null);
+    // With a single in-stock colour there is nothing to choose: select it so
+    // Add to Cart is ready instead of waiting on a click with one option.
+    const inStock = variants.filter((v) => v.size === size && v.stock > 0);
+    if (inStock.length === 1) {
+      setSelectedColor(inStock[0].color);
+      onVariantSelect(inStock[0]);
+    } else {
+      setSelectedColor(null);
+      onVariantSelect(null);
+    }
   }
+
+  // Many pieces come in one size only (e.g. UNSTITCHED, FREE-SIZE); pre-select it.
+  useEffect(() => {
+    const availableSizes = sizes.filter((s) => s.available);
+    if (availableSizes.length === 1 && selectedSize === null) {
+      handleSizeClick(availableSizes[0].size, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sizes]);
 
   function handleColorClick(variantOption) {
     if (!variantOption.available) return;

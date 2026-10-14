@@ -69,10 +69,10 @@ describe("VariantPicker — colour reveal", () => {
 });
 
 describe("VariantPicker — onVariantSelect callback", () => {
-  it("calls onVariantSelect(null) when a size is selected", () => {
+  it("calls onVariantSelect(null) when a size with several colours is selected", () => {
     const onSelect = jest.fn();
     render(<VariantPicker variants={VARIANTS} onVariantSelect={onSelect} />);
-    fireEvent.click(screen.getByRole("button", { name: "S" }));
+    fireEvent.click(screen.getByRole("button", { name: "M" }));
     expect(onSelect).toHaveBeenCalledWith(null);
   });
 
@@ -100,5 +100,27 @@ describe("VariantPicker — onVariantSelect callback", () => {
     onSelect.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Blue" })); // stock=0, disabled
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe("VariantPicker — single option auto-select", () => {
+  it("selects the only available size and colour so Add to Cart is ready", () => {
+    const onSelect = jest.fn();
+    const only = [{ variantid: "u1", size: "UNSTITCHED", color: "Green", stock: 1 }];
+    render(<VariantPicker variants={only} onVariantSelect={onSelect} />);
+    expect(onSelect).toHaveBeenLastCalledWith(only[0]);
+  });
+
+  it("selects the only in-stock colour after a size is chosen", () => {
+    const onSelect = jest.fn();
+    render(<VariantPicker variants={VARIANTS} onVariantSelect={onSelect} />);
+    fireEvent.click(screen.getByRole("button", { name: "S" }));
+    expect(onSelect).toHaveBeenLastCalledWith(VARIANTS[0]);
+  });
+
+  it("does not pre-select when several sizes are available", () => {
+    const onSelect = jest.fn();
+    render(<VariantPicker variants={VARIANTS} onVariantSelect={onSelect} />);
+    expect(onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ variantid: expect.any(String) }));
   });
 });
