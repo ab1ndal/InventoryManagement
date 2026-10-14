@@ -14,7 +14,7 @@ export const SHIPPING = [
     heading: "Shipping charges",
     body: [
       "Shipping is free on orders above ₹5,000.",
-      "For orders below ₹5,000, the shipping charge is calculated at checkout based on your delivery location.",
+      "For orders below ₹5,000, a flat shipping charge of ₹99 applies.",
     ],
   },
   {

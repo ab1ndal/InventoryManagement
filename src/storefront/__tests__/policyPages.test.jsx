@@ -13,6 +13,12 @@ describe("Policy pages", () => {
     expect(screen.getByText(/free.*above ₹5,000/i)).toBeInTheDocument();
   });
 
+  it("shipping page states the same flat fee checkout charges", () => {
+    const { shippingFee } = require("../lib/checkout");
+    render(<ShippingPolicyPage />);
+    expect(screen.getByText(new RegExp(`flat.*₹${shippingFee(0)}`, "i"))).toBeInTheDocument();
+  });
+
   it("returns page states no-returns / 7-day in-store exchange", () => {
     render(<ReturnsPolicyPage />);
     expect(screen.getByRole("heading", { name: /returns.*exchange/i })).toBeInTheDocument();
