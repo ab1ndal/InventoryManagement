@@ -1,18 +1,17 @@
 # Todo
 
-## IN PROGRESS: Andaaz-style left filter sidebar on /shop (2026-10-14, owner: auto-approve)
+## DONE: Andaaz-style left filter sidebar on /shop (2026-10-14, PR #24 merged 5861d50)
 Spec `docs/superpowers/specs/2026-10-14-shop-filter-sidebar-design.md`, plan
 `docs/superpowers/plans/2026-10-14-shop-filter-sidebar.md`, branch `feat/shop-filter-sidebar`.
 - [x] Root cause: un-paged productsizecolors queries hit PostgREST 1000-row cap (fabric mapping fine)
 - [x] RPC `get_shop_available_options` applied to prod 2026-10-14 + verified as anon
 - [x] Track A (hook) + Track B (sidebar UI) merged; product-query race fixed (owner asked)
 - [x] Tests (only baseline 6 fail), build, Playwright: 787 → Blue 210 → +XL 50 → <₹2k 29 = SQL truth
-- [ ] PR → merge → live smoke
+- [x] PR #24 merged; live smoke on bindalscreations.com/shop: same counts, no page errors
 - Follow-ups: size labels show raw codes ("XL|42") on shop AND product page — pick a display
   format site-wide; CartDrawer passes `inert=""` (React 19 ignores it, closed drawer keyboard-reachable).
 - Pre-existing, NOT fixed: no read policy on products/productsizecolors/categories for
   `authenticated` role → a magic-link-signed-in customer would see an empty shop.
-Resume: `git worktree list`; branch `feat/shop-filter-sidebar`; check plan checkboxes.
 
 ## Overnight run 2026-10-13 → 14 (owner said "auto approve and implement overnight")
 Rules: merge only code PRs that pass tests + screenshot checks (each revertable with one revert).
