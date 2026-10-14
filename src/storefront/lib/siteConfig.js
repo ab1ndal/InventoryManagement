@@ -8,6 +8,7 @@ export const PROMO_MESSAGES = [
   { text: "Free shipping on orders above ₹5,000" },
   { text: "Diwali Edit is live — shop festive picks", to: "/collections/diwali" },
   { text: "WhatsApp us for help & custom fitting", href: "https://wa.me/919810873280" },
+  { text: "Plus sizes up to 6XL — hard to find, stocked here" },
 ];
 
 // Desktop category row and mobile drawer. `highlight` marks the seasonal tab.
