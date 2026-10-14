@@ -1,29 +1,41 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, ShoppingBag, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft,
+  ShoppingBag,
+  ChevronLeft,
+  ChevronRight,
+  Expand,
+  Heart,
+  MessageCircle,
+  RefreshCw,
+  Truck,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useProduct } from "../hooks/useProduct";
 import { getProductImagePaths, imageUrl } from "../lib/productImage";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
 import ProductSpecs from "../components/product/ProductSpecs";
+import SizeGuideDialog from "../components/product/SizeGuideDialog";
+import ImageLightbox from "../components/product/ImageLightbox";
+import StickyAddToCart from "../components/product/StickyAddToCart";
+import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { buildProductJsonLd } from "../lib/seo";
-import { DELIVERY_ESTIMATE, stockNote } from "../lib/deliveryEstimate";
+import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote } from "../lib/deliveryEstimate";
+import { stripMarkdown, whatsappProductUrl } from "../lib/productText";
 
-// Descriptions are stored with lightweight Markdown (**bold**). Render the
-// bold spans as <strong> instead of printing literal asterisks.
-function renderDescription(text) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    /^\*\*[^*]+\*\*$/.test(part) ? (
-      <strong key={i} className="font-semibold text-storefront-charcoal">
-        {part.slice(2, -2)}
-      </strong>
-    ) : (
-      <React.Fragment key={i}>{part}</React.Fragment>
-    )
-  );
+const TRUST_POINTS = [
+  { icon: Heart, label: "Handpicked with love" },
+  { icon: RefreshCw, label: "Exchange in store within 7 days" },
+  { icon: MessageCircle, label: "WhatsApp help" },
+];
+
+// Distinct values in first-seen order (variants arrive sorted by size, colour).
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
 }
 
 function GalleryPlaceholder({ name }) {
@@ -47,7 +59,7 @@ function GalleryPlaceholder({ name }) {
   );
 }
 
-function ProductGallery({ paths, name, active, onSelect }) {
+function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
   const touchX = useRef(null);
   const count = paths.length;
   const hasGallery = count > 1;
@@ -101,14 +113,24 @@ function ProductGallery({ paths, name, active, onSelect }) {
         onTouchEnd={onTouchEnd}
       >
         {count > 0 ? (
-          <BlurFillImage
-            key={paths[active]}
-            path={paths[active]}
-            alt={name}
-            width={1000}
-            quality={80}
-            eager
-          />
+          <button
+            type="button"
+            aria-label="Enlarge image"
+            onClick={onEnlarge}
+            className="block w-full h-full cursor-zoom-in"
+          >
+            <BlurFillImage
+              key={paths[active]}
+              path={paths[active]}
+              alt={name}
+              width={1000}
+              quality={80}
+              eager
+            />
+            <span className="pointer-events-none absolute top-3 right-3 p-2 bg-white/85 text-storefront-charcoal opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden sm:flex">
+              <Expand size={15} aria-hidden="true" />
+            </span>
+          </button>
         ) : (
           <GalleryPlaceholder name={name} />
         )}
@@ -141,14 +163,32 @@ function ProductGallery({ paths, name, active, onSelect }) {
   );
 }
 
+// Keyed by product so following a "More like this" card starts the new
+// product fresh (no selected variant, quantity or photo carried over) and at
+// the top of the page.
 export default function ProductDetailPage() {
   const { productid } = useParams();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [productid]);
+
+  return <ProductDetail key={productid} productid={productid} />;
+}
+
+function ProductDetail({ productid }) {
   const { product, variants, loading, error } = useProduct(productid);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [imagePaths, setImagePaths] = useState([]);
   const [activeImage, setActiveImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const addToCartRef = useRef(null);
+  const pickerRef = useRef(null);
   const { addItem, openCart } = useCart();
+
+  const colours = useMemo(() => unique(variants.map((v) => v.color)), [variants]);
+  const sizes = useMemo(() => unique(variants.map((v) => v.size)), [variants]);
 
   useEffect(() => {
     let active = true;
@@ -189,13 +229,26 @@ export default function ProductDetailPage() {
   }
 
   const categoryName = product.categories?.name;
-  const productLd = buildProductJsonLd({ product, variants, imagePaths, productid, categoryName });
+  const description = stripMarkdown(product.description);
+  const price = Number(product.retailprice);
+  const productLd = buildProductJsonLd({
+    product: { ...product, description },
+    variants,
+    imagePaths,
+    productid,
+    categoryName,
+  });
   const ogImage = imagePaths.length
     ? imageUrl(imagePaths[0], { width: 1200, quality: 80 })
     : undefined;
   const maxQty = selectedVariant?.stock ?? 0;
   const canAddToCart = selectedVariant !== null && maxQty > 0;
   const stockLabel = selectedVariant ? stockNote(selectedVariant.stock) : null;
+  const whatsappHref = whatsappProductUrl({
+    name: product.name,
+    productid,
+    pageUrl: `${window.location.origin}/product/${productid}`,
+  });
 
   function handleVariantSelect(variant) {
     setSelectedVariant(variant);
@@ -211,7 +264,7 @@ export default function ProductDetailPage() {
       name: product.name,
       size: selectedVariant.size,
       color: selectedVariant.color,
-      price: Number(product.retailprice),
+      price,
       image_url: imageUrl(imagePaths[activeImage] ?? imagePaths[0], {
         width: 400,
         quality: 70,
@@ -225,20 +278,27 @@ export default function ProductDetailPage() {
     });
   }
 
+  // The sticky bar can't host the size picker, so until a variant is chosen
+  // its button takes the shopper back up to the picker instead.
+  function handleStickyClick() {
+    if (canAddToCart) handleAddToCart();
+    else pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   return (
     <>
       <Seo
         title={product.name}
         description={
-          product.description
-            ? product.description.replace(/\*\*/g, "").slice(0, 160)
-            : `${product.name}${categoryName ? ` — ${categoryName}` : ""} · ₹${Number(product.retailprice).toLocaleString("en-IN")}`
+          description
+            ? description.slice(0, 160)
+            : `${product.name}${categoryName ? ` — ${categoryName}` : ""} · ₹${price.toLocaleString("en-IN")}`
         }
         type="product"
         image={ogImage}
         jsonLd={productLd}
       />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28">
         {/* Breadcrumb */}
         <Link
           to="/shop"
@@ -248,21 +308,22 @@ export default function ProductDetailPage() {
           Shop
         </Link>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
-          {/* Gallery */}
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16">
+          {/* Gallery — stays in view on desktop while the info column scrolls */}
+          <div className="md:sticky md:top-24 md:self-start">
             <ProductGallery
               paths={imagePaths}
               name={product.name}
               active={activeImage}
               onSelect={setActiveImage}
+              onEnlarge={() => setLightboxOpen(true)}
             />
           </div>
 
-          {/* Details */}
+          {/* Info */}
           <div className="flex flex-col">
             {categoryName && (
-              <span className="text-[10px] tracking-[0.2em] uppercase text-storefront-muted font-sans mb-2">
+              <span className="text-[10px] tracking-[0.2em] uppercase text-storefront-gold font-sans mb-2">
                 {categoryName}
               </span>
             )}
@@ -272,38 +333,28 @@ export default function ProductDetailPage() {
             </h1>
 
             <p className="font-sans text-2xl font-semibold text-storefront-charcoal tabular-nums mb-1">
-              ₹{Number(product.retailprice).toLocaleString("en-IN")}
+              ₹{price.toLocaleString("en-IN")}
             </p>
 
-            <p className="text-xs text-storefront-muted font-sans tracking-wide mb-3">
-              {DELIVERY_ESTIMATE}
+            <p className="text-xs text-storefront-muted font-sans tracking-wide mb-6">
+              {PRICE_NOTE}
             </p>
 
-            {product.description && (
-              <p className="text-sm text-storefront-charcoal font-sans leading-relaxed mb-6 whitespace-pre-line">
-                {renderDescription(product.description)}
-              </p>
-            )}
-
-            <ProductSpecs fabric={product.fabric} category={categoryName} />
-
-            <div className="border-t border-storefront-border pt-6 mb-6">
+            <div ref={pickerRef} className="border-t border-storefront-border pt-6 mb-6">
               {variants.length > 0 ? (
                 <VariantPicker
                   variants={variants}
                   onVariantSelect={handleVariantSelect}
+                  sizeAction={<SizeGuideDialog />}
                 />
               ) : (
-                <p className="text-xs text-storefront-muted font-sans">
-                  No variants available.
-                </p>
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs text-storefront-muted font-sans">
+                    No variants available.
+                  </p>
+                  <SizeGuideDialog />
+                </div>
               )}
-              <Link
-                to="/size-guide"
-                className="inline-block mt-4 text-xs font-sans tracking-wide text-storefront-muted hover:text-storefront-gold underline underline-offset-2 transition-colors"
-              >
-                Size guide
-              </Link>
             </div>
 
             {/* Quantity selector */}
@@ -334,37 +385,93 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Desktop Add to Cart */}
-            <div className="hidden md:block">
-              <button
-                disabled={!canAddToCart}
-                onClick={handleAddToCart}
-                className="w-full flex items-center justify-center gap-2 bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ShoppingBag size={15} />
-                {canAddToCart ? "Add to Cart" : "Select Size & Colour"}
-              </button>
-              {stockLabel && (
-                <p className="text-xs text-center text-storefront-muted font-sans mt-2.5">
-                  {stockLabel}
+            {/* Add to Cart — the sticky bar takes over once this leaves view */}
+            <button
+              ref={addToCartRef}
+              disabled={!canAddToCart}
+              onClick={handleAddToCart}
+              className="w-full flex items-center justify-center gap-2 bg-storefront-gold text-white font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-gold-dark transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ShoppingBag size={15} aria-hidden="true" />
+              {canAddToCart ? "Add to Cart" : "Select Size & Colour"}
+            </button>
+            {stockLabel && (
+              <p className="text-xs text-center text-storefront-muted font-sans mt-2.5">
+                {stockLabel}
+              </p>
+            )}
+
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 w-full flex items-center justify-center gap-2 border border-storefront-charcoal text-storefront-charcoal font-sans text-xs tracking-widest uppercase py-3.5 hover:bg-storefront-charcoal hover:text-storefront-cream transition-colors duration-150"
+            >
+              <MessageCircle size={15} aria-hidden="true" />
+              Ask on WhatsApp
+            </a>
+
+            <p className="flex items-center gap-2 text-xs text-storefront-charcoal font-sans tracking-wide mt-5">
+              <Truck size={15} className="text-storefront-gold flex-shrink-0" aria-hidden="true" />
+              {DELIVERY_ESTIMATE}
+            </p>
+
+            <ul className="grid grid-cols-3 gap-2 border-y border-storefront-border/70 py-4 mt-5 mb-8">
+              {TRUST_POINTS.map(({ icon: Icon, label }) => (
+                <li
+                  key={label}
+                  className="flex flex-col items-center text-center gap-1.5 text-[11px] leading-snug text-storefront-muted font-sans"
+                >
+                  <Icon size={16} className="text-storefront-gold" aria-hidden="true" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+
+            <ProductSpecs
+              productId={productid}
+              fabric={product.fabric}
+              category={categoryName}
+              colours={colours}
+              sizes={sizes}
+            />
+
+            {description && (
+              <section aria-labelledby="product-description">
+                <h2
+                  id="product-description"
+                  className="text-[10px] font-medium tracking-[0.2em] uppercase text-storefront-charcoal font-sans mb-3"
+                >
+                  Description
+                </h2>
+                <p className="text-sm text-storefront-charcoal font-sans leading-relaxed whitespace-pre-line">
+                  {description}
                 </p>
-              )}
-            </div>
+              </section>
+            )}
           </div>
         </div>
+
+        <MoreLikeThis categoryid={product.categoryid} excludeId={productid} />
       </div>
 
-      {/* Mobile sticky CTA */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t border-storefront-border px-4 py-3 z-40">
-        <button
-          disabled={!canAddToCart}
-          onClick={handleAddToCart}
-          className="w-full flex items-center justify-center gap-2 bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-3.5 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ShoppingBag size={15} />
-          {canAddToCart ? "Add to Cart" : "Select Size & Colour"}
-        </button>
-      </div>
+      <ImageLightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        paths={imagePaths}
+        index={activeImage}
+        onIndexChange={setActiveImage}
+        name={product.name}
+      />
+
+      <StickyAddToCart
+        targetRef={addToCartRef}
+        image={imagePaths.length ? imageUrl(imagePaths[0], { width: 150, quality: 55 }) : null}
+        name={product.name}
+        price={price}
+        label={canAddToCart ? "Add to Cart" : "Select size"}
+        onClick={handleStickyClick}
+      />
     </>
   );
 }
