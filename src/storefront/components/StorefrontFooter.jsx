@@ -1,6 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Instagram, Facebook, MessageCircle, Mail, Phone } from "lucide-react";
+import { NAV_LINKS } from "../lib/siteConfig";
+
+// Same categories as the header; "Shop All" already sits under Help.
+const SHOP_LINKS = NAV_LINKS.filter(({ to }) => to !== "/shop");
 
 export default function StorefrontFooter() {
   return (
@@ -46,18 +50,16 @@ export default function StorefrontFooter() {
               Shop
             </h4>
             <ul className="space-y-2.5 text-sm text-storefront-cream/70">
-              {["Sarees", "Lehengas", "Salwar Suits", "Kurtis", "Dupattas"].map(
-                (cat) => (
-                  <li key={cat}>
-                    <Link
-                      to="/shop"
-                      className="hover:text-storefront-gold transition-colors"
-                    >
-                      {cat}
-                    </Link>
-                  </li>
-                )
-              )}
+              {SHOP_LINKS.map(({ label, to }) => (
+                <li key={to}>
+                  <Link
+                    to={to}
+                    className="hover:text-storefront-gold transition-colors"
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
               <li>
                 <Link
                   to="/collections"
