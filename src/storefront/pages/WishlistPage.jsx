@@ -25,7 +25,7 @@ export default function WishlistPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <Seo title="Wishlist" noindex />
       <h1 className="font-display text-3xl font-semibold text-storefront-charcoal mb-8">Your wishlist</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
         {items.map((i) => (
           <ProductCard key={i.productid} product={i} />
         ))}
