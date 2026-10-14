@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "lib/supabaseClient";
 import { buildFamilyIndex } from "../../utility/attributeFamilies";
 import { sortOrderClause } from "./sortOptions";
+import { colorCodesFor, fabricCodesFor } from "./shopAvailability";
 
 const PAGE_SIZE = 24;
 
@@ -13,21 +14,6 @@ const INITIAL_FILTERS = {
   priceMin: null,
   priceMax: null,
 };
-
-// The fabric filter operates on families ("Group Name"), but products store the
-// trade-name code. Expand selected families to their member codes for the query.
-// Sentinel keeps an empty expansion from matching every row (Supabase `.in([])`).
-function fabricCodesFor(families, familyToCodes) {
-  const codes = [...new Set(families.flatMap((f) => familyToCodes[f] || []))];
-  return codes.length ? codes : ["__no_match__"];
-}
-
-// Color works the same way, but a code can belong to several families
-// (multi-family). Expanding a family yields every code that lists it.
-function colorCodesFor(families, familyToCodes) {
-  const codes = [...new Set(families.flatMap((f) => familyToCodes[f] || []))];
-  return codes.length ? codes : ["__no_match__"];
-}
 
 // Returns product IDs matching all filters except the excluded dimension.
 // Mirrors the runQuery join logic so results are always consistent.
@@ -120,6 +106,7 @@ export default function useShopFilters() {
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState("newest");
+  const [error, setError] = useState(null); // user-facing product load failure
 
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [colorOptions, setColorOptions] = useState([]); // family names (filter buckets)
@@ -238,34 +225,29 @@ export default function useShopFilters() {
     append ? setLoadingMore(true) : setLoading(true);
 
     try {
-      let productIds = null;
+      // Colour/size live on variant rows. Filter them inside PostgREST with an
+      // aliased inner embed instead of fetching matching product IDs first:
+      // that ID list was capped at 1000 rows (of ~10.6k) and silently
+      // truncated, and paging it would overflow the GET URL. Colour and size
+      // apply to the same embedded row, so they must co-occur on one variant.
+      // The plain `productsizecolors(stock)` embed stays unfiltered because the
+      // Sold-out badge needs every variant's stock.
+      let select =
+        "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
+      if (currentFilters.colors.length > 0 || currentFilters.sizes.length > 0)
+        select += ", match:productsizecolors!inner(productid)";
 
-      if (currentFilters.colors.length > 0 || currentFilters.sizes.length > 0) {
-        let q = supabase.from("productsizecolors").select("productid");
-        if (currentFilters.colors.length > 0)
-          q = q.in("color", colorCodesFor(currentFilters.colors, colorIndexRef.current.familyToCodes));
-        if (currentFilters.sizes.length > 0) q = q.in("size", currentFilters.sizes);
-        const { data } = await q;
-        productIds = [...new Set((data || []).map((r) => r.productid))];
-        if (productIds.length === 0) {
-          setProducts([]);
-          setTotalCount(0);
-          setHasMore(false);
-          return;
-        }
-      }
+      let query = supabase.from("products").select(select, { count: "exact" });
 
-      let query = supabase
-        .from("products")
-        .select(
-          "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)",
-          { count: "exact" }
+      if (currentFilters.colors.length > 0)
+        query = query.in(
+          "match.color",
+          colorCodesFor(currentFilters.colors, colorIndexRef.current.familyToCodes)
         );
-
+      if (currentFilters.sizes.length > 0)
+        query = query.in("match.size", currentFilters.sizes);
       if (currentFilters.categories.length > 0)
         query = query.in("categoryid", currentFilters.categories);
-      if (productIds !== null)
-        query = query.in("productid", productIds);
       if (currentFilters.priceMin !== null)
         query = query.gte("retailprice", currentFilters.priceMin);
       if (currentFilters.priceMax !== null)
@@ -281,9 +263,27 @@ export default function useShopFilters() {
         .order(column, { ascending })
         .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
-      const { data, count } = await query;
-      const fetched = data || [];
+      const { data, count, error: queryError } = await query;
+      if (queryError) {
+        console.error("useShopFilters: product query failed", {
+          error: queryError,
+          filters: currentFilters,
+          offset: currentOffset,
+          sort: currentSort,
+        });
+        setError("Couldn't load products.");
+        // Stop infinite scroll from re-requesting a failing page, and don't
+        // leave the previous filters' results on screen after a failed reload.
+        setHasMore(false);
+        if (!append) {
+          setProducts([]);
+          setTotalCount(0);
+        }
+        return;
+      }
 
+      const fetched = data || [];
+      setError(null);
       setProducts((prev) => (append ? [...prev, ...fetched] : fetched));
       setTotalCount(count || 0);
       setHasMore(fetched.length === PAGE_SIZE);
@@ -297,6 +297,12 @@ export default function useShopFilters() {
     setOffset(0);
     runQuery(filters, 0, false, sortBy);
   }, [filters, sortBy, runQuery]);
+
+  // Re-runs the current query from the first page (after a load failure).
+  const retry = useCallback(() => {
+    setOffset(0);
+    runQuery(filters, 0, false, sortBy);
+  }, [filters, runQuery, sortBy]);
 
   const fetchNextPage = useCallback(() => {
     const next = offset + PAGE_SIZE;
@@ -371,5 +377,7 @@ export default function useShopFilters() {
     fabricOptions,
     priceBounds,
     availableOptions,
+    error,
+    retry,
   };
 }
