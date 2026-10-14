@@ -1,6 +1,6 @@
 # Todo
 
-## Storefront revamp (plan: `tasks/storefront-revamp-plan.md`, awaiting owner decisions)
+## Storefront revamp — ACTION PLAN: `tasks/storefront-action-plan.md` (Diwali 8 Nov 2026); details in `tasks/storefront-revamp-plan.md`
 
 The image filter below is Phase 0 of that plan.
 
