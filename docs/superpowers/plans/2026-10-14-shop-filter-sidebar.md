@@ -11,19 +11,19 @@ Existing return fields unchanged, plus:
 - `error`: `null` or a user-facing string when the product query fails; `retry()` re-runs it.
 
 ## Track A — data (hook)
-- [ ] Migration file + apply (done in main loop, verified)
-- [ ] runQuery: aliased `!inner` embed, no ID lists; propagate error → `error` state, `retry`
-- [ ] Availability via `get_shop_available_options`; base call once after options load
-- [ ] Pure helpers exported + unit tested (args building, code→family mapping)
-- [ ] Fix stale "in-stock" comment on distinct_sizes
+- [x] Migration file + apply (done in main loop, verified)
+- [x] runQuery: aliased `!inner` embed, no ID lists; propagate error → `error` state, `retry`
+- [x] Availability via `get_shop_available_options`; base call once after options load
+- [x] Pure helpers exported + unit tested (args building, code→family mapping)
+- [x] Fix stale "in-stock" comment on distinct_sizes
 
 ## Track B — UI
-- [ ] `lib/pricePresets.js` + test (preset list, `activePreset(min,max)`)
-- [ ] `components/shop/FilterSidebar.jsx` (sections, View more, hide/grey rules)
-- [ ] Mobile drawer + toolbar (count, chips, sort) + error/Retry state in `ShopPage.jsx`
-- [ ] Remove `FilterBar`, `AllFiltersPanel`, `FilterDropdown` if unused
+- [x] `lib/pricePresets.js` + test (preset list, `activePreset(min,max)`)
+- [x] `components/shop/FilterSidebar.jsx` (sections, View more, hide/grey rules)
+- [x] Mobile drawer + toolbar (count, chips, sort) + error/Retry state in `ShopPage.jsx`
+- [x] Remove `FilterBar`, `AllFiltersPanel`, `FilterDropdown` if unused
 
 ## Integrate
-- [ ] Merge tracks, `CI=true npx react-scripts test --watchAll=false` vs 6-test baseline, `npm run build`
-- [ ] Playwright screenshots desktop 1440 + mobile 390 (dev server), filter clicks, counts match spec
+- [x] Merge tracks, `CI=true npx react-scripts test --watchAll=false` vs 6-test baseline, `npm run build`
+- [x] Playwright screenshots desktop 1440 + mobile 390 (dev server), filter clicks, counts match spec
 - [ ] PR → merge → live smoke test; update todo/memory
