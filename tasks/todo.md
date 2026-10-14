@@ -1,5 +1,21 @@
 # Todo
 
+## NEXT (fresh session): Andaaz-style left filter sidebar on /shop
+Not started (2026-10-14). Owner asked for it; review of overnight work deferred.
+- Reference: andaazfashion.com listing, a ~180px left sidebar with fully expanded
+  sections (price ranges + min/max, Size with search, Colour, Fabric, then others) and "View more"
+  on long lists; toolbar with count + sort; 4-col grid stays visible while filtering.
+- Current code: `pages/ShopPage.jsx` renders `FilterBar` (dropdown chips) + `AllFiltersPanel`
+  (overlay) + `ActiveChips` + `SortControl` + `ProductGrid`. All state/logic in
+  `hooks/useShopFilters.js` (375 lines; toggle/setPrice/clearOne/clearField, availableOptions).
+  Components in `components/shop/` (FilterDropdown, PriceInputs, CategoryRow reusable).
+- Meeting asks: keep products visible while refining (no blur/overlay), few clean filters,
+  customer-facing category groups (see `lib/collections.js` groups), separate size groups
+  (kids by age / adult letter / waist), Apply-button vs instant to decide (recommend instant).
+- Known bugs that the sidebar will expose: fabric filter returns wrong results; picking one
+  option greys out others that still have matches (`fetchAvailableOptionsFromDB`).
+- Mobile: keep a filter drawer/sheet, not the sidebar.
+
 ## Overnight run 2026-10-13 → 14 (owner said "auto approve and implement overnight")
 Rules: merge only code PRs that pass tests + screenshot checks (each revertable with one revert).
 Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
