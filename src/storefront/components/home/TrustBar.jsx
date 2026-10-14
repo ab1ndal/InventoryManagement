@@ -1,32 +1,57 @@
 import React from "react";
-import { Globe, ShieldCheck, RefreshCw } from "lucide-react";
+import { Heart, MessageCircle, RefreshCw, Truck } from "lucide-react";
 
+const WHATSAPP_URL =
+  "https://wa.me/919810873280?text=Hi,%20I%20have%20a%20question%20about%20a%20product";
+
+// Keep every claim factual: no returns (in-store exchange only), no secure-checkout
+// claim before online checkout ships.
 const SIGNALS = [
-  { icon: Globe, title: "Pan-India Shipping", desc: "Free on orders above ₹5,000" },
-  { icon: ShieldCheck, title: "100% Authentic", desc: "Sourced directly from artisans" },
-  { icon: RefreshCw, title: "7-Day Exchange", desc: "In-store exchange within 7 days" },
+  { icon: Heart, title: "Handpicked with love", desc: "Every piece chosen by our family" },
+  { icon: RefreshCw, title: "Easy exchanges in store", desc: "Exchange within 7 days at our store" },
+  { icon: MessageCircle, title: "WhatsApp help", desc: "Ask us about size, fabric or fit", href: WHATSAPP_URL },
+  { icon: Truck, title: "Free shipping over ₹5,000", desc: "Delivered across India" },
 ];
+
+function Signal({ icon: Icon, title, desc }) {
+  return (
+    <>
+      <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-storefront-gold/10">
+        <Icon size={18} className="text-storefront-gold" aria-hidden="true" />
+      </span>
+      <span>
+        <span className="block font-sans text-sm font-medium leading-tight text-storefront-charcoal">
+          {title}
+        </span>
+        <span className="mt-0.5 block font-sans text-xs leading-snug text-storefront-muted">{desc}</span>
+      </span>
+    </>
+  );
+}
 
 export default function TrustBar() {
   return (
-    <section className="bg-storefront-charcoal py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
-        {SIGNALS.map(({ icon: Icon, title, desc }) => (
-          <div key={title} className="flex flex-col items-center text-center gap-3">
-            <div className="w-10 h-10 rounded-full border border-storefront-gold/40 flex items-center justify-center">
-              <Icon size={18} className="text-storefront-gold" />
-            </div>
-            <div>
-              <p className="font-display font-semibold text-storefront-cream text-lg leading-tight">
-                {title}
-              </p>
-              <p className="font-sans text-xs text-storefront-cream/50 mt-0.5 leading-snug">
-                {desc}
-              </p>
-            </div>
-          </div>
+    <section aria-label="Why shop with us" className="border-y border-storefront-border/70 bg-white px-4 py-8 sm:px-6 lg:px-8">
+      <ul className="mx-auto grid max-w-7xl grid-cols-1 gap-x-6 gap-y-5 min-[420px]:grid-cols-2 lg:grid-cols-4">
+        {SIGNALS.map((s) => (
+          <li key={s.title}>
+            {s.href ? (
+              <a
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-sm transition-opacity hover:opacity-80"
+              >
+                <Signal {...s} />
+              </a>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Signal {...s} />
+              </div>
+            )}
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }
