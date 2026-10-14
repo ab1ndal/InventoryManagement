@@ -26,4 +26,10 @@ describe("StorefrontFooter", () => {
     expect(screen.getByRole("link", { name: /contact/i })).toHaveAttribute("href", "/contact");
     expect(screen.getByRole("link", { name: /size guide/i })).toHaveAttribute("href", "/size-guide");
   });
+
+  it("uses handpicked wording, never crafted", () => {
+    renderFooter();
+    expect(screen.getByText(/handpicked with love/i)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/crafted/i);
+  });
 });

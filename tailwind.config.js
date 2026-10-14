@@ -40,6 +40,7 @@ module.exports = {
           muted: "#78716C",
           border: "#D6D3D1",
           card: "#FFFFFF",
+          whatsapp: "#25D366",
         },
       },
       fontFamily: {
