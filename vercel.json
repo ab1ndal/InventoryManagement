@@ -3,6 +3,10 @@
     {
       "source": "/sb-rest/:path*",
       "destination": "https://epotsxdugwfhyeiudjox.supabase.co/rest/v1/:path*"
+    },
+    {
+      "source": "/sb-auth/:path*",
+      "destination": "https://epotsxdugwfhyeiudjox.supabase.co/auth/v1/:path*"
     }
   ],
   "images": {
