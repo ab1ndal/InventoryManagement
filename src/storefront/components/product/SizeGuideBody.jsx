@@ -1,7 +1,5 @@
 import React from "react";
-import { MEASURE_INTRO, SIZE_ROWS } from "../../pages/sizeGuideContent";
-
-const SIZES = ["S", "M", "L", "XL"];
+import { MEASURE_INTRO, SIZE_CHART } from "../../pages/sizeGuideContent";
 
 // Shared by the /size-guide page and the PDP size-guide modal so the two
 // never drift apart.
@@ -19,33 +17,25 @@ export function SizeGuideIntro() {
 
 export function SizeGuideTable() {
   return (
-    <div className="overflow-x-auto mb-8">
-      <table className="w-full text-sm font-sans border-collapse">
+    <div className="mb-8">
+      <table className="w-full max-w-xs text-sm font-sans border-collapse">
         <thead>
           <tr className="border-b border-storefront-border text-left">
-            <th className="py-2 pr-4 font-display font-semibold text-storefront-charcoal">
-              Measurement
+            <th scope="col" className="py-2 pr-4 font-display font-semibold text-storefront-charcoal">
+              Size
             </th>
-            {SIZES.map((s) => (
-              <th
-                key={s}
-                scope="col"
-                className="py-2 px-3 font-display font-semibold text-storefront-charcoal text-center"
-              >
-                {s}
-              </th>
-            ))}
+            <th scope="col" className="py-2 pl-3 font-display font-semibold text-storefront-charcoal text-right">
+              Fits bust (inches)
+            </th>
           </tr>
         </thead>
         <tbody>
-          {SIZE_ROWS.map((row) => (
-            <tr key={row.label} className="border-b border-storefront-border/60">
-              <td className="py-2 pr-4 text-storefront-charcoal">{row.label}</td>
-              {SIZES.map((s) => (
-                <td key={s} className="py-2 px-3 text-center text-storefront-muted tabular-nums">
-                  {row[s]}
-                </td>
-              ))}
+          {SIZE_CHART.map(({ size, bust }) => (
+            <tr key={size} className="border-b border-storefront-border/60">
+              <th scope="row" className="py-2 pr-4 text-left font-normal text-storefront-charcoal">
+                {size}
+              </th>
+              <td className="py-2 pl-3 text-right text-storefront-muted tabular-nums">{bust}</td>
             </tr>
           ))}
         </tbody>

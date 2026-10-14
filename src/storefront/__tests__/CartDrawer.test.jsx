@@ -163,6 +163,6 @@ describe("CartDrawer — closed", () => {
 describe("CartDrawer — size label", () => {
   it("shows a customer-facing size instead of the raw code", () => {
     renderDrawer({ items: [{ ...ITEM_A, size: "XL|42" }], itemCount: 2 });
-    expect(screen.getByText("XL · Red")).toBeInTheDocument();
+    expect(screen.getByText("XL (42) · Red")).toBeInTheDocument();
   });
 });

@@ -1,10 +1,10 @@
 // Customer-facing size labels and ordering for variant size codes.
 //
 // Codes come from the `sizes` reference table: letter sizes pair the letter
-// with a garment number ("XL|42"), kids sizes pair age with a number ("10|30"),
-// waist and plain kids sizes are bare numbers, and a few special codes
-// ("FREE-SIZE"). The garment number disagrees with the size guide's body
-// measurements (guide: XL bust 40), so letter sizes show the letter alone.
+// with the bust it fits in inches ("XL|42", matching the size guide), kids
+// sizes pair age with a number ("10|30"), waist and plain kids sizes are bare
+// numbers, plus a few special codes ("FREE-SIZE"). A "|0" suffix (baby
+// sizes) carries no measurement and is dropped.
 
 const SPECIAL_LABELS = {
   "FREE-SIZE": "Free Size",
@@ -29,8 +29,7 @@ export function formatSize(code) {
   if (!code) return "";
   if (SPECIAL_LABELS[code]) return SPECIAL_LABELS[code];
   const [head, tail] = code.split("|");
-  if (tail === undefined) return code;
-  if (letterRank(head) !== null) return head;
+  if (tail === undefined || tail === "0") return head;
   return `${head} (${tail})`;
 }
 

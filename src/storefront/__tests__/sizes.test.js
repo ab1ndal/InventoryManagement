@@ -1,10 +1,13 @@
 import { formatSize, compareSizes } from "../lib/sizes";
 
 describe("formatSize", () => {
-  test("letter sizes drop the garment number", () => {
-    expect(formatSize("XL|42")).toBe("XL");
-    expect(formatSize("2XL|44")).toBe("2XL");
-    expect(formatSize("XS|34")).toBe("XS");
+  test("letter sizes show the bust they fit", () => {
+    expect(formatSize("XL|42")).toBe("XL (42)");
+    expect(formatSize("2XL|44")).toBe("2XL (44)");
+    expect(formatSize("XS|34")).toBe("XS (34)");
+  });
+
+  test("baby sizes with no measurement show the letter only", () => {
     expect(formatSize("S|0")).toBe("S");
   });
 
