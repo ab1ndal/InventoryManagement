@@ -1,5 +1,19 @@
 # Todo
 
+## Online seller = regular-scheme company (owner decision 2026-10-14)
+Online orders will be sold by the owner's parallel distribution company (regular GST), not the
+composition shop. Delivery across India; PR #14 (UP-only) closed.
+- [ ] Owner: new company's legal name, GSTIN, registered address (state), PAN, contact email.
+- [ ] Swap seller identity on the site: footer line (`StorefrontFooter.jsx:156`, currently the shop's
+      composition GSTIN), Terms/Privacy drafts, shipping/returns policy pages, Contact page.
+- [ ] Razorpay + Delhivery KYC in the new company's name (not the shop's).
+- [ ] Online orders get a GST **tax invoice** from the new company (not a Bill of Supply). Decide where
+      those invoices are made (this app's billing vs separate) — needs a design pass.
+- [ ] CA questions: (1) stock moving from the composition shop to the new company — a composition
+      dealer issues a Bill of Supply, so the company gets no input credit and pays full GST on the
+      online sale; (2) GST rate on apparel by price slab, and whether site prices stay GST-inclusive;
+      (3) related-party pricing between the two businesses.
+
 ## DONE: storefront fixes batch (2026-10-14, branch fix/storefront-sizes-auth-footer)
 - [x] Signed-in customers saw empty shop (no `authenticated` read policy) — migration
       `schema/migration_storefront_authenticated_read.sql` APPLIED to prod 2026-10-14; non-admin
@@ -43,7 +57,7 @@ Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
 ### Waiting on owner (morning)
 1. Review the Diwali 50 (`tasks/diwali-pick-sheet.html`), send back IDs if you change any.
 2. Approve description drafts (`tasks/diwali-description-drafts.md`; 25 flagged).
-3. CA questions (`tasks/accounts-setup.md` §1) → then merge PR #14 (UP-only checkout).
+3. ~~CA questions → merge PR #14~~ superseded 2026-10-14: online seller is the regular-scheme company (see top).
 4. Start Razorpay + Delhivery One KYC (`tasks/accounts-setup.md`).
 5. Review `tasks/legal-drafts.md` (Terms/Privacy).
 6. First-order discount terms (amount + how to claim) before adding it to the promo line.

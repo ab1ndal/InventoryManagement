@@ -16,7 +16,12 @@ Written 2026-10-13. Status: plan, awaiting owner decisions (bottom) and accounts
 - Delivery estimate is static text; tracking and order history are "coming soon" pages.
 - Terms and Privacy pages are placeholders pending legal review; gateways need them real.
 
-## Constraint that shapes everything: composition GST → Uttar Pradesh only
+> **Superseded 2026-10-14:** online sales will be made by the owner's separate
+> distribution company, registered under the **regular** GST scheme. The UP-only
+> constraint below no longer applies: deliver across India. PR #14 closed.
+> Open items: see `tasks/todo.md` "Online seller = regular-scheme company".
+
+## (Superseded) Constraint: composition GST → Uttar Pradesh only
 The business is a composition dealer (Bill of Supply). CGST Act **s.10(2)(c) bars composition
 dealers from inter-state supplies of goods**, so online orders can only ship to **UP addresses**.
 Selling intra-state through the shop's own website appears allowed, but no source addresses
