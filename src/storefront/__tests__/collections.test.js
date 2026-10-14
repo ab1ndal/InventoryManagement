@@ -8,6 +8,14 @@ describe("collections config", () => {
     );
   });
 
+  it("has a Diwali collection driven by an explicit, duplicate-free product list", () => {
+    const diwali = getCollection("diwali");
+    expect(diwali).toEqual(expect.objectContaining({ slug: "diwali", title: "Diwali Edit" }));
+    expect(diwali.productIds.length).toBeGreaterThan(0);
+    expect(new Set(diwali.productIds).size).toBe(diwali.productIds.length);
+    diwali.productIds.forEach((id) => expect(id).toMatch(/^BC\d+$/));
+  });
+
   it("returns null for an unknown slug", () => {
     expect(getCollection("nope")).toBeNull();
   });

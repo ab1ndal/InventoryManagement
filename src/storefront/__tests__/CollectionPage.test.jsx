@@ -48,6 +48,28 @@ describe("CollectionPage", () => {
     );
   });
 
+  it("keeps a product-list collection in its curated order", async () => {
+    const { getCollection } = require("../lib/collections");
+    const [first, second] = getCollection("diwali").productIds;
+    supabase.from.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        // The database returns rows in its own order, not the curated one.
+        in: jest.fn().mockResolvedValue({
+          data: [
+            { productid: second, name: "Second pick" },
+            { productid: first, name: "First pick" },
+          ],
+        }),
+      }),
+    });
+    renderAt("diwali");
+    await waitFor(() => expect(screen.getAllByTestId("product-card")).toHaveLength(2));
+    expect(screen.getAllByTestId("product-card").map((el) => el.textContent)).toEqual([
+      "First pick",
+      "Second pick",
+    ]);
+  });
+
   it("shows a not-found state for an unknown slug", async () => {
     renderAt("nope");
     expect(await screen.findByText(/collection not found/i)).toBeInTheDocument();
