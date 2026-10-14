@@ -1,5 +1,16 @@
 # Todo
 
+## Overnight run 2026-10-13 → 14 (owner said "auto approve and implement overnight")
+Rules: merge only code PRs that pass tests + screenshot checks (each revertable with one revert).
+Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
+- [x] PR #11 plans merged; PR #12 Diwali Edit collection (/collections/diwali, 50 Jev picks) merged
+- [x] Supplier names/codes stripped from 9 descriptions (backup in session scratchpad)
+- [ ] Parallel worktree streams (agents commit; main loop pushes/merges): grid, header, home, pdp
+- [x] ₹99 shipping policy wording fixed — PR #13 merged
+- [x] UP-only checkout validation — PR #14 open, HOLD until CA confirms
+- [x] Terms/Privacy drafts: `tasks/legal-drafts.md` (owner/legal review, not on site)
+Resume: `gh pr list`; `git worktree list`; `gh auth switch -u ab1ndal` before pushing, switch back to abindal-nyase after.
+
 ## Storefront revamp — ACTION PLAN: `tasks/storefront-action-plan.md` (Diwali 8 Nov 2026); details in `tasks/storefront-revamp-plan.md`
 
 The image filter below is Phase 0 of that plan.
