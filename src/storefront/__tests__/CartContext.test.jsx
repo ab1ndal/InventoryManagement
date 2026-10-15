@@ -248,3 +248,30 @@ describe("CartContext — guest cart survives INITIAL_SESSION with no session", 
     expect(JSON.parse(screen.getByTestId("items").textContent)).toEqual([]);
   });
 });
+
+describe("CartContext — auth callback must not block the auth lock", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    fetchServerCart.mockReset();
+  });
+
+  // supabase-js awaits onAuthStateChange callbacks while holding its auth lock
+  // (e.g. SIGNED_IN during initialize()). A callback that awaits a Supabase
+  // query deadlocks: the query's getSession() waits for that same lock.
+  it("returns synchronously even when the server cart never resolves", async () => {
+    fetchServerCart.mockReturnValue(new Promise(() => {}));
+    renderHarness();
+    let ret;
+    await act(async () => { ret = authCb("SIGNED_IN", { user: { id: "u1" } }); });
+    expect(ret).toBeUndefined();
+  });
+
+  it("still loads the server cart after the callback returns", async () => {
+    fetchServerCart.mockResolvedValue([ITEM_V2]);
+    renderHarness();
+    await act(async () => { authCb("INITIAL_SESSION", { user: { id: "u1" } }); });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(fetchServerCart).toHaveBeenCalled();
+    expect(screen.getByTestId("count").textContent).toBe("2");
+  });
+});

@@ -34,14 +34,7 @@ export function CartProvider({ children }) {
   // Auth-driven sync. Subscribe directly to supabase.auth for event granularity
   // (merge only on a genuine SIGNED_IN, load-only on session restore).
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const uid = session?.user?.id ?? null;
-      userIdRef.current = uid;
-
-      if (!uid) {
-        if (event === "SIGNED_OUT") setItems([]);
-        return;
-      }
+    const syncWithServer = async (event) => {
       setSyncing(true);
       try {
         const server = await fetchServerCart();
@@ -61,6 +54,22 @@ export function CartProvider({ children }) {
       } finally {
         setSyncing(false);
       }
+    };
+
+    // Must stay synchronous: supabase-js awaits this callback while holding its
+    // auth lock (e.g. SIGNED_IN from initialize() for a stored session), and
+    // every Supabase query first awaits getSession() on that same lock.
+    // Awaiting a query here deadlocks the whole client — the storefront hangs
+    // on skeletons for any returning signed-in visitor. Defer the work instead.
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      const uid = session?.user?.id ?? null;
+      userIdRef.current = uid;
+
+      if (!uid) {
+        if (event === "SIGNED_OUT") setItems([]);
+        return;
+      }
+      setTimeout(() => syncWithServer(event), 0);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
