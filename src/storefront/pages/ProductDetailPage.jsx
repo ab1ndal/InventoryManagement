@@ -127,6 +127,7 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
               alt={name}
               width={1000}
               quality={80}
+              fit="cover"
               eager
             />
             <span className="pointer-events-none absolute top-3 right-3 p-2 bg-white/85 text-storefront-charcoal opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden sm:flex">

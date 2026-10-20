@@ -7,10 +7,12 @@ import { imageUrl } from "../lib/productImage";
 // transform, so the fill costs almost no bandwidth.
 //
 // fit="cover" instead fills the frame edge to edge, anchored to the top, with
-// no blur layer. Product cards use it: most source photos are square with the
-// model centred on a plain backdrop, so a 3:4 cover crop only trims backdrop
-// from the sides, and top anchoring keeps the head on tall shots (owner
-// approved after a 30-product test, 2026-10-13).
+// no blur layer. Product cards and the product page gallery use it: most
+// source photos are square with the model centred on a plain backdrop, so a
+// 3:4 cover crop only trims backdrop from the sides, and top anchoring keeps
+// the head on tall shots (owner approved after a 30-product test, 2026-10-13;
+// gallery switched 2026-10-19, when ~75% of the 981 live images were 1:1).
+// The lightbox still shows the full uncropped image.
 export default function BlurFillImage({
   path,
   alt,
