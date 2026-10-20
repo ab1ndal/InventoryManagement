@@ -74,7 +74,15 @@ function LoadError({ message, onRetry }) {
   );
 }
 
-export default function ShopPage() {
+const SHOP_DESCRIPTION = "Browse our handpicked sarees, lehengas, suits, and ethnic wear.";
+
+// Also renders category collections (/collections/suits): same filters and
+// sort, limited to `scopeCategoryIds`.
+export default function ShopPage({
+  title = "Shop",
+  subtitle = "Handpicked with love, for every occasion.",
+  scopeCategoryIds = null,
+}) {
   const {
     filters,
     products,
@@ -101,7 +109,7 @@ export default function ShopPage() {
     baseOptions,
     error,
     retry,
-  } = useShopFilters();
+  } = useShopFilters({ scopeCategoryIds });
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Stable so the drawer's open effect (focus, scroll lock) runs once per open.
@@ -129,16 +137,14 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-storefront-cream">
-      <Seo title="Shop" description="Browse our handpicked sarees, lehengas, suits, and ethnic wear." />
+      <Seo title={title} description={scopeCategoryIds ? subtitle : SHOP_DESCRIPTION} />
       {/* Page header */}
       <div className="border-b border-storefront-border bg-storefront-cream">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h1 className="font-display font-semibold text-3xl sm:text-4xl text-storefront-charcoal leading-none">
-            Shop
+            {title}
           </h1>
-          <p className="font-sans text-sm text-storefront-muted">
-            Handpicked with love, for every occasion.
-          </p>
+          <p className="font-sans text-sm text-storefront-muted">{subtitle}</p>
         </div>
       </div>
 

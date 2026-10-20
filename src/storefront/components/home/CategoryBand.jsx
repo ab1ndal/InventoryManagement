@@ -94,7 +94,9 @@ export default function CategoryBand() {
   if (entries && entries.length === 0) return null;
 
   return (
-    <nav aria-label="Shop by category" className="border-b border-storefront-border/70 bg-white">
+    // Phones only: from md up the header's text category row shows the same
+    // links, and the two stacked read as a repeat.
+    <nav aria-label="Shop by category" className="md:hidden border-b border-storefront-border/70 bg-white">
       <div className="mx-auto max-w-7xl">
         {/* w-max + mx-auto: centred when the row fits, scrollable from the start when it doesn't. */}
         <div className="scrollbar-hide overflow-x-auto px-4 py-3 sm:px-6 lg:px-8">

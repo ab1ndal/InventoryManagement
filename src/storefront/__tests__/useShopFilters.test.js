@@ -83,3 +83,65 @@ test("a next page for older filters is not appended to newer results", async () 
   expect(result.current.products.map((p) => p.productid)).toEqual(["SAREE"]);
   expect(result.current.loadingMore).toBe(false);
 });
+
+test("a category scope limits queries until the shopper picks a category", async () => {
+  const inCalls = [];
+  supabase.from.mockImplementation(() => {
+    const builder = {
+      select: () => builder,
+      in: (column, values) => {
+        inCalls.push([column, values]);
+        return builder;
+      },
+      gte: () => builder,
+      lte: () => builder,
+      order: () => builder,
+      range: () => Promise.resolve({ data: [], count: 0, error: null }),
+    };
+    return builder;
+  });
+  supabase.rpc.mockImplementation((name) =>
+    Promise.resolve(
+      name === "get_shop_filter_options"
+        ? {
+            data: {
+              categories: [
+                { categoryid: "ST", name: "Suits" },
+                { categoryid: "RMS", name: "Readymade Suits" },
+                { categoryid: "SA", name: "Saree" },
+              ],
+            },
+            error: null,
+          }
+        : { data: null, error: null }
+    )
+  );
+  const scope = ["ST", "RMS"];
+  const { result } = renderHook(() => useShopFilters({ scopeCategoryIds: scope }));
+
+  await waitFor(() => expect(inCalls).toContainEqual(["categoryid", scope]));
+  await waitFor(() =>
+    expect(result.current.categoryOptions.map((c) => c.categoryid)).toEqual(["ST", "RMS"])
+  );
+  expect(supabase.rpc).toHaveBeenCalledWith(
+    "get_shop_available_options",
+    expect.objectContaining({ p_categories: scope })
+  );
+
+  act(() => result.current.toggle("categories", "RMS"));
+  await waitFor(() => expect(inCalls).toContainEqual(["categoryid", ["RMS"]]));
+});
+
+test("a single-category scope hides the category filter", async () => {
+  supabase.rpc.mockImplementation((name) =>
+    Promise.resolve(
+      name === "get_shop_filter_options"
+        ? { data: { categories: [{ categoryid: "LE", name: "Lehenga" }, { categoryid: "SA", name: "Saree" }] }, error: null }
+        : { data: null, error: null }
+    )
+  );
+  const scope = ["LE"];
+  const { result } = renderHook(() => useShopFilters({ scopeCategoryIds: scope }));
+  await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith("get_shop_filter_options"));
+  await waitFor(() => expect(result.current.categoryOptions).toEqual([]));
+});

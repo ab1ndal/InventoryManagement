@@ -35,7 +35,16 @@ async function fetchAvailableOptions(filters, fabricIndex, colorIndex) {
   return mapAvailability(data, colorIndex.codeToFamilies, fabricIndex.codeToFamilies);
 }
 
-export default function useShopFilters() {
+// A category page (e.g. Suits = ["ST", "RMS"]) limits every query to its
+// categories until the shopper narrows further with the Category filter.
+export function scopeFilters(filters, scopeCategoryIds) {
+  if (!scopeCategoryIds?.length || filters.categories.length) return filters;
+  return { ...filters, categories: scopeCategoryIds };
+}
+
+// `scopeCategoryIds` must be stable for the hook's lifetime; callers remount
+// (key) when it changes.
+export default function useShopFilters({ scopeCategoryIds = null } = {}) {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +89,13 @@ export default function useShopFilters() {
       const { data, error } = await supabase.rpc("get_shop_filter_options");
       if (error || !data) return;
 
-      setCategoryOptions(data.categories || []);
+      // Inside a category page, offer only its own categories, and none when
+      // there is just one (a single always-on checkbox filters nothing).
+      const categories = data.categories || [];
+      const scopedCategories = scopeCategoryIds
+        ? categories.filter((c) => scopeCategoryIds.includes(c.categoryid))
+        : categories;
+      setCategoryOptions(scopedCategories.length > 1 || !scopeCategoryIds ? scopedCategories : []);
 
       const colorFams = data.color_families || [];
       if (colorFams.length) {
@@ -142,11 +157,15 @@ export default function useShopFilters() {
       // reference sizes never stocked. Runs after the indices above are set
       // because code -> family mapping depends on them.
       setBaseOptions(
-        await fetchAvailableOptions(INITIAL_FILTERS, fabricIndexRef.current, colorIndexRef.current)
+        await fetchAvailableOptions(
+          scopeFilters(INITIAL_FILTERS, scopeCategoryIds),
+          fabricIndexRef.current,
+          colorIndexRef.current
+        )
       );
     }
     fetchOptions();
-  }, []);
+  }, [scopeCategoryIds]);
 
   // Debounced server-side available options — fires only when filters are active
   useEffect(() => {
@@ -170,7 +189,7 @@ export default function useShopFilters() {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       const available = await fetchAvailableOptions(
-        filters,
+        scopeFilters(filters, scopeCategoryIds),
         fabricIndexRef.current,
         colorIndexRef.current
       );
@@ -179,9 +198,10 @@ export default function useShopFilters() {
     }, 200);
 
     return () => clearTimeout(debounceRef.current);
-  }, [filters]);
+  }, [filters, scopeCategoryIds]);
 
-  const runQuery = useCallback(async (currentFilters, currentOffset, append, currentSort) => {
+  const runQuery = useCallback(async (requestedFilters, currentOffset, append, currentSort) => {
+    const currentFilters = scopeFilters(requestedFilters, scopeCategoryIds);
     const generation = append ? queryGenerationRef.current : ++queryGenerationRef.current;
     const isStale = () => generation !== queryGenerationRef.current;
     append ? setLoadingMore(true) : setLoading(true);
@@ -257,7 +277,7 @@ export default function useShopFilters() {
         setLoadingMore(false);
       }
     }
-  }, []);
+  }, [scopeCategoryIds]);
 
   useEffect(() => {
     setOffset(0);

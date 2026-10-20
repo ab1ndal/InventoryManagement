@@ -4,12 +4,33 @@ import { supabase } from "lib/supabaseClient";
 import Seo from "../components/Seo";
 import ProductCard from "../components/ProductCard";
 import { getCollection } from "../lib/collections";
+import ShopPage from "./ShopPage";
 
 const PRODUCT_COLUMNS = "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
 
 export default function CollectionPage() {
   const { slug } = useParams();
   const collection = getCollection(slug);
+
+  // Category collections get the full shop filters; keyed so switching
+  // categories starts fresh filters for the new scope.
+  if (collection && !collection.productIds && collection.categoryIds?.length) {
+    return (
+      <ShopPage
+        key={slug}
+        title={collection.title}
+        subtitle={collection.subtitle}
+        scopeCategoryIds={collection.categoryIds}
+      />
+    );
+  }
+
+  return <CuratedCollection slug={slug} collection={collection} />;
+}
+
+// Hand-picked lists (Diwali) keep their curated order, and empty placeholder
+// collections show a pointer to the shop.
+function CuratedCollection({ slug, collection }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,7 +40,7 @@ export default function CollectionPage() {
       return;
     }
 
-    const { productIds, categoryIds } = collection;
+    const { productIds } = collection;
     if (productIds?.length) {
       supabase
         .from("products")
@@ -29,16 +50,6 @@ export default function CollectionPage() {
           // `in` returns rows in database order; show them in the curated order.
           const rank = new Map(productIds.map((id, i) => [id, i]));
           setProducts((data || []).slice().sort((a, b) => rank.get(a.productid) - rank.get(b.productid)));
-          setLoading(false);
-        });
-    } else if (categoryIds?.length) {
-      supabase
-        .from("products")
-        .select(PRODUCT_COLUMNS)
-        .in("categoryid", categoryIds)
-        .order("productid", { ascending: false })
-        .then(({ data }) => {
-          setProducts(data || []);
           setLoading(false);
         });
     } else {

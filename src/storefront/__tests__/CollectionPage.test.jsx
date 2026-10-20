@@ -3,6 +3,11 @@ jest.mock("lib/supabaseClient", () => ({
     from: jest.fn(),
   },
 }));
+jest.mock("../pages/ShopPage", () => (props) => (
+  <div data-testid="shop-page">
+    {props.title}|{props.scopeCategoryIds.join(",")}
+  </div>
+));
 jest.mock("../components/ProductCard", () => (props) => (
   <div data-testid="product-card">{props.product.name}</div>
 ));
@@ -68,6 +73,11 @@ describe("CollectionPage", () => {
       "First pick",
       "Second pick",
     ]);
+  });
+
+  it("renders a category collection as a filterable shop scoped to its categories", () => {
+    renderAt("suits");
+    expect(screen.getByTestId("shop-page")).toHaveTextContent("Suits|ST,RMS");
   });
 
   it("shows a not-found state for an unknown slug", async () => {

@@ -32,13 +32,14 @@ export const COLLECTIONS = [
   { slug: "sarees", title: "Sarees", subtitle: "Handpicked sarees for every celebration", categoryIds: ["SA"] },
   { slug: "lehengas", title: "Lehengas", subtitle: "Festive and bridal lehengas", categoryIds: ["LE"] },
   { slug: "suits", title: "Suits", subtitle: "Suits and readymade suits", categoryIds: ["ST", "RMS"] },
-  { slug: "kurtis", title: "Kurtis", subtitle: "Everyday to festive kurtis", categoryIds: ["KUR", "SK"] },
+  // "Short Kurta" (SK) is men's wear despite the name, so it sits under Men.
+  { slug: "kurtis", title: "Kurtis", subtitle: "Everyday to festive kurtis", categoryIds: ["KUR"] },
   { slug: "gowns", title: "Gowns & Dresses", subtitle: "Gowns and dresses for every occasion", categoryIds: ["GWN", "DRS"] },
   {
     slug: "men",
     title: "Men",
-    subtitle: "Sherwanis, kurta pajamas, jackets, suits and shirts",
-    categoryIds: ["SW", "KP", "NHJ", "IW", "SJ-2P", "S2P", "S5P", "BLZ", "SHT", "T-SHT", "FRMP", "PNT"],
+    subtitle: "Sherwanis, kurtas, jackets, suits and shirts",
+    categoryIds: ["SW", "KP", "SK", "NHJ", "IW", "SJ-2P", "S2P", "S5P", "BLZ", "SHT", "T-SHT", "FRMP", "PNT"],
   },
   { slug: "wedding", title: "Wedding", subtitle: "Lehengas & statement sarees", categoryIds: [] },
   { slug: "festive", title: "Festive", subtitle: "Bright, celebratory pieces", categoryIds: [] },
