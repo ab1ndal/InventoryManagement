@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigationType } from "react-router-dom";
 import StorefrontHeader from "./StorefrontHeader";
 import StorefrontFooter from "./StorefrontFooter";
 import { CartProvider } from "../context/CartContext";
@@ -10,6 +10,7 @@ import { initAnalytics, trackPageView } from "../lib/analytics";
 
 export default function StorefrontLayout() {
   const location = useLocation();
+  const navigationType = useNavigationType();
 
   useEffect(() => {
     initAnalytics();
@@ -18,6 +19,13 @@ export default function StorefrontLayout() {
   useEffect(() => {
     trackPageView(location.pathname);
   }, [location.pathname]);
+
+  // BrowserRouter keeps the old scroll position across links, so a category
+  // or product clicked from far down a page opened mid-page. Back/forward
+  // (POP) is left to the browser so returning to a list keeps its place.
+  useEffect(() => {
+    if (navigationType !== "POP") window.scrollTo(0, 0);
+  }, [location.pathname, navigationType]);
 
   return (
     <StorefrontAuthProvider>

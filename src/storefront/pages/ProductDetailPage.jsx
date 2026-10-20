@@ -165,14 +165,10 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
 }
 
 // Keyed by product so following a "More like this" card starts the new
-// product fresh (no selected variant, quantity or photo carried over) and at
-// the top of the page.
+// product fresh (no selected variant, quantity or photo carried over).
+// StorefrontLayout scrolls each new page to the top.
 export default function ProductDetailPage() {
   const { productid } = useParams();
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [productid]);
 
   return <ProductDetail key={productid} productid={productid} />;
 }
