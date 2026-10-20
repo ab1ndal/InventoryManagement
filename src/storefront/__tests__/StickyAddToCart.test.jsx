@@ -25,7 +25,7 @@ afterEach(() => {
   delete global.IntersectionObserver;
 });
 
-function Harness({ onClick = jest.fn() }) {
+function Harness({ onClick = jest.fn(), soldOut = false }) {
   const ref = useRef(null);
   return (
     <>
@@ -35,6 +35,7 @@ function Harness({ onClick = jest.fn() }) {
         image="thumb.png"
         name="Silk Lehenga"
         price={12500}
+        soldOut={soldOut}
         label="Add to Cart"
         onClick={onClick}
       />
@@ -61,6 +62,14 @@ describe("StickyAddToCart", () => {
     expect(bar).toHaveTextContent("₹12,500");
     setIntersecting(true);
     expect(screen.queryByTestId("sticky-add-to-cart")).not.toBeInTheDocument();
+  });
+
+  it("shows Sold out instead of the price for a sold-out product", () => {
+    render(<Harness soldOut />);
+    setIntersecting(false);
+    const bar = screen.getByTestId("sticky-add-to-cart");
+    expect(bar).toHaveTextContent("Sold out");
+    expect(bar).not.toHaveTextContent("₹12,500");
   });
 
   it("flags the body while visible so the floating WhatsApp button can move up", () => {

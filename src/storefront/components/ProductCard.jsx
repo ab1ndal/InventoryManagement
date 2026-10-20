@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImagePaths } from "../lib/productImage";
+import { isSoldOut } from "../lib/stock";
 import { useWishlist } from "../context/WishlistContext";
 import BlurFillImage from "./BlurFillImage";
 
@@ -27,14 +28,12 @@ function PlaceholderImage({ name }) {
 }
 
 // Badge from the product's real variant stock. Some card sources (wishlist
-// snapshots, the home rail) don't load `productsizecolors`; without variant
+// snapshots) don't load `productsizecolors`; without variant
 // data the stock is unknown, so show nothing rather than guess. No low-stock
 // badge: ~78% of visible products have only 1-3 pieces, so it would sit on
 // most cards and read as false scarcity (see deliveryEstimate.js history).
 function stockBadge(variants) {
-  if (!Array.isArray(variants) || variants.length === 0) return null;
-  const total = variants.reduce((sum, v) => sum + Math.max(0, Number(v.stock) || 0), 0);
-  return total === 0 ? { label: "Sold out", soldOut: true } : null;
+  return isSoldOut(variants) ? { label: "Sold out", soldOut: true } : null;
 }
 
 export default function ProductCard({ product, priority = false }) {
@@ -181,11 +180,12 @@ export default function ProductCard({ product, priority = false }) {
           />
         </button>
 
-        {/* Category + stock badges */}
+        {/* Category + stock badges. The category tag is hidden on phones, where
+            cards are ~170px wide and it covers too much of the photo. */}
         {(categoryName || badge) && (
           <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 max-w-[calc(100%-3.5rem)] flex flex-col items-start gap-1">
             {categoryName && (
-              <span className="max-w-full truncate bg-white/85 backdrop-blur-sm text-storefront-charcoal text-[9px] tracking-[0.18em] uppercase px-2 sm:px-2.5 py-1 font-sans font-medium">
+              <span className="hidden sm:block max-w-full truncate bg-white/85 backdrop-blur-sm text-storefront-charcoal text-[9px] tracking-[0.18em] uppercase px-2 sm:px-2.5 py-1 font-sans font-medium">
                 {categoryName}
               </span>
             )}
@@ -202,10 +202,13 @@ export default function ProductCard({ product, priority = false }) {
 
       {/* Info */}
       <div className="p-3 sm:px-4">
-        <div className="flex items-baseline justify-between gap-2 mb-1">
-          <span className="font-sans text-base font-semibold text-storefront-charcoal tabular-nums">
-            ₹{Number(product.retailprice).toLocaleString("en-IN")}
-          </span>
+        {/* min-h keeps the row a price line tall when a sold-out card hides its price */}
+        <div className="flex items-baseline justify-between gap-2 mb-1 min-h-6">
+          {!badge?.soldOut && (
+            <span className="font-sans text-base font-semibold text-storefront-charcoal tabular-nums">
+              ₹{Number(product.retailprice).toLocaleString("en-IN")}
+            </span>
+          )}
           {product.fabric && (
             <span className="text-[10px] text-storefront-muted font-sans tracking-[0.12em] uppercase truncate">
               {product.fabric}
