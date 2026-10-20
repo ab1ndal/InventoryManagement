@@ -11,7 +11,7 @@ export const HERO_SLIDES = [
   {
     id: "diwali",
     eyebrow: "Diwali 2026",
-    headline: "The Diwali Edit",
+    headline: "Diwali Glam",
     subline: "Handpicked festive pieces for the season of lights.",
     cta: "Shop the edit",
     href: "/collections/diwali",

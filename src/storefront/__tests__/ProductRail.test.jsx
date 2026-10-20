@@ -10,7 +10,7 @@ import ProductRail from "../components/home/ProductRail";
 function renderRail(props) {
   return render(
     <MemoryRouter>
-      <ProductRail title="Diwali Edit" viewAllHref="/collections/diwali" {...props} />
+      <ProductRail title="Diwali Glam" viewAllHref="/collections/diwali" {...props} />
     </MemoryRouter>
   );
 }
@@ -24,7 +24,7 @@ describe("ProductRail", () => {
         { productid: "BC2", name: "Two" },
       ],
     });
-    expect(screen.getByRole("heading", { name: "Diwali Edit" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Diwali Glam" })).toBeInTheDocument();
     expect(screen.getAllByTestId("product-card").map((c) => c.textContent)).toEqual(["One", "Two"]);
     expect(screen.getByRole("link", { name: /view all/i })).toHaveAttribute("href", "/collections/diwali");
   });

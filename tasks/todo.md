@@ -1,5 +1,44 @@
 # Todo
 
+## Website review with Anushka (2026-10-19), in priority order
+Deadline driver: Diwali 8 Nov 2026. Until real checkout ships, Diwali orders use the
+WhatsApp + Razorpay Payment Link bridge (`tasks/checkout-shipping-plan.md` Phase A).
+
+### P0: quick wins before Diwali (this week)
+- [ ] Rename "Diwali Edit". Owner picks: Diwali Glam / Diwali Dhamaka / Diwali Showstopper / other.
+      Single source `src/storefront/lib/collections.js:24`; update the 6 tests that assert the label.
+- [ ] More hero carousel images (3 today, looks sparse). **Blocked on owner supplying photos**
+      (product-only or lifestyle, either is fine). Add them, then review the look together.
+- [ ] "More like this" already shipped (PR #20, `components/product/MoreLikeThis.jsx`) but Anushka
+      didn't notice it. Check why: below the fold, too few matches, or empty for some products.
+
+### P1: unblock real checkout (owner/CA actions, not code)
+- [ ] CA: stock transfer shop → Santosh Global LLP, and GST-inclusive site prices (see section below).
+- [ ] LLP current bank account, then Razorpay KYC in the LLP's name.
+- [ ] Courier decision: meeting said **Shiprocket**, earlier plan said Delhivery One (picked when
+      delivery was UP-only). With India-wide delivery, recommend Shiprocket: one API gives
+      pincode serviceability + rates across couriers. Confirm, then KYC in the LLP's name.
+- [ ] Swap seller identity on the site (footer GSTIN, policies, Contact) once CA confirms.
+
+### P2: checkout build (Phase B of `tasks/checkout-shipping-plan.md`)
+- [ ] Prepaid only, **no COD** (costlier, couriers block it in high-return pincodes). Razorpay
+      covers UPI, RuPay, Visa, Mastercard.
+- [ ] Two paths: guest checkout (nothing saved) and signed-in checkout (cart + address saved;
+      magic-link login already shipped).
+- [ ] Shipping estimate by pincode at checkout (Apple-style), via the Shiprocket rate API. Use 2–3
+      weight classes instead of per-item weights: heavy (lehengas), medium (sarees), light.
+      Cart keeps "Shipping calculated at checkout" until then.
+- [ ] Online orders get a GST tax invoice from the LLP (design pass on where invoices are made).
+
+### P3: retention emails (after checkout ships)
+- [ ] Custom SMTP (also required before magic-link login goes to prod).
+- [ ] Wishlist / "like" feature for signed-in customers.
+- [ ] Abandoned-cart emails (signed-in customers with items left in the cart).
+- [ ] Emails about liked items (back in stock, price drop). Needs consent + unsubscribe link.
+
+### Later, only if demand shows
+- [ ] COD with a surcharge (plus OTP/WhatsApp confirmation).
+
 ## Online seller = regular-scheme company (owner decision 2026-10-14)
 Online orders will be sold by SANTOSH GLOBAL LLP (GSTIN 09AFKFS5575H1ZC, regular, UP; PAN AFKFS5575H;
 registered at the shop address; same owner). Delivery across India; PR #14 (UP-only) closed.

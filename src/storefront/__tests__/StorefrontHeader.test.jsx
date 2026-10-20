@@ -50,13 +50,13 @@ describe("StorefrontHeader", () => {
     });
   });
 
-  it("renders the category row with a highlighted Diwali Edit link", () => {
+  it("renders the category row with a highlighted Diwali Glam link", () => {
     renderHeader();
     const row = screen.getByRole("navigation", { name: "Categories" });
     NAV_LINKS.forEach(({ label, to }) => {
       expect(within(row).getByRole("link", { name: label })).toHaveAttribute("href", to);
     });
-    const diwali = within(row).getByRole("link", { name: "Diwali Edit" });
+    const diwali = within(row).getByRole("link", { name: "Diwali Glam" });
     expect(diwali).toHaveAttribute("href", "/collections/diwali");
     expect(diwali.className).toMatch(/text-storefront-gold/);
   });

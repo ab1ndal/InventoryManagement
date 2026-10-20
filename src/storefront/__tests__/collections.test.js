@@ -10,7 +10,7 @@ describe("collections config", () => {
 
   it("has a Diwali collection driven by an explicit, duplicate-free product list", () => {
     const diwali = getCollection("diwali");
-    expect(diwali).toEqual(expect.objectContaining({ slug: "diwali", title: "Diwali Edit" }));
+    expect(diwali).toEqual(expect.objectContaining({ slug: "diwali", title: "Diwali Glam" }));
     expect(diwali.productIds.length).toBeGreaterThan(0);
     expect(new Set(diwali.productIds).size).toBe(diwali.productIds.length);
     diwali.productIds.forEach((id) => expect(id).toMatch(/^BC\d+$/));
@@ -23,7 +23,7 @@ describe("collections config", () => {
       expect(collection).not.toBeNull();
       expect((collection.productIds || collection.categoryIds).length).toBeGreaterThan(0);
     });
-    const categoryLinks = NAV_LINKS.filter((l) => !["Diwali Edit", "Shop All"].includes(l.label));
+    const categoryLinks = NAV_LINKS.filter((l) => !["Diwali Glam", "Shop All"].includes(l.label));
     categoryLinks.forEach((l) => expect(l.to).toMatch(/^\/collections\//));
   });
 
