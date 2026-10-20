@@ -15,6 +15,21 @@ WhatsApp + Razorpay Payment Link bridge (`tasks/checkout-shipping-plan.md` Phase
 - [x] Men's "Short Kurta" (SK) moved from Kurtis to Men. Owner may rename the DB category
       "Men's Short Kurta" so the card badge is unambiguous.
 
+### Product descriptions + tags revamp (paused 2026-10-19, waiting on owner review)
+Full context: `tasks/description-revamp-plan.md` (read its "Resume here" section first) and
+`scripts/describe/README.md`. No DB writes have happened yet.
+- [ ] Owner: review the 20-product pilot page https://claude.ai/artifact/7ft65naksZtpdYTVPpDJGe.
+      Each product has Approve / Needs changes / Reject plus a comment box. Comments save to the
+      page itself (collection `feedback`, one doc per product ID).
+- [ ] Claude: read the feedback (ArtifactData `list` on collection `feedback` of that URL), fold
+      it and the known fixes into `scripts/describe/prompt.md`, re-run the 20, and republish the
+      page for a second look.
+- [ ] Once the 20 are approved: draft the tag vocab per category, then run the other ~767 live
+      products in batches of about 150 (Codex Terra, Sonnet for flagged ones), each batch
+      reviewed on its own page.
+- [ ] After approval: migration for `tag_vocab` / `product_tags`, write the descriptions and tags,
+      then PDP detail rows plus Occasion and Work filters.
+
 ### P1: unblock real checkout (owner/CA actions, not code)
 - [ ] CA: stock transfer shop → Santosh Global LLP, and GST-inclusive site prices (see section below).
 - [ ] LLP current bank account, then Razorpay KYC in the LLP's name.

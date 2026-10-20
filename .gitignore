@@ -34,3 +34,6 @@ graphify-out/
 # vCard exports contain customer names and phone numbers — never commit
 vcf-export/
 *.vcf
+
+# product description pipeline working files (photos, logs)
+/.describe-work/

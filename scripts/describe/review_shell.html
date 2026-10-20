@@ -1,0 +1,151 @@
+<title>Description Pilot Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: one reading column of product cards; photos strip above a live-vs-proposed pair. Shop palette (stone + gold). */
+:root {
+  --bg: #FAFAF9; --surface: #FFFFFF; --fg: #1C1917; --muted: #78716C; --line: #E7E5E4;
+  --gold: #A16207; --gold-soft: #FEF3C7; --warn: #B45309; --warn-soft: #FFF7ED; --bad: #B91C1C; --bad-soft: #FEF2F2;
+  --ok: #3F6212; --ok-soft: #F7FEE7;
+  --display: "Fraunces", Georgia, serif; --body: "Inter", -apple-system, "Segoe UI", sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #171412; --surface: #211D1A; --fg: #EDE9E4; --muted: #A8A29E; --line: #36302B;
+  --gold: #E0A63A; --gold-soft: #3A2C12; --warn: #F0A050; --warn-soft: #36240F; --bad: #F08080; --bad-soft: #3A1717;
+  --ok: #A3C760; --ok-soft: #1F2A12; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #171412; --surface: #211D1A; --fg: #EDE9E4; --muted: #A8A29E; --line: #36302B;
+  --gold: #E0A63A; --gold-soft: #3A2C12; --warn: #F0A050; --warn-soft: #36240F; --bad: #F08080; --bad-soft: #3A1717;
+  --ok: #A3C760; --ok-soft: #1F2A12; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1 { font: 600 clamp(28px, 4vw, 38px)/1.15 var(--display); margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 65ch; margin: 8px 0 0; }
+.eyebrow { font: 500 11px/1 var(--body); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+.summary { display: grid; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 20px; }
+.summary h2 { font: 600 18px/1.3 var(--display); margin: 0; }
+.summary ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; max-width: 75ch; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 13px; color: var(--muted); }
+.stats b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: grid; gap: 14px; min-width: 0; }
+.ch { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.ch h2 { font: 600 19px/1.25 var(--display); margin: 0; }
+.meta { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 12px; color: var(--fg); }
+.badge { font-size: 11px; font-weight: 600; letter-spacing: .04em; padding: 4px 9px; border-radius: 99px; white-space: nowrap; }
+.b-ok { background: var(--ok-soft); color: var(--ok); }
+.b-hard { background: var(--gold-soft); color: var(--gold); }
+.imgs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+figure { margin: 0; flex: 0 0 auto; }
+figure img { height: 190px; width: auto; max-width: none; border-radius: 4px; display: block; background: var(--line); }
+figcaption { font-size: 11px; color: var(--muted); margin-top: 4px; }
+figcaption.mk { color: var(--warn); }
+.cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cmp section { min-width: 0; border-radius: 4px; padding: 12px 14px; }
+.cmp h3 { margin: 0 0 6px; font: 600 11px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.cmp p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.old { background: var(--bg); color: var(--muted); }
+.new { background: var(--ok-soft); }
+.tags { display: grid; gap: 6px; }
+.tagrow { display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; }
+.tk { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); width: 104px; flex: 0 0 auto; }
+.chip { font-size: 12.5px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 99px; }
+.flags { margin: 0; padding: 10px 14px; list-style: none; background: var(--warn-soft); border-radius: 4px; display: grid; gap: 5px; font-size: 13.5px; }
+.flags b { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; margin-right: 6px; }
+.fc { color: var(--bad); } .fu { color: var(--warn); }
+details { font-size: 13.5px; color: var(--muted); }
+summary { cursor: pointer; }
+summary:focus-visible, a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.fb { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }
+.verdicts { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+.verdicts legend, .cl { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 6px; float: left; width: 100%; }
+.verdicts label { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+.verdicts input { accent-color: var(--gold); }
+textarea { font: 14px/1.5 var(--body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; resize: vertical; width: 100%; box-sizing: border-box; }
+textarea:focus-visible, .fb button:focus-visible, .verdicts input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.fbrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.fb button { font: 600 13px/1 var(--body); color: var(--surface); background: var(--fg); border: 0; border-radius: 4px; padding: 9px 16px; cursor: pointer; }
+.fb button:disabled { opacity: .45; cursor: not-allowed; }
+.st { font-size: 12.5px; color: var(--muted); }
+.st.err { color: var(--bad); }
+.card.v-approve { border-color: var(--ok); } .card.v-change { border-color: var(--warn); } .card.v-reject { border-color: var(--bad); }
+.progress { font-size: 13px; color: var(--muted); }
+.progress b { color: var(--fg); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .cmp { grid-template-columns: 1fr; } figure img { height: 150px; } .tk { width: 100%; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Bindal's Creation · storefront copy</div>
+    <h1>{{HEADING}}</h1>
+    <p class="lede">Each card shows the original Drive photos, the AI mockup, the description live today, and the proposed description and tags. Nothing has been written to the database.</p>
+  </header>
+
+  <section class="summary">
+    <h2>What the pilot showed</h2>
+    <div class="stats"><span><b>{{COUNT}}</b> products</span><span><b>{{HARD}}</b> sent for a second opinion</span><span id="progress" class="progress"></span></div>
+    {{SUMMARY}}
+  </section>
+
+{{CARDS}}
+</div>
+<script>
+// Saves one feedback doc per product at feedback/<productid>: {verdict, comment, proposed, updatedAt}.
+// Claude reads these later with the ArtifactData tool to refine the prompt and rewrites.
+(function () {
+  const forms = [...document.querySelectorAll("form.fb")];
+  const progress = document.getElementById("progress");
+  const state = {};
+  const paint = () => {
+    const done = Object.values(state).filter(s => s.verdict).length;
+    if (progress) progress.innerHTML = `<b>${done}</b> of <b>${forms.length}</b> reviewed`;
+  };
+  const show = (form, s) => {
+    const card = form.closest(".card");
+    card.classList.remove("v-approve", "v-change", "v-reject");
+    if (s.verdict) {
+      card.classList.add("v-" + s.verdict);
+      const r = form.querySelector(`input[value="${s.verdict}"]`); if (r) r.checked = true;
+    }
+    const ta = form.querySelector("textarea");
+    if (document.activeElement !== ta && typeof s.comment === "string") ta.value = s.comment;
+  };
+  const setAll = (disabled, msg) => forms.forEach(f => {
+    f.querySelectorAll("input,textarea,button").forEach(el => (el.disabled = disabled));
+    if (msg) f.querySelector(".st").textContent = msg;
+  });
+  setAll(true, "Connecting…");
+  paint();
+  claude.use("db").then(db => {
+    if (!db) { setAll(true, "Comments can't be saved in this view. Open the page signed in to claude.ai."); return; }
+    setAll(false, "");
+    const col = db.collection("feedback");
+    col.onSnapshot(snap => {
+      snap.docs.forEach(d => {
+        const form = forms.find(f => f.dataset.id === d.id);
+        if (!form) return;
+        state[d.id] = d.data();
+        show(form, state[d.id]);
+        if (!form.dataset.busy) form.querySelector(".st").textContent = "Saved " + new Date(state[d.id].updatedAt).toLocaleString();
+      });
+      paint();
+    }, e => setAll(true, "Saved comments couldn't load (" + e.code + "). Reload the page."));
+    forms.forEach(form => form.addEventListener("submit", async ev => {
+      ev.preventDefault();
+      const id = form.dataset.id, st = form.querySelector(".st"), btn = form.querySelector("button");
+      const verdict = form.querySelector("input[type=radio]:checked")?.value || "";
+      const comment = form.querySelector("textarea").value.trim();
+      if (!verdict && !comment) { st.textContent = "Pick a verdict or write a comment first."; return; }
+      form.dataset.busy = "1"; btn.disabled = true; st.classList.remove("err"); st.textContent = "Saving…";
+      try {
+        await col.doc(id).set({ verdict, comment, proposed: form.dataset.proposed, updatedAt: new Date().toISOString() });
+        st.textContent = "Saved";
+      } catch (e) {
+        st.classList.add("err");
+        st.textContent = e.code === "invalid_argument" ? "You don't have permission to save comments here." : "Couldn't save (" + (e.code || "error") + "). Try again.";
+      } finally { delete form.dataset.busy; btn.disabled = false; }
+    }));
+  });
+})();
+</script>
