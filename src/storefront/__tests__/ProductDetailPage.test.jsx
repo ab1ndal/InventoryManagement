@@ -38,14 +38,16 @@ const VARIANTS = [
 ];
 
 const RELATED = [
-  { productid: "BC250001", name: "Rose Lehenga" },
-  { productid: "BC250002", name: "Gold Lehenga" },
+  { productid: "BC250001", name: "Rose Lehenga", categoryid: "LE", retailprice: 12000, productsizecolors: [{ stock: 1, color: "Pink" }] },
+  { productid: "BC250002", name: "Gold Lehenga", categoryid: "LE", retailprice: 13000, productsizecolors: [{ stock: 1, color: "Green" }] },
+  { productid: "BC250003", name: "Sold Lehenga", categoryid: "LE", retailprice: 12500, productsizecolors: [{ stock: 0, color: "Green" }] },
 ];
 
 function mockRelated(data = RELATED) {
   const chain = {
     select: jest.fn(() => chain),
     eq: jest.fn(() => chain),
+    in: jest.fn(() => chain),
     neq: jest.fn(() => chain),
     order: jest.fn(() => chain),
     limit: jest.fn(() => Promise.resolve({ data, error: null })),
@@ -140,14 +142,21 @@ describe("ProductDetailPage", () => {
     expect(within(dialog).getByText("2 / 2")).toBeInTheDocument();
   });
 
-  it("shows a More like this rail from the same category, excluding this product", async () => {
+  it("shows a ranked More like this rail from the category group, without sold-out pieces", async () => {
     const chain = mockRelated();
     renderPage();
     expect(await screen.findByText("Rose Lehenga")).toBeInTheDocument();
-    expect(screen.getAllByTestId("product-card")).toHaveLength(2);
-    expect(chain.eq).toHaveBeenCalledWith("categoryid", "LE");
+    // Gold shares a colour (Green) with this product, so it ranks first.
+    expect(screen.getAllByTestId("product-card").map((c) => c.textContent)).toEqual([
+      "Gold Lehenga",
+      "Rose Lehenga",
+    ]);
+    expect(chain.in).toHaveBeenCalledWith("categoryid", ["LE"]);
     expect(chain.neq).toHaveBeenCalledWith("productid", "BC252742");
-    expect(chain.limit).toHaveBeenCalledWith(8);
+    expect(screen.getByRole("link", { name: /view all lehengas/i })).toHaveAttribute(
+      "href",
+      "/collections/lehengas"
+    );
   });
 
   it("renders one add-to-cart button until the sticky bar is needed", () => {

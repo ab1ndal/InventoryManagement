@@ -456,7 +456,7 @@ function ProductDetail({ productid }) {
           </div>
         </div>
 
-        <MoreLikeThis categoryid={product.categoryid} excludeId={productid} />
+        <MoreLikeThis product={product} colours={colours} />
       </div>
 
       <ImageLightbox
