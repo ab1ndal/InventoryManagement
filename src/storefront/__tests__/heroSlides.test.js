@@ -27,7 +27,7 @@ describe("hero slides config", () => {
     });
   });
 
-  it("leads with the Diwali Edit", () => {
+  it("leads with the Diwali Glam", () => {
     expect(HERO_SLIDES[0].href).toBe("/collections/diwali");
   });
 

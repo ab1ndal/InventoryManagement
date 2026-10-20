@@ -39,7 +39,7 @@ describe("StorefrontFooter — shop links", () => {
     renderFooter();
     expect(screen.getByRole("link", { name: "Sarees" })).toHaveAttribute("href", "/collections/sarees");
     expect(screen.getByRole("link", { name: "Suits" })).toHaveAttribute("href", "/collections/suits");
-    expect(screen.getByRole("link", { name: "Diwali Edit" })).toHaveAttribute("href", "/collections/diwali");
+    expect(screen.getByRole("link", { name: "Diwali Glam" })).toHaveAttribute("href", "/collections/diwali");
     expect(screen.queryByRole("link", { name: /dupattas/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /salwar suits/i })).not.toBeInTheDocument();
   });

@@ -51,7 +51,7 @@ describe("CategoryBand", () => {
     });
   });
 
-  it("leads with the Diwali Edit and links icons to category collections", async () => {
+  it("leads with the Diwali Glam and links icons to category collections", async () => {
     render(
       <MemoryRouter>
         <CategoryBand />
@@ -63,7 +63,7 @@ describe("CategoryBand", () => {
     );
     const links = screen.getAllByRole("link");
     expect(links[0]).toHaveAttribute("href", "/collections/diwali");
-    expect(links[0]).toHaveTextContent(/diwali edit/i);
+    expect(links[0]).toHaveTextContent(/diwali glam/i);
     expect(screen.getByRole("link", { name: /lehengas/i })).toHaveAttribute("href", "/collections/lehengas");
     // No products in these categories in the mock, so no icon.
     expect(screen.queryByRole("link", { name: /^men$/i })).toBeNull();

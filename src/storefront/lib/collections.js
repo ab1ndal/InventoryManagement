@@ -21,7 +21,7 @@ const DIWALI_PRODUCT_IDS = [
 export const COLLECTIONS = [
   {
     slug: "diwali",
-    title: "Diwali Edit",
+    title: "Diwali Glam",
     subtitle: "Handpicked festive pieces for Diwali",
     productIds: DIWALI_PRODUCT_IDS,
   },
