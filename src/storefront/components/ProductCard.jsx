@@ -82,7 +82,6 @@ export default function ProductCard({ product, priority = false }) {
     touchX.current = null;
   };
 
-  const categoryName = product.categories?.name || product.category_name || null;
   const badge = stockBadge(product.productsizecolors);
 
   return (
@@ -180,22 +179,13 @@ export default function ProductCard({ product, priority = false }) {
           />
         </button>
 
-        {/* Category + stock badges. The category tag is hidden on phones, where
-            cards are ~170px wide and it covers too much of the photo. */}
-        {(categoryName || badge) && (
-          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10 max-w-[calc(100%-3.5rem)] flex flex-col items-start gap-1">
-            {categoryName && (
-              <span className="hidden sm:block max-w-full truncate bg-white/85 backdrop-blur-sm text-storefront-charcoal text-[9px] tracking-[0.18em] uppercase px-2 sm:px-2.5 py-1 font-sans font-medium">
-                {categoryName}
-              </span>
-            )}
-            {badge && (
-              <span
-                className="text-[9px] tracking-[0.14em] uppercase px-2 sm:px-2.5 py-1 font-sans font-semibold bg-storefront-charcoal text-storefront-cream"
-              >
-                {badge.label}
-              </span>
-            )}
+        {/* Stock badge only. No category tag on the photo: it covered faces, and
+            the product name already ends with the category ("Cotton Nehru Jacket"). */}
+        {badge && (
+          <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10">
+            <span className="block text-[9px] tracking-[0.14em] uppercase px-2 sm:px-2.5 py-1 font-sans font-semibold bg-storefront-charcoal text-storefront-cream">
+              {badge.label}
+            </span>
           </div>
         )}
       </div>

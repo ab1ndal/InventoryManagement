@@ -27,11 +27,11 @@ function renderCard(product) {
 }
 
 describe("ProductCard", () => {
-  it("shows name, price and category", () => {
+  it("shows name and price, with no category tag over the photo", () => {
     renderCard(base);
     expect(screen.getByText("Silk Saree")).toBeInTheDocument();
     expect(screen.getByText("₹2,499")).toBeInTheDocument();
-    expect(screen.getByText("Saree")).toBeInTheDocument();
+    expect(screen.queryByText("Saree")).not.toBeInTheDocument();
   });
 
   it("shows Sold out when total stock across variants is 0", () => {
