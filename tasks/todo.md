@@ -5,12 +5,15 @@ Deadline driver: Diwali 8 Nov 2026. Until real checkout ships, Diwali orders use
 WhatsApp + Razorpay Payment Link bridge (`tasks/checkout-shipping-plan.md` Phase A).
 
 ### P0: quick wins before Diwali (this week)
-- [ ] Rename "Diwali Edit". Owner picks: Diwali Glam / Diwali Dhamaka / Diwali Showstopper / other.
-      Single source `src/storefront/lib/collections.js:24`; update the 6 tests that assert the label.
+- [x] Rename "Diwali Edit" → "Diwali Glam" (2026-10-19).
 - [ ] More hero carousel images (3 today, looks sparse). **Blocked on owner supplying photos**
       (product-only or lifestyle, either is fine). Add them, then review the look together.
-- [ ] "More like this" already shipped (PR #20, `components/product/MoreLikeThis.jsx`) but Anushka
-      didn't notice it. Check why: below the fold, too few matches, or empty for some products.
+- [x] "More like this" ranked by category/price/colour/fabric, sold-out dropped, all 8 visible on
+      desktop, "View all" link, small categories borrow from their header group (2026-10-19).
+- [x] Category pages get /shop filters + sort + paging, scoped to the collection (2026-10-19).
+- [x] Home thumbnail band shown on phones only (it repeated the header text row on md+).
+- [x] Men's "Short Kurta" (SK) moved from Kurtis to Men. Owner may rename the DB category
+      "Men's Short Kurta" so the card badge is unambiguous.
 
 ### P1: unblock real checkout (owner/CA actions, not code)
 - [ ] CA: stock transfer shop → Santosh Global LLP, and GST-inclusive site prices (see section below).
