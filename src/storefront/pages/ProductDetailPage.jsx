@@ -27,6 +27,7 @@ import Seo from "../components/Seo";
 import { buildProductJsonLd } from "../lib/seo";
 import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote } from "../lib/deliveryEstimate";
 import { stripMarkdown, whatsappProductUrl } from "../lib/productText";
+import { isSoldOut } from "../lib/stock";
 
 const TRUST_POINTS = [
   { icon: Heart, label: "Handpicked with love" },
@@ -231,6 +232,7 @@ function ProductDetail({ productid }) {
   const categoryName = product.categories?.name;
   const description = stripMarkdown(product.description);
   const price = Number(product.retailprice);
+  const soldOut = isSoldOut(variants);
   const productLd = buildProductJsonLd({
     product: { ...product, description },
     variants,
@@ -332,13 +334,21 @@ function ProductDetail({ productid }) {
               {product.name}
             </h1>
 
-            <p className="font-sans text-2xl font-semibold text-storefront-charcoal tabular-nums mb-1">
-              ₹{price.toLocaleString("en-IN")}
-            </p>
+            {soldOut ? (
+              <p className="font-sans text-2xl font-semibold text-storefront-muted mb-6">
+                Sold out
+              </p>
+            ) : (
+              <>
+                <p className="font-sans text-2xl font-semibold text-storefront-charcoal tabular-nums mb-1">
+                  ₹{price.toLocaleString("en-IN")}
+                </p>
 
-            <p className="text-xs text-storefront-muted font-sans tracking-wide mb-6">
-              {PRICE_NOTE}
-            </p>
+                <p className="text-xs text-storefront-muted font-sans tracking-wide mb-6">
+                  {PRICE_NOTE}
+                </p>
+              </>
+            )}
 
             <div ref={pickerRef} className="border-t border-storefront-border pt-6 mb-6">
               {variants.length > 0 ? (
@@ -469,6 +479,7 @@ function ProductDetail({ productid }) {
         image={imagePaths.length ? imageUrl(imagePaths[0], { width: 150, quality: 55 }) : null}
         name={product.name}
         price={price}
+        soldOut={soldOut}
         label={canAddToCart ? "Add to Cart" : "Select size"}
         onClick={handleStickyClick}
       />

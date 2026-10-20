@@ -40,6 +40,22 @@ describe("ProductCard", () => {
     expect(screen.queryByText(/left/i)).not.toBeInTheDocument();
   });
 
+  it("hides the price when every variant is sold out", () => {
+    renderCard({ ...base, productsizecolors: [{ stock: 0 }, { stock: 0 }] });
+    expect(screen.queryByText("₹2,499")).not.toBeInTheDocument();
+  });
+
+  it("keeps the price when only some variants are sold out", () => {
+    renderCard({ ...base, productsizecolors: [{ stock: 0 }, { stock: 1 }] });
+    expect(screen.getByText("₹2,499")).toBeInTheDocument();
+    expect(screen.queryByText(/sold out/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the price when stock data is absent", () => {
+    renderCard(base);
+    expect(screen.getByText("₹2,499")).toBeInTheDocument();
+  });
+
   it("shows no low-stock badge even when only one piece is left", () => {
     // Most items are single pieces (stock 1-3), so a low-stock badge would sit
     // on ~80% of cards: noise that reads as false scarcity.

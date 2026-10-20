@@ -56,8 +56,8 @@ function mockRelated(data = RELATED) {
   return chain;
 }
 
-function renderPage(product = PRODUCT) {
-  useProduct.mockReturnValue({ product, variants: VARIANTS, loading: false, error: null });
+function renderPage(product = PRODUCT, variants = VARIANTS) {
+  useProduct.mockReturnValue({ product, variants, loading: false, error: null });
   return render(
     <MemoryRouter initialEntries={[`/product/${product.productid}`]}>
       <Routes>
@@ -131,6 +131,27 @@ describe("ProductDetailPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/handpicked with love/i)).toBeInTheDocument();
     expect(screen.getByText(/exchange in store within 7 days/i)).toBeInTheDocument();
+  });
+
+  it("shows Sold out instead of the price and tax line when every variant is sold out", () => {
+    renderPage(PRODUCT, VARIANTS.map((v) => ({ ...v, stock: 0 })));
+    expect(screen.getByText("Sold out")).toBeInTheDocument();
+    expect(screen.queryByText("₹12,500")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Inclusive of all taxes · Free shipping above ₹5,000")
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the price when only some variants are sold out", () => {
+    renderPage(PRODUCT, [{ ...VARIANTS[0], stock: 0 }, VARIANTS[1]]);
+    expect(screen.getByText("₹12,500")).toBeInTheDocument();
+    expect(screen.queryByText("Sold out")).not.toBeInTheDocument();
+  });
+
+  it("keeps the price for a product with no variants", () => {
+    renderPage(PRODUCT, []);
+    expect(screen.getByText("₹12,500")).toBeInTheDocument();
+    expect(screen.queryByText("Sold out")).not.toBeInTheDocument();
   });
 
   it("opens a lightbox from the main image and steps to the next photo", async () => {

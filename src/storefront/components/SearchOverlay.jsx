@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { useProductSearch } from "../hooks/useProductSearch";
 import { SEARCH_MIN_CHARS } from "../lib/searchUtils";
+import { isSoldOut } from "../lib/stock";
 
 // Command-palette style product search. Debounced name/category match; results
 // link straight to the PDP. Keyboard: ↑/↓ to move, Enter to open, Esc to close.
@@ -141,9 +142,13 @@ export default function SearchOverlay({ open, onClose }) {
                     </span>
                   )}
                 </span>
-                <span className="text-sm font-sans tabular-nums text-storefront-charcoal flex-shrink-0">
-                  ₹{Number(product.retailprice).toLocaleString("en-IN")}
-                </span>
+                {isSoldOut(product.productsizecolors) ? (
+                  <span className="text-sm font-sans text-storefront-muted flex-shrink-0">Sold out</span>
+                ) : (
+                  <span className="text-sm font-sans tabular-nums text-storefront-charcoal flex-shrink-0">
+                    ₹{Number(product.retailprice).toLocaleString("en-IN")}
+                  </span>
+                )}
               </button>
             ))}
         </div>

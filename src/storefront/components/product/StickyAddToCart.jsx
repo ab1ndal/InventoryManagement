@@ -5,7 +5,7 @@ import { ShoppingBag } from "lucide-react";
 // button is off screen — above it after scrolling past, or below the fold on
 // a phone before reaching it — so a purchase button is always one tap away
 // without ever showing two at once.
-export default function StickyAddToCart({ targetRef, image, name, price, label, disabled = false, onClick }) {
+export default function StickyAddToCart({ targetRef, image, name, price, soldOut = false, label, disabled = false, onClick }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -45,9 +45,13 @@ export default function StickyAddToCart({ targetRef, image, name, price, label, 
         )}
         <div className="min-w-0 flex-1">
           <p className="font-display text-sm text-storefront-charcoal truncate">{name}</p>
-          <p className="font-sans text-sm font-semibold text-storefront-charcoal tabular-nums">
-            ₹{Number(price).toLocaleString("en-IN")}
-          </p>
+          {soldOut ? (
+            <p className="font-sans text-sm font-semibold text-storefront-muted">Sold out</p>
+          ) : (
+            <p className="font-sans text-sm font-semibold text-storefront-charcoal tabular-nums">
+              ₹{Number(price).toLocaleString("en-IN")}
+            </p>
+          )}
         </div>
         <button
           type="button"
