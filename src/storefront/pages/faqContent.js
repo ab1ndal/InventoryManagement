@@ -3,8 +3,8 @@
 // COD is not mentioned at all.
 export const FAQ_ITEMS = [
   {
-    q: "How long does delivery take, and do you ship across India?",
-    a: "We dispatch within 2 working days. Delivery anywhere in India typically takes 5–7 days after dispatch.",
+    q: "How long does delivery take, and where do you deliver?",
+    a: "We dispatch within 2 working days. Delivery typically takes 5–7 days after dispatch. We currently deliver within Uttar Pradesh only; for other locations, please contact us on WhatsApp.",
   },
   {
     q: "What payment methods do you accept?",
