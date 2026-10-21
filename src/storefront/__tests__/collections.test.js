@@ -14,6 +14,9 @@ describe("collections config", () => {
     expect(diwali.productIds.length).toBeGreaterThan(0);
     expect(new Set(diwali.productIds).size).toBe(diwali.productIds.length);
     diwali.productIds.forEach((id) => expect(id).toMatch(/^BC\d+$/));
+    // Product-list collections are filtered and ordered client-side.
+    const { MAX_SCOPED_PRODUCT_IDS } = require("../hooks/useShopFilters");
+    expect(diwali.productIds.length).toBeLessThanOrEqual(MAX_SCOPED_PRODUCT_IDS);
   });
 
   it("backs every header category link with a category collection", () => {

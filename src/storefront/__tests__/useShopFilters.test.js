@@ -145,3 +145,126 @@ test("a single-category scope hides the category filter", async () => {
   await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith("get_shop_filter_options"));
   await waitFor(() => expect(result.current.categoryOptions).toEqual([]));
 });
+
+describe("product-id scope (curated collections)", () => {
+  // Thenable builder: records every call and resolves with `resolve(calls)`.
+  function mockProducts(resolve) {
+    const queries = [];
+    supabase.from.mockImplementation(() => {
+      const calls = [];
+      queries.push(calls);
+      const builder = {};
+      ["select", "in", "gte", "lte", "order", "range"].forEach((m) => {
+        builder[m] = (...a) => {
+          calls.push([m, ...a]);
+          return builder;
+        };
+      });
+      builder.then = (onOk, onErr) => Promise.resolve(resolve(calls)).then(onOk, onErr);
+      return builder;
+    });
+    return queries;
+  }
+
+  const IDS = Array.from({ length: 30 }, (_, i) => `BC${100 + i}`);
+  // The database returns rows in its own order, not the curated one.
+  const ROWS = [...IDS].reverse().map((id, i) => ({
+    productid: id,
+    name: id,
+    retailprice: 1000 + i,
+    categoryid: i % 2 ? "SA" : "LE",
+    fabric: "KATAN",
+    productsizecolors: [{ stock: 1, color: i % 2 ? "RED" : "NAVY", size: "FREE" }],
+  }));
+  const isOptionsQuery = (calls) => calls[0][1].includes("productsizecolors(color, size)");
+
+  beforeEach(() => {
+    supabase.rpc.mockImplementation((name) =>
+      Promise.resolve(
+        name === "get_shop_filter_options"
+          ? {
+              data: {
+                categories: [
+                  { categoryid: "LE", name: "Lehenga" },
+                  { categoryid: "SA", name: "Saree" },
+                  { categoryid: "ST", name: "Suits" },
+                ],
+                colors: [
+                  { code: "RED", families: ["Red"] },
+                  { code: "NAVY", families: ["Blue"] },
+                ],
+              },
+              error: null,
+            }
+          : { data: null, error: null }
+      )
+    );
+  });
+
+  test("defaults to the curated order and pages through it", async () => {
+    const queries = mockProducts((calls) =>
+      isOptionsQuery(calls) ? { data: ROWS, error: null } : { data: ROWS, count: ROWS.length, error: null }
+    );
+    const { result } = renderHook(() => useShopFilters({ scopeProductIds: IDS }));
+
+    expect(result.current.sortBy).toBe("featured");
+    expect(result.current.sortOptions.map((o) => o.value)).toEqual([
+      "featured",
+      "newest",
+      "price_asc",
+      "price_desc",
+    ]);
+    await waitFor(() => expect(result.current.products).toHaveLength(24));
+    expect(result.current.products.map((p) => p.productid)).toEqual(IDS.slice(0, 24));
+    expect(result.current.totalCount).toBe(30);
+    expect(result.current.hasMore).toBe(true);
+
+    const listQuery = queries.find((c) => !isOptionsQuery(c));
+    expect(listQuery).toContainEqual(["in", "productid", IDS]);
+    expect(listQuery.some(([m]) => m === "range")).toBe(false);
+
+    act(() => result.current.fetchNextPage());
+    await waitFor(() => expect(result.current.products).toHaveLength(30));
+    expect(result.current.products.map((p) => p.productid)).toEqual(IDS);
+    expect(result.current.hasMore).toBe(false);
+  });
+
+  test("other sorts still order and page in the database", async () => {
+    const queries = mockProducts((calls) =>
+      isOptionsQuery(calls) ? { data: ROWS, error: null } : { data: [], count: 0, error: null }
+    );
+    const { result } = renderHook(() => useShopFilters({ scopeProductIds: IDS }));
+    act(() => result.current.setSortBy("price_asc"));
+    await waitFor(() =>
+      expect(queries.some((c) => c.some(([m, col]) => m === "order" && col === "retailprice"))).toBe(true)
+    );
+    const priced = queries.find((c) => c.some(([m, col]) => m === "order" && col === "retailprice"));
+    expect(priced).toContainEqual(["in", "productid", IDS]);
+    expect(priced).toContainEqual(["range", 0, 23]);
+  });
+
+  test("filter options come from the scoped products, not the shop-wide RPC", async () => {
+    mockProducts((calls) =>
+      isOptionsQuery(calls) ? { data: ROWS, error: null } : { data: [], count: 0, error: null }
+    );
+    const { result } = renderHook(() => useShopFilters({ scopeProductIds: IDS }));
+
+    await waitFor(() =>
+      expect(result.current.categoryOptions.map((c) => c.categoryid)).toEqual(["LE", "SA"])
+    );
+    await waitFor(() => expect(result.current.baseOptions).not.toBeNull());
+    expect(result.current.baseOptions.colors).toEqual(new Set(["Red", "Blue"]));
+
+    act(() => result.current.toggle("colors", "Red"));
+    await waitFor(() => expect(result.current.availableOptions).not.toBeNull());
+    expect(result.current.availableOptions.categories).toEqual(new Set(["SA"]));
+    expect(supabase.rpc).not.toHaveBeenCalledWith("get_shop_available_options", expect.anything());
+  });
+
+  test("rejects a product list too large to load client-side", () => {
+    const tooMany = Array.from({ length: 201 }, (_, i) => `BC${i}`);
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => renderHook(() => useShopFilters({ scopeProductIds: tooMany }))).toThrow(/at most 200/);
+    console.error.mockRestore();
+  });
+});
