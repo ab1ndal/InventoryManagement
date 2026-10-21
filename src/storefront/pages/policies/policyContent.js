@@ -7,7 +7,7 @@ export const SHIPPING = [
     heading: "Dispatch & delivery",
     body: [
       "We dispatch orders within 2 working days.",
-      "Delivery anywhere in India typically takes 5–7 days after dispatch.",
+      "Delivery typically takes 5–7 days after dispatch.",
     ],
   },
   {
@@ -20,7 +20,7 @@ export const SHIPPING = [
   {
     heading: "Serviceable regions",
     body: [
-      "We currently ship across India only. We do not offer international shipping at this time.",
+      "We currently deliver within Uttar Pradesh only. For other locations, please contact us on WhatsApp.",
     ],
   },
 ];

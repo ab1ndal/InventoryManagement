@@ -6,7 +6,7 @@ Deadline driver: Diwali 8 Nov 2026. Until real checkout ships, Diwali orders use
 WhatsApp + Razorpay Payment Link bridge (`tasks/checkout-shipping-plan.md` Phase A).
 
 
-New Comments (done 2026-10-20, branch feat/storefront-review-comments, not yet pushed):
+New Comments (done 2026-10-20, PR #31 merged + live):
 
 1. [X] We need to make the logo appear more prominantly at all the locations it appear (header/footer). it should scale with the zoom. It should be more visible for the favicon as well
    → header uses monogram crop (rem-sized), footer 2x in native gold, new favicon/apple/192/512 icons.
@@ -49,25 +49,34 @@ Full context: `tasks/description-revamp-plan.md` (read its "Resume here" section
 - [ ] After approval: migration for `tag_vocab` / `product_tags`, write the descriptions and tags,
   then PDP detail rows plus Occasion and Work filters.
 
-### P1: unblock real checkout (owner/CA actions, not code)
+### P1: unblock real checkout (owner actions, not code)
 
-- [ ] CA: stock transfer shop → Santosh Global LLP, and GST-inclusive site prices (see section below).
-- [ ] LLP current bank account, then Razorpay KYC in the LLP's name.
-- [ ] Courier decision: meeting said **Shiprocket**, earlier plan said Delhivery One (picked when
-  delivery was UP-only). With India-wide delivery, recommend Shiprocket: one API gives
-  pincode serviceability + rates across couriers. Confirm, then KYC in the LLP's name.
-- [ ] Swap seller identity on the site (footer GSTIN, policies, Contact) once CA confirms.
+**Owner decision 2026-10-20: the shop sells online itself, stays on the composition scheme,
+delivers within Uttar Pradesh only** (composition dealers can't make inter-state supplies,
+CGST s.10(2)(c)). LLP route parked (section below) until India-wide delivery is wanted.
+Online orders get a Bill of Supply from the shop, same as in-store.
+
+- [ ] UP-only checkout + policy/FAQ/trust-bar wording: branch `feat/checkout-up-only-v2`
+  (PR #14 rebased + 3 missed "across India" spots).
+- [ ] Razorpay KYC in the **shop's** name (shop's current account).
+- [ ] Courier decision: Shiprocket (one API for pincode serviceability + rates across couriers)
+  or Delhivery One (picked earlier for UP-only). Either works; KYC in the shop's name.
+- [ ] Ask CA to confirm: composition shop may sell online intra-state from its own website.
 
 ### P2: checkout build (Phase B of `tasks/checkout-shipping-plan.md`)
 
 - [ ] Prepaid only, **no COD** (costlier, couriers block it in high-return pincodes). Razorpay
   covers UPI, RuPay, Visa, Mastercard.
+- Decided 2026-10-20: gateway = **Razorpay**. Rejected YouPI-PG (github.com/youpi-pg/YouPI-PG):
+  confirms payments by scraping bank SMS/notifications with open bugs that can mark unpaid orders
+  paid, no license, repo ~1 month old, APK reads every SMS incl. OTPs, ~20 txn/day, no cards/refunds.
 - [ ] Two paths: guest checkout (nothing saved) and signed-in checkout (cart + address saved;
   magic-link login already shipped).
 - [ ] Shipping estimate by pincode at checkout (Apple-style), via the Shiprocket rate API. Use 2–3
   weight classes instead of per-item weights: heavy (lehengas), medium (sarees), light.
   Cart keeps "Shipping calculated at checkout" until then.
-- [ ] Online orders get a GST tax invoice from the LLP (design pass on where invoices are made).
+- [ ] Online orders get a Bill of Supply from the shop (reuse the existing BoS billing; design
+  pass on creating the bill from an online order).
 
 ### P3: retention emails (after checkout ships)
 
@@ -80,7 +89,10 @@ Full context: `tasks/description-revamp-plan.md` (read its "Resume here" section
 
 - [ ] COD with a surcharge (plus OTP/WhatsApp confirmation).
 
-## Online seller = regular-scheme company (owner decision 2026-10-14)
+## PARKED 2026-10-20 — Online seller = regular-scheme company (owner decision 2026-10-14)
+
+Superseded for now: owner chose UP-only sales from the composition shop (see P1 above).
+Revive this when India-wide delivery is wanted.
 
 Online orders will be sold by SANTOSH GLOBAL LLP (GSTIN 09AFKFS5575H1ZC, regular, UP; PAN AFKFS5575H;
 registered at the shop address; same owner). Delivery across India; PR #14 (UP-only) closed.

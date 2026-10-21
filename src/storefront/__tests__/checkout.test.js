@@ -22,7 +22,7 @@ describe("addressSchema", () => {
     line1: "58 Sihani Gate Market",
     line2: "",
     city: "Ghaziabad",
-    state: INDIAN_STATES[0],
+    state: "Uttar Pradesh",
     pincode: "201001",
   };
 
@@ -32,6 +32,18 @@ describe("addressSchema", () => {
 
   it("rejects a 9-digit phone number", () => {
     const result = addressSchema.safeParse({ ...valid, phone: "981087328" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects addresses outside Uttar Pradesh with a clear message", () => {
+    const result = addressSchema.safeParse({ ...valid, state: "Delhi", pincode: "110001" });
+    expect(result.success).toBe(false);
+    const messages = result.error.issues.map((i) => i.message).join(" ");
+    expect(messages).toMatch(/Uttar Pradesh only/i);
+  });
+
+  it("rejects a pincode outside the Uttar Pradesh range", () => {
+    const result = addressSchema.safeParse({ ...valid, pincode: "110001" });
     expect(result.success).toBe(false);
   });
 

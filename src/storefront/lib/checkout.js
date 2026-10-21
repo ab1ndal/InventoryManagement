@@ -50,6 +50,14 @@ export function shippingFee(subtotal) {
   return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
 }
 
+// The business is a GST composition dealer, which may not make inter-state
+// supplies (CGST Act s.10(2)(c)), so online orders can only ship within
+// Uttar Pradesh. UP pincodes start 20–28. See tasks/checkout-shipping-plan.md.
+export const SERVICEABLE_STATE = "Uttar Pradesh";
+const SERVICEABLE_PINCODE = /^2[0-8]\d{4}$/;
+const OUT_OF_AREA =
+  "We currently deliver within Uttar Pradesh only. WhatsApp us for other locations.";
+
 export const addressSchema = z.object({
   name: z.string().min(2, "Enter your full name"),
   phone: z
@@ -59,6 +67,11 @@ export const addressSchema = z.object({
   line1: z.string().min(3, "Enter your address"),
   line2: z.string().optional().or(z.literal("")),
   city: z.string().min(2, "Enter your city"),
-  state: z.enum(INDIAN_STATES, { errorMap: () => ({ message: "Select a state" }) }),
-  pincode: z.string().regex(/^\d{6}$/, "Enter a valid 6-digit pincode"),
+  state: z
+    .enum(INDIAN_STATES, { errorMap: () => ({ message: "Select a state" }) })
+    .refine((state) => state === SERVICEABLE_STATE, OUT_OF_AREA),
+  pincode: z
+    .string()
+    .regex(/^\d{6}$/, "Enter a valid 6-digit pincode")
+    .regex(SERVICEABLE_PINCODE, OUT_OF_AREA),
 });
