@@ -59,8 +59,8 @@ Online orders get a Bill of Supply from the shop, same as in-store.
 - [ ] UP-only checkout + policy/FAQ/trust-bar wording: branch `feat/checkout-up-only-v2`
   (PR #14 rebased + 3 missed "across India" spots).
 - [ ] Razorpay KYC in the **shop's** name (shop's current account).
-- [ ] Courier decision: Shiprocket (one API for pincode serviceability + rates across couriers)
-  or Delhivery One (picked earlier for UP-only). Either works; KYC in the shop's name.
+- [X] Courier: **Shiprocket** (decided 2026-10-20). Owner steps: `tasks/accounts-setup.md` §3;
+  integration spec: `tasks/checkout-shipping-plan.md` Phase C.
 - [ ] Ask CA to confirm: composition shop may sell online intra-state from its own website.
 
 ### P2: checkout build (Phase B of `tasks/checkout-shipping-plan.md`)
