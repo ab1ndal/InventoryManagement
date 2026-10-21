@@ -8,7 +8,6 @@ const MAP_SRC = `https://www.google.com/maps?q=${encodeURIComponent(ADDRESS)}&ou
 export default function ContactPage() {
   return (
     <StaticPage
-      eyebrow="Visit"
       title="Visit Us"
       seoTitle="Contact & Store"
       seoDescription="Visit Bindal's Creations at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (closed Tuesdays)."

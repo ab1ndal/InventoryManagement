@@ -6,7 +6,6 @@ import { RETURNS } from "./policyContent";
 export default function ReturnsPolicyPage() {
   return (
     <StaticPage
-      eyebrow="Policy"
       title="Returns & Exchange"
       seoDescription="Our exchange policy: 7-day in-store exchange on unworn items. No returns."
     >

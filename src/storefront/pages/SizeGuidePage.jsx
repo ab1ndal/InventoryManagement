@@ -9,7 +9,6 @@ import {
 export default function SizeGuidePage() {
   return (
     <StaticPage
-      eyebrow="Sizing"
       title="Size Guide"
       seoDescription="How to measure and choose the right size at Bindal's Creations. Unsure? Message us on WhatsApp."
     >

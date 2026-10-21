@@ -26,13 +26,6 @@ export default function BrandStory() {
 
         {/* Text */}
         <div className={STORE_PHOTO_URL ? "" : "max-w-2xl mx-auto text-center"}>
-          <div className={`flex items-center gap-3 mb-4 ${STORE_PHOTO_URL ? "" : "justify-center"}`}>
-            <div className="h-px w-8 bg-storefront-gold" aria-hidden="true" />
-            <span className="font-sans text-xs tracking-[0.3em] uppercase text-storefront-gold">
-              Our Story
-            </span>
-            {!STORE_PHOTO_URL && <div className="h-px w-8 bg-storefront-gold" aria-hidden="true" />}
-          </div>
           <h2 className="font-display font-semibold text-storefront-charcoal text-[clamp(2rem,4vw,3rem)] leading-tight mb-4">
             Rooted in tradition,<br />handpicked with love
           </h2>

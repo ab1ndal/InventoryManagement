@@ -31,7 +31,6 @@ const arrowClass =
  */
 export default function ProductRail({
   title,
-  eyebrow,
   products,
   loading,
   viewAllHref,
@@ -51,14 +50,6 @@ export default function ProductRail({
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
-            {eyebrow && (
-              <div className="mb-1.5 flex items-center gap-3">
-                <span className="h-px w-6 bg-storefront-gold/60" aria-hidden="true" />
-                <span className="font-sans text-[11px] uppercase tracking-[0.25em] text-storefront-gold">
-                  {eyebrow}
-                </span>
-              </div>
-            )}
             <h2 className="font-display text-2xl font-semibold text-storefront-charcoal sm:text-3xl">
               {title}
             </h2>

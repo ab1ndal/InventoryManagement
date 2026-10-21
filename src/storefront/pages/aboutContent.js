@@ -2,7 +2,6 @@
 // the owner (image slots remain placeholders until real photos are uploaded).
 
 export const ABOUT = {
-  eyebrow: "Our Story",
   title: "Our Story",
   lede: "Bindal's Creations is a family-run ethnic-wear house in Ghaziabad, offering a curated, hand-selected collection of sarees, lehengas, suits and more — since 2018.",
   story: [

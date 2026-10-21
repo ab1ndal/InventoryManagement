@@ -6,7 +6,6 @@ import { TERMS } from "./policyContent";
 export default function TermsPage() {
   return (
     <StaticPage
-      eyebrow="Policy"
       title="Terms of Service"
       seoDescription="The terms governing use of the Bindal's Creations website and orders."
     >

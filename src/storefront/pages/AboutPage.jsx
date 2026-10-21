@@ -6,7 +6,6 @@ import { ABOUT } from "./aboutContent";
 export default function AboutPage() {
   return (
     <StaticPage
-      eyebrow={ABOUT.eyebrow}
       title={ABOUT.title}
       seoTitle="About"
       seoDescription="The story behind Bindal's Creations — a family-run ethnic-wear house in Ghaziabad."
