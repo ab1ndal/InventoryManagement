@@ -26,3 +26,9 @@
 
 - **PostgREST caps every response at 1000 rows, silently.** An un-ranged `select` on a big table (e.g. `productsizecolors`, 10.6k rows, open to anon for ALL products not just image-backed ones) returns the first 1000 with no error — Content-Range `0-999/10637`. Never build ID lists client-side from such a query. Filter child rows inside PostgREST with an aliased inner embed (`match:productsizecolors!inner(productid)` + `.in("match.color", ...)`), and do distinct/aggregate work in a SECURITY INVOKER RPC. Paging the rows instead overflows the GET URL (~3.7k IDs → 39k chars → HTTP 400).
 - Playwright on the storefront: header promo line is also `aria-live`; target the product count by text (`/\d+ products?$/`).
+
+## DB functions and migrations
+
+- **plpgsql `RETURNS TABLE (email, ...)` makes `email` an OUT variable.** An unqualified `email` in the body's SQL then errors `42702 ambiguous`, but only on the code path that reaches it, so it hides until a fresh user calls it. Put `#variable_conflict use_column` right after `as $$`, or qualify columns with aliases. Test SECURITY DEFINER customer functions in `begin; insert into auth.users ...; set_config('request.jwt.claims', ...); set local role authenticated; ...; rollback;`.
+- `_migrations` was backfilled 2026-10-21, so `npm run migrate` is safe again. Never put `BEGIN`/`COMMIT` in a new migration (`exec_sql` gives `0A000`).
+- Never chain `git stash pop` after `;` when the `git stash` may not have run: it pops an older unrelated stash (this repo keeps `stash@{0}` "Added Free-Size").
