@@ -187,8 +187,12 @@ function ProductDetail({ productid }) {
   const { addItem, openCart } = useCart();
 
   const colours = useMemo(() => unique(variants.map((v) => v.color)), [variants]);
+  // In-stock sizes for the Details table (stock summed across colours).
   const sizes = useMemo(
-    () => unique(variants.map((v) => v.size)).sort(compareSizes).map(formatSize),
+    () =>
+      unique(variants.filter((v) => v.stock > 0).map((v) => v.size))
+        .sort(compareSizes)
+        .map(formatSize),
     [variants]
   );
 
@@ -325,12 +329,6 @@ function ProductDetail({ productid }) {
 
           {/* Info */}
           <div className="flex flex-col">
-            {categoryName && (
-              <span className="text-[10px] tracking-[0.2em] uppercase text-storefront-gold font-sans mb-2">
-                {categoryName}
-              </span>
-            )}
-
             <h1 className="font-display text-3xl lg:text-4xl font-semibold text-storefront-charcoal leading-tight mb-3">
               {product.name}
             </h1>

@@ -53,3 +53,34 @@ export function compareSizes(a, b) {
   }
   return String(a).localeCompare(String(b));
 }
+
+// The adult letter range every letter-sized piece lists on the PDP, so a
+// shopper sees which sizes exist even when one is not stocked. Busts match
+// the `sizes` reference table and the size guide.
+export const STANDARD_LETTER_SIZES = ["XS|34", "S|36", "M|38", "L|40", "XL|42", "2XL|44"];
+
+// Adult letter size: a letter with a bust, or a bare letter. Baby sizes
+// ("S|0") are not, so they never get adult sizes padded around them.
+function isAdultLetterSize(code) {
+  const [head, tail] = String(code).split("|");
+  return letterRank(head) !== null && tail !== "0";
+}
+
+/**
+ * Size codes for the PDP picker: when the product has adult letter sizes, the
+ * standard XS–2XL range is merged in (a real code wins over the standard one
+ * for the same letter), keeping any extra sizes. Sorted with compareSizes.
+ * @param {string[]} codes the product's own size codes
+ * @returns {string[]}
+ */
+export function withStandardLetterSizes(codes) {
+  const letterCodes = codes.filter(isAdultLetterSize);
+  if (letterCodes.length === 0) return [...codes].sort(compareSizes);
+  // Pad in the product's own style: with busts unless its codes are bare letters.
+  const withBust = letterCodes.some((c) => c.includes("|"));
+  const have = new Set(letterCodes.map((c) => c.split("|")[0]));
+  const missing = STANDARD_LETTER_SIZES.map((c) => (withBust ? c : c.split("|")[0])).filter(
+    (c) => !have.has(c.split("|")[0])
+  );
+  return [...codes, ...missing].sort(compareSizes);
+}

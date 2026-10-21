@@ -19,4 +19,21 @@ describe("ProductSpecs", () => {
     expect(screen.getByText(CARE_NOTE)).toBeInTheDocument();
     expect(screen.getByText(COLOUR_NOTE)).toBeInTheDocument();
   });
+
+  it("labels in-stock sizes as available sizes", () => {
+    render(<ProductSpecs sizes={["M (38)", "L (40)"]} />);
+    expect(screen.getByText("Available sizes")).toBeInTheDocument();
+    expect(screen.getByText("M (38), L (40)")).toBeInTheDocument();
+    expect(screen.queryByText("Sizes")).not.toBeInTheDocument();
+  });
+
+  it("uses the singular label for one available size", () => {
+    render(<ProductSpecs sizes={["Unstitched"]} />);
+    expect(screen.getByText("Available size")).toBeInTheDocument();
+  });
+
+  it("omits the row when no size is in stock", () => {
+    render(<ProductSpecs sizes={[]} />);
+    expect(screen.queryByText(/available size/i)).not.toBeInTheDocument();
+  });
 });

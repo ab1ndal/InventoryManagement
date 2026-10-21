@@ -17,18 +17,72 @@ describe("VariantPicker — sizes", () => {
     render(<VariantPicker variants={VARIANTS} onVariantSelect={jest.fn()} />);
     expect(screen.getByRole("button", { name: "S" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "L" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "L, out of stock" })).toBeInTheDocument();
   });
 
   it("disables a size when all its colours have stock=0", () => {
     render(<VariantPicker variants={VARIANTS} onVariantSelect={jest.fn()} />);
-    expect(screen.getByRole("button", { name: "L" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "L, out of stock" })).toBeDisabled();
   });
 
   it("does not disable a size that has at least one colour in stock", () => {
     render(<VariantPicker variants={VARIANTS} onVariantSelect={jest.fn()} />);
     expect(screen.getByRole("button", { name: "S" })).not.toBeDisabled();
     expect(screen.getByRole("button", { name: "M" })).not.toBeDisabled();
+  });
+});
+
+describe("VariantPicker — standard letter sizes", () => {
+  const LETTER = [
+    { variantid: "a", size: "L|40", color: "Red", stock: 1 },
+    { variantid: "b", size: "XL|42", color: "Red", stock: 2 },
+    { variantid: "c", size: "4XL|48", color: "Red", stock: 0 },
+  ];
+
+  function sizeButtons() {
+    return screen
+      .getAllByRole("button")
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent);
+  }
+
+  it("always lists XS to 2XL plus extra sizes in order", () => {
+    render(<VariantPicker variants={LETTER} onVariantSelect={jest.fn()} />);
+    expect(sizeButtons()).toEqual([
+      "XS (34), out of stock",
+      "S (36), out of stock",
+      "M (38), out of stock",
+      "L (40)",
+      "XL (42)",
+      "2XL (44), out of stock",
+      "4XL (48), out of stock",
+    ]);
+  });
+
+  it("shows sizes the product lacks as out of stock and not selectable", () => {
+    const onSelect = jest.fn();
+    render(<VariantPicker variants={LETTER} onVariantSelect={onSelect} />);
+    const xs = screen.getByRole("button", { name: "XS (34), out of stock" });
+    expect(xs).toBeDisabled();
+    fireEvent.click(xs);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.queryByText(/^Colour/)).not.toBeInTheDocument();
+  });
+
+  it("auto-selects only a truly available size, ignoring padded ones", () => {
+    const onSelect = jest.fn();
+    const one = [{ variantid: "z", size: "M|38", color: "Blue", stock: 1 }];
+    render(<VariantPicker variants={one} onVariantSelect={onSelect} />);
+    expect(onSelect).toHaveBeenLastCalledWith(one[0]);
+    expect(screen.getAllByRole("button", { name: /out of stock/ })).toHaveLength(5);
+  });
+
+  it("leaves products without letter sizes unchanged", () => {
+    const special = [
+      { variantid: "f", size: "FREE-SIZE", color: "Red", stock: 1 },
+      { variantid: "g", size: "UNSTITCHED", color: "Red", stock: 1 },
+    ];
+    render(<VariantPicker variants={special} onVariantSelect={jest.fn()} />);
+    expect(sizeButtons()).toEqual(["Free Size", "Unstitched"]);
   });
 });
 

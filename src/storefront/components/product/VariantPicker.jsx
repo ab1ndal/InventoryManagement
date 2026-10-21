@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { formatSize, compareSizes } from "../../lib/sizes";
+import { formatSize, withStandardLetterSizes } from "../../lib/sizes";
 
 // Shared look for size and colour options: square-cornered boxes, charcoal
 // when selected, struck through when out of stock.
@@ -24,12 +24,11 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
     for (const v of variants) {
       totals[v.size] = (totals[v.size] ?? 0) + v.stock;
     }
-    return Object.entries(totals)
-      .sort(([a], [b]) => compareSizes(a, b))
-      .map(([size, totalStock]) => ({
-        size,
-        available: totalStock > 0,
-      }));
+    // Standard sizes the product lacks have no total and show as out of stock.
+    return withStandardLetterSizes(Object.keys(totals)).map((size) => ({
+      size,
+      available: (totals[size] ?? 0) > 0,
+    }));
   }, [variants]);
 
   const colors = useMemo(() => {
@@ -93,6 +92,8 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
               key={size}
               onClick={() => handleSizeClick(size, available)}
               disabled={!available}
+              aria-label={available ? undefined : `${formatSize(size)}, out of stock`}
+              title={available ? undefined : "Out of stock"}
               className={optionClass(selectedSize === size, available)}
             >
               {formatSize(size)}
