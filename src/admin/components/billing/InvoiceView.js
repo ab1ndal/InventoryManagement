@@ -2,6 +2,11 @@ import React, { forwardRef } from "react";
 import logo from "../../../assets/LOGO-Bill.png";
 import { getFreeItems, valueOfDiscount } from './billUtils';
 import { computeCreditsApplied } from './exchangeHelpers';
+import { QRCodeSVG } from "qrcode.react";
+import {
+  WHATSAPP_COMMUNITY_INVITE_URL,
+  WHATSAPP_COMMUNITY_QR_CAPTION,
+} from "./communityInvite";
 
 const STORE = {
   name: "BINDAL'S CREATION",
@@ -10,6 +15,10 @@ const STORE = {
   phone: "+91 9810873280 | +91 9810121438",
   gstin: "09ABVPB4203A1Z4",
 };
+
+// 132px of the 794px-wide view prints ~33mm wide on A4 (symbol ~26mm + 4-module
+// quiet zone), above the ~25mm minimum for reliable phone scanning off paper.
+const COMMUNITY_QR_SIZE_PX = 132;
 
 function formatDate(d) {
   return new Date(d).toLocaleDateString("en-IN", {
@@ -650,6 +659,23 @@ const InvoiceView = forwardRef(function InvoiceView(
             <li>Color of products is not guaranteed.</li>
             <li>Any damage must be reported within 24 hours of purchase.</li>
           </ul>
+        </div>
+        <div
+          data-testid="community-qr"
+          style={{ textAlign: "center", width: `${COMMUNITY_QR_SIZE_PX + 16}px` }}
+        >
+          <QRCodeSVG
+            value={WHATSAPP_COMMUNITY_INVITE_URL}
+            size={COMMUNITY_QR_SIZE_PX}
+            level="M"
+            marginSize={4}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            title={WHATSAPP_COMMUNITY_QR_CAPTION}
+          />
+          <div style={{ fontSize: "10px", color: "#111827", lineHeight: 1.3 }}>
+            {WHATSAPP_COMMUNITY_QR_CAPTION}
+          </div>
         </div>
         <div style={{ textAlign: "center" }}>
           <div style={{ height: "60px" }} />

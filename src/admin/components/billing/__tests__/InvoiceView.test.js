@@ -25,3 +25,32 @@ test("invoice: keeps tax columns, no declaration", () => {
   expect(screen.getByText("SGST (₹)")).toBeInTheDocument();
   expect(screen.queryByText(/Composition taxable person/i)).not.toBeInTheDocument();
 });
+
+describe("WhatsApp Community QR footer", () => {
+  const { QRCodeSVG } = require("qrcode.react");
+  const { WHATSAPP_COMMUNITY_INVITE_URL } = require("../communityInvite");
+
+  // Module path encodes the payload; compare against a QR built straight from the invite URL.
+  const expectedModulePath = () => {
+    const { container } = render(
+      <QRCodeSVG value={WHATSAPP_COMMUNITY_INVITE_URL} level="M" marginSize={4} />,
+    );
+    const d = container.querySelectorAll("path")[1].getAttribute("d");
+    container.remove();
+    return d;
+  };
+
+  test.each(["invoice", "bos"])("%s: footer has QR encoding the invite URL + caption", (docType) => {
+    const expected = expectedModulePath();
+    render(<InvoiceView {...base} docType={docType} />);
+    const block = screen.getByTestId("community-qr");
+    expect(within(block).getByText(/Scan to join our WhatsApp Community/, { selector: "div" })).toBeInTheDocument();
+    const paths = block.querySelectorAll("svg path");
+    expect(paths).toHaveLength(2);
+    expect(paths[1].getAttribute("d")).toBe(expected);
+  });
+
+  test("invite URL is the Community link", () => {
+    expect(WHATSAPP_COMMUNITY_INVITE_URL).toBe("https://chat.whatsapp.com/ErIgYB8O2Cq6z8DXYG1iCg");
+  });
+});
