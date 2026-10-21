@@ -1,4 +1,4 @@
-import { buildAvailabilityArgs, mapAvailability } from "./shopAvailability";
+import { buildAvailabilityArgs, computeAvailability, mapAvailability } from "./shopAvailability";
 
 const NO_FILTERS = { categories: [], colors: [], sizes: [], fabrics: [], priceMin: null, priceMax: null };
 
@@ -92,5 +92,55 @@ describe("mapAvailability", () => {
       sizes: new Set(),
       fabrics: new Set(),
     });
+  });
+});
+
+describe("computeAvailability", () => {
+  // Mirrors get_shop_available_options for a small, fully loaded product set.
+  const ROWS = [
+    { productid: "A", categoryid: "SA", fabric: "KATAN", retailprice: 5000, productsizecolors: [{ color: "NAVY", size: "FREE" }] },
+    { productid: "B", categoryid: "LE", fabric: "MUL", retailprice: 9000, productsizecolors: [{ color: "RED", size: "M|38" }, { color: "NAVY", size: "L|40" }] },
+    { productid: "C", categoryid: null, fabric: null, retailprice: 2000, productsizecolors: [{ color: null, size: null }] },
+  ];
+  const sorted = (r) => ({
+    categories: [...r.categories].sort(),
+    color_codes: [...r.color_codes].sort(),
+    sizes: [...r.sizes].sort(),
+    fabric_codes: [...r.fabric_codes].sort(),
+  });
+  const args = (o = {}) => ({ ...buildAvailabilityArgs(NO_FILTERS, {}, {}), ...o });
+
+  it("returns every distinct non-null value when nothing is filtered", () => {
+    expect(sorted(computeAvailability(ROWS, args()))).toEqual({
+      categories: ["LE", "SA"],
+      color_codes: ["NAVY", "RED"],
+      sizes: ["FREE", "L|40", "M|38"],
+      fabric_codes: ["KATAN", "MUL"],
+    });
+  });
+
+  it("ignores a dimension's own filter and applies the others", () => {
+    const r = sorted(computeAvailability(ROWS, args({ p_color_codes: ["RED"] })));
+    expect(r.color_codes).toEqual(["NAVY", "RED"]);
+    expect(r.categories).toEqual(["LE"]);
+    expect(r.fabric_codes).toEqual(["MUL"]);
+    expect(r.sizes).toEqual(["M|38"]);
+  });
+
+  it("matches colour and size on the same variant", () => {
+    const r = computeAvailability(ROWS, args({ p_color_codes: ["RED"], p_sizes: ["L|40"] }));
+    expect(r.categories).toEqual([]);
+  });
+
+  it("applies price bounds to every dimension", () => {
+    const r = sorted(computeAvailability(ROWS, args({ p_price_min: 4000, p_price_max: 6000 })));
+    expect(r).toEqual({ categories: ["SA"], color_codes: ["NAVY"], sizes: ["FREE"], fabric_codes: ["KATAN"] });
+  });
+
+  it("applies category and fabric filters", () => {
+    const r = sorted(computeAvailability(ROWS, args({ p_categories: ["SA"], p_fabric_codes: ["MUL"] })));
+    expect(r.categories).toEqual(["LE"]);
+    expect(r.fabric_codes).toEqual(["KATAN"]);
+    expect(r.color_codes).toEqual([]);
   });
 });

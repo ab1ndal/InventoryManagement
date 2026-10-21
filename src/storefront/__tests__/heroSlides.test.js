@@ -32,7 +32,7 @@ describe("hero slides config", () => {
   });
 
   it("never says crafted or handcrafted", () => {
-    const copy = HERO_SLIDES.map((s) => [s.eyebrow, s.headline, s.subline, s.cta].join(" ")).join(" ");
+    const copy = HERO_SLIDES.map((s) => [s.headline, s.subline, s.cta].join(" ")).join(" ");
     expect(copy).not.toMatch(/crafted/i);
   });
 });

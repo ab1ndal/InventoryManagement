@@ -108,14 +108,6 @@ function Slide({ slide, index, count, active, srcFor }) {
           panel ? "md:text-storefront-charcoal" : ""
         }`}
       >
-        {slide.eyebrow && (
-          <div className="mb-3 flex items-center gap-3">
-            <span className="h-px w-8 bg-storefront-gold" aria-hidden="true" />
-            <span className="font-sans text-[11px] uppercase tracking-[0.3em] text-white/90 md:text-storefront-gold">
-              {slide.eyebrow}
-            </span>
-          </div>
-        )}
         <h2 className="font-display font-semibold leading-[1.05] text-[clamp(2rem,4.2vw,3.5rem)] text-inherit">
           {slide.headline}
         </h2>

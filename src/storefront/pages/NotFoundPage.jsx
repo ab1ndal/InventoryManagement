@@ -10,9 +10,6 @@ export default function NotFoundPage() {
         description="The page you’re looking for doesn’t exist or may have moved."
         noindex
       />
-      <span className="font-sans text-xs tracking-[0.25em] uppercase text-storefront-gold mb-4">
-        404
-      </span>
       <h1 className="font-display text-4xl sm:text-5xl font-semibold text-storefront-charcoal mb-4">
         Page not found
       </h1>

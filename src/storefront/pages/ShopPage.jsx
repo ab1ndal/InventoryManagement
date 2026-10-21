@@ -76,12 +76,14 @@ function LoadError({ message, onRetry }) {
 
 const SHOP_DESCRIPTION = "Browse our handpicked sarees, lehengas, suits, and ethnic wear.";
 
-// Also renders category collections (/collections/suits): same filters and
-// sort, limited to `scopeCategoryIds`.
+// Also renders collections: category ones (/collections/suits) limited to
+// `scopeCategoryIds`, and curated lists (/collections/diwali) limited to
+// `scopeProductIds`, which also get a "Featured" (list order) sort.
 export default function ShopPage({
   title = "Shop",
   subtitle = "Handpicked with love, for every occasion.",
   scopeCategoryIds = null,
+  scopeProductIds = null,
 }) {
   const {
     filters,
@@ -93,6 +95,7 @@ export default function ShopPage({
     fetchNextPage,
     sortBy,
     setSortBy,
+    sortOptions,
     toggle,
     setPrice,
     clearAll,
@@ -109,7 +112,7 @@ export default function ShopPage({
     baseOptions,
     error,
     retry,
-  } = useShopFilters({ scopeCategoryIds });
+  } = useShopFilters({ scopeCategoryIds, scopeProductIds });
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Stable so the drawer's open effect (focus, scroll lock) runs once per open.
@@ -137,7 +140,7 @@ export default function ShopPage({
 
   return (
     <div className="min-h-screen bg-storefront-cream">
-      <Seo title={title} description={scopeCategoryIds ? subtitle : SHOP_DESCRIPTION} />
+      <Seo title={title} description={scopeCategoryIds || scopeProductIds ? subtitle : SHOP_DESCRIPTION} />
       {/* Page header */}
       <div className="border-b border-storefront-border bg-storefront-cream">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -178,7 +181,7 @@ export default function ShopPage({
                   {loading ? "Loading…" : productCountLabel(totalCount)}
                 </p>
               </div>
-              <SortControl value={sortBy} onChange={setSortBy} />
+              <SortControl value={sortBy} onChange={setSortBy} options={sortOptions} />
             </div>
             <ActiveChips
               filters={filters}

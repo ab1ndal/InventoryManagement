@@ -4,6 +4,20 @@ export const SORT_OPTIONS = [
   { value: "price_desc", label: "Price: High to Low" },
 ];
 
+// Owner-curated display order of a product-list collection (Diwali). Only
+// offered, and the default, when the shop is scoped to such a list.
+export const CURATED_SORT = "featured";
+
+export function sortOptionsFor(curated) {
+  return curated ? [{ value: CURATED_SORT, label: "Featured" }, ...SORT_OPTIONS] : SORT_OPTIONS;
+}
+
+// `in` filters return rows in database order; put them back in list order.
+export function sortByCuratedOrder(rows, productIds) {
+  const rank = new Map(productIds.map((id, i) => [id, i]));
+  return rows.slice().sort((a, b) => rank.get(a.productid) - rank.get(b.productid));
+}
+
 // Maps a sort selection to a Supabase .order() clause.
 export function sortOrderClause(sortBy) {
   switch (sortBy) {

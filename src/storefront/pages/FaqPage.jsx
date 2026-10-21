@@ -21,7 +21,6 @@ function FaqItem({ q, a }) {
 export default function FaqPage() {
   return (
     <StaticPage
-      eyebrow="Help"
       title="Frequently Asked Questions"
       seoTitle="FAQ"
       seoDescription="Answers to common questions about delivery, exchanges, payments, sizing, and visiting Bindal's Creations."

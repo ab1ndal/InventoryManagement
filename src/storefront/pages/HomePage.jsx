@@ -14,6 +14,9 @@ const CATEGORY_RAILS = [
   { slug: "sarees", title: "Sarees" },
   { slug: "lehengas", title: "Lehengas" },
   { slug: "kurtis", title: "Kurtis" },
+  { slug: "everyday", title: "Everyday" },
+  { slug: "sherwani", title: "Sherwani" },
+  { slug: "kurta-pajama", title: "Kurta Pajama" },
 ];
 
 export default function HomePage() {

@@ -124,6 +124,25 @@ describe("ProductDetailPage", () => {
     expect(within(details).getByText("Unstitched")).toBeInTheDocument();
   });
 
+  it("lists only in-stock sizes, in order, as available sizes", () => {
+    renderPage(PRODUCT, [
+      { variantid: "x1", size: "XL|42", color: "Green", stock: 1 },
+      { variantid: "x2", size: "M|38", color: "Green", stock: 0 },
+      { variantid: "x3", size: "M|38", color: "Peach", stock: 2 },
+      { variantid: "x4", size: "L|40", color: "Green", stock: 0 },
+    ]);
+    const details = screen.getByRole("region", { name: /details/i });
+    expect(within(details).getByText("Available sizes")).toBeInTheDocument();
+    expect(within(details).getByText("M (38), XL (42)")).toBeInTheDocument();
+  });
+
+  it("has no category eyebrow above the product title", () => {
+    renderPage();
+    const h1 = screen.getByRole("heading", { level: 1, name: "Silk-Lehenga", hidden: true });
+    const prev = h1.previousElementSibling;
+    expect(prev?.textContent ?? "").not.toBe("Lehenga");
+  });
+
   it("shows the tax and shipping line and the trust row", () => {
     renderPage();
     expect(

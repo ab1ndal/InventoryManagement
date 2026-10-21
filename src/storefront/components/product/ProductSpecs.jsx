@@ -3,13 +3,17 @@ import { CARE_NOTE, COLOUR_NOTE } from "../../lib/deliveryEstimate";
 
 // Structured "Details" table for the PDP, built only from real per-product
 // data (product row + its variants). There are no care/work columns, so the
-// notes below the table stay honest, universal microcopy.
+// notes below the table stay honest, universal microcopy. `sizes` holds only
+// the in-stock sizes, already formatted and ordered.
 export default function ProductSpecs({ productId, fabric, category, colours = [], sizes = [] }) {
   const rows = [
     category && { label: "Category", value: category },
     fabric && { label: "Fabric", value: fabric },
     colours.length > 0 && { label: colours.length > 1 ? "Colours" : "Colour", value: colours.join(", ") },
-    sizes.length > 0 && { label: sizes.length > 1 ? "Sizes" : "Size", value: sizes.join(", ") },
+    sizes.length > 0 && {
+      label: sizes.length > 1 ? "Available sizes" : "Available size",
+      value: sizes.join(", "),
+    },
     productId && { label: "Product code", value: productId },
   ].filter(Boolean);
 

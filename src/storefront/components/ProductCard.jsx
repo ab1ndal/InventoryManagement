@@ -6,6 +6,9 @@ import { isSoldOut } from "../lib/stock";
 import { useWishlist } from "../context/WishlistContext";
 import BlurFillImage from "./BlurFillImage";
 
+// No visible title on the card (owner: the photo and fabric tag already say it),
+// so the name lives only in image alt text, or here as sr-only text when there
+// is no photo, to keep the card's <Link> announced with the product name.
 function PlaceholderImage({ name }) {
   const initials = name
     ? name
@@ -17,7 +20,11 @@ function PlaceholderImage({ name }) {
     : "BC";
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-storefront-charcoal to-storefront-warm gap-2">
-      <span className="font-display text-3xl font-semibold text-storefront-gold opacity-60">
+      <span className="sr-only">{name}</span>
+      <span
+        aria-hidden="true"
+        className="font-display text-3xl font-semibold text-storefront-gold opacity-60"
+      >
         {initials}
       </span>
       <span className="text-[10px] text-storefront-cream/40 tracking-widest uppercase font-sans">
@@ -83,6 +90,8 @@ export default function ProductCard({ product, priority = false }) {
   };
 
   const badge = stockBadge(product.productsizecolors);
+  // Names are stored as "Fabric-Category" ("Cotton-Kurta Pajama").
+  const displayName = product.name?.replace(/-/g, " ");
 
   return (
     <Link
@@ -106,7 +115,7 @@ export default function ProductCard({ product, priority = false }) {
               <div key={path} className="w-full h-full flex-shrink-0">
                 <BlurFillImage
                   path={path}
-                  alt={`${product.name}${count > 1 ? ` — view ${i + 1}` : ""}`}
+                  alt={`${displayName}${count > 1 ? ` — view ${i + 1}` : ""}`}
                   width={600}
                   quality={70}
                   eager={priority && i === 0}
@@ -116,7 +125,7 @@ export default function ProductCard({ product, priority = false }) {
             ))}
           </div>
         ) : (
-          <PlaceholderImage name={product.name} />
+          <PlaceholderImage name={displayName} />
         )}
 
         {/* Carousel arrows (desktop hover) */}
@@ -163,7 +172,7 @@ export default function ProductCard({ product, priority = false }) {
         {/* Wishlist */}
         <button
           type="button"
-          aria-label={wishlisted ? `Remove ${product.name} from wishlist` : `Add ${product.name} to wishlist`}
+          aria-label={wishlisted ? `Remove ${displayName} from wishlist` : `Add ${displayName} to wishlist`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -180,7 +189,7 @@ export default function ProductCard({ product, priority = false }) {
         </button>
 
         {/* Stock badge only. No category tag on the photo: it covered faces, and
-            the product name already ends with the category ("Cotton Nehru Jacket"). */}
+            the photo already shows what the product is. */}
         {badge && (
           <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-10">
             <span className="block text-[9px] tracking-[0.14em] uppercase px-2 sm:px-2.5 py-1 font-sans font-semibold bg-storefront-charcoal text-storefront-cream">
@@ -193,7 +202,7 @@ export default function ProductCard({ product, priority = false }) {
       {/* Info */}
       <div className="p-3 sm:px-4">
         {/* min-h keeps the row a price line tall when a sold-out card hides its price */}
-        <div className="flex items-baseline justify-between gap-2 mb-1 min-h-6">
+        <div className="flex items-baseline justify-between gap-2 min-h-6">
           {!badge?.soldOut && (
             <span className="font-sans text-base font-semibold text-storefront-charcoal tabular-nums">
               ₹{Number(product.retailprice).toLocaleString("en-IN")}
@@ -205,9 +214,6 @@ export default function ProductCard({ product, priority = false }) {
             </span>
           )}
         </div>
-        <h3 className="font-sans text-[13px] sm:text-sm text-storefront-warm leading-5 line-clamp-2 min-h-[2.5rem]">
-          {product.name?.replace(/-/g, " ")}
-        </h3>
       </div>
     </Link>
   );

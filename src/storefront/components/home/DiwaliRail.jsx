@@ -26,7 +26,6 @@ export default function DiwaliRail() {
 
   return (
     <ProductRail
-      eyebrow="Diwali 2026"
       title={DIWALI.title}
       products={products}
       loading={loading}

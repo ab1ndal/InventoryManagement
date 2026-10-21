@@ -10,7 +10,6 @@
 export const HERO_SLIDES = [
   {
     id: "diwali",
-    eyebrow: "Diwali 2026",
     headline: "Diwali Glam",
     subline: "Handpicked festive pieces for the season of lights.",
     cta: "Shop the edit",
@@ -19,7 +18,6 @@ export const HERO_SLIDES = [
   },
   {
     id: "sarees",
-    eyebrow: "Silk · Georgette · Net",
     headline: "Sarees for every celebration",
     subline: "Rich weaves and festive reds, curated with care.",
     cta: "Shop sarees",
@@ -28,7 +26,6 @@ export const HERO_SLIDES = [
   },
   {
     id: "lehengas",
-    eyebrow: "For the big nights",
     headline: "Lehengas & gowns",
     subline: "Statement silhouettes, handpicked with love.",
     cta: "Shop lehengas",
@@ -37,7 +34,6 @@ export const HERO_SLIDES = [
   },
   {
     id: "mens-festive",
-    eyebrow: "Menswear",
     headline: "Men's festive",
     subline: "Sherwanis and kurta pajamas for pujas, weddings and everything between.",
     cta: "Shop menswear",

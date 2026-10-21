@@ -20,7 +20,6 @@ export default function NewArrivals() {
 
   return (
     <ProductRail
-      eyebrow="Just in"
       title="New Arrivals"
       products={products}
       loading={loading}

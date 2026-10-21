@@ -45,10 +45,10 @@ describe("HomePage", () => {
     expect(precedes(trust, story)).toBe(true);
   });
 
-  it("shows rails for sarees, lehengas and kurtis", () => {
+  it("shows women's rails, then everyday, then men's sherwani and kurta pajama", () => {
     renderHome();
     const titles = screen.getAllByTestId("category-rail").map((r) => r.textContent);
-    expect(titles).toEqual(["Sarees", "Lehengas", "Kurtis"]);
+    expect(titles).toEqual(["Sarees", "Lehengas", "Kurtis", "Everyday", "Sherwani", "Kurta Pajama"]);
   });
 
   it("has a page heading for the home page", () => {

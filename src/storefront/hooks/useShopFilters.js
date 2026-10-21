@@ -1,16 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "lib/supabaseClient";
 import { buildFamilyIndex } from "../../utility/attributeFamilies";
-import { sortOrderClause } from "./sortOptions";
+import { CURATED_SORT, sortByCuratedOrder, sortOptionsFor, sortOrderClause } from "./sortOptions";
 import { formatSize } from "../lib/sizes";
 import {
   buildAvailabilityArgs,
   colorCodesFor,
+  computeAvailability,
   fabricCodesFor,
   mapAvailability,
 } from "./shopAvailability";
 
 const PAGE_SIZE = 24;
+
+// A product-id scope (curated collection) is loaded whole: its filter options
+// are computed client-side from every scoped variant, and the curated sort
+// orders all of it in the browser before paging. That is only safe while the
+// list stays far below PostgREST's 1000-row response cap (which would silently
+// truncate it) and short enough for the `in` filter's GET URL.
+export const MAX_SCOPED_PRODUCT_IDS = 200;
+
+const SCOPE_OPTION_COLUMNS = "productid, categoryid, fabric, retailprice, productsizecolors(color, size)";
 
 const INITIAL_FILTERS = {
   categories: [],
@@ -25,8 +35,20 @@ const INITIAL_FILTERS = {
 // in SQL by get_shop_available_options (each dimension ignores its own filter
 // so selecting a colour never greys out other colours). Returns family-level
 // Sets, or null on failure so the UI fails open (nothing greyed or hidden).
-async function fetchAvailableOptions(filters, fabricIndex, colorIndex) {
+//
+// The RPC can't filter by product id, so a product-id scope passes its loaded
+// rows as `scopeRows` and the same computation runs locally (null rows = the
+// scope failed to load, so fail open).
+async function fetchAvailableOptions(filters, fabricIndex, colorIndex, scopeRows) {
   const args = buildAvailabilityArgs(filters, colorIndex.familyToCodes, fabricIndex.familyToCodes);
+  if (scopeRows !== undefined) {
+    if (!scopeRows) return null;
+    return mapAvailability(
+      computeAvailability(scopeRows, args),
+      colorIndex.codeToFamilies,
+      fabricIndex.codeToFamilies
+    );
+  }
   const { data, error } = await supabase.rpc("get_shop_available_options", args);
   if (error || !data) {
     console.error("useShopFilters: get_shop_available_options failed", { error, args });
@@ -42,9 +64,29 @@ export function scopeFilters(filters, scopeCategoryIds) {
   return { ...filters, categories: scopeCategoryIds };
 }
 
-// `scopeCategoryIds` must be stable for the hook's lifetime; callers remount
-// (key) when it changes.
-export default function useShopFilters({ scopeCategoryIds = null } = {}) {
+// A curated collection's product list, with every variant's colour/size, for
+// local filter options. Null on failure.
+async function fetchScopeRows(scopeProductIds) {
+  const { data, error } = await supabase
+    .from("products")
+    .select(SCOPE_OPTION_COLUMNS)
+    .in("productid", scopeProductIds);
+  if (error || !data) {
+    console.error("useShopFilters: scoped product options query failed", { error, scopeProductIds });
+    return null;
+  }
+  return data;
+}
+
+// `scopeCategoryIds` / `scopeProductIds` must be stable for the hook's
+// lifetime; callers remount (key) when they change.
+export default function useShopFilters({ scopeCategoryIds = null, scopeProductIds = null } = {}) {
+  if (scopeProductIds && scopeProductIds.length > MAX_SCOPED_PRODUCT_IDS) {
+    throw new Error(
+      `useShopFilters: scopeProductIds has ${scopeProductIds.length} ids; at most ${MAX_SCOPED_PRODUCT_IDS} are supported`
+    );
+  }
+
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +94,7 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [sortBy, setSortBy] = useState("newest");
+  const [sortBy, setSortBy] = useState(scopeProductIds ? CURATED_SORT : "newest");
   const [error, setError] = useState(null); // user-facing product load failure
 
   const [categoryOptions, setCategoryOptions] = useState([]);
@@ -78,6 +120,8 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
   const fabricIndexRef = useRef({ familyToCodes: {}, codeToFamilies: {} });
   // color maps: family -> [codes] (multi-family), code -> [families].
   const colorIndexRef = useRef({ familyToCodes: {}, codeToFamilies: {} });
+  // Product-id scope rows for local availability; undefined = no such scope.
+  const scopeRowsRef = useRef(undefined);
 
   useEffect(() => {
     async function fetchOptions() {
@@ -86,16 +130,24 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
       // concurrent burst was what triggered Cloudflare's `__cf_bm` bot cookie.
       // The fetch layer (src/lib/supabaseFetch.js) adds timeout + retry; on
       // failure the filters simply stay at their defaults.
-      const { data, error } = await supabase.rpc("get_shop_filter_options");
+      const [{ data, error }, scopeRows] = await Promise.all([
+        supabase.rpc("get_shop_filter_options"),
+        scopeProductIds ? fetchScopeRows(scopeProductIds) : undefined,
+      ]);
+      scopeRowsRef.current = scopeRows;
       if (error || !data) return;
 
-      // Inside a category page, offer only its own categories, and none when
-      // there is just one (a single always-on checkbox filters nothing).
+      // Inside a category page or curated list, offer only the categories it
+      // covers, and none when there is just one (a single always-on checkbox
+      // filters nothing).
+      const scopeCategories = scopeProductIds
+        ? (scopeRows || []).map((p) => p.categoryid)
+        : scopeCategoryIds;
       const categories = data.categories || [];
-      const scopedCategories = scopeCategoryIds
-        ? categories.filter((c) => scopeCategoryIds.includes(c.categoryid))
+      const scopedCategories = scopeCategories
+        ? categories.filter((c) => scopeCategories.includes(c.categoryid))
         : categories;
-      setCategoryOptions(scopedCategories.length > 1 || !scopeCategoryIds ? scopedCategories : []);
+      setCategoryOptions(scopedCategories.length > 1 || !scopeCategories ? scopedCategories : []);
 
       const colorFams = data.color_families || [];
       if (colorFams.length) {
@@ -160,12 +212,13 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
         await fetchAvailableOptions(
           scopeFilters(INITIAL_FILTERS, scopeCategoryIds),
           fabricIndexRef.current,
-          colorIndexRef.current
+          colorIndexRef.current,
+          scopeRowsRef.current
         )
       );
     }
     fetchOptions();
-  }, [scopeCategoryIds]);
+  }, [scopeCategoryIds, scopeProductIds]);
 
   // Debounced server-side available options — fires only when filters are active
   useEffect(() => {
@@ -191,7 +244,8 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
       const available = await fetchAvailableOptions(
         scopeFilters(filters, scopeCategoryIds),
         fabricIndexRef.current,
-        colorIndexRef.current
+        colorIndexRef.current,
+        scopeRowsRef.current
       );
       if (requestId !== availabilityRequestRef.current) return;
       setAvailableOptions(available);
@@ -221,6 +275,8 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
 
       let query = supabase.from("products").select(select, { count: "exact" });
 
+      if (scopeProductIds) query = query.in("productid", scopeProductIds);
+
       if (currentFilters.colors.length > 0)
         query = query.in(
           "match.color",
@@ -240,10 +296,16 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
           fabricCodesFor(currentFilters.fabrics, fabricIndexRef.current.familyToCodes)
         );
 
-      const { column, ascending } = sortOrderClause(currentSort);
-      query = query
-        .order(column, { ascending })
-        .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+      // The database can't order by position in the curated list, so that
+      // sort fetches the whole scope (bounded by MAX_SCOPED_PRODUCT_IDS) and
+      // orders and pages it here.
+      const curated = scopeProductIds && currentSort === CURATED_SORT;
+      if (!curated) {
+        const { column, ascending } = sortOrderClause(currentSort);
+        query = query
+          .order(column, { ascending })
+          .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+      }
 
       const { data, count, error: queryError } = await query;
       if (isStale()) return;
@@ -265,11 +327,14 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
         return;
       }
 
-      const fetched = data || [];
+      const rows = data || [];
+      const fetched = curated
+        ? sortByCuratedOrder(rows, scopeProductIds).slice(currentOffset, currentOffset + PAGE_SIZE)
+        : rows;
       setError(null);
       setProducts((prev) => (append ? [...prev, ...fetched] : fetched));
       setTotalCount(count || 0);
-      setHasMore(fetched.length === PAGE_SIZE);
+      setHasMore(curated ? currentOffset + PAGE_SIZE < rows.length : fetched.length === PAGE_SIZE);
     } finally {
       // A superseded query leaves the loading flags to the current one.
       if (!isStale()) {
@@ -277,7 +342,7 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
         setLoadingMore(false);
       }
     }
-  }, [scopeCategoryIds]);
+  }, [scopeCategoryIds, scopeProductIds]);
 
   useEffect(() => {
     setOffset(0);
@@ -344,6 +409,7 @@ export default function useShopFilters({ scopeCategoryIds = null } = {}) {
     fetchNextPage,
     sortBy,
     setSortBy,
+    sortOptions: sortOptionsFor(Boolean(scopeProductIds)),
     toggle,
     setPrice,
     clearAll,

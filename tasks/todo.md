@@ -1,120 +1,153 @@
 # Todo
 
 ## Website review with Anushka (2026-10-19), in priority order
+
 Deadline driver: Diwali 8 Nov 2026. Until real checkout ships, Diwali orders use the
 WhatsApp + Razorpay Payment Link bridge (`tasks/checkout-shipping-plan.md` Phase A).
 
+
+New Comments (done 2026-10-20, branch feat/storefront-review-comments, not yet pushed):
+
+1. [X] We need to make the logo appear more prominantly at all the locations it appear (header/footer). it should scale with the zoom. It should be more visible for the favicon as well
+   → header uses monogram crop (rem-sized), footer 2x in native gold, new favicon/apple/192/512 icons.
+2. [X] Remove AI tells like eyebrows for the sections
+3. [X] in the cards, the "title" is not providing much info. The material is already there and people can see the product
+   → visible title dropped; name kept as image alt / screen-reader text.
+4. [X] Lets make a new view list of everyday items like cordsets, shirts, kid's collection
+   → /collections/everyday = cord sets, kurtis, shirts, T-shirts, tops + home rail. **Kids pending: 0 kids products have photos.**
+5. [X] Show some photo caroasal for mens - 1 to 2 categories [ Kurta Pajama, Sherwani, Shirts]
+   → Sherwani + Kurta Pajama home rails (+ collections); shirts live in Everyday.
+6. [X] in the Size listing where we have XL, L - Add all from XS to 2XL at the very minimum, add additional plus or minus sizes if they are in addition to there. Show the ones not in stock as out of stock.
+7. [X] In the details, replace Sizes with available sizes
+
 ### P0: quick wins before Diwali (this week)
-- [x] Rename "Diwali Edit" → "Diwali Glam" (2026-10-19).
+
+- [X] Rename "Diwali Edit" → "Diwali Glam" (2026-10-19).
 - [ ] More hero carousel images (3 today, looks sparse). **Blocked on owner supplying photos**
-      (product-only or lifestyle, either is fine). Add them, then review the look together.
-- [x] "More like this" ranked by category/price/colour/fabric, sold-out dropped, all 8 visible on
-      desktop, "View all" link, small categories borrow from their header group (2026-10-19).
-- [x] Category pages get /shop filters + sort + paging, scoped to the collection (2026-10-19).
-- [x] Home thumbnail band shown on phones only (it repeated the header text row on md+).
-- [x] Men's "Short Kurta" (SK) moved from Kurtis to Men. Owner may rename the DB category
-      "Men's Short Kurta" so the card badge is unambiguous.
+  (product-only or lifestyle, either is fine). Add them, then review the look together.
+- [X] "More like this" ranked by category/price/colour/fabric, sold-out dropped, all 8 visible on
+  desktop, "View all" link, small categories borrow from their header group (2026-10-19).
+- [X] Category pages get /shop filters + sort + paging, scoped to the collection (2026-10-19).
+- [X] Home thumbnail band shown on phones only (it repeated the header text row on md+).
+- [X] Men's "Short Kurta" (SK) moved from Kurtis to Men. Owner may rename the DB category
+  "Men's Short Kurta" so the card badge is unambiguous.
 
 ### Product descriptions + tags revamp (paused 2026-10-19, waiting on owner review)
+
 Full context: `tasks/description-revamp-plan.md` (read its "Resume here" section first) and
 `scripts/describe/README.md`. No DB writes have happened yet.
+
 - [ ] Owner: review the 20-product pilot page https://claude.ai/artifact/7ft65naksZtpdYTVPpDJGe.
-      Each product has Approve / Needs changes / Reject plus a comment box. Comments save to the
-      page itself (collection `feedback`, one doc per product ID).
+  Each product has Approve / Needs changes / Reject plus a comment box. Comments save to the
+  page itself (collection `feedback`, one doc per product ID).
 - [ ] Claude: read the feedback (ArtifactData `list` on collection `feedback` of that URL), fold
-      it and the known fixes into `scripts/describe/prompt.md`, re-run the 20, and republish the
-      page for a second look.
+  it and the known fixes into `scripts/describe/prompt.md`, re-run the 20, and republish the
+  page for a second look.
 - [ ] Once the 20 are approved: draft the tag vocab per category, then run the other ~767 live
-      products in batches of about 150 (Codex Terra, Sonnet for flagged ones), each batch
-      reviewed on its own page.
+  products in batches of about 150 (Codex Terra, Sonnet for flagged ones), each batch
+  reviewed on its own page.
 - [ ] After approval: migration for `tag_vocab` / `product_tags`, write the descriptions and tags,
-      then PDP detail rows plus Occasion and Work filters.
+  then PDP detail rows plus Occasion and Work filters.
 
 ### P1: unblock real checkout (owner/CA actions, not code)
+
 - [ ] CA: stock transfer shop → Santosh Global LLP, and GST-inclusive site prices (see section below).
 - [ ] LLP current bank account, then Razorpay KYC in the LLP's name.
 - [ ] Courier decision: meeting said **Shiprocket**, earlier plan said Delhivery One (picked when
-      delivery was UP-only). With India-wide delivery, recommend Shiprocket: one API gives
-      pincode serviceability + rates across couriers. Confirm, then KYC in the LLP's name.
+  delivery was UP-only). With India-wide delivery, recommend Shiprocket: one API gives
+  pincode serviceability + rates across couriers. Confirm, then KYC in the LLP's name.
 - [ ] Swap seller identity on the site (footer GSTIN, policies, Contact) once CA confirms.
 
 ### P2: checkout build (Phase B of `tasks/checkout-shipping-plan.md`)
+
 - [ ] Prepaid only, **no COD** (costlier, couriers block it in high-return pincodes). Razorpay
-      covers UPI, RuPay, Visa, Mastercard.
+  covers UPI, RuPay, Visa, Mastercard.
 - [ ] Two paths: guest checkout (nothing saved) and signed-in checkout (cart + address saved;
-      magic-link login already shipped).
+  magic-link login already shipped).
 - [ ] Shipping estimate by pincode at checkout (Apple-style), via the Shiprocket rate API. Use 2–3
-      weight classes instead of per-item weights: heavy (lehengas), medium (sarees), light.
-      Cart keeps "Shipping calculated at checkout" until then.
+  weight classes instead of per-item weights: heavy (lehengas), medium (sarees), light.
+  Cart keeps "Shipping calculated at checkout" until then.
 - [ ] Online orders get a GST tax invoice from the LLP (design pass on where invoices are made).
 
 ### P3: retention emails (after checkout ships)
+
 - [ ] Custom SMTP (also required before magic-link login goes to prod).
 - [ ] Wishlist / "like" feature for signed-in customers.
 - [ ] Abandoned-cart emails (signed-in customers with items left in the cart).
 - [ ] Emails about liked items (back in stock, price drop). Needs consent + unsubscribe link.
 
 ### Later, only if demand shows
+
 - [ ] COD with a surcharge (plus OTP/WhatsApp confirmation).
 
 ## Online seller = regular-scheme company (owner decision 2026-10-14)
+
 Online orders will be sold by SANTOSH GLOBAL LLP (GSTIN 09AFKFS5575H1ZC, regular, UP; PAN AFKFS5575H;
 registered at the shop address; same owner). Delivery across India; PR #14 (UP-only) closed.
 Fallback if CA finds the LLP route too heavy: UP-only via the composition shop (reopen PR #14), later
 move the shop to the regular scheme. CA questions doc: https://claude.ai/code/artifact/342df0ee-b022-4959-86c6-dc0367787dfa
+
 - [ ] LLP current bank account in the LLP's name (GST Rule 10A; Amazon penny-drop failed on the personal
-      joint account 2026-07-24, see ../amazon_listing/tasks/todo.md). Needed before Razorpay KYC.
+  joint account 2026-07-24, see ../amazon_listing/tasks/todo.md). Needed before Razorpay KYC.
 - [ ] After CA picks option A/B/C: swap seller identity on the site (or reopen PR #14 for B).
 - [ ] Swap seller identity on the site: footer line (`StorefrontFooter.jsx:156`, currently the shop's
-      composition GSTIN), Terms/Privacy drafts, shipping/returns policy pages, Contact page.
+  composition GSTIN), Terms/Privacy drafts, shipping/returns policy pages, Contact page.
 - [ ] Razorpay + Delhivery KYC in the new company's name (not the shop's).
 - [ ] Online orders get a GST **tax invoice** from the new company (not a Bill of Supply). Decide where
-      those invoices are made (this app's billing vs separate) — needs a design pass.
+  those invoices are made (this app's billing vs separate) — needs a design pass.
 - [ ] CA questions: (1) stock moving from the composition shop to the new company — a composition
-      dealer issues a Bill of Supply, so the company gets no input credit and pays full GST on the
-      online sale; (2) GST rate on apparel by price slab, and whether site prices stay GST-inclusive;
-      (3) related-party pricing between the two businesses.
+  dealer issues a Bill of Supply, so the company gets no input credit and pays full GST on the
+  online sale; (2) GST rate on apparel by price slab, and whether site prices stay GST-inclusive;
+  (3) related-party pricing between the two businesses.
 
 ## DONE: storefront fixes batch (2026-10-14, branch fix/storefront-sizes-auth-footer)
-- [x] Signed-in customers saw empty shop (no `authenticated` read policy) — migration
-      `schema/migration_storefront_authenticated_read.sql` APPLIED to prod 2026-10-14; non-admin
-      authenticated = 787 products / 0 bills, admin = 3,676
-- [x] Sizes: `lib/sizes.js` formatSize/compareSizes; PDP, cart, checkout, WhatsApp text, shop filter
-      show "XS, S, M, L, XL, 2XL…" in that order. Letter sizes drop the "|42" number because it
-      disagrees with the size guide (guide XL bust 40 vs code XL|42) — owner may want guide fixed.
-- [x] Footer shop links reuse NAV_LINKS; CartDrawer `inert` fixed; guest cart drops hidden products
-- [x] Plus sizes up to 6XL: promo line + trust row (5 signals)
-- [x] Imageless side effects checked: PDP shows "Product not found"; 0 server cart rows affected;
-      home band uses fixed collections (all populated), so the ">=10 products" worry is obsolete
+
+- [X] Signed-in customers saw empty shop (no `authenticated` read policy) — migration
+  `schema/migration_storefront_authenticated_read.sql` APPLIED to prod 2026-10-14; non-admin
+  authenticated = 787 products / 0 bills, admin = 3,676
+- [X] Sizes: `lib/sizes.js` formatSize/compareSizes; PDP, cart, checkout, WhatsApp text, shop filter
+  show "XS, S, M, L, XL, 2XL…" in that order. Letter sizes drop the "|42" number because it
+  disagrees with the size guide (guide XL bust 40 vs code XL|42) — owner may want guide fixed.
+- [X] Footer shop links reuse NAV_LINKS; CartDrawer `inert` fixed; guest cart drops hidden products
+- [X] Plus sizes up to 6XL: promo line + trust row (5 signals)
+- [X] Imageless side effects checked: PDP shows "Product not found"; 0 server cart rows affected;
+  home band uses fixed collections (all populated), so the ">=10 products" worry is obsolete
+
 - Open: shop size filter "View more (47)" lists sizes no visible product stocks (pre-existing).
 
 ## DONE: Andaaz-style left filter sidebar on /shop (2026-10-14, PR #24 merged 5861d50)
+
 Spec `docs/superpowers/specs/2026-10-14-shop-filter-sidebar-design.md`, plan
 `docs/superpowers/plans/2026-10-14-shop-filter-sidebar.md`, branch `feat/shop-filter-sidebar`.
-- [x] Root cause: un-paged productsizecolors queries hit PostgREST 1000-row cap (fabric mapping fine)
-- [x] RPC `get_shop_available_options` applied to prod 2026-10-14 + verified as anon
-- [x] Track A (hook) + Track B (sidebar UI) merged; product-query race fixed (owner asked)
-- [x] Tests (only baseline 6 fail), build, Playwright: 787 → Blue 210 → +XL 50 → <₹2k 29 = SQL truth
-- [x] PR #24 merged; live smoke on bindalscreations.com/shop: same counts, no page errors
+
+- [X] Root cause: un-paged productsizecolors queries hit PostgREST 1000-row cap (fabric mapping fine)
+- [X] RPC `get_shop_available_options` applied to prod 2026-10-14 + verified as anon
+- [X] Track A (hook) + Track B (sidebar UI) merged; product-query race fixed (owner asked)
+- [X] Tests (only baseline 6 fail), build, Playwright: 787 → Blue 210 → +XL 50 → <₹2k 29 = SQL truth
+- [X] PR #24 merged; live smoke on bindalscreations.com/shop: same counts, no page errors
+
 - Follow-ups: size labels show raw codes ("XL|42") on shop AND product page — pick a display
   format site-wide; CartDrawer passes `inert=""` (React 19 ignores it, closed drawer keyboard-reachable).
 - Pre-existing, NOT fixed: no read policy on products/productsizecolors/categories for
   `authenticated` role → a magic-link-signed-in customer would see an empty shop.
 
 ## Overnight run 2026-10-13 → 14 (owner said "auto approve and implement overnight")
+
 Rules: merge only code PRs that pass tests + screenshot checks (each revertable with one revert).
 Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
-- [x] PR #11 plans merged; PR #12 Diwali Edit collection (/collections/diwali, 50 Jev picks) merged
-- [x] Supplier names/codes stripped from 9 descriptions (backup in session scratchpad)
-- [x] Header: rotating promo line + category row + mobile drawer — PR #16 merged
-- [x] Header categories → collection pages (sarees/lehengas/suits/kurtis/gowns/men) — PR #17 merged
-- [x] 4-col grid, flatter cards, Sold out badge (low-stock badge dropped: 78% of items have 1-3 pcs) — PR #18 merged
-- [x] Diwali 50 description rewrites drafted: `tasks/diwali-description-drafts.md` (owner approval; 25 have notes)
-- [x] Product page: size guide modal, lightbox, details table, sticky bar, WhatsApp ask, more like this, single-option auto-select — PR #20 merged
-- [x] Home: category band → hero slider (product photos) → Diwali/New/category rails → trust row → brand story — PR #21 merged
-- [x] Live smoke test after deploy 7f33c74: /, /shop, /collections/diwali, /collections/men, /product/BC252742, /size-guide, /cart, /checkout, /policies/shipping — no page errors
+
+- [X] PR #11 plans merged; PR #12 Diwali Edit collection (/collections/diwali, 50 Jev picks) merged
+- [X] Supplier names/codes stripped from 9 descriptions (backup in session scratchpad)
+- [X] Header: rotating promo line + category row + mobile drawer — PR #16 merged
+- [X] Header categories → collection pages (sarees/lehengas/suits/kurtis/gowns/men) — PR #17 merged
+- [X] 4-col grid, flatter cards, Sold out badge (low-stock badge dropped: 78% of items have 1-3 pcs) — PR #18 merged
+- [X] Diwali 50 description rewrites drafted: `tasks/diwali-description-drafts.md` (owner approval; 25 have notes)
+- [X] Product page: size guide modal, lightbox, details table, sticky bar, WhatsApp ask, more like this, single-option auto-select — PR #20 merged
+- [X] Home: category band → hero slider (product photos) → Diwali/New/category rails → trust row → brand story — PR #21 merged
+- [X] Live smoke test after deploy 7f33c74: /, /shop, /collections/diwali, /collections/men, /product/BC252742, /size-guide, /cart, /checkout, /policies/shipping — no page errors
 
 ### Waiting on owner (morning)
+
 1. Review the Diwali 50 (`tasks/diwali-pick-sheet.html`), send back IDs if you change any.
 2. Approve description drafts (`tasks/diwali-description-drafts.md`; 25 flagged).
 3. ~~CA questions → merge PR #14~~ superseded 2026-10-14: online seller is the regular-scheme company (see top).
@@ -123,13 +156,15 @@ Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
 6. First-order discount terms (amount + how to claim) before adding it to the promo line.
 
 ### Next build items (action plan)
+
 - Filters cleanup (fabric bug, greyed options, size groups) — after Diwali.
 - Shop page left sidebar; `/shop` URL filters (category links currently use collections instead).
 - Footer still lists old category names (Salwar Suits, Dupattas); align with NAV_LINKS.
-- [x] ₹99 shipping policy wording fixed — PR #13 merged
-- [x] UP-only checkout validation — PR #14 open, HOLD until CA confirms
-- [x] Terms/Privacy drafts: `tasks/legal-drafts.md` (owner/legal review, not on site)
-Resume: `gh pr list`; `git worktree list`; `gh auth switch -u ab1ndal` before pushing, switch back to abindal-nyase after.
+
+- [X] ₹99 shipping policy wording fixed — PR #13 merged
+- [X] UP-only checkout validation — PR #14 open, HOLD until CA confirms
+- [X] Terms/Privacy drafts: `tasks/legal-drafts.md` (owner/legal review, not on site)
+  Resume: `gh pr list`; `git worktree list`; `gh auth switch -u ab1ndal` before pushing, switch back to abindal-nyase after.
 
 ## Storefront revamp — ACTION PLAN: `tasks/storefront-action-plan.md` (Diwali 8 Nov 2026); details in `tasks/storefront-revamp-plan.md`
 
@@ -151,12 +186,12 @@ plus `create index productimages_productid_idx on productimages (productid)`
 `get_shop_filter_options` RPC (security invoker). Admin unaffected (`admin_only`
 policy via `is_admin()`).
 
-- [x] Owner decision 2026-10-13: keep out-of-stock products visible (787, images-only).
-- [x] Write `schema/migration_storefront_products_with_images.sql`
-- [x] Apply to prod, verify anon count = 787 and admin count = 3,676
-- [x] Side effects checked 2026-10-14 (see top); imageless product URL becomes "not found"; cart items for
-      imageless products lose price in `cartApi.fetchLiveVariantData`; home category
-      tiles need >=10 products, so some categories may disappear
+- [X] Owner decision 2026-10-13: keep out-of-stock products visible (787, images-only).
+- [X] Write `schema/migration_storefront_products_with_images.sql`
+- [X] Apply to prod, verify anon count = 787 and admin count = 3,676
+- [X] Side effects checked 2026-10-14 (see top); imageless product URL becomes "not found"; cart items for
+  imageless products lose price in `cartApi.fetchLiveVariantData`; home category
+  tiles need >=10 products, so some categories may disappear
 
 ## Event promo copy — Festive Pop-Up, Day 2
 
@@ -165,6 +200,7 @@ R-14/84, Raj Nagar, Ghaziabad · +91 98108 73280. Raksha Bandhan / Teej
 collection: sarees, suits, cord sets, bedsheets, silver rakhi.
 
 **Two different addresses — do not conflate them:**
+
 - **Shop** (permanent): 58, Sihani Gate Market, Near Durga Bhabhi Chowk,
   Ghaziabad, UP 201001. This is where customers have actually been, so it is the
   right recall hook in outreach and the right address in the Community profile.
@@ -349,6 +385,7 @@ The tooling optimised for speed while the guidance said to go slow. Written
 pacing advice does not survive contact with a fast tool.
 
 **Rules going forward:**
+
 - Never send bulk 1:1 WhatsApp outreach from a personal or shop number again.
   Use the Cloud API with an approved marketing template (task 4), or a BSP.
 - If manual outreach is unavoidable: hard cap ~20–25/day, spread over hours,
@@ -363,6 +400,7 @@ Reached before the restriction: 56 of 197, the warmest cohort (batches 1-3).
 first-offence temporary restriction. Number usable again 2026-08-03.
 
 Decisions taken:
+
 - **Do not rebuild the Community.** The invite link
   (.../ErIgYB8O2Cq6z8DXYG1iCg) already went to 56 customers; rebuilding orphans
   it for everyone yet to click. The Community keeps working while its owner is
@@ -388,12 +426,12 @@ they visit — and none have the shop's number saved. An unexplained group from 
 unrecognised number reads as spam, and reports from people with no prior chat
 history are what get a number banned. So:
 
-| Who | Method |
-|---|---|
-| Members of the old June 2025 group | Merge the group — zero adds, zero risk |
-| Anyone who has **saved** the shop number | Direct add works |
-| Everyone else | **Invite link**, sent in a personal 1:1 message |
-| Batch 8 cold tail (20 never billed) | Skip |
+| Who                                            | Method                                                |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| Members of the old June 2025 group             | Merge the group — zero adds, zero risk               |
+| Anyone who has **saved** the shop number | Direct add works                                      |
+| Everyone else                                  | **Invite link**, sent in a personal 1:1 message |
+| Batch 8 cold tail (20 never billed)            | Skip                                                  |
 
 Direct-adding is earned per customer, not done in bulk.
 
@@ -437,6 +475,7 @@ against whether **the adder** is in **the recipient's** address book. The US
 number is saved there; the freshly activated Indian number is not.
 
 Implications:
+
 - Customers with *My contacts* set cannot be added from either number, since
   neither is in their address book. The add simply fails.
 - Customers on the default *Everyone* can be added, but see an unrecognised
@@ -463,6 +502,7 @@ are hidden from other members. Paid 1:1 Cloud API messages are reserved for
 occasional event nudges.
 
 Rejected along the way, with reasons:
+
 - **Channel** — not seedable, membership invisible, so no way to target
   non-followers or detect leaves.
 - **Plain Group** — seedable, but exposes every customer's phone number to all
@@ -474,31 +514,32 @@ Rejected along the way, with reasons:
 - **Broadcast lists** — 256 cap, and only reach people who saved the store number.
 
 ### Done (2026-08-01)
-- [x] `schema/migration_marketing_consent_community.sql` — applied to prod.
-      `marketing_consents` append-only log (RLS `admin_only` via `is_admin()`),
-      `customers.marketing_opt_in`, `community_status` state machine,
-      `community_status_at`. Backfilled 200 consent rows as `counter_verbal`.
-- [x] `scripts/export-customers-vcf.js` — exports opted-in customers as batched
-      vCard 3.0 files for contact import. Ordered by last purchase date so the
-      warmest customers land in batch 1 and never-billed contacts land last;
-      add risk is concentrated in the final batch. Skips existing members on
-      re-run, so a partial seed can be resumed.
-- [x] `.gitignore` — `vcf-export/` and `*.vcf` (exports contain customer PII).
-- [x] Exported 197 contacts to `vcf-export/` in 8 batches of 25, ordered newest
-      purchase first. Batches 1–3 bought within 3 months, 4–7 within 5 months,
-      batch 8 is the cold tail (20 of 22 never billed).
-- [x] Imported all 197 to the **owner's US iPhone** via AirDrop, 2026-08-01 PT.
-      All prefixed `BC ` — search "BC" in Contacts to isolate or bulk-delete them.
+
+- [X] `schema/migration_marketing_consent_community.sql` — applied to prod.
+  `marketing_consents` append-only log (RLS `admin_only` via `is_admin()`),
+  `customers.marketing_opt_in`, `community_status` state machine,
+  `community_status_at`. Backfilled 200 consent rows as `counter_verbal`.
+- [X] `scripts/export-customers-vcf.js` — exports opted-in customers as batched
+  vCard 3.0 files for contact import. Ordered by last purchase date so the
+  warmest customers land in batch 1 and never-billed contacts land last;
+  add risk is concentrated in the final batch. Skips existing members on
+  re-run, so a partial seed can be resumed.
+- [X] `.gitignore` — `vcf-export/` and `*.vcf` (exports contain customer PII).
+- [X] Exported 197 contacts to `vcf-export/` in 8 batches of 25, ordered newest
+  purchase first. Batches 1–3 bought within 3 months, 4–7 within 5 months,
+  batch 8 is the cold tail (20 of 22 never billed).
+- [X] Imported all 197 to the **owner's US iPhone** via AirDrop, 2026-08-01 PT.
+  All prefixed `BC ` — search "BC" in Contacts to isolate or bulk-delete them.
 
 ### Numbers and their roles (settled 2026-08-01)
 
 Three distinct numbers are in play. Only one means anything to customers.
 
-| Number | Role | Customer recognition |
-|---|---|---|
-| Developer's US number | Created the Community; regular personal use | None |
-| Developer's personal Indian number | Community **owner**; WhatsApp activated 2026-08-01 | None |
-| **+91 98108 73280** (shop, on flyer and bills) | Community **admin** | The only one with any |
+| Number                                               | Role                                                     | Customer recognition  |
+| ---------------------------------------------------- | -------------------------------------------------------- | --------------------- |
+| Developer's US number                                | Created the Community; regular personal use              | None                  |
+| Developer's personal Indian number                   | Community **owner**; WhatsApp activated 2026-08-01 | None                  |
+| **+91 98108 73280** (shop, on flyer and bills) | Community **admin**                                | The only one with any |
 
 **Sender identity barely matters; where replies land does.** Customers have not
 saved any of these numbers, so WhatsApp shows raw digits whichever one sends —
@@ -507,6 +548,7 @@ recognition is not the deciding factor. Identity is carried by the *message text
 number.
 
 What actually decides the sender:
+
 - **Replies go to the sending phone.** Price, size, and availability questions
   must reach someone who can answer during Indian shop hours.
 - **Whatever number sends first is the number customers save.** Migrating a
@@ -534,29 +576,32 @@ share a number — currently no clash, since the API uses a separate alternate
 number, but do not consolidate them later without checking.
 
 ### 1. Mark customers as Community members  — blocks repeat seeding
+
 Without this `community_status` never advances past `not_added`, so every export
 re-exports everyone and the skip logic is dead weight.
 
 - [ ] Multi-select checkbox column on `CustomerTable.js`
 - [ ] Bulk action: set `community_status` to `member` / `invite_pending` / `left`,
-      stamping `community_status_at`
+  stamping `community_status_at`
 - [ ] Show current `community_status` as a column so state is visible at a glance
 - [ ] Filter by `community_status` so "who still needs adding" is one click
 
 Files: `src/admin/components/CustomerTable.js`, `src/admin/pages/CustomersPage.js`
 
 ### 2. Consent checkbox on customer create/edit
+
 New customers currently get no consent record — they'd need another backfill.
 
 - [ ] Checkbox on `CustomerForm.js`: "Send store offers on WhatsApp"
 - [ ] On submit, write a `marketing_consents` row (`source: 'counter_form'`,
-      `recorded_by`: current admin) and set `customers.marketing_opt_in`
+  `recorded_by`: current admin) and set `customers.marketing_opt_in`
 - [ ] Unchecking an opted-in customer writes an `opt_out` row — never delete or
-      mutate consent history, the log is append-only by design
+  mutate consent history, the log is append-only by design
 
 Files: `src/admin/components/CustomerForm.js`
 
 ### 3. Community QR on bill PDF
+
 Cheapest recurring acquisition channel — compounds with every bill printed.
 
 - [ ] Generate QR for the Community invite link
@@ -566,18 +611,19 @@ Cheapest recurring acquisition channel — compounds with every bill printed.
 Files: billing PDF generation under `src/admin/components/billing/`
 
 ### 4. Event nudge — paid 1:1 Cloud API
+
 For occasional pushes to customers not yet in the Community. Needs a Meta
 **marketing**-category template approved (1–24h); the existing `bindals_invoice`
 template is Utility and cannot carry promotional content.
 
 - [ ] Submit reusable marketing template — fixed scaffolding plus `{{1}}` name,
-      `{{2}}` campaign body, `{{3}}` link, so future campaigns need no re-approval.
-      Templates that are only variables get rejected.
+  `{{2}}` campaign body, `{{3}}` link, so future campaigns need no re-approval.
+  Templates that are only variables get rejected.
 - [ ] `send-campaign` edge function reusing existing `WHATSAPP_*` secrets;
-      refuses to send when `marketing_opt_in` is false; idempotent per campaign
+  refuses to send when `marketing_opt_in` is false; idempotent per campaign
 - [ ] `campaigns` + `channel_invites` tables for send/delivery history
 - [ ] Trigger button on the Customers page — single-customer first (staff ask in
-      person, converts better), bulk later
+  person, converts better), bulk later
 
 Cost: ~₹0.86/message + 18% GST, billed at **recipient** country rates, so Indian
 rates apply regardless of the developer being US-based. ~₹200 for a 200-person blast.
@@ -586,23 +632,25 @@ Watch: Meta is steering marketing traffic to the **MM Lite API** and phasing out
 Cloud API marketing support. Check before investing heavily here.
 
 ### 5. Data hygiene
+
 - [ ] Fix 3 customers with 9-digit `+91` numbers, then re-run the export:
-      customerid 273 (Rohit Yadav), 274 (Ruhi), 328 (Manju)
+  customerid 273 (Rohit Yadav), 274 (Ruhi), 328 (Manju)
 
 ### Blocked / needs owner action (not code)
+
 - [ ] Create the WhatsApp Community + announcement group, capture invite link.
-      Name it after the shop with the logo as the photo — recognition is the
-      main defence against add-related reports.
+  Name it after the shop with the logo as the photo — recognition is the
+  main defence against add-related reports.
 - [ ] Add the pre-existing group (created 2025-06-15) to the Community first —
-      its members join the announcement group automatically, at no add risk.
+  its members join the announcement group automatically, at no add risk.
 - [ ] Then seed only the customers not already in that group, one vCard batch
-      per day, in file order (warmest first). Watch the member list after each
-      batch: several immediate exits means slow down. Consider stopping after
-      batch 7 and inviting the cold tail personally.
+  per day, in file order (warmest first). Watch the member list after each
+  batch: several immediate exits means slow down. Consider stopping after
+  batch 7 and inviting the cold tail personally.
 - [ ] Verify the Cloud API sender number is `+91`, not a US number
 - [ ] Confirm the WABA sold-to entity is the Indian business (GST invoicing)
 - [ ] Check the WABA messaging limit before any blast — unverified accounts cap
-      at 250 business-initiated conversations per 24h
+  at 250 business-initiated conversations per 24h
 
 ---
 
