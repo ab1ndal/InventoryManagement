@@ -1,7 +1,7 @@
 import React from "react";
 
 const SITE_NAME = "Bindal's Creations";
-const DEFAULT_OG_IMAGE = "/LOGO-BindalsCreation.png";
+const DEFAULT_OG_IMAGE = "/logo512.png";
 
 // React 19 hoists <title>/<meta>/<link> rendered anywhere into <head> and
 // dedupes across route changes — no react-helmet needed. JSON-LD <script>

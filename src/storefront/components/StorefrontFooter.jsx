@@ -14,10 +14,14 @@ export default function StorefrontFooter() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand */}
           <div className="lg:col-span-1">
+            {/* Native gold: the asset is now transparent, so the old
+                brightness-0 invert would only turn the brand gold white. */}
             <img
-              src="/LOGO-BindalsCreation.png"
+              src="/logo-bindals-creation.png"
               alt="Bindal's Creations"
-              className="h-12 w-auto object-contain mb-4 brightness-0 invert"
+              width={600}
+              height={373}
+              className="h-24 w-auto object-contain mb-4"
             />
             <p className="font-display text-lg text-storefront-cream/80 leading-relaxed mb-5">
               Rooted in tradition,<br />handpicked with love.
