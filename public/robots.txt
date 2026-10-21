@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin
 
-Sitemap: https://bindalscreations.com/sitemap.xml
+Sitemap: https://www.bindalscreations.com/sitemap.xml

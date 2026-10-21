@@ -16,12 +16,12 @@ Written 2026-10-13. Status: plan, awaiting owner decisions (bottom) and accounts
 - Delivery estimate is static text; tracking and order history are "coming soon" pages.
 - Terms and Privacy pages are placeholders pending legal review; gateways need them real.
 
-> **Superseded 2026-10-14:** online sales will be made by the owner's separate
-> distribution company, registered under the **regular** GST scheme. The UP-only
-> constraint below no longer applies: deliver across India. PR #14 closed.
-> Open items: see `tasks/todo.md` "Online seller = regular-scheme company".
+> **Current (owner decision 2026-10-20):** the shop sells online itself under the composition
+> scheme, UP-only. UP-only checkout + wording shipped in PR #32. Courier = **Shiprocket**,
+> gateway = **Razorpay**, both KYC'd in the shop's name. (The 2026-10-14 plan to sell via the
+> regular-scheme LLP across India is parked; see `tasks/todo.md`.)
 
-## (Superseded) Constraint: composition GST → Uttar Pradesh only
+## Constraint: composition GST → Uttar Pradesh only
 The business is a composition dealer (Bill of Supply). CGST Act **s.10(2)(c) bars composition
 dealers from inter-state supplies of goods**, so online orders can only ship to **UP addresses**.
 Selling intra-state through the shop's own website appears allowed, but no source addresses
@@ -37,7 +37,7 @@ Consequences:
 | Need | Choice | Why |
 |---|---|---|
 | Payments | **Razorpay** | Published pricing (2% + GST on UPI/cards/netbanking), no setup or yearly fee, T+1 settlement, Payment Links need no code. Matches the earlier spec. |
-| Shipping | **Delhivery One** (manual dashboard booking first) | UP-only orders mostly get local/same-zone rates; COD remitted within ~48h vs Shiprocket's D+8. Shiprocket is the alternative if comparing several couriers matters more. |
+| Shipping | **Shiprocket** (owner decision 2026-10-20; dashboard booking first, API in Phase C) | One API for pincode serviceability, rates and tracking across couriers. |
 | COD | **Prepaid only at first**; add COD with a fee + WhatsApp/OTP confirmation if demand shows | COD return rates in fashion run ~30%, and each failed parcel costs ₹150–300 in two-way freight. |
 | Server code | Supabase Edge Functions | The only safe place for the Razorpay secret and webhook signature checks (as in the earlier spec). |
 
@@ -49,7 +49,7 @@ Take prepaid orders online for Diwali without building checkout:
 2. Staff confirm stock and delivery address (UP only), then send a **Razorpay Payment Link**
    from the Razorpay dashboard or app for the exact amount (incl. ₹99 shipping below ₹5,000).
 3. Once paid: create the Bill of Supply in admin billing as usual, then book the parcel in the
-   **Delhivery One dashboard** (pickup from the shop) and send the tracking link on WhatsApp.
+   **Shiprocket dashboard** (pickup from the shop) and send the tracking link on WhatsApp.
 4. The first-order discount (action plan P1 #8) is applied by hand at step 2.
 
 Code changes in this phase (small, part of the Diwali work):
@@ -76,15 +76,58 @@ Following the earlier spec, trimmed to prepaid-only and UP-only:
 8. **Tests:** pricing/shipping/discount logic (unit), Edge Functions with mocked Razorpay
    (signature verify, idempotency), one end-to-end test-mode payment.
 
-## Phase C — Shipping automation (when volume justifies it)
-- [ ] Delhivery API: pincode serviceability + live rate at checkout, auto-create shipment,
-      tracking webhook updates order status.
-- [ ] Product weights/dimensions per the 2026-05-30 shipping-fields spec (category defaults).
-- [ ] COD (if decided), with a fee and confirmation before dispatch.
+## Phase C — Shiprocket integration (spec 2026-10-20)
+
+API facts verified from apidocs.shiprocket.in / support.shiprocket.in on 2026-10-20 (research
+notes in session; re-check anything marked unverified against a live call):
+base `https://apiv2.shiprocket.in`; `POST /v1/external/auth/login {email,password}` → Bearer
+token valid 240 h; API user is a separate email, password shown once, max 4 users.
+
+### C1. Pincode check + delivery estimate at checkout (needs only the API user; no orders table)
+Edge Function `shipping-quote` (Deno, public, CORS = `ALLOWED_ORIGIN`):
+- Input `{ pincode, weightClass }`; reject anything not 6 digits before calling Shiprocket.
+- `GET /v1/external/open/postcode/details?postcode=` → must be state Uttar Pradesh. This replaces
+  the 20–28 prefix check, which wrongly lets Uttarakhand pincodes through (keep the prefix check
+  client-side as a fast pre-filter). Unknown pincode returns `status_code` 403 → "not serviceable".
+- `GET /v1/external/courier/serviceability/?pickup_postcode=201001&delivery_postcode=…&weight=…&cod=0`
+  → serviceable if `available_courier_companies` is non-empty (treat empty list **and** a body
+  `status: 404` as not serviceable; exact signal unverified). Return
+  `{ serviceable, state, etdDays }` from `recommended_courier_company_id` (else fastest).
+- Token: cached in a service-role-only table `integration_tokens (provider, token, expires_at)`;
+  re-login when <24 h left or on 401. Never log the token or password.
+- Failure mode: Shiprocket down/timeout (5 s) → `{ serviceable: null }`, checkout falls back to
+  the prefix check + static "5–7 days" text. Never block an order because the quote API failed.
+- Customer still pays the flat fee (₹99 below ₹5,000) unless the owner chooses pass-through after
+  seeing the rate table; the quote's `rate` is returned to admin only, never shown to shoppers.
+- Weight classes (no per-product weights yet): light 0.5 kg (kurtis, shirts, tops, T-shirts),
+  medium 1 kg (sarees, suits, kurta pajama, gowns, dresses, cord sets), heavy 2 kg (lehengas,
+  sherwanis, suit sets). Cart weight = heaviest class + 0.5 kg per extra item, capped at 5 kg.
+- Tests: pure helpers (weight calc, response parsing incl. empty/404/403 cases) unit-tested;
+  function tested with mocked `fetch`; one manual live call per pincode in the owner's rate table.
+
+### C2. Shipments from orders (after Phase B orders table exists)
+Admin "Ship" button on a paid order → Edge Function `create-shipment` (admin-only):
+`/orders/create/adhoc` (`order_id` = our order ref, `pickup_location` = `Shop`,
+`payment_method` = Prepaid, `selling_price` GST-inclusive, `invoice_number` = Bill of Supply no.)
+→ `/courier/assign/awb` → `/courier/generate/pickup` → `/courier/generate/label`. Store
+`sr_order_id`, `shipment_id`, `awb`, label URL on the order; idempotent on retry (check stored ids
+first; Shiprocket rejects reused `order_id`s, even cancelled ones). Print our own Bill of Supply,
+not Shiprocket's auto invoice.
+
+### C3. Tracking webhook
+Settings → API → Webhooks → our URL with a security token (arrives as `x-api-key`). URL must not
+contain "shiprocket", "sr", "kr" or "kartrocket" → name it `/functions/v1/courier-status`.
+Treat the token as a shared secret only: on each event re-fetch `/courier/track/awb/{awb}` and map
+status ids (6 Shipped, 17 Out for delivery, 7 Delivered, 9/10 RTO, 8/45 Cancelled) onto the order
+state machine; always return 200. Customer `/track` page reads from `orders`.
+
+### Not now
+COD; Shiprocket's paid plans (revisit above ~100 shipments/month); returns via courier;
+per-product weights (2026-05-30 shipping-fields spec) until weight disputes show it's needed.
 
 ## Owner decisions needed
 1. **CA confirmation of UP-only** online selling under composition (blocks Phase A going live).
-2. **Courier:** Delhivery One (recommended) or Shiprocket (the earlier plan; more couriers, slower COD payout).
+2. ~~Courier~~ decided 2026-10-20: **Shiprocket**.
 3. **COD:** prepaid only at launch (recommended), or COD with a fee + confirmation?
 4. **Shipping fee:** keep flat ₹99 below ₹5,000 (recommended, simple for UP-only), or zone-based?
 5. **First-order discount:** amount and how it's claimed (also in the action plan).

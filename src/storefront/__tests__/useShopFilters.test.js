@@ -268,3 +268,57 @@ describe("product-id scope (curated collections)", () => {
     console.error.mockRestore();
   });
 });
+
+describe("size options", () => {
+  // distinct_sizes covers variants of every product; only XS and XL belong to
+  // products the storefront shows (the shop-wide availability RPC's sizes).
+  const filterOptions = {
+    sizes: [
+      { code: "XS|34", label: "XS|34", sort_order: 1 },
+      { code: "S|36", label: "S|36", sort_order: 2 },
+      { code: "XL|42", label: "XL|42", sort_order: 5 },
+      { code: "28", label: "28 (Waist)", sort_order: 9 },
+    ],
+    distinct_sizes: ["XL|42", "28", "S|36", "XS|34"],
+  };
+
+  function mockRpc(availability) {
+    supabase.rpc.mockImplementation((name) =>
+      name === "get_shop_filter_options"
+        ? Promise.resolve({ data: filterOptions, error: null })
+        : availability.promise
+    );
+  }
+
+  test("lists only sizes a shop product has, never the raw variant sizes first", async () => {
+    const availability = deferred();
+    mockRpc(availability);
+    const { result } = renderHook(() => useShopFilters());
+
+    await waitFor(() =>
+      expect(supabase.rpc).toHaveBeenCalledWith("get_shop_available_options", expect.anything())
+    );
+    // Before availability lands, no size outside the shop's products is offered.
+    expect(result.current.sizeOptions).toEqual([]);
+
+    await act(async () => {
+      availability.resolve({ data: { sizes: ["XL|42", "XS|34"] }, error: null });
+    });
+    await waitFor(() => expect(result.current.sizeOptions).toEqual(["XS|34", "XL|42"]));
+  });
+
+  test("falls back to every variant size when availability fails", async () => {
+    const availability = deferred();
+    mockRpc(availability);
+    const { result } = renderHook(() => useShopFilters());
+    jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await act(async () => {
+      availability.resolve({ data: null, error: { message: "boom" } });
+    });
+    await waitFor(() =>
+      expect(result.current.sizeOptions).toEqual(["XS|34", "S|36", "XL|42", "28"])
+    );
+    console.error.mockRestore();
+  });
+});

@@ -19,6 +19,12 @@ import { toast } from "sonner";
 import { useTableFilters } from "../hooks/useTableFilters";
 import { logActivity } from "../../lib/activityLog";
 import { customerName } from "../../utility/activitySummary";
+import { Checkbox } from "../../components/ui/checkbox";
+import {
+  COMMUNITY_STATUS_LABELS,
+  BULK_COMMUNITY_STATUSES,
+  setCommunityStatus,
+} from "../lib/customerMarketing";
 
 const INITIAL_FILTERS = {
   first_name: "",
@@ -27,7 +33,11 @@ const INITIAL_FILTERS = {
   referred_by: "",
   email: "",
   loyalty_tier: "",
+  community_status: "",
 };
+
+const FILTER_SELECT_CLASS =
+  "w-full h-6 px-1 rounded-md text-center bg-gray-50 border border-gray-200 text-gray-600 focus:ring-1 focus:ring-primary";
 
 export default function CustomerTable({ onEditCustomer, refreshSignal }) {
   const [customers, setCustomers] = useState([]);
@@ -35,13 +45,18 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
 
   const [page, setPage] = useState(1);
   const rowsPerPage = 15;
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
   }, [refreshSignal]);
 
+  // Clear selection with the filter so a bulk action never touches rows the
+  // admin can no longer see.
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
   }, [filters]);
 
   const fetchCustomers = async () => {
@@ -134,7 +149,9 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
       safe(c.phone).includes(safe(debouncedFilters.phone)) &&
       safe(c.email).includes(safe(debouncedFilters.email)) &&
       safe(c.loyalty_tier).includes(safe(debouncedFilters.loyalty_tier)) &&
-      safe(referredName).includes(safe(debouncedFilters.referred_by))
+      safe(referredName).includes(safe(debouncedFilters.referred_by)) &&
+      (!debouncedFilters.community_status ||
+        c.community_status === debouncedFilters.community_status)
     );
   });
 
@@ -143,11 +160,82 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
     page * rowsPerPage
   );
 
+  const pageIds = paginatedCustomers.map((c) => c.customerid);
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const togglePageSelected = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      pageIds.forEach((id) =>
+        allPageSelected ? next.delete(id) : next.add(id),
+      );
+      return next;
+    });
+  };
+
+  const handleBulkCommunityStatus = async (status) => {
+    const ids = [...selectedIds];
+    const label = COMMUNITY_STATUS_LABELS[status];
+    setBulkUpdating(true);
+    try {
+      const updated = await setCommunityStatus(ids, status);
+      if (updated === ids.length) {
+        toast.success(`Marked ${updated} customer(s) as ${label}`);
+      } else {
+        toast.warning(`Marked ${updated} of ${ids.length} customer(s) as ${label}`);
+      }
+      setSelectedIds(new Set());
+      fetchCustomers();
+    } catch (err) {
+      toast.error(`Could not mark ${ids.length} customer(s) as ${label}`, {
+        description: err.message,
+      });
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="overflow-auto border rounded-md">
         <div className="flex justify-between items-center px-4 py-2 bg-gray-50 border-b">
           <h3 className="text-lg font-semibold text-gray-700">Customers</h3>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                {selectedIds.size} selected · Community:
+              </span>
+              {BULK_COMMUNITY_STATUSES.map((status) => (
+                <Button
+                  key={status}
+                  variant="outline"
+                  size="sm"
+                  disabled={bulkUpdating}
+                  onClick={() => handleBulkCommunityStatus(status)}
+                >
+                  {COMMUNITY_STATUS_LABELS[status]}
+                </Button>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={bulkUpdating}
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Clear
+              </Button>
+            </div>
+          )}
           <CustomerForm
             triggerLabel="Add Customer"
             onSubmit={() => fetchCustomers()}
@@ -157,6 +245,13 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
         <table className="min-w-full text-sm text-left table-fixed">
           <thead className="bg-gray-100">
             <tr>
+              <th className="p-2 text-center w-[40px]">
+                <Checkbox
+                  aria-label="Select all on page"
+                  checked={allPageSelected}
+                  onCheckedChange={togglePageSelected}
+                />
+              </th>
               <th className="p-2 text-center w-[140px]">First Name</th>
               <th className="p-2 text-center w-[140px]">Last Name</th>
               <th className="p-2 text-center w-[180px]">Phone</th>
@@ -166,10 +261,12 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
               <th className="p-2 text-center w-[80px]">Store Credit</th>
               <th className="p-2 text-center w-[50px]">Total Spend</th>
               <th className="p-2 text-center w-[50px]">Last Purchase</th>
+              <th className="p-2 text-center w-[110px]">Community</th>
               <th className="p-2 text-center w-[50px]">Actions</th>
             </tr>
             <tr className="bg-white text-xs text-gray-400 text-center border-t">
               {[
+                "",
                 "first_name",
                 "last_name",
                 "phone",
@@ -179,10 +276,29 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                 "",
                 "",
                 "",
+                "community_status",
                 "",
               ].map((key, idx) => (
                 <th key={idx} className="p-1 text-center">
-                  {key ? (
+                  {key === "community_status" ? (
+                    <select
+                      aria-label="Filter by community status"
+                      value={filters.community_status}
+                      onChange={(e) =>
+                        setFilter("community_status", e.target.value)
+                      }
+                      className={FILTER_SELECT_CLASS}
+                    >
+                      <option value="">All</option>
+                      {Object.entries(COMMUNITY_STATUS_LABELS).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  ) : key ? (
                     <Input
                       type="text"
                       placeholder="Filter"
@@ -201,7 +317,7 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
             {filteredCustomers.length === 0 ? (
               <tr className="border-t">
                 <td
-                  colSpan={11}
+                  colSpan={12}
                   className="p-2 text-center w-[140px] py-4 text-gray-500"
                 >
                   No customers found
@@ -210,6 +326,13 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
             ) : (
               paginatedCustomers.map((customer) => (
                 <tr key={customer.customer_ulid} className="border-t">
+                  <td className="p-2 text-center w-[40px]">
+                    <Checkbox
+                      aria-label={`Select ${customerName(customer)}`}
+                      checked={selectedIds.has(customer.customerid)}
+                      onCheckedChange={() => toggleSelected(customer.customerid)}
+                    />
+                  </td>
                   <td className="p-2 text-center w-[140px]">
                     {customer.first_name}
                   </td>
@@ -267,6 +390,11 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
                     {customer.last_purchased_at
                       ? formatDate(customer.last_purchased_at)
                       : "-"}
+                  </td>
+                  <td className="p-2 text-center w-[110px]">
+                    {COMMUNITY_STATUS_LABELS[customer.community_status] ||
+                      customer.community_status ||
+                      "-"}
                   </td>
                   <td className="p-2 text-center w-[50px] flex justify-center gap-2">
                     <Tooltip>

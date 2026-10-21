@@ -170,11 +170,12 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
         colorIndexRef.current = { familyToCodes, codeToFamilies };
       }
 
-      // Every distinct size code on any variant (no stock or storefront
-      // visibility filter; baseOptions hides the ones no shop product has),
-      // sorted by the reference table order.
+      // Every distinct size code on any variant, including products the
+      // storefront hides (no images). Sorted by the reference table order; the
+      // list is narrowed to shop products below, once base availability lands.
       const rawSizes = (data.distinct_sizes || []).filter(Boolean);
       const sizeDefs = data.sizes || [];
+      let sortedSizes;
       if (sizeDefs.length) {
         // Labels that are still raw codes ("XL|42") get the shared
         // customer-facing format; worded ones ("28 (Waist)") are kept.
@@ -185,10 +186,10 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
         setSizeDisplayMap(displayMap);
 
         const orderMap = Object.fromEntries(sizeDefs.map((s) => [s.code, s.sort_order]));
-        setSizeOptions([...rawSizes].sort((a, b) => (orderMap[a] ?? 9999) - (orderMap[b] ?? 9999)));
+        sortedSizes = [...rawSizes].sort((a, b) => (orderMap[a] ?? 9999) - (orderMap[b] ?? 9999));
       } else {
         // Fallback if sizes reference table is empty
-        setSizeOptions([...rawSizes].sort());
+        sortedSizes = [...rawSizes].sort();
       }
 
       const fabrics = data.fabrics || [];
@@ -208,14 +209,19 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
       // Base availability (no filters) hides options no shop product has, e.g.
       // reference sizes never stocked. Runs after the indices above are set
       // because code -> family mapping depends on them.
-      setBaseOptions(
-        await fetchAvailableOptions(
-          scopeFilters(INITIAL_FILTERS, scopeCategoryIds),
-          fabricIndexRef.current,
-          colorIndexRef.current,
-          scopeRowsRef.current
-        )
+      const base = await fetchAvailableOptions(
+        scopeFilters(INITIAL_FILTERS, scopeCategoryIds),
+        fabricIndexRef.current,
+        colorIndexRef.current,
+        scopeRowsRef.current
       );
+      setBaseOptions(base);
+      // Sizes are published only now: the variant-size vocabulary spans every
+      // product, mostly hidden ones, so showing it before base availability
+      // flashed dozens of sizes no shop product has behind "View more". If
+      // availability failed (null), fail open with the full list like the
+      // other filters.
+      setSizeOptions(base ? sortedSizes.filter((s) => base.sizes.has(s)) : sortedSizes);
     }
     fetchOptions();
   }, [scopeCategoryIds, scopeProductIds]);

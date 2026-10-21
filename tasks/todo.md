@@ -59,8 +59,8 @@ Online orders get a Bill of Supply from the shop, same as in-store.
 - [ ] UP-only checkout + policy/FAQ/trust-bar wording: branch `feat/checkout-up-only-v2`
   (PR #14 rebased + 3 missed "across India" spots).
 - [ ] Razorpay KYC in the **shop's** name (shop's current account).
-- [ ] Courier decision: Shiprocket (one API for pincode serviceability + rates across couriers)
-  or Delhivery One (picked earlier for UP-only). Either works; KYC in the shop's name.
+- [X] Courier: **Shiprocket** (decided 2026-10-20). Owner steps: `tasks/accounts-setup.md` §3;
+  integration spec: `tasks/checkout-shipping-plan.md` Phase C.
 - [ ] Ask CA to confirm: composition shop may sell online intra-state from its own website.
 
 ### P2: checkout build (Phase B of `tasks/checkout-shipping-plan.md`)
@@ -81,7 +81,8 @@ Online orders get a Bill of Supply from the shop, same as in-store.
 ### P3: retention emails (after checkout ships)
 
 - [ ] Custom SMTP (also required before magic-link login goes to prod).
-- [ ] Wishlist / "like" feature for signed-in customers.
+- [X] Wishlist saved to signed-in customers' accounts (branch feat/unblocked-batch, 2026-10-20).
+  **Needs** `schema/migration_wishlist_items.sql` applied; until then it stays local-only.
 - [ ] Abandoned-cart emails (signed-in customers with items left in the cart).
 - [ ] Emails about liked items (back in stock, price drop). Needs consent + unsubscribe link.
 
@@ -125,7 +126,7 @@ move the shop to the regular scheme. CA questions doc: https://claude.ai/code/ar
 - [X] Imageless side effects checked: PDP shows "Product not found"; 0 server cart rows affected;
   home band uses fixed collections (all populated), so the ">=10 products" worry is obsolete
 
-- Open: shop size filter "View more (47)" lists sizes no visible product stocks (pre-existing).
+- [X] Shop size filter listed all 55 variant sizes; now only the 18 visible products have (2026-10-20).
 
 ## DONE: Andaaz-style left filter sidebar on /shop (2026-10-14, PR #24 merged 5861d50)
 
@@ -592,11 +593,11 @@ number, but do not consolidate them later without checking.
 Without this `community_status` never advances past `not_added`, so every export
 re-exports everyone and the skip logic is dead weight.
 
-- [ ] Multi-select checkbox column on `CustomerTable.js`
-- [ ] Bulk action: set `community_status` to `member` / `invite_pending` / `left`,
+- [X] Multi-select checkbox column on `CustomerTable.js`
+- [X] Bulk action: set `community_status` to `member` / `invite_pending` / `left`,
   stamping `community_status_at`
-- [ ] Show current `community_status` as a column so state is visible at a glance
-- [ ] Filter by `community_status` so "who still needs adding" is one click
+- [X] Show current `community_status` as a column so state is visible at a glance
+- [X] Filter by `community_status` so "who still needs adding" is one click
 
 Files: `src/admin/components/CustomerTable.js`, `src/admin/pages/CustomersPage.js`
 
@@ -604,10 +605,10 @@ Files: `src/admin/components/CustomerTable.js`, `src/admin/pages/CustomersPage.j
 
 New customers currently get no consent record — they'd need another backfill.
 
-- [ ] Checkbox on `CustomerForm.js`: "Send store offers on WhatsApp"
-- [ ] On submit, write a `marketing_consents` row (`source: 'counter_form'`,
+- [X] Checkbox on `CustomerForm.js`: "Send store offers on WhatsApp"
+- [X] On submit, write a `marketing_consents` row (`source: 'counter_form'`,
   `recorded_by`: current admin) and set `customers.marketing_opt_in`
-- [ ] Unchecking an opted-in customer writes an `opt_out` row — never delete or
+- [X] Unchecking an opted-in customer writes an `opt_out` row — never delete or
   mutate consent history, the log is append-only by design
 
 Files: `src/admin/components/CustomerForm.js`
@@ -616,8 +617,8 @@ Files: `src/admin/components/CustomerForm.js`
 
 Cheapest recurring acquisition channel — compounds with every bill printed.
 
-- [ ] Generate QR for the Community invite link
-- [ ] Add to bill PDF footer with a short line of copy
+- [X] Generate QR for the Community invite link
+- [X] Add to bill PDF footer with a short line of copy
 - [ ] Same QR as a printed counter sign (non-code task)
 
 Files: billing PDF generation under `src/admin/components/billing/`
@@ -674,5 +675,12 @@ contains transaction commands, and `exec_sql` returns
 applied by hand but never recorded, so the runner retries and fails every time.
 New migrations must currently be applied directly via the `exec_sql` RPC
 (parameter is `query`, not `sql`).
+
+**DO NOT run `npm run migrate` (found 2026-10-20):** `_migrations` records only 16 of 32 files.
+The other 26 were mostly applied by hand, so the runner would re-run them all, including data
+rewrites and drops. Read-only audit (2026-10-20) verified **all 26 are applied**; 6 would be
+harmful on replay (colors_families, size_normalization reset reference tables;
+storefront_public_read reopens all products to anon). Fix = insert the 26 filenames into
+`_migrations` (prod write, needs owner OK). Audit table: `tasks/migrations-audit-2026-10-20.md`.
 
 - [ ] Either record it in `_migrations` as applied, or strip its `BEGIN`/`COMMIT`

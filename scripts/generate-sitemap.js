@@ -1,13 +1,34 @@
 // scripts/generate-sitemap.js
 /**
- * Generates public/sitemap.xml from the products table + static routes.
- * Run on demand (NOT wired into `npm run build`):
+ * Generates public/sitemap.xml from storefront-visible products, collections
+ * and static routes. Run on demand (NOT wired into `npm run build`):
  *   node scripts/generate-sitemap.js
- * Reads REACT_APP_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY from .env.
- * Site domain: https://bindalscreations.com (override with SITE_URL).
+ * Reads REACT_APP_SUPABASE_URL + REACT_APP_SUPABASE_ANON_KEY from .env.
+ * Uses the anon key on purpose: the products RLS policy decides which products
+ * the storefront shows (only those with productimages rows), so the sitemap
+ * lists exactly the pages that render instead of "Product not found".
  */
 const fs = require("fs");
 const path = require("path");
+
+// Canonical host. The bare domain 307-redirects here, so never list it.
+// Keep in sync with the Sitemap line in public/robots.txt.
+const SITE_URL = "https://www.bindalscreations.com";
+
+// Public, indexable storefront routes (see src/App.js). Cart, checkout,
+// wishlist, login, account, search and track are left out on purpose.
+const STATIC_PATHS = [
+  "/",
+  "/shop",
+  "/collections",
+  "/faq",
+  "/about",
+  "/contact",
+  "/size-guide",
+  "/policies/shipping",
+  "/policies/returns",
+  // Privacy and Terms stay out until their placeholder copy passes legal review.
+];
 
 function loadEnv() {
   const envPath = path.join(__dirname, "..", ".env");
@@ -20,22 +41,33 @@ function loadEnv() {
   return out;
 }
 
+// Collections with no categoryIds/productIds are empty placeholders
+// (e.g. "wedding", "festive") and would render an empty page.
+async function loadCollectionSlugs() {
+  const { COLLECTIONS } = await import(
+    path.join(__dirname, "..", "src", "storefront", "lib", "collections.js")
+  );
+  return COLLECTIONS.filter(
+    (c) => (c.productIds?.length || 0) + (c.categoryIds?.length || 0) > 0
+  ).map((c) => c.slug);
+}
+
 async function main() {
   const env = { ...loadEnv(), ...process.env };
-  const SITE_URL = (env.SITE_URL || "https://bindalscreations.com").replace(/\/$/, "");
   const supaUrl = env.REACT_APP_SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = env.REACT_APP_SUPABASE_ANON_KEY;
   if (!supaUrl || !key) {
-    console.error("Missing REACT_APP_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
+    console.error("Missing REACT_APP_SUPABASE_URL or REACT_APP_SUPABASE_ANON_KEY in .env");
     process.exit(1);
   }
 
-  // PostgREST caps a single response at ~1000 rows, so page through the
-  // whole products table with Range headers instead of trusting one fetch.
+  // PostgREST caps a single response at ~1000 rows, so page through with
+  // Range headers instead of trusting one fetch. Stable order keeps pages
+  // from overlapping or skipping rows.
   const PAGE = 1000;
   const products = [];
   for (let from = 0; ; from += PAGE) {
-    const res = await fetch(`${supaUrl}/rest/v1/products?select=productid`, {
+    const res = await fetch(`${supaUrl}/rest/v1/products?select=productid&order=productid`, {
       headers: {
         apikey: key,
         Authorization: `Bearer ${key}`,
@@ -51,11 +83,11 @@ async function main() {
     if (batch.length < PAGE) break;
   }
 
-  // Policy pages excluded intentionally: copy is still placeholder pending legal review.
-  const staticPaths = ["/", "/shop", "/faq", "/about", "/contact", "/size-guide"];
+  const collectionSlugs = await loadCollectionSlugs();
   const urls = [
-    ...staticPaths.map((p) => `${SITE_URL}${p}`),
-    ...products.map((p) => `${SITE_URL}/product/${p.productid}`),
+    ...STATIC_PATHS.map((p) => `${SITE_URL}${p}`),
+    ...collectionSlugs.map((s) => `${SITE_URL}/collections/${encodeURIComponent(s)}`),
+    ...products.map((p) => `${SITE_URL}/product/${encodeURIComponent(p.productid)}`),
   ];
 
   const xml =
@@ -66,7 +98,10 @@ async function main() {
 
   const outPath = path.join(__dirname, "..", "public", "sitemap.xml");
   fs.writeFileSync(outPath, xml);
-  console.log(`Wrote ${urls.length} URLs to ${outPath}`);
+  console.log(
+    `Wrote ${urls.length} URLs to ${outPath} ` +
+      `(${STATIC_PATHS.length} static, ${collectionSlugs.length} collections, ${products.length} products)`
+  );
 }
 
 main().catch((e) => {

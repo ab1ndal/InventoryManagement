@@ -57,37 +57,47 @@ Ask your CA these questions (copy and send):
 
 ---
 
-## 3. Delhivery One — shipping (start now; KYC ~1–3 days)
+## 3. Shiprocket — shipping (owner decision 2026-10-20; KYC instant to ~3 days)
+
+Everything in the **shop's** name (BINDAL'S CREATION, GSTIN 09ABVPB4203A1Z4). Prepaid only, UP only.
 
 **Have ready:**
-- GST number and certificate (or PAN + Aadhaar)
-- Pickup address (the shop), contact person, phone
-- Bank account for COD remittance (only needed if COD is enabled later)
+- Phone that receives the OTP for the GST-registered mobile number (for instant GSTIN KYC)
+- PAN and GST certificate (fallback if instant KYC fails; names must match exactly)
+- Pickup/RTO contact person and phone (gets an OTP to confirm the pickup address)
 - ₹500 for the minimum wallet recharge
+- A **second email address** for the API user (must differ from the main login email)
 
 **Steps:**
-1. Go to https://one.delhivery.com → **Sign up** with the business phone/email.
-2. Complete **KYC** with GSTIN (or PAN + Aadhaar).
-3. Add the **pickup location**: the shop address, pincode 201001.
-4. Recharge the wallet (minimum ₹500).
-5. Book one **test shipment** (e.g. to a family address in UP) to learn the flow:
-   create order → print label → pickup → tracking link.
-6. Check the rate card for a 0.5 kg and a 1 kg parcel within Ghaziabad and to Lucknow,
-   and send me those numbers. They decide whether the flat ₹99 shipping fee holds up.
+1. Sign up at https://app.shiprocket.in with the business phone and email. Stay on the free
+   **Lite** plan for now (higher plans only lower rates; worth it above ~100 shipments/month).
+2. **KYC:** take the selfie, then verify with **GSTIN** (OTP to the GST mobile). If that fails,
+   upload PAN + GST certificate (manual review 1–3 working days).
+3. **Pickup address:** Settings → Pickup Addresses → Add. Shop address, pincode 201001.
+   Name it exactly `Shop` (the API refers to it by this name). Confirm with the OTP.
+4. Recharge the wallet with ₹500.
+5. **Rates:** open the rate calculator, pickup 201001, prepaid, and note the cheapest rate +
+   delivery days for:
+   - 0.5 kg and 1 kg and 2 kg to a Ghaziabad pincode (e.g. 201002)
+   - the same weights to Lucknow (226001) and Varanasi (221001)
+   These decide whether the flat ₹99 fee below ₹5,000 holds up.
+6. **One test parcel** to a family address in UP: create order → pick courier → label →
+   pickup → watch tracking. Learns the flow used for Diwali orders.
+7. **API user** (for the website integration): Settings → API → **Create API User**, using the
+   second email. Grant only Orders, Shipments/Courier, Tracking and Pincode modules. The password
+   is shown **once**: put it straight into Supabase secrets (section 4) yourself, or into a
+   password manager to hand over in person. **Never send it in chat or email.**
 
-**Send back:** the rates from step 6. For Phase C (automation) only: the API token, which goes
-straight into Supabase secrets, never sent in chat.
-
-*Alternative:* Shiprocket (https://app.shiprocket.in). Similar KYC (Aadhaar/GSTIN OTP + selfie),
-more couriers, COD payout D+8. Only if you choose it over Delhivery.
+**Send back:** the rate table from step 5, and confirm steps 2, 3 and 7 are done.
 
 ---
 
-## 4. Supabase secrets — only for Phase B (after Diwali)
+## 4. Supabase secrets — when the website integration starts
 
 Done by whoever sets up the website, not shared in chat:
 1. Supabase dashboard → project → **Edge Functions → Secrets** (or `supabase secrets set`).
-2. Add `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` (and `DELHIVERY_API_TOKEN` in Phase C).
+2. Add `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`, and for shipping
+   `SHIPROCKET_API_EMAIL` and `SHIPROCKET_API_PASSWORD` (the API user from section 3, step 7).
 3. In Vercel → project → Settings → Environment Variables, add `REACT_APP_RAZORPAY_KEY_ID`
    (public key only).
 
@@ -105,6 +115,7 @@ Done by whoever sets up the website, not shared in chat:
 ## Checklist
 - [ ] CA answers received
 - [ ] Razorpay account activated (Key ID shared)
-- [ ] Delhivery One KYC done, test shipment sent, rates shared
+- [ ] Shiprocket KYC done, pickup address `Shop` verified, test parcel sent, rates shared
+- [ ] Shiprocket API user created, credentials in Supabase secrets
 - [ ] Terms / Privacy / Refund content finalised
 - [ ] (Phase B) secrets added to Supabase and Vercel

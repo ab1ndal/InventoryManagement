@@ -30,6 +30,8 @@ import {
 import CustomDropdown from "../../components/CustomDropdown";
 import { logActivity } from "../../lib/activityLog";
 import { customerName, diffFields } from "../../utility/activitySummary";
+import { Checkbox } from "../../components/ui/checkbox";
+import { recordMarketingConsent } from "../lib/customerMarketing";
 
 const formSchema = z.object({
   referred_by: z.coerce.number().optional(),
@@ -55,6 +57,7 @@ const formSchema = z.object({
   gender: z.string().optional(),
   store_credit: z.coerce.number().nonnegative().optional(),
   customer_notes: z.string().optional(),
+  marketing_opt_in: z.boolean().optional(),
 });
 
 export default function CustomerForm(props) {
@@ -101,6 +104,7 @@ export default function CustomerForm(props) {
       gender: "",
       store_credit: 0,
       customer_notes: "",
+      marketing_opt_in: false,
       ...stableDefaults,
     },
   });
@@ -118,6 +122,7 @@ export default function CustomerForm(props) {
       store_credit: 0,
       customer_notes: "",
       referred_by: null,
+      marketing_opt_in: false,
     }),
     [],
   );
@@ -161,8 +166,11 @@ export default function CustomerForm(props) {
       const cleanedPhone = values.phone
         ? values.phone.replace(/\s/g, "")
         : null;
+      // marketing_opt_in is written only via recordMarketingConsent, which
+      // keeps it in step with the append-only marketing_consents log.
+      const { marketing_opt_in: optIn, ...customerValues } = values;
       const payload = {
-        ...values,
+        ...customerValues,
         phone: cleanedPhone,
         last_name: values.last_name || null,
         customer_ulid: ulid,
@@ -224,6 +232,24 @@ export default function CustomerForm(props) {
           stableDefaults.customer_ulid ? "updated" : "added"
         } successfully`
       );
+
+      // The customer is already saved, so a consent failure is reported on its
+      // own rather than rolled back; the dialog still closes because re-submitting
+      // a new customer would trip the duplicate-phone check.
+      if (Boolean(optIn) !== Boolean(stableDefaults.marketing_opt_in)) {
+        try {
+          await recordMarketingConsent({
+            customerid: saved.customerid,
+            optIn: Boolean(optIn),
+            source: "counter_form",
+          });
+        } catch (consentErr) {
+          toast.error("WhatsApp consent not saved", {
+            description: consentErr.message,
+          });
+        }
+      }
+
       setOpen(false);
       onSubmit?.(data[0]);
     } catch (err) {
@@ -540,6 +566,24 @@ export default function CustomerForm(props) {
                     />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              name="marketing_opt_in"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-2 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={Boolean(field.value)}
+                      onCheckedChange={(v) => field.onChange(v === true)}
+                    />
+                  </FormControl>
+                  <FormLabel className="font-normal">
+                    Send store offers on WhatsApp
+                  </FormLabel>
                 </FormItem>
               )}
             />
