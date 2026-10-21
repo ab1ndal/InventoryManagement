@@ -82,7 +82,7 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
     <div className="flex flex-col-reverse sm:flex-row gap-3">
       {/* Thumbnail rail */}
       {hasGallery && (
-        <div className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-visible sm:w-[72px] flex-shrink-0">
+        <div className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-visible md:max-h-[calc(100svh-182px)] md:overflow-y-auto sm:w-[72px] flex-shrink-0">
           {paths.map((path, i) => (
             <button
               key={path}
@@ -108,9 +108,12 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
         </div>
       )}
 
-      {/* Main image */}
+      {/* Main image. On md+ the width is capped so the 3:4 frame fits the
+          screen below the sticky header (166px) with 16px to spare;
+          otherwise landscape screens cut off the top and bottom. self-start
+          stops the row stretching it to the thumbnail rail's height. */}
       <div
-        className="group relative flex-1 aspect-[3/4] overflow-hidden bg-storefront-cream"
+        className="group relative flex-1 self-start aspect-[3/4] md:max-w-[calc((100svh-182px)*0.75)] overflow-hidden bg-storefront-cream"
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -316,8 +319,9 @@ function ProductDetail({ productid }) {
         </Link>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16">
-          {/* Gallery — stays in view on desktop while the info column scrolls */}
-          <div className="md:sticky md:top-24 md:self-start">
+          {/* Gallery — stays in view on desktop while the info column scrolls.
+              The sticky header is 150px tall on md+, so stick 16px below it. */}
+          <div className="md:sticky md:top-[166px] md:self-start">
             <ProductGallery
               paths={imagePaths}
               name={product.name}
