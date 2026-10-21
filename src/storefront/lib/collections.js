@@ -43,7 +43,20 @@ export const COLLECTIONS = [
   },
   { slug: "wedding", title: "Wedding", subtitle: "Lehengas & statement sarees", categoryIds: [] },
   { slug: "festive", title: "Festive", subtitle: "Bright, celebratory pieces", categoryIds: [] },
-  { slug: "everyday", title: "Everyday", subtitle: "Easy, elegant daily wear", categoryIds: [] },
+  // Owner ask (2026-10-20): everyday cord sets, shirts and kids' wear. Kurtis
+  // are included because they are the main everyday women's piece; without
+  // them the page is almost all men's shirts. Kids is pending: no kids'
+  // products have photos yet. Kept after Kurtis and Men so those stay the
+  // "More like this" group for kurtis and shirts (first match wins).
+  {
+    slug: "everyday",
+    title: "Everyday",
+    subtitle: "Cord sets, kurtis, shirts and tops for daily wear",
+    categoryIds: ["CRD", "KUR", "SHT", "T-SHT", "TOP"],
+  },
+  // Men's home rails. Both are also in Men, which stays first above.
+  { slug: "sherwani", title: "Sherwani", subtitle: "Sherwanis for weddings and celebrations", categoryIds: ["SW"] },
+  { slug: "kurta-pajama", title: "Kurta Pajama", subtitle: "Kurta pajama sets for festive days", categoryIds: ["KP"] },
 ];
 
 export function getCollection(slug) {

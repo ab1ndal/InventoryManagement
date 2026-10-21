@@ -27,6 +27,33 @@ describe("collections config", () => {
     categoryLinks.forEach((l) => expect(l.to).toMatch(/^\/collections\//));
   });
 
+  it("backs every home page category rail with a non-empty category collection", () => {
+    ["sarees", "lehengas", "kurtis", "everyday", "sherwani", "kurta-pajama"].forEach((slug) => {
+      const collection = getCollection(slug);
+      expect(collection).not.toBeNull();
+      expect(collection.productIds).toBeUndefined();
+      expect(collection.categoryIds.length).toBeGreaterThan(0);
+    });
+    expect(getCollection("everyday").categoryIds).toEqual(
+      expect.arrayContaining(["CRD", "SHT", "KUR"])
+    );
+    expect(getCollection("sherwani").categoryIds).toEqual(["SW"]);
+    expect(getCollection("kurta-pajama").categoryIds).toEqual(["KP"]);
+  });
+
+  it("keeps Kurtis and Men as the similar-products group for categories Everyday shares", () => {
+    const { categoryGroup } = require("../lib/similarProducts");
+    expect(categoryGroup("KUR").slug).toBe("kurtis");
+    expect(categoryGroup("SHT").slug).toBe("men");
+    expect(categoryGroup("SW").slug).toBe("men");
+    expect(categoryGroup("KP").slug).toBe("men");
+  });
+
+  it("has unique slugs", () => {
+    const slugs = COLLECTIONS.map((c) => c.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+  });
+
   it("returns null for an unknown slug", () => {
     expect(getCollection("nope")).toBeNull();
   });
