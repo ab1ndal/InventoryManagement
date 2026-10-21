@@ -1,12 +1,14 @@
+const mockImagePaths = jest.fn();
 jest.mock("../lib/productImage", () => ({
-  getProductImagePaths: () => Promise.resolve([]),
+  getProductImagePaths: (...args) => mockImagePaths(...args),
 }));
+jest.mock("../components/BlurFillImage", () => ({ alt }) => <img alt={alt} />);
 jest.mock("../context/WishlistContext", () => ({
   useWishlist: () => ({ has: () => false, toggle: jest.fn() }),
 }));
 
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 
@@ -27,11 +29,40 @@ function renderCard(product) {
 }
 
 describe("ProductCard", () => {
-  it("shows name and price, with no category tag over the photo", () => {
+  beforeEach(() => {
+    mockImagePaths.mockReset();
+    mockImagePaths.mockResolvedValue([]);
+  });
+
+  it("shows price and fabric, with no visible title or category tag", () => {
     renderCard(base);
-    expect(screen.getByText("Silk Saree")).toBeInTheDocument();
     expect(screen.getByText("₹2,499")).toBeInTheDocument();
+    expect(screen.getByText("Silk")).toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
     expect(screen.queryByText("Saree")).not.toBeInTheDocument();
+  });
+
+  it("names the card link via sr-only text when there is no photo", () => {
+    renderCard(base);
+    expect(screen.getByText("Silk Saree")).toHaveClass("sr-only");
+    expect(screen.getByRole("link", { name: /silk saree/i })).toHaveAttribute(
+      "href",
+      "/product/BC25001"
+    );
+  });
+
+  it("carries the de-hyphenated name in image alt text, not as sr-only text", async () => {
+    mockImagePaths.mockResolvedValue(["a.png", "b.png"]);
+    renderCard(base);
+    expect(await screen.findByAltText("Silk Saree — view 1")).toBeInTheDocument();
+    expect(screen.getByAltText("Silk Saree — view 2")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Silk Saree")).not.toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /silk saree/i })).toBeInTheDocument();
+  });
+
+  it("uses the de-hyphenated name in the wishlist button label", () => {
+    renderCard(base);
+    expect(screen.getByRole("button", { name: "Add Silk Saree to wishlist" })).toBeInTheDocument();
   });
 
   it("shows Sold out when total stock across variants is 0", () => {
