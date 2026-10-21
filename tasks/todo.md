@@ -81,8 +81,8 @@ Online orders get a Bill of Supply from the shop, same as in-store.
 ### P3: retention emails (after checkout ships)
 
 - [ ] Custom SMTP (also required before magic-link login goes to prod).
-- [X] Wishlist saved to signed-in customers' accounts (branch feat/unblocked-batch, 2026-10-20).
-  **Needs** `schema/migration_wishlist_items.sql` applied; until then it stays local-only.
+- [X] Wishlist saved to signed-in customers' accounts (PR #33, merged 2026-10-21).
+  `schema/migration_wishlist_items.sql` applied to prod 2026-10-21.
 - [ ] Abandoned-cart emails (signed-in customers with items left in the cart).
 - [ ] Emails about liked items (back in stock, price drop). Needs consent + unsubscribe link.
 
@@ -667,20 +667,21 @@ Cloud API marketing support. Check before investing heavily here.
 
 ---
 
-## Unrelated: migration runner is blocked
+## Migration runner: unblocked 2026-10-21
 
-`npm run migrate` halts on `migration_attributes_manager_rls.sql` — the file
-contains transaction commands, and `exec_sql` returns
-`0A000: EXECUTE of transaction commands is not implemented`. That work was already
-applied by hand but never recorded, so the runner retries and fails every time.
-New migrations must currently be applied directly via the `exec_sql` RPC
-(parameter is `query`, not `sql`).
+The 26 unrecorded files (all verified applied, see `tasks/migrations-audit-2026-10-20.md`)
+were inserted into `_migrations` on 2026-10-21. `npm run migrate` now reports
+"No pending migrations." and is the normal way to apply new files again.
+New files must not contain `BEGIN`/`COMMIT`: `exec_sql` rejects transaction commands
+(`0A000`). The 14 older files that have them are recorded, so the runner never replays them.
 
-**DO NOT run `npm run migrate` (found 2026-10-20):** `_migrations` records only 16 of 32 files.
-The other 26 were mostly applied by hand, so the runner would re-run them all, including data
-rewrites and drops. Read-only audit (2026-10-20) verified **all 26 are applied**; 6 would be
-harmful on replay (colors_families, size_normalization reset reference tables;
-storefront_public_read reopens all products to anon). Fix = insert the 26 filenames into
-`_migrations` (prod write, needs owner OK). Audit table: `tasks/migrations-audit-2026-10-20.md`.
+## Online signup fixed 2026-10-21
 
-- [ ] Either record it in `_migrations` as applied, or strip its `BEGIN`/`COMMIT`
+`resolve_my_customer()` failed for every first-time online shopper. There were two bugs:
+- 32-char `customer_ulid` vs `varchar(26)`, fixed by `migration_fix_resolve_my_customer_ulid.sql`.
+- `42702 column reference "email" is ambiguous`. RETURNS TABLE column names clash with
+  unqualified customers columns, in `update_my_customer` too. Fixed by
+  `migration_fix_customer_fn_variable_conflict.sql` (`#variable_conflict use_column`).
+Both applied to prod. Verified in a rolled-back transaction with a temp `auth.users` row:
+resolve, then update, then resolve again; ULID is 26 chars and the row links. The phone
+must be E.164 (`chk_phone_format`).
