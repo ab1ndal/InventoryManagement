@@ -3,8 +3,8 @@ import { imageUrl } from "../lib/productImage";
 
 // Renders a product image fully visible (object-contain) over a blurred,
 // zoomed copy of itself that fills the (typically square) container — so
-// portrait garment shots never get cropped. The blur layer uses a tiny 48px
-// transform, so the fill costs almost no bandwidth.
+// portrait garment shots never get cropped. The blur layer uses the smallest
+// (150px) variant, so the fill costs almost no bandwidth.
 //
 // fit="cover" instead fills the frame edge to edge, anchored to the top, with
 // no blur layer. Product cards and the product page gallery use it: most
@@ -17,15 +17,14 @@ export default function BlurFillImage({
   path,
   alt,
   width = 600,
-  quality = 75,
   eager = false,
   className = "",
   fit = "contain",
 }) {
   const cover = fit === "cover";
   const [loaded, setLoaded] = useState(false);
-  const fg = imageUrl(path, { width, quality });
-  const bg = imageUrl(path, { width: 48, quality: 30 });
+  const fg = imageUrl(path, { width });
+  const bg = imageUrl(path, { width: 150 });
 
   return (
     <div className={`relative w-full h-full overflow-hidden bg-storefront-cream ${className}`}>

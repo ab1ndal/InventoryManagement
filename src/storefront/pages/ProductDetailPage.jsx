@@ -97,7 +97,7 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
               }`}
             >
               <img
-                src={imageUrl(path, { width: 150, quality: 55 })}
+                src={imageUrl(path, { width: 150 })}
                 alt=""
                 loading="lazy"
                 draggable={false}
@@ -129,7 +129,6 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
               path={paths[active]}
               alt={name}
               width={1000}
-              quality={80}
               fit="cover"
               eager
             />
@@ -249,7 +248,7 @@ function ProductDetail({ productid }) {
     categoryName,
   });
   const ogImage = imagePaths.length
-    ? imageUrl(imagePaths[0], { width: 1200, quality: 80 })
+    ? imageUrl(imagePaths[0], { width: 1200 })
     : undefined;
   const maxQty = selectedVariant?.stock ?? 0;
   const canAddToCart = selectedVariant !== null && maxQty > 0;
@@ -277,7 +276,6 @@ function ProductDetail({ productid }) {
       price,
       image_url: imageUrl(imagePaths[activeImage] ?? imagePaths[0], {
         width: 400,
-        quality: 70,
       }),
     });
     toast.success("Added to cart", {
@@ -479,7 +477,7 @@ function ProductDetail({ productid }) {
 
       <StickyAddToCart
         targetRef={addToCartRef}
-        image={imagePaths.length ? imageUrl(imagePaths[0], { width: 150, quality: 55 }) : null}
+        image={imagePaths.length ? imageUrl(imagePaths[0], { width: 150 }) : null}
         name={product.name}
         price={price}
         soldOut={soldOut}

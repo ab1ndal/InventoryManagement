@@ -26,6 +26,10 @@ beforeEach(() => {
   supabase.from.mockReset();
 });
 
+const MOCKUP_DIR =
+  "https://epotsxdugwfhyeiudjox.supabase.co/storage/v1/object/public/mockups/BC25054";
+const MOCKUP = `${MOCKUP_DIR}/mahroon_89462790.webp`;
+
 describe("imageUrl", () => {
   it("returns null for a falsy url", () => {
     expect(imageUrl(null)).toBeNull();
@@ -34,36 +38,42 @@ describe("imageUrl", () => {
 
   it("returns the raw url when no transform is given", () => {
     expect(imageUrl("https://x/img.png")).toBe("https://x/img.png");
+    expect(imageUrl(MOCKUP)).toBe(MOCKUP);
   });
 
-  it("returns the raw url outside production even with a transform", () => {
-    // NODE_ENV is 'test' under Jest — the /_vercel/image endpoint doesn't exist.
-    expect(imageUrl("https://x/img.png", { width: 400, quality: 70 })).toBe(
-      "https://x/img.png"
+  it("returns the raw url when the transform has no width", () => {
+    expect(imageUrl(MOCKUP, {})).toBe(MOCKUP);
+  });
+
+  it.each([
+    [48, 150],
+    [150, 150],
+    [151, 600],
+    [400, 600],
+    [600, 600],
+    [1000, 1200],
+    [1200, 1200],
+    [1600, 1200],
+  ])("maps width %i to the _%i.webp variant", (width, variant) => {
+    expect(imageUrl(MOCKUP, { width })).toBe(
+      `${MOCKUP_DIR}/mahroon_89462790_${variant}.webp`
     );
   });
 
-  it("wraps in /_vercel/image with whitelisted w/q in production", () => {
-    const prev = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    try {
-      const out = imageUrl("https://x/img.png", { width: 400, quality: 70 });
-      expect(out).toBe(
-        "/_vercel/image?url=https%3A%2F%2Fx%2Fimg.png&w=400&q=70"
-      );
-    } finally {
-      process.env.NODE_ENV = prev;
-    }
+  it("matches the .webp extension case-insensitively", () => {
+    expect(imageUrl(`${MOCKUP_DIR}/a.WEBP`, { width: 400 })).toBe(
+      `${MOCKUP_DIR}/a_600.webp`
+    );
   });
 
-  it("defaults quality to 75 when omitted in production", () => {
-    const prev = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
-    try {
-      expect(imageUrl("https://x/img.png", { width: 600 })).toContain("&q=75");
-    } finally {
-      process.env.NODE_ENV = prev;
-    }
+  it("returns non-webp, other-bucket and other-host urls unchanged", () => {
+    const png = `${MOCKUP_DIR}/a.png`;
+    const otherBucket =
+      "https://epotsxdugwfhyeiudjox.supabase.co/storage/v1/object/public/lifestyle/a.webp";
+    const otherHost = "https://cdn.example.com/mockups/a.webp";
+    expect(imageUrl(png, { width: 400 })).toBe(png);
+    expect(imageUrl(otherBucket, { width: 400 })).toBe(otherBucket);
+    expect(imageUrl(otherHost, { width: 400 })).toBe(otherHost);
   });
 });
 
@@ -137,13 +147,13 @@ describe("getProductImages / getProductImageUrl", () => {
   it("maps every path through imageUrl", async () => {
     mockTable({
       data: [
-        { productid: "PIMG_MAP", imageurl: "https://x/a.png", displayorder: 0 },
-        { productid: "PIMG_MAP", imageurl: "https://x/b.png", displayorder: 1 },
+        { productid: "PIMG_MAP", imageurl: `${MOCKUP_DIR}/a.webp`, displayorder: 0 },
+        { productid: "PIMG_MAP", imageurl: `${MOCKUP_DIR}/b.webp`, displayorder: 1 },
       ],
     });
-    expect(await getProductImages("PIMG_MAP")).toEqual([
-      "https://x/a.png",
-      "https://x/b.png",
+    expect(await getProductImages("PIMG_MAP", { width: 400 })).toEqual([
+      `${MOCKUP_DIR}/a_600.webp`,
+      `${MOCKUP_DIR}/b_600.webp`,
     ]);
   });
 

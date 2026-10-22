@@ -32,7 +32,7 @@ export default function ImageLightbox({ open, onOpenChange, paths, index, onInde
           <Dialog.Title className="sr-only">{name}</Dialog.Title>
           <img
             key={paths[index]}
-            src={imageUrl(paths[index], { width: 1200, quality: 80 })}
+            src={imageUrl(paths[index], { width: 1200 })}
             alt={`${name} — view ${index + 1} of ${count}`}
             className="max-w-full max-h-full object-contain"
           />

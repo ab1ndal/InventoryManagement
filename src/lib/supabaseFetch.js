@@ -18,7 +18,7 @@
 // incognito is unaffected because it has no session to refresh). Only auth
 // *API calls* go through fetch; OAuth/magic-link browser redirects are built
 // from the Supabase URL directly and stay on supabase.co. Storage
-// (`/storage/v1`) is left direct — images load via `/_vercel/image`.
+// (`/storage/v1`) is left direct — images load straight from Storage.
 //
 // The same wrapper adds a timeout to REST GETs (plus one retry) and to auth
 // calls (no retry: auth-js retries refreshes itself, and a duplicate refresh
@@ -37,7 +37,7 @@ export const DEFAULT_RETRIES = 1;
 // Map a Supabase REST/auth URL to its same-origin proxy path. Only rewrites
 // when running in production (the Vercel rewrites only exist there — CRA's dev
 // server has no `/sb-rest` or `/sb-auth` route, so dev talks to supabase.co
-// directly, exactly like the image pipeline). Storage URLs pass through.
+// directly). Storage URLs pass through.
 export function toProxyUrl(url, { isProd, origin }) {
   if (!isProd || typeof url !== "string") return url;
   if (url.startsWith(REST_PREFIX)) {
