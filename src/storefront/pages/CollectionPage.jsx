@@ -8,10 +8,10 @@ export default function CollectionPage() {
   const { slug } = useParams();
   const collection = getCollection(slug);
 
-  // Curated lists (Diwali) and category collections both get the full shop
-  // filters; keyed so switching collections starts fresh filters for the new
+  // Curated lists (Diwali), category and size collections all get the full
+  // shop filters; keyed so switching collections starts fresh filters for the new
   // scope. Curated lists default to their curated order.
-  if (collection?.productIds?.length || collection?.categoryIds?.length) {
+  if (collection?.productIds?.length || collection?.categoryIds?.length || collection?.sizes?.length) {
     return (
       <ShopPage
         key={slug}
@@ -19,6 +19,7 @@ export default function CollectionPage() {
         subtitle={collection.subtitle}
         scopeCategoryIds={collection.productIds ? null : collection.categoryIds}
         scopeProductIds={collection.productIds || null}
+        scopeSizes={collection.sizes || null}
       />
     );
   }

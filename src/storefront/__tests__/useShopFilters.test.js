@@ -132,6 +132,40 @@ test("a category scope limits queries until the shopper picks a category", async
   await waitFor(() => expect(inCalls).toContainEqual(["categoryid", ["RMS"]]));
 });
 
+test("a size scope limits queries until the shopper picks a size", async () => {
+  const inCalls = [];
+  supabase.from.mockImplementation(() => {
+    const builder = {
+      select: () => builder,
+      in: (column, values) => {
+        inCalls.push([column, values]);
+        return builder;
+      },
+      gte: () => builder,
+      lte: () => builder,
+      order: () => builder,
+      range: () => Promise.resolve({ data: [], count: 0, error: null }),
+    };
+    return builder;
+  });
+  supabase.rpc.mockImplementation((name) =>
+    Promise.resolve(
+      name === "get_shop_filter_options" ? { data: {}, error: null } : { data: null, error: null }
+    )
+  );
+  const scope = ["4XL|48", "5XL|50"];
+  const { result } = renderHook(() => useShopFilters({ scopeSizes: scope }));
+
+  await waitFor(() => expect(inCalls).toContainEqual(["match.size", scope]));
+  expect(supabase.rpc).toHaveBeenCalledWith(
+    "get_shop_available_options",
+    expect.objectContaining({ p_sizes: scope })
+  );
+
+  act(() => result.current.toggle("sizes", "5XL|50"));
+  await waitFor(() => expect(inCalls).toContainEqual(["match.size", ["5XL|50"]]));
+});
+
 test("a single-category scope hides the category filter", async () => {
   supabase.rpc.mockImplementation((name) =>
     Promise.resolve(
@@ -305,6 +339,20 @@ describe("size options", () => {
       availability.resolve({ data: { sizes: ["XL|42", "XS|34"] }, error: null });
     });
     await waitFor(() => expect(result.current.sizeOptions).toEqual(["XS|34", "XL|42"]));
+  });
+
+  test("a size scope offers only its own sizes", async () => {
+    const availability = deferred();
+    mockRpc(availability);
+    const scope = ["XL|42", "28"];
+    const { result } = renderHook(() => useShopFilters({ scopeSizes: scope }));
+
+    // Availability ignores the size dimension's own filter, so it reports
+    // sizes outside the scope too; the hook must cut them.
+    await act(async () => {
+      availability.resolve({ data: { sizes: ["XL|42", "XS|34"] }, error: null });
+    });
+    await waitFor(() => expect(result.current.sizeOptions).toEqual(["XL|42"]));
   });
 
   test("falls back to every variant size when availability fails", async () => {

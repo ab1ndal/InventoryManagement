@@ -1,5 +1,6 @@
 // PLACEHOLDER collections — owner to curate slugs/titles/membership.
-// A collection resolves by explicit productIds when given, else by categoryIds.
+// A collection resolves by explicit productIds when given, else by categoryIds,
+// and/or by variant sizes.
 // Category ids come from the `categories` table (see /shop filters).
 
 // Diwali 2026 (8 Nov): provisional 50 picked by TypeSafe Jev for festive wear
@@ -57,6 +58,16 @@ export const COLLECTIONS = [
   // Men's home rails. Both are also in Men, which stays first above.
   { slug: "sherwani", title: "Sherwani", subtitle: "Sherwanis for weddings and celebrations", categoryIds: ["SW"] },
   { slug: "kurta-pajama", title: "Kurta Pajama", subtitle: "Kurta pajama sets for festive days", categoryIds: ["KP"] },
+  // Owner ask (2026-10-22): every product stocked in 3XL and up, across all
+  // categories. Codes from the `sizes` table, which stops at 7XL|54 today;
+  // 8XL-10XL follow its +2in bust pattern so they match once created with
+  // those exact codes.
+  {
+    slug: "plus-size",
+    title: "Plus Size",
+    subtitle: "Ethnic wear in 3XL and up",
+    sizes: ["3XL|46", "4XL|48", "5XL|50", "6XL|52", "7XL|54", "8XL|56", "9XL|58", "10XL|60"],
+  },
 ];
 
 export function getCollection(slug) {

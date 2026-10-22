@@ -40,15 +40,24 @@ function useImageSources(slides) {
   return (img) => img.url || byProduct[img.productid] || null;
 }
 
-function SlideImage({ src, className = "" }) {
+// A portrait mobileSrc is chosen by <picture> below md, so each device
+// downloads only its own file.
+function SlideImage({ src, mobileSrc, className = "" }) {
   if (!src) return <div className={`bg-storefront-gold/10 ${className}`} />;
-  return (
+  const img = (
     <img
       src={src}
       alt=""
       decoding="async"
       className={`object-cover object-top ${className}`}
     />
+  );
+  if (!mobileSrc) return img;
+  return (
+    <picture>
+      <source media="(max-width: 767px)" srcSet={mobileSrc} />
+      {img}
+    </picture>
   );
 }
 
@@ -75,6 +84,7 @@ function Slide({ slide, index, count, active, srcFor }) {
       {/* Full-bleed lead image: always on mobile, on desktop only for single-image slides. */}
       <SlideImage
         src={srcFor(slide.images[0])}
+        mobileSrc={slide.images[0].mobileUrl}
         className={`absolute inset-0 h-full w-full ${panel ? "md:hidden" : ""}`}
       />
 
@@ -173,11 +183,13 @@ export default function HeroSlider({ slides = HERO_SLIDES }) {
 
   if (count === 0) return null;
 
+  // Banners are 2.6:1, so the height cap (Andaaz's 740px at 1920 wide) only
+  // starts cropping them on screens wider than 1920px.
   return (
     <section
       aria-roledescription="carousel"
       aria-label="Featured collections"
-      className="relative w-full aspect-[4/5] overflow-hidden bg-storefront-cream md:aspect-[2.6/1] md:max-h-[520px]"
+      className="relative w-full aspect-[4/5] overflow-hidden bg-storefront-cream md:aspect-[2.6/1] md:max-h-[740px]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}

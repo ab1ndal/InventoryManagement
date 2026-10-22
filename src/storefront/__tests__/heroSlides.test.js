@@ -1,9 +1,9 @@
 import { HERO_SLIDES } from "../lib/heroSlides";
 
 describe("hero slides config", () => {
-  it("has 3 to 4 slides with unique ids", () => {
+  it("has 3 to 5 slides with unique ids", () => {
     expect(HERO_SLIDES.length).toBeGreaterThanOrEqual(3);
-    expect(HERO_SLIDES.length).toBeLessThanOrEqual(4);
+    expect(HERO_SLIDES.length).toBeLessThanOrEqual(5);
     const ids = HERO_SLIDES.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -25,6 +25,24 @@ describe("hero slides config", () => {
         expect(hasOne).toBe(true);
       });
     });
+  });
+
+  it("points every static image at a file in /public", () => {
+    const fs = require("fs");
+    const path = require("path");
+    HERO_SLIDES.flatMap((s) => s.images)
+      .flatMap((img) => [img.url, img.mobileUrl])
+      .filter(Boolean)
+      .forEach((url) => {
+        expect(fs.existsSync(path.join(__dirname, "../../../public", url))).toBe(true);
+      });
+  });
+
+  it("links the plus-size slide to the 3XL-and-up collection", () => {
+    const { getCollection } = require("../lib/collections");
+    const slide = HERO_SLIDES.find((s) => s.id === "plus-size");
+    expect(slide.href).toBe("/collections/plus-size");
+    expect(getCollection("plus-size").sizes).toEqual(["3XL|46", "4XL|48", "5XL|50", "6XL|52", "7XL|54", "8XL|56", "9XL|58", "10XL|60"]);
   });
 
   it("leads with the Diwali Glam", () => {
