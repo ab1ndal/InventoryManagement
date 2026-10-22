@@ -24,7 +24,7 @@ export async function fetchServerCart() {
       size: row.productsizecolors?.size ?? "",
       color: row.productsizecolors?.color ?? "",
       price: Number(row.products?.retailprice ?? 0),
-      image_url: await getProductImageUrl(row.product_id, { width: 400, quality: 70 }),
+      image_url: await getProductImageUrl(row.product_id, { width: 400 }),
     }))
   );
 }

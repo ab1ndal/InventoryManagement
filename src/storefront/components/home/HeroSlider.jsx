@@ -7,7 +7,7 @@ import { HERO_SLIDES } from "../../lib/heroSlides";
 const AUTOPLAY_MS = 5000;
 const SWIPE_THRESHOLD_PX = 40;
 // Width must be whitelisted in vercel.json images.sizes.
-const IMAGE_TRANSFORM = { width: 1000, quality: 75 };
+const IMAGE_TRANSFORM = { width: 1000 };
 
 // Read once on mount. matchMedia is absent in some non-browser environments.
 function prefersReducedMotion() {

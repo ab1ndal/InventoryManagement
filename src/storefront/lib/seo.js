@@ -4,7 +4,7 @@ import { imageUrl } from "./productImage";
 export function buildProductJsonLd({ product, variants, imagePaths, productid, categoryName }) {
   const inStock = (variants || []).some((v) => Number(v.stock) > 0);
   const image = imagePaths && imagePaths.length
-    ? [imageUrl(imagePaths[0], { width: 1000, quality: 80 })]
+    ? [imageUrl(imagePaths[0], { width: 1000 })]
     : undefined;
   const description =
     product.description ||

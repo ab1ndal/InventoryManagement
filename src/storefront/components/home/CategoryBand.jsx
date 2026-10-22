@@ -6,7 +6,7 @@ import { COLLECTIONS, getCollection } from "../../lib/collections";
 import { NAV_LINKS } from "../../lib/siteConfig";
 
 // Icons render at 72px; 150 is the nearest whitelisted width for 2x screens.
-const ICON_TRANSFORM = { width: 150, quality: 70 };
+const ICON_TRANSFORM = { width: 150 };
 
 const DIWALI = getCollection("diwali");
 

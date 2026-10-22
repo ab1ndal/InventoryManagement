@@ -117,7 +117,6 @@ export default function ProductCard({ product, priority = false }) {
                   path={path}
                   alt={`${displayName}${count > 1 ? ` — view ${i + 1}` : ""}`}
                   width={600}
-                  quality={70}
                   eager={priority && i === 0}
                   fit="cover"
                 />
