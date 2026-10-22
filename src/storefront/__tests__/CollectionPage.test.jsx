@@ -1,6 +1,7 @@
 jest.mock("../pages/ShopPage", () => (props) => (
   <div data-testid="shop-page">
-    {props.title}|{(props.scopeCategoryIds || []).join(",")}|{(props.scopeProductIds || []).join(",")}
+    {props.title}|{(props.scopeCategoryIds || []).join(",")}|{(props.scopeProductIds || []).join(",")}|
+    {(props.scopeSizes || []).join(",")}
   </div>
 ));
 
@@ -46,6 +47,13 @@ describe("CollectionPage", () => {
   it("renders a category collection as a filterable shop scoped to its categories", () => {
     renderAt("suits");
     expect(screen.getByTestId("shop-page")).toHaveTextContent("Suits|ST,RMS|");
+  });
+
+  it("renders a size collection as a filterable shop scoped to its sizes", () => {
+    renderAt("plus-size");
+    expect(screen.getByTestId("shop-page")).toHaveTextContent(
+      "Plus Size|||3XL|46,4XL|48,5XL|50,6XL|52,7XL|54,8XL|56,9XL|58,10XL|60"
+    );
   });
 
   it("shows a not-found state for an unknown slug", async () => {

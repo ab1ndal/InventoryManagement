@@ -58,10 +58,14 @@ async function fetchAvailableOptions(filters, fabricIndex, colorIndex, scopeRows
 }
 
 // A category page (e.g. Suits = ["ST", "RMS"]) limits every query to its
-// categories until the shopper narrows further with the Category filter.
-export function scopeFilters(filters, scopeCategoryIds) {
-  if (!scopeCategoryIds?.length || filters.categories.length) return filters;
-  return { ...filters, categories: scopeCategoryIds };
+// categories until the shopper narrows further with the Category filter; a
+// size page (Plus Size = 4XL and up) does the same with its sizes.
+export function scopeFilters(filters, scopeCategoryIds, scopeSizes = null) {
+  let scoped = filters;
+  if (scopeCategoryIds?.length && !filters.categories.length)
+    scoped = { ...scoped, categories: scopeCategoryIds };
+  if (scopeSizes?.length && !filters.sizes.length) scoped = { ...scoped, sizes: scopeSizes };
+  return scoped;
 }
 
 // A curated collection's product list, with every variant's colour/size, for
@@ -78,9 +82,13 @@ async function fetchScopeRows(scopeProductIds) {
   return data;
 }
 
-// `scopeCategoryIds` / `scopeProductIds` must be stable for the hook's
-// lifetime; callers remount (key) when they change.
-export default function useShopFilters({ scopeCategoryIds = null, scopeProductIds = null } = {}) {
+// `scopeCategoryIds` / `scopeProductIds` / `scopeSizes` must be stable for the
+// hook's lifetime; callers remount (key) when they change.
+export default function useShopFilters({
+  scopeCategoryIds = null,
+  scopeProductIds = null,
+  scopeSizes = null,
+} = {}) {
   if (scopeProductIds && scopeProductIds.length > MAX_SCOPED_PRODUCT_IDS) {
     throw new Error(
       `useShopFilters: scopeProductIds has ${scopeProductIds.length} ids; at most ${MAX_SCOPED_PRODUCT_IDS} are supported`
@@ -210,7 +218,7 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
       // reference sizes never stocked. Runs after the indices above are set
       // because code -> family mapping depends on them.
       const base = await fetchAvailableOptions(
-        scopeFilters(INITIAL_FILTERS, scopeCategoryIds),
+        scopeFilters(INITIAL_FILTERS, scopeCategoryIds, scopeSizes),
         fabricIndexRef.current,
         colorIndexRef.current,
         scopeRowsRef.current
@@ -220,11 +228,13 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
       // product, mostly hidden ones, so showing it before base availability
       // flashed dozens of sizes no shop product has behind "View more". If
       // availability failed (null), fail open with the full list like the
-      // other filters.
-      setSizeOptions(base ? sortedSizes.filter((s) => base.sizes.has(s)) : sortedSizes);
+      // other filters. Availability ignores the size filter for the size
+      // dimension, so a size scope is cut here explicitly.
+      const shopSizes = base ? sortedSizes.filter((s) => base.sizes.has(s)) : sortedSizes;
+      setSizeOptions(scopeSizes ? shopSizes.filter((s) => scopeSizes.includes(s)) : shopSizes);
     }
     fetchOptions();
-  }, [scopeCategoryIds, scopeProductIds]);
+  }, [scopeCategoryIds, scopeProductIds, scopeSizes]);
 
   // Debounced server-side available options — fires only when filters are active
   useEffect(() => {
@@ -248,7 +258,7 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       const available = await fetchAvailableOptions(
-        scopeFilters(filters, scopeCategoryIds),
+        scopeFilters(filters, scopeCategoryIds, scopeSizes),
         fabricIndexRef.current,
         colorIndexRef.current,
         scopeRowsRef.current
@@ -258,10 +268,10 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
     }, 200);
 
     return () => clearTimeout(debounceRef.current);
-  }, [filters, scopeCategoryIds]);
+  }, [filters, scopeCategoryIds, scopeSizes]);
 
   const runQuery = useCallback(async (requestedFilters, currentOffset, append, currentSort) => {
-    const currentFilters = scopeFilters(requestedFilters, scopeCategoryIds);
+    const currentFilters = scopeFilters(requestedFilters, scopeCategoryIds, scopeSizes);
     const generation = append ? queryGenerationRef.current : ++queryGenerationRef.current;
     const isStale = () => generation !== queryGenerationRef.current;
     append ? setLoadingMore(true) : setLoading(true);
@@ -348,7 +358,7 @@ export default function useShopFilters({ scopeCategoryIds = null, scopeProductId
         setLoadingMore(false);
       }
     }
-  }, [scopeCategoryIds, scopeProductIds]);
+  }, [scopeCategoryIds, scopeProductIds, scopeSizes]);
 
   useEffect(() => {
     setOffset(0);
