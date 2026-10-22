@@ -1,12 +1,16 @@
 // Home page hero slides, shown in this order.
 //
 // Each image is either { productid } (the product's first photo, resolved at
-// runtime) or { url } (a static file, e.g. "/hero/diwali.jpg" in /public).
-// Several images render side by side on a gold/cream backdrop on desktop
-// (the interim look, built from the best Diwali product photos); a slide with
-// a single image renders it full-bleed, which is what a lifestyle photo wants.
-// Mobile always shows the first image. Swapping in lifestyle photos later is
-// a config-only change: replace `images` with [{ url }].
+// runtime) or { url } (a static file, e.g. "/hero/diwali-desktop.webp" in
+// /public), optionally with a portrait { mobileUrl } served below md. Several
+// images render side by side on a gold/cream backdrop on desktop; a slide
+// with a single image renders it full-bleed, which is what a banner wants.
+// Mobile shows the first image (its mobileUrl when given).
+//
+// The /hero banners are AI-generated with our real products as garment
+// references (scripts/generate-hero-banners.mjs, 2026-10-22): desktop
+// 2560x976 with the left 40% kept clear for the copy, mobile 1088x1360 with
+// the bottom quarter clear.
 export const HERO_SLIDES = [
   {
     id: "diwali",
@@ -14,7 +18,7 @@ export const HERO_SLIDES = [
     subline: "Handpicked festive pieces for the season of lights.",
     cta: "Shop the edit",
     href: "/collections/diwali",
-    images: [{ productid: "BC252742" }, { productid: "BC25743" }, { productid: "BC251262" }],
+    images: [{ url: "/hero/diwali-desktop.webp", mobileUrl: "/hero/diwali-mobile.webp" }],
   },
   {
     id: "sarees",
@@ -22,7 +26,7 @@ export const HERO_SLIDES = [
     subline: "Rich weaves and festive reds, curated with care.",
     cta: "Shop sarees",
     href: "/collections/sarees",
-    images: [{ productid: "BC252089" }, { productid: "BC251584" }, { productid: "BC252090" }],
+    images: [{ url: "/hero/sarees-desktop.webp", mobileUrl: "/hero/sarees-mobile.webp" }],
   },
   {
     id: "lehengas",
@@ -30,7 +34,7 @@ export const HERO_SLIDES = [
     subline: "Statement silhouettes, handpicked with love.",
     cta: "Shop lehengas",
     href: "/collections/lehengas",
-    images: [{ productid: "BC252736" }, { productid: "BC251460" }, { productid: "BC252745" }],
+    images: [{ url: "/hero/lehengas-desktop.webp", mobileUrl: "/hero/lehengas-mobile.webp" }],
   },
   {
     id: "mens-festive",
@@ -38,6 +42,14 @@ export const HERO_SLIDES = [
     subline: "Sherwanis and kurta pajamas for pujas, weddings and everything between.",
     cta: "Shop menswear",
     href: "/collections/men",
-    images: [{ productid: "BC251259" }, { productid: "BC25810" }, { productid: "BC251243" }],
+    images: [{ url: "/hero/mens-festive-desktop.webp", mobileUrl: "/hero/mens-festive-mobile.webp" }],
+  },
+  {
+    id: "plus-size",
+    headline: "Plus size, 3XL and up",
+    subline: "Festive suits, kurtis and jackets in sizes that fit beautifully.",
+    cta: "Shop plus size",
+    href: "/collections/plus-size",
+    images: [{ url: "/hero/plus-size-desktop.webp", mobileUrl: "/hero/plus-size-mobile.webp" }],
   },
 ];

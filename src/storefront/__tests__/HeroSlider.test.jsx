@@ -12,6 +12,14 @@ const SLIDES = [
   { id: "a", headline: "Slide A", subline: "Sub A", cta: "Shop A", href: "/a", images: [{ productid: "BC1" }] },
   { id: "b", headline: "Slide B", subline: "Sub B", cta: "Shop B", href: "/b", images: [{ productid: "BC2" }, { productid: "BC3" }] },
   { id: "c", headline: "Slide C", subline: "Sub C", cta: "Shop C", href: "/c", images: [{ url: "/hero/c.jpg" }] },
+  {
+    id: "d",
+    headline: "Slide D",
+    subline: "Sub D",
+    cta: "Shop D",
+    href: "/d",
+    images: [{ url: "/hero/d-desktop.webp", mobileUrl: "/hero/d-mobile.webp" }],
+  },
 ];
 
 function mockReducedMotion(reduce) {
@@ -58,13 +66,23 @@ describe("HeroSlider", () => {
     );
   });
 
+  it("serves a slide's mobileUrl below md and its url above", () => {
+    const { container } = renderSlider();
+    const source = container.querySelector('picture source[srcset="/hero/d-mobile.webp"]');
+    expect(source).not.toBeNull();
+    expect(source).toHaveAttribute("media", "(max-width: 767px)");
+    expect(source.parentElement.querySelector("img")).toHaveAttribute("src", "/hero/d-desktop.webp");
+    // Slides without a mobileUrl render a bare <img>.
+    expect(container.querySelector('img[src="/hero/c.jpg"]').closest("picture")).toBeNull();
+  });
+
   it("moves forward and backward with the arrows, wrapping at the ends", () => {
     renderSlider();
     fireEvent.click(screen.getByRole("button", { name: /next slide/i }));
     expect(activeHeadline()).toBe("Slide B");
     fireEvent.click(screen.getByRole("button", { name: /previous slide/i }));
     fireEvent.click(screen.getByRole("button", { name: /previous slide/i }));
-    expect(activeHeadline()).toBe("Slide C");
+    expect(activeHeadline()).toBe("Slide D");
   });
 
   it("jumps to a slide from its dot", () => {
