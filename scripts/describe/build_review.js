@@ -22,7 +22,7 @@ const cards = ids.map((id, i) => {
   const sizes = [...new Set(p.productsizecolors.map(v => v.size))].join(", ");
   const thumbs = fs.readdirSync(path.join(run, id, "thumb")).sort((a, b) => (a.startsWith("mockup") ? 1 : 0) - (b.startsWith("mockup") ? 1 : 0) || a.localeCompare(b));
   const imgs = thumbs.map(t => `<figure><img loading="lazy" src="${uri(path.join(run, id, "thumb", t))}" alt="${esc(id + " " + t)}"><figcaption class="${t.startsWith("mockup") ? "mk" : ""}">${t.startsWith("mockup") ? "AI mockup" : "Original " + t.match(/\d+/)[0]}</figcaption></figure>`).join("");
-  const work = fin.work.map(w => `${w.type}${w.placement ? " (" + w.placement + ")" : ""}${w.confidence < 0.7 ? " ?" : ""}`);
+  const work = [...new Set(fin.work.map(w => `${w.type}${w.confidence < 0.7 ? " ?" : ""}`))];
   const flags = [...fin.uncertain.map(u => ["Unsure", u]), ...fin.conflicts.map(c => ["Conflict", c])];
   return `<article class="card" id="${id}">
   <header class="ch"><div><h2>${esc(p.name)}</h2><p class="meta"><span class="mono">${id}</span> · ${esc(p.categories?.name)} · ${esc(p.fabric)} · ${esc(colours)} · ${esc(sizes)}</p></div>
@@ -32,7 +32,7 @@ const cards = ids.map((id, i) => {
     <section class="old"><h3>Live now</h3><p>${esc(p.description || "(empty)")}</p></section>
     <section class="new"><h3>Proposed</h3><p>${esc(fin.description)}</p></section>
   </div>
-  <div class="tags">${chips("Work", work)}${chips("Print / weave", fin.print_weave)}${chips("Cut", [fin.silhouette, fin.length, fin.neck, fin.sleeve])}${chips("Occasion", fin.occasion)}${chips("Festival", fin.festival)}</div>
+  <div class="tags">${chips("Work", work)}${chips("Print / weave", fin.print_weave)}${chips("Cut", [fin.silhouette, fin.length, fin.neck, fin.sleeve])}${chips("Occasion", fin.occasion)}</div>
   ${flags.length ? `<ul class="flags">${flags.map(([k, v]) => `<li><b class="${k === "Conflict" ? "fc" : "fu"}">${k}</b> ${esc(v)}</li>`).join("")}</ul>` : ""}
   ${isHard ? `<details><summary>Codex first pass</summary><p>${esc(terra.description)}</p></details>` : ""}
   <form class="fb" data-id="${id}" data-proposed="${esc(fin.description)}">

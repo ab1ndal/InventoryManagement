@@ -130,3 +130,12 @@ State on 2026-10-19: pilot done, waiting for owner feedback on the review page. 
   Migration not written yet; confirm which repo's session writes it.
 - Text vs photo conflicts: flag for review, leave the fact out.
 - Tags in both repos, only after the owner approves the `tag_vocab` draft.
+
+## Round 2 (2026-10-24)
+
+Owner round 1 feedback (3 comments, rules applied to all 20): "Package includes:" line; work tags = technique
+only; no festival group ("festive" occasion instead); never mention stitching or blouse style (shop default:
+blouse unstitched, skirt stitched); catalogue data wins over photos; old long/markdown descriptions are earlier
+AI captions, so photos win over them. Prompt, schema and builder updated; outputs in
+`tasks/description-pilot/round2/`. Review page: https://claude.ai/artifact/91aEH6y1TLRKchAFDrwCUS
+(round 1 page with the original feedback stays at PDsnoPKgJFeqmaezwfLZga).
