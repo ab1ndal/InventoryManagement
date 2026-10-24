@@ -27,7 +27,8 @@ const STATIC_PATHS = [
   "/size-guide",
   "/policies/shipping",
   "/policies/returns",
-  // Privacy and Terms stay out until their placeholder copy passes legal review.
+  "/policies/privacy",
+  "/policies/terms",
 ];
 
 function loadEnv() {

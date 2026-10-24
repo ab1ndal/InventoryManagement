@@ -26,13 +26,22 @@ describe("Policy pages", () => {
     expect(screen.getByText(/in-store only/i)).toBeInTheDocument();
   });
 
-  it("privacy and terms render with review markers", () => {
-    const { unmount } = render(<PrivacyPolicyPage />);
+  it("returns page states online cancellation and damaged-item refunds", () => {
+    render(<ReturnsPolicyPage />);
+    expect(screen.getByText(/cancel an online order any time before it is dispatched/i)).toBeInTheDocument();
+    expect(screen.getByText(/within 48 hours of delivery/i)).toBeInTheDocument();
+  });
+
+  it("privacy and terms are real content naming the payment partner", () => {
+    const { container, unmount } = render(<PrivacyPolicyPage />);
     expect(screen.getByRole("heading", { name: /privacy policy/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/needs owner\/legal review/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/do not see or store your card/i)).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/placeholder|TODO/i);
     unmount();
-    render(<TermsPage />);
+    const terms = render(<TermsPage />);
     expect(screen.getByRole("heading", { name: /terms/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/needs owner\/legal review/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/no GST is charged separately/i)).toBeInTheDocument();
+    expect(screen.getByText(/laws of India/i)).toBeInTheDocument();
+    expect(terms.container).not.toHaveTextContent(/placeholder|TODO/i);
   });
 });
