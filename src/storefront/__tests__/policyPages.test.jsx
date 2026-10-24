@@ -10,13 +10,31 @@ describe("Policy pages", () => {
     render(<ShippingPolicyPage />);
     expect(screen.getByRole("heading", { name: /shipping policy/i })).toBeInTheDocument();
     expect(screen.getByText(/dispatch.*2 working days/i)).toBeInTheDocument();
-    expect(screen.getByText(/free.*above ₹5,000/i)).toBeInTheDocument();
+    expect(screen.getByText(/free on orders of ₹5,000 and above/i)).toBeInTheDocument();
   });
 
-  it("shipping page states the same flat fee checkout charges", () => {
-    const { shippingFee } = require("../lib/checkout");
-    render(<ShippingPolicyPage />);
-    expect(screen.getByText(new RegExp(`flat.*₹${shippingFee(0)}`, "i"))).toBeInTheDocument();
+  it("shipping page says the courier charge is shown at checkout, not a flat fee", () => {
+    const { container } = render(<ShippingPolicyPage />);
+    expect(
+      screen.getByText(/courier charge for your pincode is shown at checkout before you pay/i)
+    ).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/flat shipping charge/i);
+  });
+
+  it("returns page offers original method or instant store credit, and no shipping refund on RTO", () => {
+    render(<ReturnsPolicyPage />);
+    expect(screen.getAllByText(/instant store credit if you choose/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(/refunded to the original payment method, or as instant store credit if you choose/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/prepaid parcel is refused or undeliverable.*shipping charge is not refundable/i)
+    ).toBeInTheDocument();
+  });
+
+  it("terms cancellation paragraph matches the refund choice and RTO rule", () => {
+    render(<TermsPage />);
+    expect(screen.getByText(/cancelled before dispatch.*instant store credit if you choose.*shipping charge is not refundable/i)).toBeInTheDocument();
   });
 
   it("returns page states no-returns / 7-day in-store exchange", () => {

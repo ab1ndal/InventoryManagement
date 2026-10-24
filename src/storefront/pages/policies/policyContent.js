@@ -16,8 +16,7 @@ export const SHIPPING = [
   {
     heading: "Shipping charges",
     body: [
-      "Shipping is free on orders above ₹5,000.",
-      "For orders below ₹5,000, a flat shipping charge of ₹99 applies.",
+      "Shipping is free on orders of ₹5,000 and above. Below that, the courier charge for your pincode is shown at checkout before you pay.",
     ],
   },
   {
@@ -39,7 +38,7 @@ export const RETURNS = [
     heading: "Cancelling an online order",
     body: [
       "You can cancel an online order any time before it is dispatched by messaging us on WhatsApp at +91 98108 73280 or emailing bindalscreations@gmail.com.",
-      "Cancelled orders are refunded in full to the original payment method within 5–7 working days.",
+      "Cancelled orders are refunded in full, to the original payment method within 5–7 working days, or as instant store credit if you choose.",
       "Once an order has been dispatched it can no longer be cancelled.",
     ],
   },
@@ -47,7 +46,14 @@ export const RETURNS = [
     heading: "Damaged or wrong item",
     body: [
       "If your online order arrives damaged or you receive the wrong item, tell us within 48 hours of delivery on WhatsApp or by email, with photos of the item and packaging.",
-      "We will send a replacement or, if one is not available, refund you in full to the original payment method within 5–7 working days.",
+      "We will send a replacement or, if one is not available, refund you in full to the original payment method within 5–7 working days, or as instant store credit if you choose.",
+    ],
+  },
+  {
+    heading: "Unavailable items and returned parcels",
+    body: [
+      "If an item you paid for turns out to be unavailable, it is refunded to the original payment method, or as instant store credit if you choose.",
+      "If a prepaid parcel is refused or undeliverable and returns to us, we refund the item value; the shipping charge is not refundable.",
     ],
   },
   {
@@ -144,7 +150,7 @@ export const TERMS = [
     heading: "Orders and payment",
     body: [
       "An order is confirmed once we receive your payment.",
-      "We may decline or cancel an order if an item is out of stock, the delivery address is outside our delivery area, or we suspect fraud. Any amount paid is refunded in full to the original payment method.",
+      "We may decline or cancel an order if an item is out of stock, the delivery address is outside our delivery area, or we suspect fraud. Any amount paid is refunded in full, to the original payment method or as instant store credit if you choose.",
       "Payments are processed securely by Cashfree Payments (UPI, cards and net banking). We do not store your payment details.",
     ],
   },
@@ -157,7 +163,7 @@ export const TERMS = [
   {
     heading: "Cancellations, exchanges and refunds",
     body: [
-      "Online orders can be cancelled before dispatch for a full refund to the original payment method within 5–7 working days. After dispatch, items cannot be returned, except damaged or wrong items reported within 48 hours of delivery. Exchanges follow our Returns & Exchange Policy.",
+      "Online orders can be cancelled before dispatch for a full refund, to the original payment method within 5–7 working days or as instant store credit if you choose. If a prepaid parcel is refused or undeliverable and returns to us, we refund the item value; the shipping charge is not refundable. After dispatch, items cannot be returned, except damaged or wrong items reported within 48 hours of delivery. Exchanges follow our Returns & Exchange Policy.",
     ],
   },
   {
