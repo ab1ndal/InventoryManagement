@@ -1,14 +1,26 @@
 import React, { useState } from "react";
 import Seo from "../components/Seo";
+import OrderDetails from "../components/OrderDetails";
+import OrderTimeline from "../components/OrderTimeline";
+import { WHATSAPP_URL, lookupOrder } from "../lib/ordersApi";
+import { statusLabel } from "../lib/orderStatus";
 
 export default function TrackOrderPage() {
   const [orderRef, setOrderRef] = useState("");
   const [phone, setPhone] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  // idle | loading | found | not_found | error
+  const [result, setResult] = useState({ kind: "idle", order: null });
 
-  function onSubmit(e) {
+  async function onSubmit(e) {
     e.preventDefault();
-    setSubmitted(true);
+    setResult({ kind: "loading", order: null });
+    try {
+      const order = await lookupOrder(orderRef.trim(), phone.trim());
+      setResult(order ? { kind: "found", order } : { kind: "not_found", order: null });
+    } catch (error) {
+      console.warn("online_order_lookup failed", { orderRef, message: error.message });
+      setResult({ kind: "error", order: null });
+    }
   }
 
   return (
@@ -18,11 +30,26 @@ export default function TrackOrderPage() {
         Track your order
       </h1>
 
-      {submitted ? (
-        <div className="space-y-4 text-sm font-sans text-storefront-charcoal">
-          <p>
-            Online order tracking will be available once online orders go live. For any order placed in-store or on WhatsApp, message us at +91 98108 73280 and we'll share the status.
-          </p>
+      {result.kind === "found" ? (
+        <div className="space-y-6 mt-6">
+          <div className="text-sm font-sans text-storefront-charcoal">
+            <p className="text-xs tracking-widest uppercase text-storefront-muted">Order {result.order.orderRef}</p>
+            <p className="text-lg font-semibold mt-1">{statusLabel(result.order.status)}</p>
+          </div>
+          <OrderTimeline status={result.order.status} />
+          {result.order.trackingUrl && (
+            <a href={result.order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
+              Track with the courier
+            </a>
+          )}
+          <OrderDetails order={result.order} />
+          <button
+            type="button"
+            onClick={() => setResult({ kind: "idle", order: null })}
+            className="text-xs font-sans tracking-widest uppercase text-storefront-gold hover:underline"
+          >
+            Track another order
+          </button>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
@@ -38,6 +65,7 @@ export default function TrackOrderPage() {
               type="text"
               value={orderRef}
               onChange={(e) => setOrderRef(e.target.value)}
+              placeholder="WEB-000123"
               className="w-full border border-storefront-border bg-white px-3 py-3 text-sm font-sans focus:outline-none focus:border-storefront-gold"
             />
           </div>
@@ -58,9 +86,22 @@ export default function TrackOrderPage() {
             />
           </div>
 
+          {result.kind === "not_found" && (
+            <p role="alert" className="text-sm font-sans text-red-600">
+              We couldn't find that order. Check the order number and the phone number used at checkout, or{" "}
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="underline">WhatsApp us</a>.
+            </p>
+          )}
+          {result.kind === "error" && (
+            <p role="alert" className="text-sm font-sans text-red-600">
+              We couldn't check right now. Please try again in a moment.
+            </p>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors"
+            disabled={result.kind === "loading"}
+            className="w-full bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-warm transition-colors disabled:opacity-40"
           >
             Check Status
           </button>
