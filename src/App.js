@@ -28,6 +28,7 @@ import SearchResultsPage from "./storefront/pages/SearchResultsPage";
 import CollectionsIndexPage from "./storefront/pages/CollectionsIndexPage";
 import CollectionPage from "./storefront/pages/CollectionPage";
 import TrackOrderPage from "./storefront/pages/TrackOrderPage";
+import OrderPage from "./storefront/pages/OrderPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
@@ -80,6 +81,7 @@ function App() {
             <Route path="collections" element={<CollectionsIndexPage />} />
             <Route path="collections/:slug" element={<CollectionPage />} />
             <Route path="track" element={<TrackOrderPage />} />
+            <Route path="order/:ref" element={<OrderPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 

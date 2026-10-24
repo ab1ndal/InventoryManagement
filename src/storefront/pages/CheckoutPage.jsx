@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,6 +7,8 @@ import FreeShippingNudge from "../components/FreeShippingNudge";
 import { useCart } from "../context/CartContext";
 import { formatSize } from "../lib/sizes";
 import { addressSchema, shippingFee, INDIAN_STATES } from "../lib/checkout";
+import { getCheckoutLive } from "../lib/ordersApi";
+import LiveCheckout from "../components/LiveCheckout";
 
 const WHATSAPP = "919810873280";
 
@@ -43,13 +45,25 @@ function whatsappHref(items, subtotal, shipping, address) {
 
 export default function CheckoutPage() {
   const { items } = useCart();
+  // Until the switch is read (and whenever it is off) the page is exactly the
+  // WhatsApp flow; the live checkout never renders on an unknown state.
+  const [live, setLive] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors, isValid },
-  } = useForm({
+  useEffect(() => {
+    let active = true;
+    getCheckoutLive()
+      .then((value) => {
+        if (active) setLive(value);
+      })
+      .catch((error) => console.warn("checkout_live read failed; using WhatsApp checkout", error));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const goOffline = useCallback(() => setLive(false), []);
+
+  const form = useForm({
     resolver: zodResolver(addressSchema),
     mode: "onChange",
     defaultValues: {
@@ -63,6 +77,12 @@ export default function CheckoutPage() {
       pincode: "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isValid },
+  } = form;
 
   if (!items.length) {
     return <Navigate to="/cart" replace />;
@@ -179,65 +199,69 @@ export default function CheckoutPage() {
           </section>
         </div>
 
-        <div>
-          <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Order summary</h2>
-          <ul className="divide-y divide-storefront-border border-t border-storefront-border">
-            {items.map((i) => (
-              <li key={i.variant_id} className="flex justify-between py-3 text-sm font-sans text-storefront-charcoal">
-                <span>{i.name} ({formatSize(i.size)}/{i.color}) ×{i.quantity}</span>
-                <span className="tabular-nums">₹{(i.price * i.quantity).toLocaleString("en-IN")}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="pt-4">
-            <FreeShippingNudge amount={subtotal} cartItems={items} />
-          </div>
-          <div className="border-t border-storefront-border pt-4 mt-2 space-y-2 text-sm font-sans text-storefront-charcoal">
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span className="tabular-nums">₹{subtotal.toLocaleString("en-IN")}</span>
+        {live ? (
+          <LiveCheckout items={items} form={form} onCheckoutOff={goOffline} />
+        ) : (
+          <div>
+            <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Order summary</h2>
+            <ul className="divide-y divide-storefront-border border-t border-storefront-border">
+              {items.map((i) => (
+                <li key={i.variant_id} className="flex justify-between py-3 text-sm font-sans text-storefront-charcoal">
+                  <span>{i.name} ({formatSize(i.size)}/{i.color}) ×{i.quantity}</span>
+                  <span className="tabular-nums">₹{(i.price * i.quantity).toLocaleString("en-IN")}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="pt-4">
+              <FreeShippingNudge amount={subtotal} cartItems={items} />
             </div>
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span className="tabular-nums">{shipping === 0 ? "Free" : `₹${shipping.toLocaleString("en-IN")}`}</span>
+            <div className="border-t border-storefront-border pt-4 mt-2 space-y-2 text-sm font-sans text-storefront-charcoal">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="tabular-nums">₹{subtotal.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span className="tabular-nums">{shipping === 0 ? "Free" : `₹${shipping.toLocaleString("en-IN")}`}</span>
+              </div>
+              <div className="flex justify-between font-semibold pt-2 border-t border-storefront-border">
+                <span>Total</span>
+                <span className="tabular-nums">₹{total.toLocaleString("en-IN")}</span>
+              </div>
             </div>
-            <div className="flex justify-between font-semibold pt-2 border-t border-storefront-border">
-              <span>Total</span>
-              <span className="tabular-nums">₹{total.toLocaleString("en-IN")}</span>
-            </div>
-          </div>
 
-          <div className="mt-8 flex flex-col gap-4">
-            <button
-              type="submit"
-              disabled
-              className="w-full bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 opacity-40 cursor-not-allowed"
-            >
-              Place order — online payment launching soon
-            </button>
-            {isValid ? (
-              <a
-                href={whatsappHref(items, subtotal, shipping, address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full text-center bg-[#25D366] text-white font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"
-              >
-                Complete your order on WhatsApp
-              </a>
-            ) : (
+            <div className="mt-8 flex flex-col gap-4">
               <button
-                type="button"
+                type="submit"
                 disabled
-                className="w-full text-center bg-[#25D366] text-white font-sans text-xs tracking-widest uppercase py-4 px-8 opacity-40 cursor-not-allowed"
+                className="w-full bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 opacity-40 cursor-not-allowed"
               >
-                Complete your order on WhatsApp
+                Place order — online payment launching soon
               </button>
-            )}
-            <Link to="/cart" className="text-xs font-sans text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 text-center">
-              Back to cart
-            </Link>
+              {isValid ? (
+                <a
+                  href={whatsappHref(items, subtotal, shipping, address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full text-center bg-[#25D366] text-white font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"
+                >
+                  Complete your order on WhatsApp
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full text-center bg-[#25D366] text-white font-sans text-xs tracking-widest uppercase py-4 px-8 opacity-40 cursor-not-allowed"
+                >
+                  Complete your order on WhatsApp
+                </button>
+              )}
+              <Link to="/cart" className="text-xs font-sans text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2 text-center">
+                Back to cart
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
       </form>
     </div>
   );
