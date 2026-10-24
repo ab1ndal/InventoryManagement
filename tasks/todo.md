@@ -12,7 +12,10 @@ Live switch `storefront_settings.checkout_live` stays **false** until owner acco
 - [x] Codex adversarial review: 25 findings folded into plan as R1–R20 (adds Slice 1b: in-store atomic writes)
 - [x] Slice 0 nudge SHIPPED (PR #39, live + verified in browser 2026-10-23)
 - [x] Local test DB harness: `scripts/test-db.sh up` (schema/test_harness/bootstrap.sql, generated from live catalog)
-- Wave A running in worktrees: Task 1 DB migrations, Task 2 pricing (Deno), Task 1b in-store atomic RPC calls
+- [x] Task 2 pricing merged (PR #41). Docs/plan/harness merged (PR #40).
+- Task 1b in-store atomic writes DONE on branch `worktree-agent-aa4f47beda722f64c` (bf04fa4) — **hold until R1 migration is live on prod**, then PR + merge.
+- Task 1 DB migrations: running.
+- R22 (ProductTable/CustomerForm absolute overwrites) = go-live blocker, not started.
 - [ ] Slice 1 Foundation  - [ ] 2 Pay  - [ ] 3 Ship  - [ ] 4 Admin  - [ ] 5 Refunds/credit/codes  - [ ] 6 Messages/tracking
 
 Owner (parallel): Cashfree signup/KYC; Shiprocket signup/KYC + API user; Gmail app password
