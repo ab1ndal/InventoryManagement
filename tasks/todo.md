@@ -18,9 +18,12 @@ for courier-rate shipping) — merge at go-live so policy wording matches what c
   (Pooja Bindal 100%); Claude can fill Principal Place of Business; then GST certificate upload; step 4 bank.
 - **GST facts (screenshots in `docs/`, untracked):** legal name POOJA BINDAL, trade name Bindals Creation,
   Proprietorship, Composition. GST principal place = *H NO-23, MIRJAJAN-58, Subhangini Fancy Saree, SIHANI GATE,
-  Chandrapuri, Ghaziabad, UP 201001* → **use exactly this in Cashfree KYC "Principal Place of Business"**.
-  Owner to decide: show "Bindals Creation (Prop. Pooja Bindal)" on bills + footer; align site address with GST
-  address; ask CA about HSN (6210 on record vs 6204/6211/6203 for ethnic garments).
+  Chandrapuri, Ghaziabad, UP 201001*. Owner 2026-10-24: same physical shop as the site address; canonical
+  short address = *58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001* (site already uses
+  it, no change). "Subhangini Fancy Saree" is a different shop: never use it. Cashfree PPOB: accept the GST
+  prefill if it comes; if typed by hand, use the short address.
+  Owner to decide: show "Bindals Creation (Prop. Pooja Bindal)" on bills + footer; ask CA about HSN (6210 on
+  record vs 6204/6211/6203 for ethnic garments).
 - **Held branch `feat/online-orders-storefront`** now conflicts with the name changes (policyContent.js,
   footer/SEO) — rebase on main and re-run tests before merging at go-live.
 - Guide doc for the owner: https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth (setup steps + what remains).
