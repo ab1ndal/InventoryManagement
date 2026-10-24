@@ -14,7 +14,7 @@ describe("buildProductJsonLd", () => {
     expect(ld.offers.price).toBe(4500);
     expect(ld.offers.priceCurrency).toBe("INR");
     expect(ld.offers.availability).toBe("https://schema.org/InStock");
-    expect(ld.offers.seller.name).toBe("BINDAL'S CREATION");
+    expect(ld.offers.seller.name).toBe("Bindals Creation");
     expect(ld.brand.name).toBe("Bindal's Creations");
   });
 
