@@ -29,11 +29,11 @@
 
 ## Review Focus
 
-1. **Duplicate/out-of-order webhooks** (Cashfree success twice, success after expiry, Shiprocket events out of order): confirm and tracking must be idempotent and never move state backwards. Tests in Tasks 3 and 13.
-2. **Money arrives after the order expired or its credit/voucher was released**: must re-validate and either confirm (if coverable) or auto-refund the gateway amount. Test in Task 3.
+1. **Duplicate/out-of-order webhooks** (Cashfree success twice, success after expiry, Shiprocket events out of order): confirm and tracking must be idempotent and never move state backwards. Tests in Tasks 1, 5 and 7.
+2. **Money arrives after the order expired or its credit/voucher was released**: must re-validate and either confirm (if coverable) or auto-refund the gateway amount. Tests in Tasks 1 and 5.
 3. **Rounding**: promo shares, credit splits and per-unit refunds must sum exactly to totals in paise; Σ refunds never exceeds paid per source. Property-style tests in Task 2.
-4. **Concurrent last unit**: two confirms for the same single-stock variant: exactly one gets stock, the other's unit becomes unavailable + refund. Test in Task 3.
-5. **Live switch off**: with `checkout_live=false`, checkout UI is byte-for-byte the current WhatsApp flow and every public order function refuses. Tests in Tasks 6 and 8.
+4. **Concurrent last unit**: two confirms for the same single-stock variant: exactly one gets stock, the other's unit becomes unavailable + refund. Test in Task 1.
+5. **Live switch off**: with `checkout_live=false`, checkout UI is byte-for-byte the current WhatsApp flow and every public order function refuses. Tests in Tasks 1, 4 and 6.
 
 ---
 

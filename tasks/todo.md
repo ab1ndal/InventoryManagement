@@ -1,5 +1,21 @@
 # Todo
 
+## IN FLIGHT: online orders build (started 2026-10-23, running unattended)
+
+Design: `docs/superpowers/specs/2026-10-23-online-orders-design.md` (owner-approved in chat).
+Workflow: design → builder check → plan (`docs/superpowers/plans/2026-10-23-online-orders.md`)
+→ Codex adversarial plan review → parallel subagents per slice → PR + merge per slice.
+Live switch `storefront_settings.checkout_live` stays **false** until owner accounts are ready.
+
+- [ ] Builder check on design
+- [ ] Plan written
+- [ ] Codex adversarial review of plan, fixes applied
+- [ ] Slice 1 Foundation  - [ ] 2 Pay  - [ ] 3 Ship  - [ ] 4 Admin  - [ ] 5 Refunds/credit/codes  - [ ] 6 Messages/tracking
+
+Owner (parallel): Cashfree signup/KYC; Shiprocket signup/KYC + API user; Gmail app password
+for bindalscreations@gmail.com (2-Step Verification on). Secrets go into Supabase, never chat.
+
+
 ## Website review with Anushka (2026-10-19), in priority order
 
 Deadline driver: Diwali 8 Nov 2026. Until real checkout ships, Diwali orders use the
