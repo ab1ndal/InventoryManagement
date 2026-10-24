@@ -190,6 +190,36 @@ export default function CustomerForm(props) {
         }
       }
 
+      const isEdit = Boolean(stableDefaults?.customer_ulid);
+
+      // Store credit also moves concurrently (online orders, billing), so an
+      // existing customer's loaded balance is never re-written as an absolute
+      // value: it is omitted unless edited, and an edit is applied as a delta.
+      // The delta runs before the upsert so the returned row has the new balance.
+      if (isEdit) {
+        delete payload.store_credit;
+        const creditDelta =
+          values.store_credit === undefined
+            ? 0
+            : Math.round(
+                (Number(values.store_credit) -
+                  Number(stableDefaults.store_credit ?? 0)) *
+                  100,
+              ) / 100;
+        if (creditDelta !== 0) {
+          const { error: creditError } = await supabase.rpc(
+            "store_credit_adjust",
+            {
+              p_customer: stableDefaults.customerid,
+              p_delta: creditDelta,
+              p_reason: "manual_edit",
+              p_ref: String(stableDefaults.customerid),
+            },
+          );
+          if (creditError) throw creditError;
+        }
+      }
+
       const { data, error } = await supabase
         .from("customers")
         .upsert(payload, { onConflict: "customer_ulid" })
@@ -197,7 +227,6 @@ export default function CustomerForm(props) {
 
       if (error) throw error;
 
-      const isEdit = Boolean(stableDefaults?.customer_ulid);
       const saved = data[0];
       if (isEdit) {
         const fields = [
