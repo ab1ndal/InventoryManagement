@@ -77,6 +77,7 @@ begin
   if p_opt ? 'voucher_code' then
     select least(value, v_due) into v_vouch from public.vouchers where voucher_id = p_opt ->> 'voucher_code';
   end if;
+  if p_opt ? 'voucher_applied' then v_vouch := (p_opt ->> 'voucher_applied')::numeric; end if;
   v_rem_p := v_promo;
   v_rem_c := least(v_vouch + v_credit, v_goods);
   for l in select (e ->> 'v')::uuid as v, (e ->> 'qty')::int as q, p.retailprice as price
@@ -1163,5 +1164,27 @@ begin
   assert (select count(*) from public.vouchers where note like 'Balance of voucher SPENTVOUCHER0001%') = 0, 'no leftover voucher minted';
   res := public.online_order_confirm_payment(r.order_ref, 'NO_GATEWAY', 0, 'INR');
   assert res ->> 'result' = 'refund_required', 'retry stays refund_required';
+end $$;
+rollback;
+
+-- R7: a voucher that leaves 0 < due - voucher < ₹1 is applied ₹1 short so Cashfree's
+-- ₹1 minimum holds; the exact least(value, due) amount stays rejected.
+begin;
+do $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 5);
+  r record;
+begin
+  perform pg_temp.go_live();
+  insert into public.vouchers (voucher_id, expiry_date, value, source) values ('NEARLYALL0000001', current_date + 30, 1098.50, 'online_refund');
+  begin
+    perform pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)), '{"voucher_code":"NEARLYALL0000001"}');
+    assert false, 'gateway 0.50 must be rejected';
+  exception when raise_exception then null;
+  end;
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)),
+    '{"voucher_code":"NEARLYALL0000001","voucher_applied":1098}');
+  assert pg_temp.gw(r.order_ref) = 1.00, 'gateway is the ₹1 minimum';
+  assert (select voucher_applied from public.orders where id = r.order_id) = 1098, 'voucher applied ₹1 short';
 end $$;
 rollback;
