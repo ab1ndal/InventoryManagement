@@ -3,13 +3,21 @@
 jest.mock("../components/FreeShippingNudge", () => ({ amount }) =>
   require("react").createElement("div", { "data-testid": "free-shipping-nudge", "data-amount": amount })
 );
+// Live switch off: the page must be exactly the WhatsApp flow.
+const mockGetCheckoutLive = jest.fn();
+const mockQuote = jest.fn();
+jest.mock("../lib/ordersApi", () => ({
+  ...jest.requireActual("../lib/ordersApi"),
+  getCheckoutLive: () => mockGetCheckoutLive(),
+  quote: (...args) => mockQuote(...args),
+}));
 const mockUseCart = jest.fn();
 jest.mock("../context/CartContext", () => ({
   useCart: () => mockUseCart(),
 }));
 
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import CheckoutPage from "../pages/CheckoutPage";
@@ -19,6 +27,17 @@ const ITEM = { variant_id: "v1", product_id: "BC1", quantity: 2, name: "Silk Sar
 // CRA sets Jest's `resetMocks: true` — re-arm the mock's return value here.
 beforeEach(() => {
   mockUseCart.mockReturnValue({ items: [ITEM] });
+  mockGetCheckoutLive.mockResolvedValue(false);
+});
+
+it("with checkout_live off shows the WhatsApp CTA and never asks for a quote", async () => {
+  render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
+  await waitFor(() => expect(mockGetCheckoutLive).toHaveBeenCalled());
+  expect(screen.getByRole("button", { name: /complete your order on whatsapp/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /online payment launching soon/i })).toBeDisabled();
+  await new Promise((r) => setTimeout(r, 400));
+  expect(mockQuote).not.toHaveBeenCalled();
+  expect(screen.queryByText(/gift card/i)).not.toBeInTheDocument();
 });
 
 it("renders contact/address fields and the order summary", () => {
