@@ -15,7 +15,8 @@ Live switch `storefront_settings.checkout_live` stays **false** until owner acco
 - [x] Task 2 pricing merged (PR #41). Docs/plan/harness merged (PR #40).
 - Task 1b in-store atomic writes DONE on branch `worktree-agent-aa4f47beda722f64c` (bf04fa4) — **hold until R1 migration is live on prod**, then PR + merge.
 - Task 1 DB migrations: running.
-- R22 (ProductTable/CustomerForm absolute overwrites) = go-live blocker, not started.
+- R22 DONE on branch `fix/admin-stock-credit-deltas` (6b5de89) — **hold until R1 migration live**, then PR + merge with 1b.
+- Task 3 external clients: running.
 - [ ] Slice 1 Foundation  - [ ] 2 Pay  - [ ] 3 Ship  - [ ] 4 Admin  - [ ] 5 Refunds/credit/codes  - [ ] 6 Messages/tracking
 
 Owner (parallel): Cashfree signup/KYC; Shiprocket signup/KYC + API user; Gmail app password
