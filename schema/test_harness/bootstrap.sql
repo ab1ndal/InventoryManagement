@@ -104,14 +104,14 @@ create table if not exists public.customers (
   community_status_at timestamp with time zone
 );
 create table if not exists public.discount_usage (
-  id bigint not null,
+  id bigint generated always as identity not null,
   customerid integer not null,
   code text,
   used_at timestamp without time zone default CURRENT_TIMESTAMP,
   billid integer
 );
 create table if not exists public.discounts (
-  id bigint not null,
+  id bigint generated always as identity not null,
   code text,
   type text not null,
   value numeric,
