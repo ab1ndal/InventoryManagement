@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-23-online-orders-design.md`. API facts: `docs/superpowers/specs/2026-10-23-api-notes-shiprocket.md`, `docs/superpowers/specs/2026-10-23-api-notes-cashfree-gmail.md`. Executors read the spec section a task cites before starting.
 
+> **Revision 2 (2026-10-23, after Codex adversarial review):** the section **Revisions (R1–R20)** at the end of this file OVERRIDES any task text it contradicts. Every executor reads it before starting a task.
+
 ## Global Constraints
 
 - Seller is a GST composition dealer: Bill of Supply only (`document_type='bos'`), no GST added anywhere. Delivery within Uttar Pradesh only.
@@ -195,7 +197,7 @@
 
 **Interfaces:** POST (admin JWT) `{action, orderId, ...}`:
 - `set_availability {itemId, availableQty}` → DB function.
-- `process {}` → `online_order_prepare_process`; if `all_unavailable` → refund flow (Task 11 `startRefund(refundId)`), Shiprocket cancel; else if shippable set differs from original → `shiprocket.updateOrder`; then `assignAwb(shipmentId, quotedCourierId)` → `pickup` → `manifest` → `label` → `online_order_mark_packed`; partial failures leave order `paid` with sync error, retry-safe (skips steps whose ids are stored).
+- `process {}` → `online_order_prepare_process`; if `all_unavailable` → refund flow (Task 10 `startRefund(refundId)`), Shiprocket cancel; else if shippable set differs from original → `shiprocket.updateOrder`; then `assignAwb(shipmentId, quotedCourierId)` → `pickup` → `manifest` → `label` → `online_order_mark_packed`; partial failures leave order `paid` with sync error, retry-safe (skips steps whose ids are stored).
 - `cancel {reason}` → `online_order_cancel` + `shiprocket.cancel` + `startRefund`.
 - `retry_sync {}` → re-runs `postPaidActions` or the incomplete process step.
 - `rto_received {}` → `online_order_rto_received` + `startRefund`.
@@ -251,3 +253,55 @@ Non-admin JWT → 403.
 2. After slices 2–6 merges: `supabase functions deploy <name>` (`--no-verify-jwt` for `cashfree-webhook`, `courier-status`, `refund-choice`, `checkout-quote`, `create-order`, `order-status`); apply cron migration.
 3. Going live (owner present): secrets set by owner, Cashfree webhook URL + Shiprocket webhook configured, sandbox end-to-end order (pay, process, refund one unit, both choices), then flip `checkout_live`.
 4. Update `tasks/todo.md`, memory, and graphify after each merge.
+
+
+---
+
+## Revisions (R1–R20) — from Codex adversarial review, 2026-10-23
+
+**Go-live gate (replaces "merge each slice independently" risk):** slices merge independently with `checkout_live=false`, so no money moves until **all** of slices 0–6 and **Slice 1b** are merged, deployed and sandbox-tested. `create-order` refuses while false. This makes slice order safe; the refund engine existing before admin actions still matters for tests, so Task 8 depends on Task 10's `startRefund` (implement Task 10 before Task 8, or stub with a contract test).
+
+**R1 (critical, new Slice 1b, Task 1b): in-store writes become atomic.** In-store `BillingForm.js` read-modify-writes `productsizecolors.stock` (≈ lines 918–1019, 1162–1269), `customers.store_credit` (≈ 461–483, 1408–1416, 1457–1468, 1788–1797) and voucher redemption (≈ 642–680, 1438–1448, 1772–1782). Add DB functions and switch those call sites to them, keeping every visible behaviour identical:
+- `stock_adjust(p_variant uuid, p_delta numeric, p_reason text, p_ref text) returns numeric` — `update ... set stock = stock + p_delta ... returning stock` (no floor check for in-store: in-store can legitimately go below what online thinks; keep current semantics, just atomic).
+- `store_credit_adjust(p_customer int, p_delta numeric, p_reason text, p_ref text) returns numeric` — atomic, writes `store_credit_ledger` (source `instore`), rounds to 2 dp; raises if result < 0 for negative deltas.
+- `voucher_redeem(p_voucher text, p_bill int) returns boolean` — `update vouchers set redeemed=true, redeemed_at=now(), redeemed_billid=p_bill where voucher_id=p_voucher and redeemed=false and held_order_id is null and expiry_date >= current_date`; returns found. In-store voucher lookup also rejects `held_order_id is not null` with message "This voucher is reserved for an online order".
+- `customers.store_credit` stays `double precision` (no type migration; existing balances untouched); all new writers round to 2 dp.
+- Tests: billing suite (`src/admin/components/billing/__tests__`) stays green; new tests assert BillingForm calls the RPCs with the same deltas it used to write (mock supabase); SQL tests: concurrent `stock_adjust` + `online_order_confirm_payment` on the same variant sum correctly; held voucher cannot be redeemed in store.
+
+**R2 (critical): outbox.** Add `order_jobs(id, order_id, kind, status, attempts, last_error, run_after, unique(order_id, kind))`. `online_order_confirm_payment` inserts `shiprocket_create`, `email_confirmed`, `email_shop` jobs in the same transaction. A `run-jobs` Edge Function (pg_cron every 2 min + called opportunistically by webhook/order-status even when confirm returns `already`) claims jobs with `for update skip locked`, retries with backoff, max 10 attempts then flags the order problem. Replace `postPaidActions` with job handlers.
+
+**R3 (critical): Process checkpoints + claim.** Orders get per-step columns: `sr_updated_at, awb, courier_id, courier_name, pickup_requested_at, manifest_url, label_url, bill_id`, each persisted by `online_order_checkpoint(p_order_id, p_step text, p_data jsonb)` immediately after its external call succeeds. `admin-order-action process` first calls `online_order_claim(p_order_id, p_action text, p_actor uuid, p_op_key text) returns jsonb` which locks the row, moves `paid → processing` (or `paid → cancelling`), and returns the existing operation if `p_op_key` repeats or another action holds it (lease 5 min). Each step is skipped when its checkpoint exists. Failure leaves `processing` with error; Retry resumes. Cancel is only allowed from `paid` (not `processing`). Tests: failure injected after each step, then retry completes without repeating earlier calls; two concurrent claims → one wins.
+
+**R4 (critical): payment confirmation contract.** Confirm only after the Edge Function fetched `cashfree.getOrder(ref)` with `order_status == 'PAID'`, currency INR, `order_amount == orders.gateway_amount`, and `cf_order_id` matching the stored one; the successful payment's `cf_payment_id` is stored with a unique index. `online_order_confirm_payment(p_order_ref, p_cf_payment_id, p_amount, p_currency)` re-checks amount/currency equality and raises otherwise; a mismatch event creates `refund_required` for the full captured amount.
+
+**R5 (critical): failed attempts don't fail the order.** `PAYMENT_FAILED/USER_DROPPED` webhooks only append an `order_events` row. Orders leave `pending_payment` only via (a) confirm, or (b) the expiry job, which for each pending order older than 45 min calls `cashfree.getOrder`: `PAID` → confirm path; `ACTIVE` → wait (until 24 h, then mark problem); `EXPIRED/TERMINATED` → `online_order_fail(..., 'expired')`. A late success on an expired order goes through R4 + the existing re-take-or-refund logic.
+
+**R6 (high): create-order idempotency.** Client sends `attemptKey` (UUID v4 generated when the checkout page mounts, reused on retry). `orders.attempt_key unique`; repeat calls return the same order and session (re-fetching the session via Cashfree Get Order if needed). Cashfree create uses `x-idempotency-key = attemptKey`. On Cashfree timeout/5xx/409 → `getOrder(ref)`; only if Cashfree has no such order → `online_order_fail`.
+
+**R7 (high): ₹1 minimum.** In `quoteOrder`: if `0 < gatewayAmount < 1`, reduce applied credit (then voucher) so `gatewayAmount = 1.00`; if that's impossible (no credit/voucher applied), unchanged. Tests at due−tender = 0, 0.01, 0.99, 1.00.
+
+**R8 (high): identity.** Customer identity for credit and owned vouchers comes **only** from a verified JWT (`supabase.auth.getUser(jwt)` in the Edge Function → `customers.auth_user_id`). Guest phone matching is bookkeeping only (customer row for bill/usage) and never unlocks store credit or customer-owned vouchers. `online_order_create` takes `p_auth_user uuid` (null for guests) and derives everything else. Test: guest using a registered customer's phone gets no credit and can't use their owned voucher.
+
+**R9 (high): code checks.** `online_code_check` is service-role only; Edge Function passes verified identity and a hashed client IP (`x-forwarded-for` first hop, SHA-256 with a server salt). Limits: 10 failed attempts/hour per IP hash and per phone/customer; responses identical for "not found" and "not eligible". Online-issued voucher codes: 16 chars from a 32-char unambiguous alphabet.
+
+**R10 (high): order access.** `create-order` returns `accessToken` (32 random bytes, base64url); DB stores SHA-256 hash. Return URL and order page use `/order/{ref}?t={token}`. `order-status` requires `ref` + token (or a verified JWT that owns the order); rate-limited per IP. `/track` keeps ref + phone via `online_order_lookup` with rate limits. Responses for wrong token/phone are identical to not found.
+
+**R11 (high): JWT + CORS contract.** `_shared/http.ts`: `optionalUser(req)` returns null for absent header and throws 401 for present-but-invalid (verified with `supabase.auth.getUser`); exact match of `Origin` against `ALLOWED_ORIGIN` (comma list) for browser-facing functions, preflight `OPTIONS` handled, no wildcard, no credentials. Webhooks have no CORS. Tests: absent/forged/expired/valid JWT; hostile origin; preflight.
+
+**R12 (high): promo reservation.** `promo_reservations(code, identity_key, order_id, status)` with a unique partial index on `(code, identity_key) where status in ('held','used')` for `once_per_customer` codes; `identity_key` = `c:{customerid}` or `p:{normalized phone}`. Created in `online_order_create`, `used` at confirm, released on expiry/fail. Concurrent creates for the same identity → one succeeds.
+
+**R13 (high): refund legs.** `order_refunds` is the header (reason, units, totals, choice, token, overall status derived). `order_refund_legs(refund_id, source in ('credit','gateway','shipping_gateway','shipping_credit'), amount, status, destination in ('store_credit','voucher','original'), cf_refund_id, voucher_id, unique(refund_id, source))`. Credit issuance per leg is idempotent through `store_credit_ledger` unique `(ref_type, ref_id)`. Cashfree refund call per gateway leg with `refund_id = leg id` (≤ 40 chars). Overall `completed` only when all legs completed. Tests: crash after credit leg, retry doesn't double-credit; Σ legs ≤ paid per source per order (DB check in a trigger or function assertion).
+
+**R14 (high): RTO accounting.** `online_order_rto_received` atomically: inserts one `exchanges` row per shipped, not-yet-refunded bill line (`original_bill_item_id`, `quantity`, `reason='RTO'`, `customerid`, `credit_amount` = refund value, `voucher_id` when the refund goes to a voucher — filled when the leg completes), returns stock for those units via `stock_adjust`, creates the refund (no shipping legs). Only units shipped and not already refunded count. Second call → no-op returning the existing refund id. Tests: partial availability then RTO refunds only shipped units; double RTO; RTO while an earlier refund is still processing.
+
+**R15 (medium): courier problem states.** Store raw `shipment_status_id` + label + time on every tracking update. `mapShipmentStatus` also returns `'problem'` for 12, 21, 24, 25, 40, 41, 46, 76, 78 (per notes table) which sets `orders.problem` text without changing status; admin "Problems" filter includes these. Courier cancellation (8/45) after packing sets problem "Courier cancelled shipment — rebook or cancel", never a business cancel/refund.
+
+**R16 (medium): UP check fail-closed.** Pincodes with 3-digit prefix in {244, 246, 247, 248, 249, 262, 263} (shared with Uttarakhand) require a successful Shiprocket postcode lookup returning "Uttar Pradesh"; if the lookup fails for these → "We couldn't verify this pincode right now, please try again or WhatsApp us" (blocks). Other 20–28 prefixes accept on lookup failure. Shipping rate failure stays flat ₹99 (independent).
+
+**R17 (medium): Shiprocket email.** `billing_email` = shopper email if present else `GMAIL_USER`; shopper email stored separately; missing shopper email skips customer emails without failing anything.
+
+**R18 (medium): rate selection tests.** `shiprocket.rate`: recommended courier if present in `available_courier_companies` and not blocked; else lowest numeric `etd_hours` (ties: lowest rate); parse `rate`/`etd_hours` as numbers; none usable → null. Tests for each case.
+
+**R19 (medium): manifest/label validation.** Manifest success requires `status === 1` and non-empty `manifest_url`, or the documented "already manifested" 400 followed by a successful print/status check; label requires `label_created` truthy and non-empty `label_url`. HTTP-200-with-failure fixtures tested.
+
+**R20: task order for execution.** Wave A (parallel): Task 1 (+ R2/R3/R4/R5/R8/R12/R13/R14 DB parts), Task 2 (+R7), Task 1b (R1). Wave B (parallel, after A merged): Task 3 (+R6 client, R11, R17–R19), Task 9 UI shell against mocked API. Wave C: Tasks 4, 5, 7 (+R2 run-jobs, R5 expiry, R15, R16). Wave D: Task 10 then Task 8, Task 6, Task 11. Wave E: Tasks 12, 13. Controller applies migrations and deploys between waves.
