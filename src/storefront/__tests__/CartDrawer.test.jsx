@@ -1,3 +1,9 @@
+// The nudge queries Supabase for suggestions (FreeShippingNudge.test.jsx
+// covers that); here we only check it receives the subtotal.
+jest.mock("../components/FreeShippingNudge", () => ({ amount }) =>
+  require("react").createElement("div", { "data-testid": "free-shipping-nudge", "data-amount": amount })
+);
+
 import React from "react";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -164,5 +170,17 @@ describe("CartDrawer — size label", () => {
   it("shows a customer-facing size instead of the raw code", () => {
     renderDrawer({ items: [{ ...ITEM_A, size: "XL|42" }], itemCount: 2 });
     expect(screen.getByText("XL (42) · Red")).toBeInTheDocument();
+  });
+});
+
+describe("CartDrawer — free-shipping nudge", () => {
+  it("passes the subtotal to the nudge while open", () => {
+    renderDrawer({ items: [ITEM_A, ITEM_B], itemCount: 3 }); // 3000 + 800
+    expect(screen.getByTestId("free-shipping-nudge")).toHaveAttribute("data-amount", "3800");
+  });
+
+  it("does not mount the nudge while closed", () => {
+    renderDrawer({ items: [ITEM_A], itemCount: 2, isOpen: false });
+    expect(screen.queryByTestId("free-shipping-nudge")).not.toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import Seo from "../components/Seo";
+import FreeShippingNudge from "../components/FreeShippingNudge";
 import { useCart } from "../context/CartContext";
 import { formatSize } from "../lib/sizes";
 import { trackEvent } from "../lib/analytics";
@@ -83,6 +84,9 @@ export default function CartPage() {
       </ul>
 
       <div className="mt-8 border-t border-storefront-border pt-6 flex flex-col items-end gap-4">
+        <div className="w-full sm:max-w-sm">
+          <FreeShippingNudge amount={subtotal} cartItems={items} />
+        </div>
         <p className="font-sans text-sm text-storefront-charcoal">
           Subtotal <span className="font-semibold tabular-nums">₹{subtotal.toLocaleString("en-IN")}</span>
         </p>
