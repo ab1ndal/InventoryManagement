@@ -291,11 +291,44 @@ const ProductTable = forwardRef(
             stock: v.stock ?? 0,
           }));
 
-        const { error: upsertError } = await supabase
-          .from("productsizecolors")
-          .upsert(upserts, { onConflict: ["variantid"] });
+        // Stock moves concurrently (online orders, billing), so an existing
+        // variant's stock is never re-written as the absolute value loaded into
+        // the form: only a user-changed stock is applied, as a delta via
+        // stock_adjust. Existing and new variants go in separate upserts because
+        // PostgREST nulls columns missing from some rows of a mixed batch.
+        const loadedVariant = (u) =>
+          u.variantid
+            ? variants.find((v) => v.variantid === u.variantid)
+            : undefined;
+        const existingUpserts = upserts
+          .filter((u) => loadedVariant(u))
+          .map(({ stock, ...rest }) => rest);
+        const newUpserts = upserts.filter((u) => !loadedVariant(u));
+        const stockAdjustments = upserts
+          .filter((u) => loadedVariant(u))
+          .map((u) => ({
+            variantid: u.variantid,
+            delta: Number(u.stock) - Number(loadedVariant(u).stock ?? 0),
+          }))
+          .filter((a) => a.delta !== 0);
 
-        if (upsertError) throw new Error(upsertError.message);
+        for (const batch of [existingUpserts, newUpserts]) {
+          if (batch.length === 0) continue;
+          const { error: upsertError } = await supabase
+            .from("productsizecolors")
+            .upsert(batch, { onConflict: ["variantid"] });
+          if (upsertError) throw new Error(upsertError.message);
+        }
+
+        for (const { variantid, delta } of stockAdjustments) {
+          const { error: stockError } = await supabase.rpc("stock_adjust", {
+            p_variant: variantid,
+            p_delta: delta,
+            p_reason: "manual_edit",
+            p_ref: productData.productid,
+          });
+          if (stockError) throw new Error(stockError.message);
+        }
 
         upserts.forEach((u) => {
           const old = variants.find((v) => v.variantid === u.variantid);
