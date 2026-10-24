@@ -8,6 +8,20 @@ server functions + admin Online Orders screen (#47). Edge Functions are in the r
 Held branch: `feat/online-orders-storefront` (live checkout UI, order/track/account/refund pages, policy text
 for courier-rate shipping) — merge at go-live so policy wording matches what customers pay.
 
+### RESUME HERE (session ended 2026-10-24)
+- **Names (owner 2026-10-24):** website/brand name = **Bindal's Creation** (no s; matches logo; domain
+  bindalscreations.com unchanged). Legal/GST name everywhere else = **Bindals Creation** (bills/labels in caps
+  BINDALS CREATION). Shipped in PRs #49, #50, #51.
+- **Cashfree onboarding** (tab open in Claude-in-Chrome): steps 1–2 done (brand "Bindals Creation", category
+  Family Clothing, turnover ₹10–50 L, Collect Payments, Website https://www.bindalscreations.com, no test
+  login). **Step 3 KYC next**: owner enters business PAN, signatory (Aadhaar OTP), beneficial owner
+  (Pooja Bindal 100%); Claude can fill Principal Place of Business; then GST certificate upload; step 4 bank.
+- **Pending:** owner's GST screenshots (Desktop, macOS blocked access) — move into repo `tmp/` or paste in
+  chat; then cross-check legal name / trade name / address / registration type vs site, bills, Cashfree.
+- **Held branch `feat/online-orders-storefront`** now conflicts with the name changes (policyContent.js,
+  footer/SEO) — rebase on main and re-run tests before merging at go-live.
+- Guide doc for the owner: https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth (setup steps + what remains).
+
 ### Go-live checklist (owner + controller, in order)
 1. Owner: Cashfree account active (sandbox keys first), Shiprocket KYC + API user + pickup location `Shop`,
    Gmail app password for bindalscreations@gmail.com. Owner puts secrets in Supabase (never chat):
