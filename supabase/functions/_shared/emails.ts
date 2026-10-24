@@ -26,7 +26,7 @@ export type EmailOrder = {
 
 export type Email = { subject: string; text: string };
 
-export const SHOP_NAME = "Bindal's Creation";
+export const SHOP_NAME = "Bindals Creation";
 
 const inr = (n: number) =>
   "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
