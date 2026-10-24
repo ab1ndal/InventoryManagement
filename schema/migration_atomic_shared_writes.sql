@@ -43,6 +43,9 @@
 --   profiles(id uuid pk, role text)
 -- customers.store_credit stays double precision (no type change); all writers round.
 
+-- Fail fast instead of queueing the live in-store app behind this migration (review S2).
+set local lock_timeout = '3s';
+
 create table if not exists public.store_credit_ledger (
   id bigint generated always as identity primary key,
   customerid integer not null references public.customers(customerid),
@@ -85,13 +88,15 @@ declare
   v_role text := nullif(auth.jwt() ->> 'role', '');
 begin
   if v_role is null then
-    return true;  -- direct database session (no PostgREST request)
+    -- direct database session (no PostgREST request); never for API sessions (review nit)
+    return session_user <> 'authenticator';
   end if;
   if v_role = 'service_role' then
     return true;
   end if;
   return exists (select 1 from public.profiles p
-                 where p.id = auth.uid() and p.role in ('admin', 'superadmin'));
+                 where p.id = auth.uid() and p.role in ('admin', 'superadmin')
+                   and coalesce(p.is_active, true));
 end;
 $$;
 revoke all on function public._is_staff_or_service() from public, anon, authenticated;
@@ -202,6 +207,11 @@ as $$
 begin
   if not public._is_staff_or_service() then
     raise exception 'not authorized' using errcode = '42501';
+  end if;
+  -- online ledger rows are written only by the online functions (review nit)
+  if p_source <> 'instore' and nullif(auth.jwt() ->> 'role', '') is not null
+     and auth.jwt() ->> 'role' <> 'service_role' then
+    raise exception 'store_credit_adjust: source % not allowed' , p_source using errcode = '42501';
   end if;
   return public._store_credit_apply(p_customer, p_delta, p_reason, p_ref, p_source, p_ref_type);
 end;

@@ -166,6 +166,7 @@ declare
 begin
   insert into auth.users (id) values (u_admin), (u_user);
   insert into public.profiles (id, email, role) values (u_admin, 'a@t.in', 'admin'), (u_user, 'b@t.in', 'user');
+  update public.profiles set is_active = true where role in ('admin', 'superadmin');
   perform set_config('request.jwt.claims', json_build_object('sub', u_user, 'role', 'authenticated')::text, true);
   begin
     perform public.store_credit_adjust(c, -1, 'bill_tender', '9');
@@ -199,7 +200,7 @@ begin
   assert not has_table_privilege('anon', 'public.orders', 'select'), 'anon has no orders access';
   assert not has_table_privilege('authenticated', 'public.orders', 'insert'), 'no direct order writes';
   assert (select checkout_live from public.storefront_settings where id = 1) = false, 'checkout_live defaults false';
-  assert (select count(*) from public.salesmethods where lower(methodname) = 'online') = 1, 'one Online sales method';
+  assert (select count(*) from public.salesmethods where lower(methodname) = 'website') = 1, 'one Website sales method';
   assert (select relrowsecurity from pg_class where oid = 'public.orders'::regclass), 'RLS on orders';
   assert (select count(*) from pg_policies where tablename in ('orders', 'order_items', 'order_events',
           'order_refunds', 'order_refund_legs') and policyname like '%_admin_select') = 5, 'admin select policies';
@@ -769,7 +770,7 @@ begin
   select * into b from public.bills where billid = bill;
   assert b.document_type = 'bos' and b.finalized and b.bill_number ~ '^FY\d{2}-\d{6}$', 'bos numbered by trigger';
   assert b.totalamount = 2800 - 100 + 80 and b.gst_total = 0 and b.discount_total = 100, 'bill totals';
-  assert b.salesmethodid = (select salesmethodid from public.salesmethods where methodname = 'Online'), 'online sales method';
+  assert b.salesmethodid = (select salesmethodid from public.salesmethods where methodname = 'Website'), 'online sales method';
   assert (select count(*) from public.bill_items where billid = bill and product_name = 'Shipping' and total = 80) = 1, 'shipping line';
   assert (select sum(total) from public.bill_items where billid = bill) = b.totalamount, 'items sum to bill';
   assert (select count(*) from public.bill_items where billid = bill and gst_amount <> 0) = 0, 'no GST';
@@ -1141,3 +1142,26 @@ end $$;
 rollback;
 
 select 'online orders: all assertions passed' as result;
+
+-- Review B1: a held voucher spent elsewhere (old in-store code path ignored the hold)
+-- must not let the online order confirm or mint a leftover voucher.
+begin;
+do $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 5);
+  r record;
+  res jsonb;
+begin
+  perform pg_temp.go_live();
+  insert into public.vouchers (voucher_id, expiry_date, value, source) values ('SPENTVOUCHER0001', current_date + 30, 2000, 'online_refund');
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)), '{"voucher_code":"SPENTVOUCHER0001"}');
+  update public.vouchers set redeemed = true, redeemed_at = now() where voucher_id = 'SPENTVOUCHER0001';
+  res := public.online_order_confirm_payment(r.order_ref, 'NO_GATEWAY', 0, 'INR');
+  assert res ->> 'result' = 'refund_required' and res ->> 'reason' = 'holds_unavailable', 'spent voucher → refund_required, got ' || res::text;
+  assert (select status from public.orders where id = r.order_id) = 'payment_failed', 'order failed';
+  assert (select stock from public.productsizecolors where variantid = v) = 5, 'no stock taken';
+  assert (select count(*) from public.vouchers where note like 'Balance of voucher SPENTVOUCHER0001%') = 0, 'no leftover voucher minted';
+  res := public.online_order_confirm_payment(r.order_ref, 'NO_GATEWAY', 0, 'INR');
+  assert res ->> 'result' = 'refund_required', 'retry stays refund_required';
+end $$;
+rollback;

@@ -135,6 +135,9 @@
 -- Refund legs are additionally capped per order and source by a trigger.
 -- =====================================================================
 
+-- Fail fast instead of queueing the live in-store app behind this migration (review S2).
+set local lock_timeout = '3s';
+
 -- ---------- existing tables (additive) ----------
 alter table public.discounts add column if not exists storefront_redeemable boolean not null default false;
 
@@ -158,9 +161,11 @@ drop policy if exists storefront_settings_public_read on public.storefront_setti
 create policy storefront_settings_public_read on public.storefront_settings
   for select to anon, authenticated using (true);
 
+-- 'Website' (not 'Online'): live salesmethods are payment types shown in the in-store picker,
+-- which hides this row (review S3).
 insert into public.salesmethods (methodname)
-  select 'Online'
-  where not exists (select 1 from public.salesmethods where lower(methodname) = 'online');
+  select 'Website'
+  where not exists (select 1 from public.salesmethods where lower(methodname) = 'website');
 
 -- ---------- orders ----------
 create sequence if not exists public.online_order_ref_seq;
@@ -879,6 +884,8 @@ begin
   end if;
 
   if v_attempt is not null then
+    -- serialise concurrent retries of the same checkout attempt
+    perform pg_advisory_xact_lock(hashtextextended('online_order_create:' || v_attempt::text, 0));
     select * into v_existing from public.orders o where o.attempt_key = v_attempt;
     if found then
       return query select v_existing.id, v_existing.order_ref, false;
@@ -1089,6 +1096,9 @@ begin
     if (v_no_gateway and o.gateway_amount = 0) or o.cf_payment_id is not distinct from v_pay_id then
       return jsonb_build_object('result', 'already', 'order_id', o.id, 'order_ref', o.order_ref, 'status', o.status);
     end if;
+    if v_no_gateway then
+      raise exception 'payment mismatch: NO_GATEWAY confirm for order % that needs a gateway payment', o.order_ref;
+    end if;
     perform public._online_event(o.id, 'duplicate_payment', o.status, o.status, null,
       jsonb_build_object('cf_payment_id', p_cf_payment_id, 'amount', p_amount));
     return jsonb_build_object('result', 'refund_required', 'reason', 'duplicate_payment',
@@ -1117,6 +1127,20 @@ begin
     end if;
     if exists (select 1 from public.orders x where x.cf_payment_id = v_pay_id and x.id <> o.id) then
       raise exception 'payment mismatch: cf_payment_id % already used by another order', v_pay_id;
+    end if;
+  end if;
+
+  -- B1 (review): the held voucher must still be ours and unredeemed. If it was spent
+  -- elsewhere, fail the order (releasing its other holds) and have the caller refund.
+  if o.status = 'pending_payment' and o.voucher_code is not null then
+    perform 1 from public.vouchers v
+     where v.voucher_id = o.voucher_code and v.held_order_id = o.id and coalesce(v.redeemed, false) = false
+       for update;
+    if not found then
+      perform public.online_order_fail(o.order_ref, 'payment_failed', 'voucher no longer available');
+      update public.orders set cf_payment_id = v_pay_id where id = o.id;
+      return jsonb_build_object('result', 'refund_required', 'reason', 'holds_unavailable',
+        'amount', coalesce(p_amount, 0), 'order_ref', o.order_ref);
     end if;
   end if;
 
@@ -1168,8 +1192,11 @@ begin
   -- voucher consumed; unused value reissued (same expiry)
   if o.voucher_code is not null then
     update public.vouchers set redeemed = true, redeemed_at = now()
-     where voucher_id = o.voucher_code and held_order_id = o.id
+     where voucher_id = o.voucher_code and held_order_id = o.id and coalesce(redeemed, false) = false
     returning * into v_voucher;
+    if not found then
+      raise exception 'voucher % is no longer held by order %', o.voucher_code, o.order_ref;
+    end if;
     v_left := v_voucher.value - o.voucher_applied;
     if v_left > 0 then
       v_left_code := public._issue_voucher(o.customerid, v_left, v_voucher.expiry_date,
@@ -1565,7 +1592,7 @@ begin
   if not exists (select 1 from public.order_items i where i.order_id = o.id and i.shipped_qty > 0) then
     raise exception 'create_bos: order % has no shipped items', o.order_ref;
   end if;
-  select salesmethodid into v_method from public.salesmethods where lower(methodname) = 'online'
+  select salesmethodid into v_method from public.salesmethods where lower(methodname) = 'website'
    order by salesmethodid limit 1;
 
   insert into public.bills (customerid, document_type, finalized, paymentstatus, notes, salesmethodid,
@@ -1753,7 +1780,8 @@ begin
                               when 'delivered' then 4 when 'rto' then 5 when 'rto_received' then 6 else 0 end;
   v_rank_new := case p_status when 'shipped' then 2 when 'out_for_delivery' then 3 when 'delivered' then 4
                               when 'rto' then 5 else null end;
-  if v_rank_new is null or v_rank_old = 0 or v_rank_old >= 4 or v_rank_new <= v_rank_old then
+  if v_rank_new is null or v_rank_old = 0 or v_rank_old >= 4 or v_rank_new <= v_rank_old
+     or (p_status = 'rto' and v_rank_old < 2) then
     return jsonb_build_object('matched', true, 'changed', false, 'status', o.status);
   end if;
 
@@ -2054,11 +2082,15 @@ as $$
 declare
   o public.orders;
   v_ref text := upper(btrim(coalesce(p_order_ref, '')));
-  v_ip text := nullif(btrim(split_part(coalesce(
-      nullif(current_setting('request.headers', true), '')::json ->> 'x-forwarded-for', ''), ',', 1)), '');
+  -- cf-connecting-ip is set by Cloudflare in front of Supabase and can't be spoofed by the
+  -- client; x-forwarded-for's first hop can (review S4).
+  v_ip text := nullif(btrim(coalesce(
+      nullif(current_setting('request.headers', true), '')::json ->> 'cf-connecting-ip', '')), '');
   v_keys text[];
 begin
-  v_keys := array_remove(array['ref:' || v_ref, case when v_ip is not null then 'ip:' || v_ip end], null);
+  -- per (ref, ip) so one attacker can't lock /track for everyone, plus per ip overall
+  v_keys := array_remove(array['refip:' || v_ref || '|' || coalesce(v_ip, '-'),
+                               case when v_ip is not null then 'ip:' || v_ip end], null);
   if exists (select 1 from public.code_attempts a
               where a.scope = 'lookup' and a.key = any (v_keys) and not a.success
                 and a.created_at > now() - interval '1 hour'
@@ -2125,3 +2157,14 @@ end $$;
 grant execute on function public.online_refund_choose(text, text) to anon, authenticated;
 grant execute on function public.online_order_lookup(text, text) to anon, authenticated;
 grant execute on function public.my_online_orders() to authenticated;
+
+
+-- Housekeeping (review S4): code_attempts is anonymous-writable through the lookup and
+-- code-check functions; keep only a day of history. Scheduled in migration_online_orders_cron.sql.
+create or replace function public.online_purge_code_attempts() returns int
+language sql security definer set search_path = public as $$
+  with d as (delete from public.code_attempts where created_at < now() - interval '24 hours' returning 1)
+  select count(*)::int from d;
+$$;
+revoke execute on function public.online_purge_code_attempts() from public, anon, authenticated;
+grant execute on function public.online_purge_code_attempts() to service_role;
