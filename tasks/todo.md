@@ -9,8 +9,10 @@ Live switch `storefront_settings.checkout_live` stays **false** until owner acco
 
 - [x] Builder check on design (7 gaps resolved, 2 by owner: credit never expires; RTO = refund items, keep shipping)
 - [x] Plan written: `docs/superpowers/plans/2026-10-23-online-orders.md` (branch feat/online-orders-docs)
-- [ ] Codex adversarial review of plan, fixes applied (running)
-- Slice 0 nudge: subagent building in worktree (running)
+- [x] Codex adversarial review: 25 findings folded into plan as R1–R20 (adds Slice 1b: in-store atomic writes)
+- [x] Slice 0 nudge SHIPPED (PR #39, live + verified in browser 2026-10-23)
+- [x] Local test DB harness: `scripts/test-db.sh up` (schema/test_harness/bootstrap.sql, generated from live catalog)
+- Wave A running in worktrees: Task 1 DB migrations, Task 2 pricing (Deno), Task 1b in-store atomic RPC calls
 - [ ] Slice 1 Foundation  - [ ] 2 Pay  - [ ] 3 Ship  - [ ] 4 Admin  - [ ] 5 Refunds/credit/codes  - [ ] 6 Messages/tracking
 
 Owner (parallel): Cashfree signup/KYC; Shiprocket signup/KYC + API user; Gmail app password
