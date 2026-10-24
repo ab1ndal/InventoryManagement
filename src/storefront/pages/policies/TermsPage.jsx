@@ -7,7 +7,7 @@ export default function TermsPage() {
   return (
     <StaticPage
       title="Terms of Service"
-      seoDescription="The terms governing use of the Bindal's Creations website and orders."
+      seoDescription="The terms governing use of the Bindal's Creation website and orders."
     >
       {TERMS.map((s) => (
         <PolicySection key={s.heading} {...s} />

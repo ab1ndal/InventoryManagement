@@ -7,7 +7,7 @@ export default function PrivacyPolicyPage() {
   return (
     <StaticPage
       title="Privacy Policy"
-      seoDescription="How Bindal's Creations handles your personal information."
+      seoDescription="How Bindal's Creation handles your personal information."
     >
       {PRIVACY.map((s) => (
         <PolicySection key={s.heading} {...s} />

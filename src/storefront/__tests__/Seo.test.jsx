@@ -5,12 +5,12 @@ import Seo from "../components/Seo";
 describe("Seo", () => {
   it("composes the document title with the site name", () => {
     render(<Seo title="Shop" description="Browse" />);
-    expect(document.title).toBe("Shop — Bindal's Creations");
+    expect(document.title).toBe("Shop — Bindal's Creation");
   });
 
   it("falls back to the bare site name when no title", () => {
     render(<Seo description="Home" />);
-    expect(document.title).toBe("Bindal's Creations");
+    expect(document.title).toBe("Bindal's Creation");
   });
 
   it("renders a JSON-LD script when jsonLd provided", () => {

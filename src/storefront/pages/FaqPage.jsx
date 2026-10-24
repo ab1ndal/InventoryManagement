@@ -23,7 +23,7 @@ export default function FaqPage() {
     <StaticPage
       title="Frequently Asked Questions"
       seoTitle="FAQ"
-      seoDescription="Answers to common questions about delivery, exchanges, payments, sizing, and visiting Bindal's Creations."
+      seoDescription="Answers to common questions about delivery, exchanges, payments, sizing, and visiting Bindal's Creation."
     >
       <div>
         {FAQ_ITEMS.map((item) => (

@@ -1,6 +1,6 @@
 import React from "react";
 
-const SITE_NAME = "Bindal's Creations";
+const SITE_NAME = "Bindal's Creation";
 const DEFAULT_OG_IMAGE = "/logo512.png";
 
 // React 19 hoists <title>/<meta>/<link> rendered anywhere into <head> and

@@ -22,8 +22,8 @@ const CATEGORY_RAILS = [
 export default function HomePage() {
   return (
     <>
-      <Seo description="Handpicked sarees, lehengas, and ethnic wear from Bindal's Creations — rooted in tradition, curated with care." />
-      <h1 className="sr-only">Bindal's Creations — handpicked Indian ethnic wear</h1>
+      <Seo description="Handpicked sarees, lehengas, and ethnic wear from Bindal's Creation — rooted in tradition, curated with care." />
+      <h1 className="sr-only">Bindal's Creation — handpicked Indian ethnic wear</h1>
       <CategoryBand />
       <HeroSlider />
       <DiwaliRail />

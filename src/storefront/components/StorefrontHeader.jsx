@@ -147,14 +147,14 @@ export default function StorefrontHeader() {
                   illegible at header height. rem sizing so it scales with zoom. */}
               <img
                 src="/logo-monogram.png"
-                alt="Bindal's Creations"
+                alt="Bindal's Creation"
                 width={256}
                 height={256}
                 className="h-11 w-11 md:h-14 md:w-14 object-contain"
               />
               <span className="hidden sm:block font-display font-semibold text-lg md:text-xl text-storefront-charcoal leading-tight">
                 Bindal's<br />
-                <span className="text-storefront-gold">Creations</span>
+                <span className="text-storefront-gold">Creation</span>
               </span>
             </Link>
           </div>

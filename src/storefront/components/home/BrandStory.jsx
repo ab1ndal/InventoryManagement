@@ -17,7 +17,7 @@ export default function BrandStory() {
         {STORE_PHOTO_URL && (
           <img
             src={STORE_PHOTO_URL}
-            alt="Inside the Bindal's Creations store"
+            alt="Inside the Bindal's Creation store"
             loading="lazy"
             decoding="async"
             className="aspect-[4/3] w-full object-cover rounded-sm"
