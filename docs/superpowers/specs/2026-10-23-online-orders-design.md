@@ -107,6 +107,9 @@ stock holds. Abandoned-cart nudges. Multiple shipments per order.
    is refunded (credit-or-original choice). Shipping is **not** refunded. The Bill of Supply
    is offset by a return record (reuse the existing in-store return/credit-note mechanism if
    one fits; builder checks `ReturnReceiptView`), never deleted.
+   The Returns page gains (slice 5): "If a prepaid parcel is refused or undeliverable and
+   returns to us, we refund the item value; the shipping charge is not refundable."
+
 
 ## 7. Money rules
 
