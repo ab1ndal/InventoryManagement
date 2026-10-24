@@ -163,9 +163,11 @@ create policy storefront_settings_public_read on public.storefront_settings
 
 -- 'Website' (not 'Online'): live salesmethods are payment types shown in the in-store picker,
 -- which hides this row (review S3).
-insert into public.salesmethods (methodname)
-  select 'Website'
-  where not exists (select 1 from public.salesmethods where lower(methodname) = 'website');
+-- Explicit id: the live salesmethods serial sequence lags its rows (seen 2026-10-24),
+-- so a default-id insert collides with an existing key.
+insert into public.salesmethods (salesmethodid, methodname)
+  select coalesce(max(salesmethodid), 0) + 1, 'Website' from public.salesmethods
+  having not exists (select 1 from public.salesmethods where lower(methodname) = 'website');
 
 -- ---------- orders ----------
 create sequence if not exists public.online_order_ref_seq;
