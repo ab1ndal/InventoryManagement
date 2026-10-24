@@ -94,7 +94,7 @@ New Comments (done 2026-10-20, PR #31 merged + live):
 Full context: `tasks/description-revamp-plan.md` (read its "Resume here" section first) and
 `scripts/describe/README.md`. No DB writes have happened yet.
 
-- [ ] Owner: review the 20-product pilot page https://claude.ai/artifact/7ft65naksZtpdYTVPpDJGe.
+- [ ] Owner: review the 20-product pilot page https://claude.ai/artifact/PDsnoPKgJFeqmaezwfLZga.
   Each product has Approve / Needs changes / Reject plus a comment box. Comments save to the
   page itself (collection `feedback`, one doc per product ID).
 - [ ] Claude: read the feedback (ArtifactData `list` on collection `feedback` of that URL), fold
