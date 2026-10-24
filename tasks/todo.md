@@ -7,9 +7,10 @@ Workflow: design → builder check → plan (`docs/superpowers/plans/2026-10-23-
 → Codex adversarial plan review → parallel subagents per slice → PR + merge per slice.
 Live switch `storefront_settings.checkout_live` stays **false** until owner accounts are ready.
 
-- [ ] Builder check on design
-- [ ] Plan written
-- [ ] Codex adversarial review of plan, fixes applied
+- [x] Builder check on design (7 gaps resolved, 2 by owner: credit never expires; RTO = refund items, keep shipping)
+- [x] Plan written: `docs/superpowers/plans/2026-10-23-online-orders.md` (branch feat/online-orders-docs)
+- [ ] Codex adversarial review of plan, fixes applied (running)
+- Slice 0 nudge: subagent building in worktree (running)
 - [ ] Slice 1 Foundation  - [ ] 2 Pay  - [ ] 3 Ship  - [ ] 4 Admin  - [ ] 5 Refunds/credit/codes  - [ ] 6 Messages/tracking
 
 Owner (parallel): Cashfree signup/KYC; Shiprocket signup/KYC + API user; Gmail app password
