@@ -1,0 +1,82 @@
+{
+  "BC25008": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC25077": {
+    "verdict": "change",
+    "comment": "do not add additional descriptions in package includes, keep it simple; Usually we provide a simple basic salwar but the customers are free to mix match with anything they wish; Usually the neckline is not cut in suits and people are free to get it tailored. Donot write things that are unclear from the images. Just mention the patterns in the descriptions without color/cut dependency."
+  },
+  "BC25107": {
+    "verdict": "change",
+    "comment": "do not add additional descriptions in package includes, keep it simple"
+  },
+  "BC251164": {
+    "verdict": "change",
+    "comment": "Is this a a-line product? I am not sure looking at the photos."
+  },
+  "BC251252": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC251265": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC251336": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC251451": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC252305": {
+    "verdict": "reject",
+    "comment": "This looks like a short kurti from the photos. Assess from the base photos and suggest what to do?"
+  },
+  "BC252340": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC252421": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC252622": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC252652": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC252714": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC25324": {
+    "verdict": "approve",
+    "comment": "Donot invent details that cannot be determined."
+  },
+  "BC25329": {
+    "verdict": "approve",
+    "comment": "Could be a cotton linen blend. Rely on what is actually there in the product details in case of conflicts."
+  },
+  "BC25526": {
+    "verdict": "approve",
+    "comment": "Donot overclaim details that you cannot verify. Usually skirt/sharara is optional as the customers decise to style themselves."
+  },
+  "BC25779": {
+    "verdict": "change",
+    "comment": "Assume typical kurta length, I am not sure about sihouette/sleeve style outside what is shown in mockups. Rely on that. Finally, pajamas are almost always plain white by default except shown in the base images (not mockup). Assume that for all kurta pajamas"
+  },
+  "BC25881": {
+    "verdict": "approve",
+    "comment": ""
+  },
+  "BC25896": {
+    "verdict": "approve",
+    "comment": ""
+  }
+}

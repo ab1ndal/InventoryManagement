@@ -1,0 +1,1 @@
+Keep "Package includes" simple: plain piece names only, no fabric or work details.
