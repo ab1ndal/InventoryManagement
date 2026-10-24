@@ -7,6 +7,10 @@
     {
       "source": "/sb-auth/:path*",
       "destination": "https://epotsxdugwfhyeiudjox.supabase.co/auth/v1/:path*"
+    },
+    {
+      "source": "/hooks/courier-status",
+      "destination": "https://epotsxdugwfhyeiudjox.supabase.co/functions/v1/courier-status"
     }
   ]
 }
