@@ -73,7 +73,7 @@ contradicts the text, flag it for review instead of choosing.
 Flow: Drive originals (up to 3, 1600px) + 1 mockup + current text → Codex Terra; products with
 uncertain/conflict/low-confidence output (7 of 20) → Claude Sonnet second opinion via `claude -p`.
 Terra: 74 s for 20 with 4 parallel, about 0.5% of the Plus 5-hour window each. Sonnet: about $0.18
-usage-equivalent each. Review page: https://claude.ai/artifact/7ft65naksZtpdYTVPpDJGe
+usage-equivalent each. Review page: https://claude.ai/artifact/PDsnoPKgJFeqmaezwfLZga
 - Mockups always show stitched garments; unstitched rule (originals only) fixed BC25077/BC25107.
 - Size field already holds UNSTITCHED / FREE-SIZE: feed it to the prompt as fact.
 - Terra misses: "Includes: kurti." on single pieces, omitted the blazer in BC25896's set, repeats
@@ -88,7 +88,7 @@ State on 2026-10-19: pilot done, waiting for owner feedback on the review page. 
 
 1. Read this file, then `scripts/describe/README.md` (how to run the pipeline).
 2. Read the owner's per-product feedback from the pilot page
-   https://claude.ai/artifact/7ft65naksZtpdYTVPpDJGe: ArtifactData `list` on collection `feedback`.
+   https://claude.ai/artifact/PDsnoPKgJFeqmaezwfLZga: ArtifactData `list` on collection `feedback`.
    There is one doc per product ID: `{verdict: approve|change|reject, comment, proposed, updatedAt}`.
    Also check `ArtifactComments` for page-level comments. To republish an updated page, rebuild it
    with `scripts/describe/build_review.js`, then publish to that `url` (read it first), keeping
@@ -117,3 +117,16 @@ State on 2026-10-19: pilot done, waiting for owner feedback on the review page. 
 - [ ] Pilot script: Drive originals + mockups + current text → Codex → review CSV/HTML (20 products
       across categories). No DB writes.
 - [ ] Owner approves pilot → migration for the tag tables → batch run → PDP rows + 2 filters.
+
+## Owner decisions (2026-10-24)
+
+- Review page moved to https://claude.ai/artifact/PDsnoPKgJFeqmaezwfLZga (the old page was gone; rebuilt
+  from `.describe-work/pilot` with `build_review.js`). Owner is now leaving per-product feedback there.
+- Split by product: mockup-generator writes descriptions for NEW products at image approval (owner reviews
+  each); this repo's batch reviews the existing ~787 live products. Both use `scripts/describe/prompt.md`
+  and the "Description format" rules above.
+- Marker columns approved: `products.description_source` (manual | ai | ai_reviewed) +
+  `products.description_reviewed_at`. The batch skips ai_reviewed and manual rows; admin edits set manual.
+  Migration not written yet; confirm which repo's session writes it.
+- Text vs photo conflicts: flag for review, leave the fact out.
+- Tags in both repos, only after the owner approves the `tag_vocab` draft.

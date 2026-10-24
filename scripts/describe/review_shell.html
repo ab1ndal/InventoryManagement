@@ -113,7 +113,7 @@ textarea:focus-visible, .fb button:focus-visible, .verdicts input:focus-visible 
   };
   const setAll = (disabled, msg) => forms.forEach(f => {
     f.querySelectorAll("input,textarea,button").forEach(el => (el.disabled = disabled));
-    if (msg) f.querySelector(".st").textContent = msg;
+    if (msg !== undefined) f.querySelector(".st").textContent = msg;
   });
   setAll(true, "Connecting…");
   paint();
