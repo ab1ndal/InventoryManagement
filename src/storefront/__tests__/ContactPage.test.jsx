@@ -14,4 +14,15 @@ describe("ContactPage", () => {
       expect.stringContaining("wa.me/919810873280")
     );
   });
+
+  it("pins the map and directions to the Google listing, not the address text", () => {
+    render(<ContactPage />);
+    const map = screen.getByTitle(/store location/i);
+    expect(map.getAttribute("src")).toContain("q=28.6658525,77.4270128");
+    expect(map.getAttribute("src")).not.toMatch(/Sihani/i);
+    expect(screen.getByRole("link", { name: /directions/i })).toHaveAttribute(
+      "href",
+      "https://maps.google.com/?cid=3990311017020362668"
+    );
+  });
 });
