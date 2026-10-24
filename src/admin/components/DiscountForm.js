@@ -63,6 +63,7 @@ const discountSchema = z
     exclusive: z.boolean().default(false),
     auto_apply: z.boolean().default(false),
     active: z.boolean().default(true),
+    storefront_redeemable: z.boolean().default(false),
   })
   .refine((d) => !d.start_date || !d.end_date || d.end_date >= d.start_date, {
     message: "End date must be on or after start date",
@@ -252,6 +253,7 @@ function toFormValues(d) {
     exclusive: d.exclusive ?? false,
     auto_apply: d.auto_apply ?? false,
     active: d.active ?? true,
+    storefront_redeemable: d.storefront_redeemable ?? false,
   };
 }
 
@@ -276,6 +278,7 @@ const EMPTY_DEFAULTS = {
   exclusive: false,
   auto_apply: false,
   active: true,
+  storefront_redeemable: false,
 };
 
 // ─── component ───────────────────────────────────────────────────────────────
@@ -357,6 +360,7 @@ export default function DiscountForm({ defaultValues, onSuccess, onCancel }) {
       exclusive: data.exclusive ?? false,
       auto_apply: data.auto_apply ?? false,
       active: data.active ?? true,
+      storefront_redeemable: data.storefront_redeemable ?? false,
     };
 
     let error;
@@ -654,6 +658,7 @@ export default function DiscountForm({ defaultValues, onSuccess, onCancel }) {
           { name: "exclusive", label: "Exclusive (can't stack)" },
           { name: "once_per_customer", label: "Once per customer" },
           { name: "active", label: "Active" },
+          { name: "storefront_redeemable", label: "Valid on website" },
         ].map(({ name, label }) => (
           <Controller
             key={name}
