@@ -1,3 +1,8 @@
+// The nudge queries Supabase for suggestions (FreeShippingNudge.test.jsx
+// covers that); here we only check it receives the subtotal.
+jest.mock("../components/FreeShippingNudge", () => ({ amount }) =>
+  require("react").createElement("div", { "data-testid": "free-shipping-nudge", "data-amount": amount })
+);
 const mockRevalidate = jest.fn(async () => []);
 jest.mock("../context/CartContext", () => ({
   useCart: () => ({
@@ -29,4 +34,10 @@ it("lists items, shows subtotal, and revalidates on mount", async () => {
   await waitFor(() => expect(mockRevalidate).toHaveBeenCalled());
   expect(screen.getByRole("link", { name: /order on whatsapp/i })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /^checkout$/i })).toHaveAttribute("href", "/checkout");
+});
+
+it("passes the subtotal to the free-shipping nudge", async () => {
+  render(<MemoryRouter><CartPage /></MemoryRouter>);
+  expect(screen.getByTestId("free-shipping-nudge")).toHaveAttribute("data-amount", "3000");
+  await waitFor(() => expect(mockRevalidate).toHaveBeenCalled());
 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FREE_SHIPPING_THRESHOLD } from "./freeShipping";
 
 // Pure checkout helpers. No DB access, no payment integration — the
 // checkout page these back is a UI-only placeholder (see CheckoutPage.jsx).
@@ -42,7 +43,6 @@ export const INDIAN_STATES = [
   "Puducherry",
 ];
 
-const FREE_SHIPPING_THRESHOLD = 5000;
 const STANDARD_SHIPPING_FEE = 99;
 
 // Flat ₹99 shipping below ₹5000 subtotal, free at/above it.

@@ -3,6 +3,7 @@ import { Navigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Seo from "../components/Seo";
+import FreeShippingNudge from "../components/FreeShippingNudge";
 import { useCart } from "../context/CartContext";
 import { formatSize } from "../lib/sizes";
 import { addressSchema, shippingFee, INDIAN_STATES } from "../lib/checkout";
@@ -188,6 +189,9 @@ export default function CheckoutPage() {
               </li>
             ))}
           </ul>
+          <div className="pt-4">
+            <FreeShippingNudge amount={subtotal} cartItems={items} />
+          </div>
           <div className="border-t border-storefront-border pt-4 mt-2 space-y-2 text-sm font-sans text-storefront-charcoal">
             <div className="flex justify-between">
               <span>Subtotal</span>
