@@ -1,26 +1,38 @@
 # Todo
 
-## IN FLIGHT: online orders build (started 2026-10-23, running unattended)
+## ONLINE ORDERS: built, awaiting go-live (2026-10-24)
 
-Design: `docs/superpowers/specs/2026-10-23-online-orders-design.md` (owner-approved in chat).
-Workflow: design → builder check → plan (`docs/superpowers/plans/2026-10-23-online-orders.md`)
-→ Codex adversarial plan review → parallel subagents per slice → PR + merge per slice.
-Live switch `storefront_settings.checkout_live` stays **false** until owner accounts are ready.
+Live DB has every migration (atomic writes, online orders, r7, refunds, ship); `checkout_live = false`.
+Merged + deployed: free-shipping nudge (#39), in-store atomic billing + product/customer delta edits (#46),
+server functions + admin Online Orders screen (#47). Edge Functions are in the repo but **not deployed**.
+Held branch: `feat/online-orders-storefront` (live checkout UI, order/track/account/refund pages, policy text
+for courier-rate shipping) — merge at go-live so policy wording matches what customers pay.
 
-- [x] Builder check on design (7 gaps resolved, 2 by owner: credit never expires; RTO = refund items, keep shipping)
-- [x] Plan written: `docs/superpowers/plans/2026-10-23-online-orders.md` (branch feat/online-orders-docs)
-- [x] Codex adversarial review: 25 findings folded into plan as R1–R20 (adds Slice 1b: in-store atomic writes)
-- [x] Slice 0 nudge SHIPPED (PR #39, live + verified in browser 2026-10-23)
-- [x] Local test DB harness: `scripts/test-db.sh up` (schema/test_harness/bootstrap.sql, generated from live catalog)
-- [x] Task 2 pricing merged (PR #41). Docs/plan/harness merged (PR #40).
-- Task 1b in-store atomic writes DONE on branch `worktree-agent-aa4f47beda722f64c` (bf04fa4) — **hold until R1 migration is live on prod**, then PR + merge.
-- Task 1 DB migrations: running.
-- R22 (ProductTable/CustomerForm absolute overwrites) = go-live blocker, not started.
-- [ ] Slice 1 Foundation  - [ ] 2 Pay  - [ ] 3 Ship  - [ ] 4 Admin  - [ ] 5 Refunds/credit/codes  - [ ] 6 Messages/tracking
+### Go-live checklist (owner + controller, in order)
+1. Owner: Cashfree account active (sandbox keys first), Shiprocket KYC + API user + pickup location `Shop`,
+   Gmail app password for bindalscreations@gmail.com. Owner puts secrets in Supabase (never chat):
+   CASHFREE_CLIENT_ID, CASHFREE_CLIENT_SECRET, CASHFREE_ENV=sandbox, SHIPROCKET_API_EMAIL,
+   SHIPROCKET_API_PASSWORD, SHIPROCKET_WEBHOOK_TOKEN, GMAIL_USER, GMAIL_APP_PASSWORD, ALLOWED_ORIGIN,
+   SITE_URL, IP_HASH_SALT, CRON_SECRET.
+2. Deploy functions: `--no-verify-jwt` for checkout-quote, create-order, order-status, cashfree-webhook,
+   run-jobs, courier-status, refund-choice, refund-sweeper; admin-order-action with JWT verification on.
+3. Enable pg_cron + pg_net; Vault secrets `online_orders_project_url`, `online_orders_cron_secret`; then run
+   `schema/golive_online_orders_cron.sql` by hand.
+4. Cashfree dashboard webhook → cashfree-webhook URL; Shiprocket webhook →
+   `https://www.bindalscreations.com/hooks/courier-status` with x-api-key token.
+5. Merge `feat/online-orders-storefront`.
+6. Sandbox end-to-end with checkout switched on for testing only: pay (UPI testsuccess@gocash), shelf check
+   1 of 2 unavailable, Process (AWB/label/BoS), refund both choices, cancel, tracking webhook. Settle the
+   UNVERIFIED API items (api notes files) against real responses.
+7. Switch CASHFREE_ENV=production + live keys, superadmin flips "Online checkout" on in /admin/online-orders.
 
-Owner (parallel): Cashfree signup/KYC; Shiprocket signup/KYC + API user; Gmail app password
-for bindalscreations@gmail.com (2-Step Verification on). Secrets go into Supabase, never chat.
-
+### Follow-ups (non-blocking)
+- "Send back to To-check" for an order stuck in processing after AWB (ship builder gap 1).
+- Courier fallback if quoted courier refuses; Shiprocket duplicate order_id / update-keeps-shipment checks.
+- BillTable/BillingForm: block edit/cancel/delete of online (Website) bills; hide Website from the in-store
+  payment picker (review S5).
+- `salesmethods` serial sequence lags its rows (pre-existing; new in-store method inserts would collide).
+- Two Shiprocket token-store helpers (pay context.ts vs ship process.ts) — consolidate.
 
 ## Website review with Anushka (2026-10-19), in priority order
 
