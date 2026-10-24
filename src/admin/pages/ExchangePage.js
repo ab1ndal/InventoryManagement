@@ -285,22 +285,17 @@ export default function ExchangePage() {
     if (selected.length === 0) return;
     setConfirmSaving(true);
     try {
-      // 1. Restock inventory variants
+      // 1. Restock inventory variants — atomic stock + qty in the DB, because online
+      // orders change the same stock concurrently
       for (const ri of selected) {
         if (ri.variantid) {
-          const { data: variant, error: ve } = await supabase
-            .from("productsizecolors")
-            .select("stock")
-            .eq("variantid", ri.variantid)
-            .single();
-          if (ve) throw new Error(`Variant lookup failed: ${ve.message}`);
-          if (variant) {
-            const { error } = await supabase
-              .from("productsizecolors")
-              .update({ stock: Number(variant.stock || 0) + Number(ri.returnQty) })
-              .eq("variantid", ri.variantid);
-            if (error) throw new Error(`Inventory restock failed: ${error.message}`);
-          }
+          const { error } = await supabase.rpc("stock_adjust", {
+            p_variant: ri.variantid,
+            p_delta: Number(ri.returnQty),
+            p_reason: "exchange_return",
+            p_ref: String(loadedBill.billid),
+          });
+          if (error) throw new Error(`Inventory restock failed: ${error.message}`);
         }
       }
 

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computePreTaxBalanceDiscount, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
-import { tallyPayment } from "./paymentHelpers";
+import { tallyPayment, storeCreditDeductionDelta } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -44,6 +44,62 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
+
+// Online orders change productsizecolors.stock, customers.store_credit and vouchers
+// concurrently with this screen, so each of those writes is one atomic DB call
+// (stock = stock + delta in SQL) rather than read-then-write-back, which would
+// overwrite an online change made between the read and the write.
+const adjustStock = (variantId, delta, reason, ref) =>
+  supabase.rpc("stock_adjust", {
+    p_variant: variantId,
+    p_delta: delta,
+    p_reason: reason,
+    p_ref: String(ref),
+  });
+
+// Deducts `amount` (negative = adds back), flooring the balance at 0 exactly as the
+// old Math.max(0, balance - amount) write did. Throws on any failure.
+async function deductStoreCredit(customerId, amount, reason, ref) {
+  const { data, error } = await supabase
+    .from("customers")
+    .select("store_credit")
+    .eq("customerid", customerId)
+    .single();
+  if (error) throw error;
+  const delta = storeCreditDeductionDelta(data?.store_credit, amount);
+  if (delta === 0) return;
+  const { error: rpcErr } = await supabase.rpc("store_credit_adjust", {
+    p_customer: customerId,
+    p_delta: delta,
+    p_reason: reason,
+    p_ref: String(ref),
+  });
+  if (rpcErr) throw rpcErr;
+}
+
+// Atomically marks the voucher redeemed against this bill. The DB refuses (false)
+// if it was redeemed meanwhile, has expired, or is held for an online order.
+async function redeemVoucher(voucherId, billId) {
+  const { data, error } = await supabase.rpc("voucher_redeem", {
+    p_voucher: voucherId,
+    p_bill: billId,
+  });
+  if (error) throw error;
+  if (data !== true) {
+    throw new Error(
+      `Voucher ${voucherId} can no longer be used (already redeemed, expired or reserved for an online order). Bill not finalized.`,
+    );
+  }
+}
+
+// Undoes this bill's own redemption before the bill row is rolled back
+// (vouchers.redeemed_billid references bills, so the delete fails otherwise).
+const releaseVoucher = (voucherId, billId) =>
+  supabase
+    .from("vouchers")
+    .update({ redeemed: false, redeemed_at: null, redeemed_billid: null })
+    .eq("voucher_id", voucherId)
+    .eq("redeemed_billid", billId);
 
 function isAutoApplyEligible(d, items, today) {
   // Date guards (defensive — loadDiscounts already filters, but belt-and-suspenders)
@@ -648,7 +704,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const { data, error } = await supabase
         .from("vouchers")
-        .select("voucher_id, customerid, expiry_date, value, redeemed")
+        .select("voucher_id, customerid, expiry_date, value, redeemed, held_order_id")
         .eq("voucher_id", code)
         .maybeSingle();
       if (error) throw error;
@@ -658,6 +714,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
       if (data.redeemed) {
         setVoucherError("Voucher code not found or already redeemed.");
+        return;
+      }
+      if (data.held_order_id != null) {
+        setVoucherError("This voucher is reserved for an online order");
         return;
       }
       if (data.expiry_date && data.expiry_date < today) {
@@ -881,11 +941,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (!isBackdated) {
           for (const [vid, delta] of Object.entries(deltaMap)) {
             if (delta === 0) continue;
-            const currentStock = stockMap[vid]?.stock ?? 0;
-            const { error: stockUpdateErr } = await supabase
-              .from("productsizecolors")
-              .update({ stock: currentStock + delta })
-              .eq("variantid", vid);
+            const { error: stockUpdateErr } = await adjustStock(vid, delta, "bill_draft_edit", billId);
             if (stockUpdateErr) {
               console.error("Stock update failed for", vid, stockUpdateErr);
               stockFailures.push(vid);
@@ -1003,11 +1059,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       const newDraftStockFailures = [];
       if (!isBackdated) {
         for (const it of inventoryItems) {
-          const currentStock = stockMap[it.variantid]?.stock ?? 0;
-          const { error: stockUpdateErr } = await supabase
-            .from("productsizecolors")
-            .update({ stock: currentStock - it.quantity })
-            .eq("variantid", it.variantid);
+          const { error: stockUpdateErr } = await adjustStock(
+            it.variantid,
+            -it.quantity,
+            "bill_draft_create",
+            bill.billid,
+          );
           if (stockUpdateErr) {
             console.error(
               "Stock update failed for",
@@ -1151,6 +1208,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       appliedStoreCredit,
       exchangeCredit?.amount,
     );
+    const stockFailures = [];
     try {
       if (!activeBillId) {
         // New bill: validate, create, and finalize in one step
@@ -1222,6 +1280,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setEffectiveBillNumber(bill.bill_number || null);
         pdfBillNumber = bill.bill_number || null;
 
+        // D-23: Redeem the voucher before anything else hangs off this bill, so a
+        // refusal (redeemed/held meanwhile) leaves nothing to undo but the bill row.
+        if (appliedVoucher?.voucher_id) {
+          try {
+            await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
+          } catch (vErr) {
+            await supabase.from("bills").delete().eq("billid", activeBillId);
+            throw vErr;
+          }
+        }
+
         // Link exchange rows to this new bill
         if (exchangeCredit?.exchangeIds?.length) {
           await supabase
@@ -1242,6 +1311,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bill_items")
           .insert(billItemsPayload);
         if (itemsError) {
+          if (appliedVoucher?.voucher_id) {
+            await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
+          }
           await supabase.from("bills").delete().eq("billid", activeBillId);
           throw new Error("Failed to save bill items: " + itemsError.message);
         }
@@ -1262,17 +1334,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         // Decrement stock (skipped for backdated bills)
         if (!isBackdated) {
           for (const it of inventoryItems) {
-            const currentStock = stockMap[it.variantid]?.stock ?? 0;
-            const { error: stockUpdateErr } = await supabase
-              .from("productsizecolors")
-              .update({ stock: currentStock - it.quantity })
-              .eq("variantid", it.variantid);
-            if (stockUpdateErr)
+            const { error: stockUpdateErr } = await adjustStock(
+              it.variantid,
+              -it.quantity,
+              "bill_finalize",
+              activeBillId,
+            );
+            if (stockUpdateErr) {
               console.error(
                 "Stock update failed for",
                 it.variantid,
                 stockUpdateErr,
               );
+              stockFailures.push(it.variantid);
+            }
           }
         }
 
@@ -1336,6 +1411,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           }
         }
 
+        // D-23: Redeem the voucher before the bill is marked finalized, so a refusal
+        // leaves the draft untouched (skip on re-finalization — already redeemed)
+        if (appliedVoucher?.voucher_id && !isFinalizedBill) {
+          await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
+        }
+
         // Update bill row — all fields
         const { error: billErr } = await supabase
           .from("bills")
@@ -1391,12 +1472,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (!isBackdated) {
           for (const [vid, delta] of Object.entries(deltaMap)) {
             if (delta === 0) continue;
-            const currentStock = stockMap[vid]?.stock ?? 0;
-            const { error: stockUpdateErr } = await supabase
-              .from("productsizecolors")
-              .update({ stock: currentStock + delta })
-              .eq("variantid", vid);
-            if (stockUpdateErr) console.error("Stock update failed for", vid, stockUpdateErr);
+            const { error: stockUpdateErr } = await adjustStock(vid, delta, "bill_edit", activeBillId);
+            if (stockUpdateErr) {
+              console.error("Stock update failed for", vid, stockUpdateErr);
+              stockFailures.push(vid);
+            }
           }
         }
 
@@ -1404,16 +1484,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (isFinalizedBill && selectedCustomerId) {
           const creditDelta = storeCreditUsed - origStoreCreditUsed;
           if (creditDelta !== 0) {
-            const { data: custRow } = await supabase
-              .from("customers")
-              .select("store_credit")
-              .eq("customerid", selectedCustomerId)
-              .single();
-            const newBalance = Math.max(0, Number(custRow?.store_credit ?? 0) - creditDelta);
-            await supabase
-              .from("customers")
-              .update({ store_credit: newBalance })
-              .eq("customerid", selectedCustomerId);
+            await deductStoreCredit(selectedCustomerId, creditDelta, "bill_refinalize", activeBillId);
           }
         }
       }
@@ -1435,51 +1506,22 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (duErr) throw duErr;
       }
 
-      // D-23: Mark applied voucher redeemed (skip on re-finalization — already redeemed)
-      if (appliedVoucher?.voucher_id && !isFinalizedBill) {
-        const { error: vErr } = await supabase
-          .from("vouchers")
-          .update({
-            redeemed: true,
-            redeemed_at: new Date().toISOString(),
-            redeemed_billid: activeBillId,
-          })
-          .eq("voucher_id", appliedVoucher.voucher_id);
-        if (vErr) throw vErr;
-      }
-
       // D-18 + D-26: Decrement customer store credit (new bill or draft→finalized only;
       // re-finalization credit delta is handled in the else block above).
       // Exchange credit is separate — not drawn from store_credit balance.
       const totalCreditToDeduct = storeCreditUsed;
       if (totalCreditToDeduct > 0 && !isFinalizedBill && selectedCustomerId) {
-        const { data: custCredRow, error: credFetchErr } = await supabase
-          .from("customers")
-          .select("store_credit")
-          .eq("customerid", selectedCustomerId)
-          .single();
-        if (credFetchErr) throw credFetchErr;
-        const currentBalance = Number(custCredRow?.store_credit ?? 0);
-        const newBalance = Math.max(0, currentBalance - totalCreditToDeduct);
-        const { error: credUpdErr } = await supabase
-          .from("customers")
-          .update({ store_credit: newBalance })
-          .eq("customerid", selectedCustomerId);
-        if (credUpdErr) throw credUpdErr;
+        await deductStoreCredit(selectedCustomerId, totalCreditToDeduct, "bill_finalize", activeBillId);
       }
 
       // Add unused exchange balance to store credit when customer chooses that option
       if (exchangeBalance > 0 && exchangeBalanceMode === "store_credit" && selectedCustomerId) {
-        const { data: custRow, error: fetchErr } = await supabase
-          .from("customers")
-          .select("store_credit")
-          .eq("customerid", selectedCustomerId)
-          .single();
-        if (fetchErr) throw fetchErr;
-        const { error: updErr } = await supabase
-          .from("customers")
-          .update({ store_credit: Number(custRow?.store_credit ?? 0) + exchangeBalance })
-          .eq("customerid", selectedCustomerId);
+        const { error: updErr } = await supabase.rpc("store_credit_adjust", {
+          p_customer: selectedCustomerId,
+          p_delta: exchangeBalance,
+          p_reason: "exchange_credit",
+          p_ref: String(activeBillId),
+        });
         if (updErr) throw updErr;
       }
 
@@ -1509,6 +1551,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
       // Steps 9-10: success toast + close
       toast.success(`Bill #${activeBillId} finalized`);
+      if (stockFailures.length > 0) {
+        toast.error("Stock sync warning", {
+          description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
+        });
+      }
       const custName = selectedCustomerId
         ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
         : null;
@@ -1538,6 +1585,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       exchangeCredit?.amount,
     );
     const isNewBill = !billId;
+    const stockFailures = [];
     try {
       if (items.length === 0) {
         toast.error("Add at least one item");
@@ -1604,6 +1652,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         pdfBillNumber = bill.bill_number || null;
         setEffectiveBillNumber(bill.bill_number || null);
 
+        // Redeem the voucher first so a refusal leaves only the bill row to undo
+        if (appliedVoucher?.voucher_id) {
+          try {
+            await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
+          } catch (vErr) {
+            await supabase.from("bills").delete().eq("billid", activeBillId);
+            throw vErr;
+          }
+        }
+
         if (exchangeCredit?.exchangeIds?.length) {
           await supabase
             .from("exchanges")
@@ -1622,6 +1680,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bill_items")
           .insert(billItemsPayload);
         if (itemsError) {
+          if (appliedVoucher?.voucher_id) {
+            await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
+          }
           await supabase.from("bills").delete().eq("billid", activeBillId);
           throw new Error("Failed to save bill items: " + itemsError.message);
         }
@@ -1634,11 +1695,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
         if (!isBackdated) {
           for (const it of inventoryItems) {
-            const currentStock = stockMap[it.variantid]?.stock ?? 0;
-            await supabase
-              .from("productsizecolors")
-              .update({ stock: currentStock - it.quantity })
-              .eq("variantid", it.variantid);
+            const { error: stockUpdateErr } = await adjustStock(
+              it.variantid,
+              -it.quantity,
+              "bill_partial_finalize",
+              activeBillId,
+            );
+            if (stockUpdateErr) {
+              console.error("Stock update failed for", it.variantid, stockUpdateErr);
+              stockFailures.push(it.variantid);
+            }
           }
         }
       } else {
@@ -1677,6 +1743,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               return;
             }
           }
+        }
+
+        // Redeem the voucher before the draft is marked finalized
+        if (appliedVoucher?.voucher_id) {
+          await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
         }
 
         const { error: billErr } = await supabase
@@ -1725,11 +1796,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (!isBackdated) {
           for (const [vid, delta] of Object.entries(deltaMap)) {
             if (delta === 0) continue;
-            const currentStock = stockMap[vid]?.stock ?? 0;
-            await supabase
-              .from("productsizecolors")
-              .update({ stock: currentStock + delta })
-              .eq("variantid", vid);
+            const { error: stockUpdateErr } = await adjustStock(vid, delta, "bill_partial_finalize", activeBillId);
+            if (stockUpdateErr) {
+              console.error("Stock update failed for", vid, stockUpdateErr);
+              stockFailures.push(vid);
+            }
           }
         }
 
@@ -1752,7 +1823,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
         .single();
       if (payErr) {
-        if (isNewBill) await supabase.from("bills").delete().eq("billid", activeBillId);
+        if (isNewBill) {
+          if (appliedVoucher?.voucher_id) {
+            await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
+          }
+          await supabase.from("bills").delete().eq("billid", activeBillId);
+        }
         throw new Error("Failed to record payment: " + payErr.message);
       }
 
@@ -1769,32 +1845,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (duErr) throw duErr;
       }
 
-      // Mark voucher redeemed
-      if (appliedVoucher?.voucher_id) {
-        const { error: vErr } = await supabase
-          .from("vouchers")
-          .update({
-            redeemed: true,
-            redeemed_at: new Date().toISOString(),
-            redeemed_billid: activeBillId,
-          })
-          .eq("voucher_id", appliedVoucher.voucher_id);
-        if (vErr) throw vErr;
-      }
-
       // Decrement store credit
       if (storeCreditUsed > 0 && selectedCustomerId) {
-        const { data: custCredRow, error: credFetchErr } = await supabase
-          .from("customers")
-          .select("store_credit")
-          .eq("customerid", selectedCustomerId)
-          .single();
-        if (credFetchErr) throw credFetchErr;
-        const currentBalance = Number(custCredRow?.store_credit ?? 0);
-        await supabase
-          .from("customers")
-          .update({ store_credit: Math.max(0, currentBalance - storeCreditUsed) })
-          .eq("customerid", selectedCustomerId);
+        await deductStoreCredit(selectedCustomerId, storeCreditUsed, "bill_partial_finalize", activeBillId);
       }
 
       // Flush all payment state into InvoiceView before PDF capture
@@ -1818,6 +1871,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       toast.success(
         `Bill #${activeBillId} saved — ₹${balanceDue.toFixed(2)} balance due`
       );
+      if (stockFailures.length > 0) {
+        toast.error("Stock sync warning", {
+          description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
+        });
+      }
       const custName = selectedCustomerId
         ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
         : null;

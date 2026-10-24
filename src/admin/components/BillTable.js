@@ -443,20 +443,30 @@ export default function BillTable({ onEdit }) {
       }
     }
 
+    // Atomic stock + qty in the DB (online orders change the same stock concurrently).
+    // A failure warns rather than aborts: aborting mid-loop would make a retry
+    // restock the already-restored variants twice.
+    const stockFailures = [];
     for (const bi of billItems || []) {
       const netQty = bi.quantity - (exchangedQtyMap[bi.bill_item_id] || 0);
       if (netQty <= 0) continue;
-      const { data: variant } = await supabase
-        .from("productsizecolors")
-        .select("stock")
-        .eq("variantid", bi.variantid)
-        .single();
-      if (variant) {
-        await supabase
-          .from("productsizecolors")
-          .update({ stock: variant.stock + netQty })
-          .eq("variantid", bi.variantid);
+      const { error } = await supabase.rpc("stock_adjust", {
+        p_variant: bi.variantid,
+        p_delta: netQty,
+        p_reason: "bill_cancel",
+        p_ref: String(billId),
+      });
+      if (error) {
+        console.error("Stock restore failed for", bi.variantid, error);
+        stockFailures.push(bi.variantid);
       }
+    }
+    if (stockFailures.length > 0) {
+      toast({
+        title: "Stock sync warning",
+        description: `Stock could not be restored for ${stockFailures.length} variant(s). Please recheck inventory.`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -471,17 +481,13 @@ export default function BillTable({ onEdit }) {
       .single();
     const refund = Number(billRow?.store_credit_used ?? 0);
     if (!(refund > 0)) return;
-    const { data: custRow } = await supabase
-      .from("customers")
-      .select("store_credit")
-      .eq("customerid", customerid)
-      .single();
-    if (!custRow) return;
-    const newBalance = Number(custRow.store_credit ?? 0) + refund;
-    await supabase
-      .from("customers")
-      .update({ store_credit: newBalance })
-      .eq("customerid", customerid);
+    const { error } = await supabase.rpc("store_credit_adjust", {
+      p_customer: customerid,
+      p_delta: refund,
+      p_reason: "bill_cancel_refund",
+      p_ref: String(billId),
+    });
+    if (error) throw new Error("Store credit refund failed: " + error.message);
   };
 
   const handleCancelDraft = async (bill) => {
@@ -597,18 +603,13 @@ export default function BillTable({ onEdit }) {
         .eq("billid", billId)
         .single();
       const refundAmount = Number(billRow?.net_amount ?? totalamount ?? 0);
-      const { data: custRow } = await supabase
-        .from("customers")
-        .select("store_credit")
-        .eq("customerid", customerid)
-        .single();
-      if (custRow) {
-        const newCredit = Number(custRow.store_credit ?? 0) + refundAmount;
-        await supabase
-          .from("customers")
-          .update({ store_credit: newCredit })
-          .eq("customerid", customerid);
-      }
+      const { error: creditErr } = await supabase.rpc("store_credit_adjust", {
+        p_customer: customerid,
+        p_delta: refundAmount,
+        p_reason: "bill_cancel_credit",
+        p_ref: String(billId),
+      });
+      if (creditErr) throw new Error("Store credit could not be added: " + creditErr.message);
       await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
       const { error } = await supabase

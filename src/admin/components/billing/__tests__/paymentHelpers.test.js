@@ -1,4 +1,20 @@
-import { sumPayments, tallyPayment } from "../paymentHelpers";
+import { sumPayments, tallyPayment, storeCreditDeductionDelta } from "../paymentHelpers";
+
+describe("storeCreditDeductionDelta", () => {
+  test("deducts the full amount when the balance covers it", () => {
+    expect(storeCreditDeductionDelta(500, 300)).toBe(-300);
+  });
+  test("floors the balance at 0 like the old Math.max(0, balance - amount) write", () => {
+    expect(storeCreditDeductionDelta(200, 300)).toBe(-200);
+    expect(storeCreditDeductionDelta(0, 300)).toBe(0);
+  });
+  test("a negative deduction adds credit back", () => {
+    expect(storeCreditDeductionDelta(100, -50)).toBe(50);
+  });
+  test("has no float noise", () => {
+    expect(storeCreditDeductionDelta(100.1, 50.05)).toBe(-50.05);
+  });
+});
 
 describe("sumPayments", () => {
   test("empty or missing rows total zero", () => {

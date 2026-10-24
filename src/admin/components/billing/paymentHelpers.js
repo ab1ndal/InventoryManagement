@@ -33,3 +33,14 @@ export function tallyPayment(existingPayments, newAmount, netAmount) {
     paymentStatus: isFullyPaid ? "finalized" : "partial",
   };
 }
+
+/**
+ * Store-credit change that deducts `deduction` from `balance` without taking it
+ * below zero (a negative `deduction` adds credit back). Billing has always floored
+ * the balance at 0 when it moved since the form loaded it; the atomic
+ * store_credit_adjust RPC takes a delta, so the floor is applied here.
+ */
+export function storeCreditDeductionDelta(balance, deduction) {
+  const bal = Number(balance || 0);
+  return round2(Math.max(0, bal - Number(deduction || 0)) - bal);
+}
