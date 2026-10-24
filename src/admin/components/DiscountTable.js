@@ -64,7 +64,8 @@ export default function DiscountTable({ onEdit, refresh }) {
         start_date,
         end_date,
         active,
-        rules
+        rules,
+        storefront_redeemable
       `);
 
     if (!error) {
@@ -97,7 +98,14 @@ export default function DiscountTable({ onEdit, refresh }) {
         <tbody>
           {discounts.map((d) => (
             <tr key={d.id} className="border-t hover:bg-gray-70">
-              <td className="px-2 py-1 text-center">{d.code || "—"}</td>
+              <td className="px-2 py-1 text-center">
+                {d.code || "—"}
+                {d.storefront_redeemable && (
+                  <span className="ml-1.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-800">
+                    Web
+                  </span>
+                )}
+              </td>
               <td className="px-2 py-1 text-center">
                 {discountTypeLabels[d.type] || d.type}
               </td>

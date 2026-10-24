@@ -50,6 +50,7 @@ const ResetPasswordPage = lazy(() => import("./admin/pages/ResetPasswordPage"));
 const MockupPage = lazy(() => import("./admin/pages/MockupPage"));
 const DashboardPage = lazy(() => import("./admin/pages/DashboardPage"));
 const HistoryPage = lazy(() => import("./admin/pages/HistoryPage"));
+const OnlineOrdersPage = lazy(() => import("./admin/pages/OnlineOrdersPage"));
 
 function App() {
   return (
@@ -103,6 +104,7 @@ function App() {
               </Route>
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="bills" element={<BillingPage />} />
+              <Route path="online-orders" element={<OnlineOrdersPage />} />
               <Route path="vouchers" element={<VoucherPage />} />
               <Route path="discounts" element={<DiscountPage />} />
               <Route path="exchanges" element={<ExchangePage />} />

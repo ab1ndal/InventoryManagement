@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
+import { countOrdersToCheck } from "./onlineOrders/onlineOrdersApi";
 
 const navItems = [
   { label: "Dashboard", path: "/admin/dashboard", superadminOnly: true },
@@ -10,6 +11,7 @@ const navItems = [
   { label: "Inventory", path: "/admin/inventory" },
   { label: "Mockups", path: "/admin/mockups" },
   { label: "Bills", path: "/admin/bills" },
+  { label: "Online Orders", path: "/admin/online-orders", badge: "ordersToCheck" },
   { label: "Vouchers", path: "/admin/vouchers" },
   { label: "Discounts", path: "/admin/discounts" },
   { label: "Exchanges", path: "/admin/exchanges" },
@@ -21,6 +23,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState(null);
+  const [ordersToCheck, setOrdersToCheck] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -38,6 +41,19 @@ export default function AdminLayout() {
       }
     })();
   }, []);
+
+  // Paid online orders waiting for a shelf check; refreshed whenever the tab regains focus.
+  useEffect(() => {
+    const refresh = () =>
+      countOrdersToCheck()
+        .then(setOrdersToCheck)
+        .catch((err) => console.error("[AdminLayout] online order count failed:", err.message));
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, []);
+
+  const badgeCounts = { ordersToCheck };
 
   const visibleNavItems = navItems.filter(
     (item) => !item.superadminOnly || userRole === "superadmin"
@@ -85,6 +101,14 @@ export default function AdminLayout() {
               }
             >
               {item.label}
+              {item.badge && badgeCounts[item.badge] > 0 && (
+                <span
+                  className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-semibold text-white"
+                  aria-label={`${badgeCounts[item.badge]} to check`}
+                >
+                  {badgeCounts[item.badge]}
+                </span>
+              )}
             </NavLink>
           ))}
         </div>
