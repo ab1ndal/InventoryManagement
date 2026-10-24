@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    document.title = "Admin Login | Bindal's Creation";
+    document.title = "Admin Login | Bindals Creation";
 
     if (location.state?.toast === "not_logged_in") {
       sessionStorage.setItem("toastData", JSON.stringify({

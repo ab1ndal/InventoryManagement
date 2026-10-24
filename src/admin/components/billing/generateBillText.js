@@ -1,5 +1,5 @@
 const STORE = {
-  name: "BINDAL'S CREATION",
+  name: "BINDALS CREATION",
   tagline: "A Complete Range of Family Wear",
   address: "58 Sihani Gate Market, Ghaziabad 201001",
   phone: "+91 9810873280 | +91 9810121438",

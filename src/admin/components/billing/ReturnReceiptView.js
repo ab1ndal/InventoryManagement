@@ -5,7 +5,7 @@ import { formatDate } from "../../../utility/dateFormat";
 import { formatINR } from "../../../utility/formatCurrency";
 
 const STORE = {
-  name: "BINDAL'S CREATION",
+  name: "BINDALS CREATION",
   tagline: "A COMPLETE RANGE OF FAMILY WEAR",
   address: "58 Sihani Gate Market, Ghaziabad 201001",
   phone: "+91 9810873280 | +91 9810121438",
@@ -39,7 +39,7 @@ const ReturnReceiptView = forwardRef(function ReturnReceiptView(
           marginBottom: "8px",
         }}
       >
-        <img src={logo} alt="Bindal's Creation" style={{ position: "absolute", left: 0, top: 0, height: "100%", width: "auto", objectFit: "contain" }} />
+        <img src={logo} alt="Bindals Creation" style={{ position: "absolute", left: 0, top: 0, height: "100%", width: "auto", objectFit: "contain" }} />
         <div>
           <div
             style={{

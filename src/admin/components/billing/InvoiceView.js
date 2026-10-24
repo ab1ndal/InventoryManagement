@@ -9,7 +9,7 @@ import {
 } from "./communityInvite";
 
 const STORE = {
-  name: "BINDAL'S CREATION",
+  name: "BINDALS CREATION",
   tagline: "A COMPLETE RANGE OF FAMILY WEAR",
   address: "58 Sihani Gate Market, Ghaziabad 201001",
   phone: "+91 9810873280 | +91 9810121438",
@@ -242,7 +242,7 @@ const InvoiceView = forwardRef(function InvoiceView(
       >
         <img
           src={logo}
-          alt="Bindal's Creation"
+          alt="Bindals Creation"
           style={{
             position: "absolute",
             left: 0,
