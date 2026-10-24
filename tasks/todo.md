@@ -14,8 +14,8 @@ for courier-rate shipping) — merge at go-live so policy wording matches what c
   BINDALS CREATION). Shipped in PRs #49, #50, #51.
 - **Cashfree onboarding DONE 2026-10-24**: KYC passed (PAN verified, owner via DigiLocker since CKYC OTP
   refuses non-individual records, PPOB = GST address option). Dashboard: "You can start transacting now",
-  Payment Gateway/Links/Forms activated, details under review. **Still open: VCIP (video KYC)**, owner emails
-  care@cashfree.com to schedule. Account manager: Saurabh Kumar. Dashboard shows "Next Steps 1/2": confirm
+  Payment Gateway/Links/Forms activated, details under review. **Still open: VCIP (video KYC)**: owner emailed
+  care@cashfree.com 2026-10-24, awaiting slot. Account manager: Saurabh Kumar. Dashboard shows "Next Steps 1/2": confirm
   the bank-account step (shop's current account). Next: owner copies sandbox keys into Supabase secrets
   (go-live checklist step 1).
 - **GST facts (screenshots in `docs/`, untracked):** legal name POOJA BINDAL, trade name Bindals Creation,
@@ -117,7 +117,7 @@ Online orders get a Bill of Supply from the shop, same as in-store.
   (PR #14 rebased + 3 missed "across India" spots).
 - [X] Cashfree KYC in the **shop's** name (proprietor Pooja Bindal). KYC passed 2026-10-24; Terms/Privacy
   live (PR #38) and proprietor named on site (PR #54).
-- [ ] Owner: Cashfree VCIP (video KYC) via care@cashfree.com; confirm bank-account step.
+- [ ] Owner: Cashfree VCIP (video KYC) (email sent 2026-10-24, awaiting slot); confirm bank-account step.
 - [X] Courier: **Shiprocket** (decided 2026-10-20). Owner steps: `tasks/accounts-setup.md` §3;
   integration spec: `tasks/checkout-shipping-plan.md` Phase C.
 - [ ] Ask CA to confirm: composition shop may sell online intra-state from its own website.

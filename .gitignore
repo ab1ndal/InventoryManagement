@@ -37,3 +37,4 @@ vcf-export/
 
 # product description pipeline working files (photos, logs)
 /.describe-work/
+.claude/skills/
