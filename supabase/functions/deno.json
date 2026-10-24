@@ -3,6 +3,8 @@
     "test": "deno test _shared/"
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert@^1"
+    "@std/assert": "jsr:@std/assert@^1",
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
+    "nodemailer": "npm:nodemailer@^9"
   }
 }
