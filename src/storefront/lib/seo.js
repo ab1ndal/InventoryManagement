@@ -25,7 +25,7 @@ export function buildProductJsonLd({ product, variants, imagePaths, productid, c
       availability: inStock
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
-      seller: { "@type": "Organization", name: "BINDAL'S CREATION" },
+      seller: { "@type": "Organization", name: "Bindals Creation" },
     },
   };
 }

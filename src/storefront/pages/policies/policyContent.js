@@ -77,7 +77,7 @@ export const PRIVACY = [
   {
     heading: "Who we are",
     body: [
-      "This website is run by BINDAL'S CREATION, 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 (GSTIN 09ABVPB4203A1Z4). This policy explains what personal information we collect and how we use it.",
+      "This website is run by Bindals Creation, 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 (GSTIN 09ABVPB4203A1Z4). This policy explains what personal information we collect and how we use it.",
     ],
   },
   {
@@ -129,7 +129,7 @@ export const TERMS = [
   {
     heading: "About us",
     body: [
-      "This website is operated by BINDAL'S CREATION, 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 (GSTIN 09ABVPB4203A1Z4). By using this website or placing an order, you agree to these terms.",
+      "This website is operated by Bindals Creation, 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001 (GSTIN 09ABVPB4203A1Z4). By using this website or placing an order, you agree to these terms.",
     ],
   },
   {
@@ -164,7 +164,7 @@ export const TERMS = [
     heading: "Use of this website",
     body: [
       "Do not misuse this website, including scraping, fraud or attempts to break its security.",
-      "Photos and text on this website belong to BINDAL'S CREATION and may not be reused without our permission.",
+      "Photos and text on this website belong to Bindals Creation and may not be reused without our permission.",
     ],
   },
   {
