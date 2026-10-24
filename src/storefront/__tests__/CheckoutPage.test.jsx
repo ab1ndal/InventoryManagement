@@ -1,3 +1,8 @@
+// The nudge queries Supabase for suggestions (FreeShippingNudge.test.jsx
+// covers that); here we only check it receives the item subtotal.
+jest.mock("../components/FreeShippingNudge", () => ({ amount }) =>
+  require("react").createElement("div", { "data-testid": "free-shipping-nudge", "data-amount": amount })
+);
 const mockUseCart = jest.fn();
 jest.mock("../context/CartContext", () => ({
   useCart: () => mockUseCart(),
@@ -49,6 +54,11 @@ it("enables the WhatsApp control once the address form is valid", async () => {
   const whatsappLink = await screen.findByRole("link", { name: /complete your order on whatsapp/i });
   expect(whatsappLink).toHaveAttribute("href", expect.stringContaining("wa.me/919810873280"));
   expect(whatsappLink).toHaveAttribute("href", expect.stringContaining("Ghaziabad"));
+});
+
+it("passes the item subtotal to the free-shipping nudge", () => {
+  render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
+  expect(screen.getByTestId("free-shipping-nudge")).toHaveAttribute("data-amount", "3000");
 });
 
 it("redirects to /cart when the cart is empty", () => {

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "../../context/CartContext";
 import { formatSize } from "../../lib/sizes";
+import FreeShippingNudge from "../FreeShippingNudge";
 
 function CartItem({ item }) {
   const { removeItem, updateQty } = useCart();
@@ -145,6 +146,13 @@ export default function CartDrawer() {
 
         {items.length > 0 && (
           <div className="border-t border-storefront-border px-5 py-5">
+            {/* Mounted only while open: the drawer stays in the DOM, and a
+                closed drawer shouldn't query suggestions on every cart change. */}
+            {isOpen && (
+              <div className="mb-4">
+                <FreeShippingNudge amount={subtotal} cartItems={items} onNavigate={closeCart} />
+              </div>
+            )}
             <div className="flex justify-between mb-4">
               <span className="font-sans text-sm text-storefront-charcoal">
                 Subtotal
