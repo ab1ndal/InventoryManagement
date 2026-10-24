@@ -15,17 +15,18 @@ for courier-rate shipping) — merge at go-live so policy wording matches what c
 - **Cashfree onboarding DONE 2026-10-24**: KYC passed (PAN verified, owner via DigiLocker since CKYC OTP
   refuses non-individual records, PPOB = GST address option). Dashboard: "You can start transacting now",
   Payment Gateway/Links/Forms activated, details under review. **Still open: VCIP (video KYC)**, owner emails
-  care@cashfree.com to schedule. Account manager: Saurabh Kumar. Bank-account step status unconfirmed.
-  Next: merge PR #54 (proprietor name on site) before Cashfree website review; owner copies sandbox keys
-  into Supabase secrets (go-live checklist step 1).
+  care@cashfree.com to schedule. Account manager: Saurabh Kumar. Dashboard shows "Next Steps 1/2": confirm
+  the bank-account step (shop's current account). Next: owner copies sandbox keys into Supabase secrets
+  (go-live checklist step 1).
 - **GST facts (screenshots in `docs/`, untracked):** legal name POOJA BINDAL, trade name Bindals Creation,
   Proprietorship, Composition. GST principal place = *H NO-23, MIRJAJAN-58, Subhangini Fancy Saree, SIHANI GATE,
   Chandrapuri, Ghaziabad, UP 201001*. Owner 2026-10-24: same physical shop as the site address; canonical
   short address = *58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001* (site already uses
   it, no change). "Subhangini Fancy Saree" is a different shop: never use it. Cashfree PPOB: accept the GST
   prefill if it comes; if typed by hand, use the short address.
-  Owner to decide: show "Bindals Creation (Prop. Pooja Bindal)" on bills + footer; ask CA about HSN (6210 on
-  record vs 6204/6211/6203 for ethnic garments).
+  "Bindals Creation (Prop. Pooja Bindal)" now on footer + Privacy + Terms (PR #54, merged 2026-10-24); bills
+  unchanged (owner: website only). Still open: ask CA about HSN (6210 on record vs 6204/6211/6203 for ethnic
+  garments).
 - **Held branch `feat/online-orders-storefront`** now conflicts with the name changes (policyContent.js,
   footer/SEO) — rebase on main and re-run tests before merging at go-live.
 - Guide doc for the owner: https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth (setup steps + what remains).
@@ -112,11 +113,11 @@ delivers within Uttar Pradesh only** (composition dealers can't make inter-state
 CGST s.10(2)(c)). LLP route parked (section below) until India-wide delivery is wanted.
 Online orders get a Bill of Supply from the shop, same as in-store.
 
-- [ ] UP-only checkout + policy/FAQ/trust-bar wording: branch `feat/checkout-up-only-v2`
+- [X] UP-only checkout + policy/FAQ/trust-bar wording: branch `feat/checkout-up-only-v2` (merged, PR #32)
   (PR #14 rebased + 3 missed "across India" spots).
-- [ ] Cashfree KYC in the **shop's** name (proprietor Pooja Bindal, shop's current account).
-  Signup opened 2026-10-23 at merchant.cashfree.com (direct, not a partner link); OTP step pending.
-  Submit the website for review only after `feat/cashfree-readiness` (real Terms/Privacy) is live.
+- [X] Cashfree KYC in the **shop's** name (proprietor Pooja Bindal). KYC passed 2026-10-24; Terms/Privacy
+  live (PR #38) and proprietor named on site (PR #54).
+- [ ] Owner: Cashfree VCIP (video KYC) via care@cashfree.com; confirm bank-account step.
 - [X] Courier: **Shiprocket** (decided 2026-10-20). Owner steps: `tasks/accounts-setup.md` §3;
   integration spec: `tasks/checkout-shipping-plan.md` Phase C.
 - [ ] Ask CA to confirm: composition shop may sell online intra-state from its own website.
