@@ -12,7 +12,7 @@ export const FAQ_ITEMS = [
   },
   {
     q: "What is your return and exchange policy?",
-    a: "We don't offer returns. Exchanges are accepted within 7 days of purchase, in-store only, provided the garment is unworn and in original condition with tags intact.",
+    a: "We don't offer returns. Exchanges are accepted within 7 days of purchase, in-store only, provided the garment is unworn and in original condition with tags intact. Online orders can be cancelled before dispatch for a full refund.",
   },
   {
     q: "Why is only one piece available? Can I reorder a sold-out design?",

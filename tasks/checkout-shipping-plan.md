@@ -2,7 +2,7 @@
 
 Written 2026-10-13. Status: plan, awaiting owner decisions (bottom) and accounts
 (see `tasks/accounts-setup.md`). Builds on the earlier specs, which are still valid:
-`docs/superpowers/specs/2026-05-03-cart-checkout-design.md` (Razorpay + Edge Functions),
+`docs/superpowers/specs/2026-05-03-cart-checkout-design.md` (Razorpay + Edge Functions; gateway is now Cashfree, same shape),
 `docs/STOREFRONT-OVERHAUL-PLAN.md` (orders table, state machine, functions),
 `docs/superpowers/specs/2026-05-30-shipping-fields-design.md` (weights/HSN).
 
@@ -18,7 +18,7 @@ Written 2026-10-13. Status: plan, awaiting owner decisions (bottom) and accounts
 
 > **Current (owner decision 2026-10-20):** the shop sells online itself under the composition
 > scheme, UP-only. UP-only checkout + wording shipped in PR #32. Courier = **Shiprocket**,
-> gateway = **Razorpay**, both KYC'd in the shop's name. (The 2026-10-14 plan to sell via the
+> gateway = **Cashfree** (2026-10-23, replaces Razorpay), both KYC'd in the shop's name. (The 2026-10-14 plan to sell via the
 > regular-scheme LLP across India is parked; see `tasks/todo.md`.)
 
 ## Constraint: composition GST → Uttar Pradesh only
@@ -36,18 +36,32 @@ Consequences:
 ## Recommended stack
 | Need | Choice | Why |
 |---|---|---|
-| Payments | **Razorpay** | Published pricing (2% + GST on UPI/cards/netbanking), no setup or yearly fee, T+1 settlement, Payment Links need no code. Matches the earlier spec. |
+| Payments | **Cashfree** (see Gateway decision below) | 0% platform fee on the first ₹20 lakh (festive offer), then 1.95% + GST. No setup or yearly fee, T+1 settlement, Payment Links free and need no code. |
 | Shipping | **Shiprocket** (owner decision 2026-10-20; dashboard booking first, API in Phase C) | One API for pincode serviceability, rates and tracking across couriers. |
 | COD | **Prepaid only at first**; add COD with a fee + WhatsApp/OTP confirmation if demand shows | COD return rates in fashion run ~30%, and each failed parcel costs ₹150–300 in two-way freight. |
-| Server code | Supabase Edge Functions | The only safe place for the Razorpay secret and webhook signature checks (as in the earlier spec). |
+| Server code | Supabase Edge Functions | The only safe place for the Cashfree secret and webhook signature checks (as in the earlier spec). |
 
 Note: the 0.4% UPI fee (on payments over ₹2,000) was **postponed until after Diwali 2026**. Expect UPI costs to rise later.
+
+### Gateway decision (2026-10-23)
+Switched from Razorpay to **Cashfree** before any account was opened. Checked on both official pricing pages that day:
+- **Cashfree festive offer:** 0% platform fee on the first ₹20,00,000 of GMV for merchants who sign up
+  on or after 21 Jul 2026, valid until 31 Mar 2027. 18% GST is still charged on the notional 1.95%,
+  so it costs about 0.35% of sales. A composition dealer can't claim that GST back. Cost on ₹20 lakh:
+  about ₹7k, against about ₹47k on Razorpay (2% + GST). After the offer: 1.95% vs Razorpay's 2%.
+- **Offer conditions:** one per PAN. Not for partner-referred or custom-priced accounts, so sign up
+  directly. AMEX, corporate cards, EMI and pay-later are excluded. Cashfree may withdraw the offer if
+  credit cards reach 60% or more of GMV (worst case: back to 1.95%).
+- **Build effort:** about the same as Razorpay (order API, JS checkout, signed webhook).
+- **Rejected:** Razorpay (no new-merchant offer). PhonePe PG (promo terms unclear). Shopify: Shopify
+  Payments isn't in India, and Shopify adds 0.5–2% on top of the gateway; it would also duplicate
+  inventory and Bill of Supply billing.
 
 ## Phase A — Diwali bridge (no new code, by ~Oct 25)
 Take prepaid orders online for Diwali without building checkout:
 1. Shopper places an order through the existing WhatsApp checkout message.
-2. Staff confirm stock and delivery address (UP only), then send a **Razorpay Payment Link**
-   from the Razorpay dashboard or app for the exact amount (incl. ₹99 shipping below ₹5,000).
+2. Staff confirm stock and delivery address (UP only), then send a **Cashfree Payment Link**
+   from the Cashfree dashboard or app for the exact amount (incl. ₹99 shipping below ₹5,000).
 3. Once paid: create the Bill of Supply in admin billing as usual, then book the parcel in the
    **Shiprocket dashboard** (pickup from the shop) and send the tracking link on WhatsApp.
 4. The first-order discount (action plan P1 #8) is applied by hand at step 2.
@@ -55,25 +69,25 @@ Take prepaid orders online for Diwali without building checkout:
 Code changes in this phase (small, part of the Diwali work):
 - [ ] Shipping policy: "Uttar Pradesh only", flat ₹99 below ₹5,000 (matches the code), dispatch and delivery times.
 - [ ] Checkout form: UP-only state/pincode validation (UP pincodes start with 20–28) with a clear message.
-- [ ] Replace placeholder Terms/Privacy with real content (needed for Razorpay website approval in Phase B).
+- [x] Replace placeholder Terms/Privacy with real content (owner-approved 2026-10-23, `feat/cashfree-readiness`; Cashfree reviews these at activation).
 
 ## Phase B — Real online checkout (after Diwali, ~2–3 weeks of work)
 Following the earlier spec, trimmed to prepaid-only and UP-only:
 1. **Schema** (`schema/migration_orders.sql`): `orders` (ref, customer, UP shipping address,
    subtotal/shipping/discount/total, status state machine `pending_payment → paid → packed →
-   shipped → delivered`, plus exits `cancelled`/`refunded`; razorpay ids, awb/tracking),
+   shipped → delivered`, plus exits `cancelled`/`refunded`; cashfree ids, awb/tracking),
    `order_items` (variant, qty, price snapshot), stock reservation as in the earlier spec.
 2. **Edge Functions:** `create-order` (re-price from DB, check stock, UP check, compute shipping
-   and discount, create Razorpay order); `razorpay-webhook` (verify signature, mark paid,
+   and discount, create Cashfree order); `cashfree-webhook` (verify signature, mark paid,
    decrement stock atomically, idempotent on redelivery).
-3. **Checkout UI:** enable "Place order" → Razorpay Checkout modal → confirmation page `/order/:ref`;
+3. **Checkout UI:** enable "Place order" → Cashfree Checkout modal → confirmation page `/order/:ref`;
    prefill the address for logged-in customers via `resolve_my_customer`.
 4. **Admin:** online orders list; "Create Bill of Supply" from an order (bills already support a
    customer + sales method); mark packed/shipped with AWB; cancel/refund.
 5. **Customer side:** order history (`/account/orders`) and tracking (`/track`) read from `orders`.
 6. **First-order discount** as a real code checked in `create-order` (reuse the `discounts` table).
 7. **Notifications:** order confirmation and shipped messages (WhatsApp link or email).
-8. **Tests:** pricing/shipping/discount logic (unit), Edge Functions with mocked Razorpay
+8. **Tests:** pricing/shipping/discount logic (unit), Edge Functions with mocked Cashfree
    (signature verify, idempotency), one end-to-end test-mode payment.
 
 ## Phase C — Shiprocket integration (spec 2026-10-20)

@@ -46,9 +46,9 @@ Without the right 50 products nothing else matters, and they take your time to p
 ## P1b — Diwali online payments bridge (target: Sat 25 Oct)
 See `tasks/checkout-shipping-plan.md` Phase A and `tasks/accounts-setup.md`.
 10a. [ ] CA confirms selling through the website, UP only, under composition. *You.*
-10b. [ ] Razorpay + Delhivery One accounts (KYC). *You.* Real Terms/Privacy pages first. *Me drafts, you approve.*
+10b. [ ] Cashfree + Shiprocket accounts (KYC). *You.* Real Terms/Privacy pages: approved 2026-10-23 (`feat/cashfree-readiness`).
 10c. [ ] Shipping policy says UP only, ₹99 below ₹5,000; checkout blocks non-UP addresses.
-10d. [ ] Flow: WhatsApp order → Razorpay Payment Link → Bill of Supply → Delhivery booking → tracking on WhatsApp.
+10d. [ ] Flow: WhatsApp order → Cashfree Payment Link → Bill of Supply → Shiprocket booking → tracking on WhatsApp.
 
 ## P2 — Home page (target: Wed 28 Oct)
 11. [ ] **Category band:** small rounded icons under the header (product-photo crops).
