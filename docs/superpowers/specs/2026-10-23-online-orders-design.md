@@ -191,7 +191,7 @@ and emails the shopper a link `/refund-choice/:token` (random, single-use, 48 h)
 ## 10. States
 
 Order: `pending_payment` → `paid` → `packed` → `shipped` → `out_for_delivery` → `delivered`.
-Exits: `payment_failed` / `expired` (from pending_payment; pending orders expire after 30 min,
+Exits: `payment_failed` / `expired` (from pending_payment; pending orders expire after 45 min,
 nothing was taken), `cancelled` (from paid), `rto` (from shipped states). Transitions only via
 database functions; every transition appended to `order_events` (who/what/when/why).
 Line: `ordered` → `available` | `unavailable` → (`shipped` | `refunded`).
