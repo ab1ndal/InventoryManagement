@@ -27,33 +27,38 @@ Ask your CA these questions (copy and send):
 
 ---
 
-## 2. Razorpay — payments (start now; KYC takes a few days)
+## 2. Cashfree — payments (signup started 2026-10-23; activation usually within a working day)
+
+Chosen over Razorpay 2026-10-23 for the festive 0% offer; reasons in
+`tasks/checkout-shipping-plan.md` "Gateway decision".
 
 **Have ready:**
-- PAN of the proprietor
-- GST certificate (composition is fine; it's used as business proof)
-- Business bank account details (account in the proprietor's or firm's name) and a cancelled cheque
-- Aadhaar of the proprietor (for verification)
+- PAN of the proprietor (Pooja Bindal; a sole proprietor uses the personal PAN)
+- Aadhaar linked to a phone that can receive the OTP (owner identity check)
+- Bank account in the proprietor's name: account number + IFSC
+- GST certificate (GSTIN 09ABVPB4203A1Z4) as business proof
 - Website: https://www.bindalscreations.com
-- Business address (58, Sihani Gate Market, Ghaziabad 201001), phone, email
+- Business email bindalscreations@gmail.com, phone, shop address
 
 **Steps:**
-1. Go to https://razorpay.com → **Sign Up**. Use the business email and phone.
-2. Choose business type **Proprietorship**, and category **Fashion / Apparel**.
-3. Complete **KYC / Activation** in the dashboard: upload PAN, GST certificate, bank details.
-4. For **Website details**, enter the website URL. Razorpay checks that these pages exist and
-   are real (not placeholder): Contact Us (with address), Terms, Privacy, Cancellation & Refund,
-   Shipping, and visible product prices. The site has these pages, but **Terms and Privacy are
-   still placeholders**. Tell me before you submit and I'll replace them first.
-5. While activation is pending, you can test in **Test Mode**.
-6. After activation, use **Payment Links** (Dashboard → Payment Links → Create) for Diwali
-   orders. No website code is needed for this.
+1. Open https://merchant.cashfree.com/merchants/signup **directly**. A partner or referral link
+   loses the 0% offer.
+2. Sign up with the business email and a new password (keep it in a password manager), then
+   enter the email and phone OTPs.
+3. Business type **Sole Proprietorship**, category **Fashion / Apparel**.
+4. KYC in the dashboard: PAN, Aadhaar OTP (or DigiLocker), bank account, GST certificate.
+5. **Website details:** submit the URL only after `feat/cashfree-readiness` is live. Cashfree
+   checks for real Terms, Privacy, About, Contact, refund/cancellation and shipping pages, and
+   can deactivate an account whose site later stops complying.
+6. While activation is pending, use the **Test** environment.
+7. After activation, use **Payment Links** in the dashboard for Diwali orders. No website code needed.
 
-**Send back (later, for Phase B):**
-- The **Key ID**, which starts with `rzp_live_` (this one is public and safe to share).
-- **Do not send the Key Secret or Webhook Secret.** They are added straight into Supabase in step 4.
+**Send back (later, for Phase B):** confirm activation. **Never send the Client ID or Client
+Secret in chat or email.** They go straight into Supabase secrets (section 4).
 
-**Fees (as published Oct 2026):** 2% + 18% GST on UPI, domestic cards and netbanking. No setup or annual fee. Settlement T+1.
+**Fees (official page, 23 Oct 2026):** 0% platform fee on the first ₹20 lakh GMV until
+31 Mar 2027 (18% GST still charged on the notional 1.95%), then 1.95% + GST. No setup fee.
+T+1 settlement. Payment Links included.
 
 ---
 
@@ -96,17 +101,18 @@ Everything in the **shop's** name (BINDAL'S CREATION, GSTIN 09ABVPB4203A1Z4). Pr
 
 Done by whoever sets up the website, not shared in chat:
 1. Supabase dashboard → project → **Edge Functions → Secrets** (or `supabase secrets set`).
-2. Add `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`, and for shipping
+2. Add `CASHFREE_CLIENT_ID` and `CASHFREE_CLIENT_SECRET` (the secret also verifies webhook
+   signatures; confirm against Cashfree's docs when Phase B starts), and for shipping
    `SHIPROCKET_API_EMAIL` and `SHIPROCKET_API_PASSWORD` (the API user from section 3, step 7).
-3. In Vercel → project → Settings → Environment Variables, add `REACT_APP_RAZORPAY_KEY_ID`
-   (public key only).
+3. No Cashfree key goes in Vercel: the browser checkout only needs the payment session id
+   that `create-order` returns.
 
 ---
 
 ## 5. Website content you need to provide
 
-- [ ] Real **Terms** and **Privacy** text (or approve drafts I write from Razorpay's templates).
-- [ ] Refund/cancellation rules for **online** orders. Today it's "no returns, in-store exchange
+- [x] Real **Terms** and **Privacy** text (or approve drafts). Done 2026-10-23.
+- [x] Refund/cancellation rules for **online** orders (2026-10-23: cancel before dispatch = full refund in 5–7 working days; damaged/wrong item within 48h of delivery = replacement or refund). Today it's "no returns, in-store exchange
       within 7 days". Decide whether online buyers can exchange by courier, and who pays shipping.
 - [ ] Confirm the shipping policy wording: UP only, ₹99 below ₹5,000, free above, dispatch in
       2 days, delivery in 5–7 days.
@@ -114,8 +120,8 @@ Done by whoever sets up the website, not shared in chat:
 
 ## Checklist
 - [ ] CA answers received
-- [ ] Razorpay account activated (Key ID shared)
+- [ ] Cashfree account activated
 - [ ] Shiprocket KYC done, pickup address `Shop` verified, test parcel sent, rates shared
 - [ ] Shiprocket API user created, credentials in Supabase secrets
-- [ ] Terms / Privacy / Refund content finalised
+- [x] Terms / Privacy / Refund content finalised (2026-10-23)
 - [ ] (Phase B) secrets added to Supabase and Vercel

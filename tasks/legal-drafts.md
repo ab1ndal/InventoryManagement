@@ -1,5 +1,8 @@
 # Draft Terms & Privacy (for owner / legal review)
 
+> **Superseded 2026-10-23:** owner approved final wording (gateway now Cashfree, proprietor Pooja Bindal,
+> online cancel-before-dispatch refunds). Source of truth is `src/storefront/pages/policies/policyContent.js`.
+
 Written 2026-10-13. **Drafts only. Not on the website.** These replace the
 `[PLACEHOLDER — needs owner/legal review]` sections in
 `src/storefront/pages/policies/policyContent.js` once you approve them. Razorpay

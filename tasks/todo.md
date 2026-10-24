@@ -3,7 +3,7 @@
 ## Website review with Anushka (2026-10-19), in priority order
 
 Deadline driver: Diwali 8 Nov 2026. Until real checkout ships, Diwali orders use the
-WhatsApp + Razorpay Payment Link bridge (`tasks/checkout-shipping-plan.md` Phase A).
+WhatsApp + Cashfree Payment Link bridge (`tasks/checkout-shipping-plan.md` Phase A).
 
 
 New Comments (done 2026-10-20, PR #31 merged + live):
@@ -58,16 +58,19 @@ Online orders get a Bill of Supply from the shop, same as in-store.
 
 - [ ] UP-only checkout + policy/FAQ/trust-bar wording: branch `feat/checkout-up-only-v2`
   (PR #14 rebased + 3 missed "across India" spots).
-- [ ] Razorpay KYC in the **shop's** name (shop's current account).
+- [ ] Cashfree KYC in the **shop's** name (proprietor Pooja Bindal, shop's current account).
+  Signup opened 2026-10-23 at merchant.cashfree.com (direct, not a partner link); OTP step pending.
+  Submit the website for review only after `feat/cashfree-readiness` (real Terms/Privacy) is live.
 - [X] Courier: **Shiprocket** (decided 2026-10-20). Owner steps: `tasks/accounts-setup.md` §3;
   integration spec: `tasks/checkout-shipping-plan.md` Phase C.
 - [ ] Ask CA to confirm: composition shop may sell online intra-state from its own website.
 
 ### P2: checkout build (Phase B of `tasks/checkout-shipping-plan.md`)
 
-- [ ] Prepaid only, **no COD** (costlier, couriers block it in high-return pincodes). Razorpay
+- [ ] Prepaid only, **no COD** (costlier, couriers block it in high-return pincodes). Cashfree
   covers UPI, RuPay, Visa, Mastercard.
-- Decided 2026-10-20: gateway = **Razorpay**. Rejected YouPI-PG (github.com/youpi-pg/YouPI-PG):
+- Decided 2026-10-23: gateway = **Cashfree** (replaces the 2026-10-20 Razorpay pick; reasons in
+  `tasks/checkout-shipping-plan.md` "Gateway decision"). Also rejected YouPI-PG (github.com/youpi-pg/YouPI-PG):
   confirms payments by scraping bank SMS/notifications with open bugs that can mark unpaid orders
   paid, no license, repo ~1 month old, APK reads every SMS incl. OTPs, ~20 txn/day, no cards/refunds.
 - [ ] Two paths: guest checkout (nothing saved) and signed-in checkout (cart + address saved;
@@ -101,11 +104,11 @@ Fallback if CA finds the LLP route too heavy: UP-only via the composition shop (
 move the shop to the regular scheme. CA questions doc: https://claude.ai/code/artifact/342df0ee-b022-4959-86c6-dc0367787dfa
 
 - [ ] LLP current bank account in the LLP's name (GST Rule 10A; Amazon penny-drop failed on the personal
-  joint account 2026-07-24, see ../amazon_listing/tasks/todo.md). Needed before Razorpay KYC.
+  joint account 2026-07-24, see ../amazon_listing/tasks/todo.md). Needed before gateway KYC.
 - [ ] After CA picks option A/B/C: swap seller identity on the site (or reopen PR #14 for B).
 - [ ] Swap seller identity on the site: footer line (`StorefrontFooter.jsx:156`, currently the shop's
   composition GSTIN), Terms/Privacy drafts, shipping/returns policy pages, Contact page.
-- [ ] Razorpay + Delhivery KYC in the new company's name (not the shop's).
+- [ ] Gateway + courier KYC in the new company's name (not the shop's).
 - [ ] Online orders get a GST **tax invoice** from the new company (not a Bill of Supply). Decide where
   those invoices are made (this app's billing vs separate) — needs a design pass.
 - [ ] CA questions: (1) stock moving from the composition shop to the new company — a composition
@@ -164,8 +167,8 @@ Do NOT apply prod schema changes, publish UP-only/legal text, or touch accounts.
 1. Review the Diwali 50 (`tasks/diwali-pick-sheet.html`), send back IDs if you change any.
 2. Approve description drafts (`tasks/diwali-description-drafts.md`; 25 flagged).
 3. ~~CA questions → merge PR #14~~ superseded 2026-10-14: online seller is the regular-scheme company (see top).
-4. Start Razorpay + Delhivery One KYC (`tasks/accounts-setup.md`).
-5. Review `tasks/legal-drafts.md` (Terms/Privacy).
+4. ~~Start Razorpay + Delhivery One KYC~~ superseded: Cashfree + Shiprocket in the shop's name (`tasks/accounts-setup.md`).
+5. ~~Review `tasks/legal-drafts.md` (Terms/Privacy).~~ Approved + published 2026-10-23 (`feat/cashfree-readiness`).
 6. First-order discount terms (amount + how to claim) before adding it to the promo line.
 
 ### Next build items (action plan)
