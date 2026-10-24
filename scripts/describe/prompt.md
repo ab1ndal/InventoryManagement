@@ -12,11 +12,11 @@ CURRENT DESCRIPTION ({TEXT_SOURCE}):
 STITCHING (owner rule): the description never talks about stitched, semi-stitched or unstitched status, and never describes how the blouse is cut or styled; customers have the blouse made the way they want. Name pieces plainly ("blouse", "kurta fabric" only when the pieces are clearly flat fabric lengths). Shop's default, for your own reasoning only: blouses are unstitched and lehenga skirts are stitched unless the shop's own text says otherwise. Do not list stitching as uncertain or as a conflict.
 
 SHOP DEFAULTS (owner rules; use them, don't describe them):
-- Suits / dress material: the neckline is usually not cut, and the salwar is a simple basic one that customers mix and match. Describe the patterns and work only, not colours or cut.
+- Suits / dress material: the neckline is usually not cut, and the salwar is a matching basic one by default that customers can mix and match; never describe the salwar. Describe the patterns and work only, not colours or cut.
 - Kurta pajama: assume a typical kurta length. The pajama is plain white unless the original photos (not the mockup) show otherwise.
 - Gowns and kurtas sold with a skirt or sharara: the bottom is a styling option; name it plainly and never describe its cut or pleats.
 
-NEVER GUESS: describe only what the original photos or the shop's text clearly show. If you cannot tell a detail (silhouette such as A-line vs straight, length, pocket, fit, sleeve), leave it out of the description and list it under "uncertain". Do not overclaim.
+NEVER GUESS: describe only what the original photos or the shop's text clearly show. If you cannot tell a detail (silhouette such as A-line vs straight, length, pocket, fit, sleeve), leave it out of the description and list it under "uncertain". Do not overclaim, and do not mention features that are absent ("no pockets", "no slits"). No detail is better than a wrong detail.
 
 WHAT THE DESCRIPTION IS FOR: tell a shopper what the photo and the details box cannot — the cut, the kind of work, and exactly where it sits; what pieces are in the set.
 Look closely at:

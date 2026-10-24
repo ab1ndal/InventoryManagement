@@ -150,3 +150,11 @@ skirt/sharara with a gown named plainly; ready-made garments may take silhouette
 Per-product owner notes go in `<work_dir>/<id>/owner_note.txt` (read by build_prompt.js). The 5 sent back
 were redone (outputs in `tasks/description-pilot/round3/`); review page
 https://claude.ai/artifact/QEmDSw4GdQypVxPoTubb5y
+
+## Pilot DONE (2026-10-24)
+
+All 20 approved after round 3 (`tasks/description-pilot/approved.json` = final copy). Last rules added: the
+salwar in suits is a matching basic one and is never described; never mention absent features ("no pockets").
+Next: tag_vocab draft for owner review; marker-column migration (description_source / description_reviewed_at;
+owner to name which session writes it); then batches of ~150 of the remaining ~767 live products, each
+reviewed before any DB write; then write approved copy (incl. the 20 pilot products).
