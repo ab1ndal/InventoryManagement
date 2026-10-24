@@ -16,7 +16,13 @@ Live switch `storefront_settings.checkout_live` stays **false** until owner acco
 - Task 1b in-store atomic writes DONE on branch `worktree-agent-aa4f47beda722f64c` (bf04fa4) — **hold until R1 migration is live on prod**, then PR + merge.
 - Task 1 DB migrations: running.
 - R22 DONE on branch `fix/admin-stock-credit-deltas` (6b5de89) — **hold until R1 migration live**, then PR + merge with 1b.
-- Task 3 external clients: running.
+- [x] Task 3 external clients merged (PR #43). Contract notes: `manifest(shipmentId, srOrderId)`; callers of `optionalUser` must pass `[SUPABASE_ANON_KEY]` as publicKeys; `cfCustomerId(5) = "C05"`.
+
+### RESUME HERE (paused 2026-10-23, usage limit)
+1. Task 1 DB migrations: pushed branch `feat/online-orders-db` (3 commits, worktree `.claude/worktrees/agent-ad92d278266b86f6d`). Builder was stopped mid-way while adding one more "not re-takeable" test, and may have uncommitted edits there. Next: `git -C <worktree> status`; `scripts/test-db.sh up && scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql schema/migration_online_orders.sql schema/test_online_orders.sql`; review; PR + merge.
+2. Then (controller): apply migrations to live with `npm run migrate`; run SQL tests; check `checkout_live=false`; `npm run probe:anon`.
+3. Then merge the parked branches together: Task 1b `worktree-agent-aa4f47beda722f64c` (bf04fa4) + R22 `fix/admin-stock-credit-deltas` (6b5de89). Smoke-test in-store billing.
+4. Waves C–E (plan R20): Tasks 4, 5, 7, then 10→8, 6, 9, 11, then 12, 13.
 - [ ] Slice 1 Foundation  - [ ] 2 Pay  - [ ] 3 Ship  - [ ] 4 Admin  - [ ] 5 Refunds/credit/codes  - [ ] 6 Messages/tracking
 
 Owner (parallel): Cashfree signup/KYC; Shiprocket signup/KYC + API user; Gmail app password
