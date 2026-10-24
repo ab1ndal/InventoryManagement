@@ -139,3 +139,14 @@ blouse unstitched, skirt stitched); catalogue data wins over photos; old long/ma
 AI captions, so photos win over them. Prompt, schema and builder updated; outputs in
 `tasks/description-pilot/round2/`. Review page: https://claude.ai/artifact/91aEH6y1TLRKchAFDrwCUS
 (round 1 page with the original feedback stays at PDsnoPKgJFeqmaezwfLZga).
+
+## Round 3 (2026-10-24)
+
+Round 2: 15 approved (saved in `tasks/description-pilot/approved.json`, final copy for those IDs), 4 changes,
+1 reject; verdicts + comments in `tasks/description-pilot/round2/feedback.json`. New prompt rules: plain piece
+names in "Package includes"; never guess undeterminable details (list under uncertain); catalogue beats photo
+with no conflict; suits = uncut neckline + basic salwar; kurta pajama = typical length + plain white pajama;
+skirt/sharara with a gown named plainly; ready-made garments may take silhouette/sleeve from the mockup.
+Per-product owner notes go in `<work_dir>/<id>/owner_note.txt` (read by build_prompt.js). The 5 sent back
+were redone (outputs in `tasks/description-pilot/round3/`); review page
+https://claude.ai/artifact/QEmDSw4GdQypVxPoTubb5y
