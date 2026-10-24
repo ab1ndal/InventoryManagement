@@ -17,7 +17,7 @@ export function buildProductJsonLd({ product, variants, imagePaths, productid, c
     image,
     description,
     sku: productid,
-    brand: { "@type": "Brand", name: "Bindal's Creations" },
+    brand: { "@type": "Brand", name: "Bindal's Creation" },
     offers: {
       "@type": "Offer",
       price: Number(product.retailprice),

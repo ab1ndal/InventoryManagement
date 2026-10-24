@@ -3,7 +3,7 @@
 
 export const ABOUT = {
   title: "Our Story",
-  lede: "Bindal's Creations is a family-run ethnic-wear house in Ghaziabad, offering a curated, hand-selected collection of sarees, lehengas, suits and more — since 2018.",
+  lede: "Bindal's Creation is a family-run ethnic-wear house in Ghaziabad, offering a curated, hand-selected collection of sarees, lehengas, suits and more — since 2018.",
   story: [
     "We started in 2018 with a simple belief: every garment we offer should be chosen with care. Each piece in our collection is curated and hand-selected, not picked in bulk from a catalogue.",
     "We take great pride in our collection and in the customers who visit us. If you're looking for something specific, tell us — we can often source it especially for you.",

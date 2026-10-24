@@ -18,7 +18,7 @@ export default function StorefrontFooter() {
                 brightness-0 invert would only turn the brand gold white. */}
             <img
               src="/logo-bindals-creation.png"
-              alt="Bindal's Creations"
+              alt="Bindal's Creation"
               width={600}
               height={373}
               className="h-24 w-auto object-contain mb-4"
@@ -164,7 +164,7 @@ export default function StorefrontFooter() {
         {/* Bottom bar */}
         <div className="border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-storefront-cream/40">
-            <span>© {new Date().getFullYear()} Bindal's Creations. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} Bindal's Creation. All rights reserved.</span>
             <div className="flex items-center gap-3 font-mono tracking-wide">
               <span className="border border-white/20 rounded px-2 py-0.5">VISA</span>
               <span className="border border-white/20 rounded px-2 py-0.5">MASTERCARD</span>

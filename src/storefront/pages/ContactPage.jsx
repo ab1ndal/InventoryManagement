@@ -10,7 +10,7 @@ export default function ContactPage() {
     <StaticPage
       title="Visit Us"
       seoTitle="Contact & Store"
-      seoDescription="Visit Bindal's Creations at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (closed Tuesdays)."
+      seoDescription="Visit Bindal's Creation at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (closed Tuesdays)."
       containerClassName="max-w-6xl"
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-14">
@@ -67,7 +67,7 @@ export default function ContactPage() {
         {/* Right: map */}
         <div className="min-h-[320px]">
           <iframe
-            title="Bindal's Creations store location"
+            title="Bindal's Creation store location"
             src={MAP_SRC}
             className="w-full h-full min-h-[320px] rounded-sm border border-storefront-border"
             loading="lazy"

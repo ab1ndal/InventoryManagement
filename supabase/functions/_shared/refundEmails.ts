@@ -97,7 +97,7 @@ export function refundChoiceEmail(n: RefundNotice, siteUrl: string): Email {
     "original payment method automatically.",
     ...(similar ? ["", `Looking for something similar? ${similar}`] : []),
     "",
-    "Bindal's Creations",
+    "Bindals Creation",
   ].join("\n");
   return { subject: `Your refund for order ${n.orderRef}: please choose`, text };
 }
@@ -123,7 +123,7 @@ export function refundCompletedEmail(n: RefundNotice, siteUrl: string): Email {
       : []),
     ...(similar ? ["", `Looking for something similar? ${similar}`] : []),
     "",
-    "Bindal's Creations",
+    "Bindals Creation",
   ].join("\n");
   return { subject: `Refund completed for order ${n.orderRef}`, text };
 }

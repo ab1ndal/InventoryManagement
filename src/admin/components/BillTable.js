@@ -293,7 +293,7 @@ export default function BillTable({ onEdit }) {
       // Free, backend-less WhatsApp: open a click-to-chat link with the bill
       // pre-filled. Staff reviews and taps send in WhatsApp.
       const message =
-        `Hi ${customerName || "there"}, here is your bill #${bill_number || billId} from Bindal's Creations.\n` +
+        `Hi ${customerName || "there"}, here is your bill #${bill_number || billId} from Bindals Creation.\n` +
         `Amount: ₹${amount}` +
         (shareUrl ? `\nView bill: ${shareUrl}` : "");
       const waUrl = `https://wa.me/${customerPhone}?text=${encodeURIComponent(message)}`;

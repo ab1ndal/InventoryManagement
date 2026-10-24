@@ -10,7 +10,7 @@ export default function SizeGuidePage() {
   return (
     <StaticPage
       title="Size Guide"
-      seoDescription="How to measure and choose the right size at Bindal's Creations. Unsure? Message us on WhatsApp."
+      seoDescription="How to measure and choose the right size at Bindal's Creation. Unsure? Message us on WhatsApp."
     >
       <SizeGuideIntro />
       <SizeGuideTable />

@@ -8,7 +8,7 @@ export default function AboutPage() {
     <StaticPage
       title={ABOUT.title}
       seoTitle="About"
-      seoDescription="The story behind Bindal's Creations — a family-run ethnic-wear house in Ghaziabad."
+      seoDescription="The story behind Bindal's Creation — a family-run ethnic-wear house in Ghaziabad."
       containerClassName="max-w-5xl"
     >
       <p className="font-sans text-base text-storefront-muted leading-relaxed max-w-2xl mb-12">
