@@ -1,5 +1,6 @@
 // Fill prompt.md with one product's public catalogue data: node build_prompt.js <products.json> <id> <prompt.md>
 const fs = require("fs");
+const { familyOf, promptBlock } = require("./tag_vocab");
 const [products, id, tpl] = process.argv.slice(2);
 const p = JSON.parse(fs.readFileSync(products, "utf8")).find(x => x.productid === id);
 if (!p) throw new Error(`product ${id} not in ${products}`);
@@ -16,4 +17,7 @@ const aiWritten = text.includes("**") || text.length > 200;
 const source = aiWritten
   ? "written earlier by an AI from photos; it may be wrong, so trust the photos over it"
   : "written by the shop; facts here are true unless a photo clearly contradicts them";
-process.stdout.write(fs.readFileSync(tpl, "utf8").replace("{DATA}", data).replace("{TEXT_SOURCE}", source).replace("{TEXT}", text || "(none)").replace("{OWNER_NOTE}", ownerNote));
+// Tag values are limited to what the product's category family may use (tag_vocab.json).
+const family = familyOf(p.categoryid);
+if (!family) throw new Error(`product ${id}: category ${p.categoryid} is in no tag_vocab family`);
+process.stdout.write(fs.readFileSync(tpl, "utf8").replace("{DATA}", data).replace("{TEXT_SOURCE}", source).replace("{TEXT}", text || "(none)").replace("{OWNER_NOTE}", ownerNote).replace("{TAGS}", promptBlock(family)));

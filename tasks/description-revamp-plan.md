@@ -158,3 +158,16 @@ salwar in suits is a matching basic one and is never described; never mention ab
 Next: tag_vocab draft for owner review; marker-column migration (description_source / description_reviewed_at;
 owner to name which session writes it); then batches of ~150 of the remaining ~767 live products, each
 reviewed before any DB write; then write approved copy (incl. the 20 pilot products).
+
+## Tag vocab draft (2026-10-24)
+
+Pilot 20 written to prod as `ai_reviewed` (guarded on old text, 20/20); marker migration on main (PR #64), admin
+edits set `manual` (PR #63). Draft vocabulary: `scripts/describe/tag_vocab.json` (6 category families x 7 groups,
+plus aliases mapping free-text model output; all 268 pilot tag values map or are flagged). Placement is not a tag.
+Review page: https://claude.ai/artifact/LNuWTJuwp1MYLz5d4DNWVX (db collection `vocab_feedback`, one doc per
+group: `{verdict, comment, updatedAt}`; rebuild with `node scripts/describe/build_vocab_review.js <out.html>`).
+Next: fold owner feedback into the vocab, then constrain prompt/schema to it, then migration for `tag_vocab` /
+`product_tags`. Message mockup-generator when the vocab is final (it vendors prompt/schema copies).
+Owner 2026-10-24: no cap on occasions per product (a dress can suit more than 3). When the prompt/schema are
+constrained to the vocab, drop "up to 3" from prompt.md and `maxItems` from schema.json (Claude structured
+outputs reject `maxItems` anyway); keep "only occasions it clearly suits".
