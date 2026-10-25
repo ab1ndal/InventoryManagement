@@ -492,6 +492,31 @@ end;
 $function$
 ;
 
+-- storefront images + admin check (needed by migration_product_tags.sql policies)
+create table if not exists public.productimages (
+  imageid serial primary key,
+  productid character varying not null,
+  imageurl text not null,
+  productcolor text,
+  displayorder integer default 0,
+  phototheme text default 'Default'::text not null
+);
+-- live: Supabase default grants; the product_tags read policy reads it as the caller
+grant select on public.productimages to anon, authenticated;
+grant select on public.products to authenticated;
+CREATE OR REPLACE FUNCTION public.is_admin()
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM profiles
+    WHERE profiles.id = auth.uid()
+    AND profiles.role IN ('admin', 'superadmin')
+  );
+$function$
+;
+
 -- triggers last (their functions are defined above)
 -- harness: trg_create_mockup_row omitted (depends on tables outside the harness: mockups, fabrics)
 CREATE TRIGGER trg_set_bill_number BEFORE INSERT ON public.bills FOR EACH ROW EXECUTE FUNCTION set_bill_number();
