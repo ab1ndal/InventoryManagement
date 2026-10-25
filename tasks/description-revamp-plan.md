@@ -168,3 +168,6 @@ Review page: https://claude.ai/artifact/LNuWTJuwp1MYLz5d4DNWVX (db collection `v
 group: `{verdict, comment, updatedAt}`; rebuild with `node scripts/describe/build_vocab_review.js <out.html>`).
 Next: fold owner feedback into the vocab, then constrain prompt/schema to it, then migration for `tag_vocab` /
 `product_tags`. Message mockup-generator when the vocab is final (it vendors prompt/schema copies).
+Owner 2026-10-24: no cap on occasions per product (a dress can suit more than 3). When the prompt/schema are
+constrained to the vocab, drop "up to 3" from prompt.md and `maxItems` from schema.json (Claude structured
+outputs reject `maxItems` anyway); keep "only occasions it clearly suits".

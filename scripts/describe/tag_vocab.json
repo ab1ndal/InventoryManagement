@@ -10,7 +10,7 @@
   },
   "groups": {
     "occasion": {
-      "label": "Occasion", "max": 3, "shop_filter": true,
+      "label": "Occasion", "shop_filter": true,
       "families": ["saree", "lehenga", "dress_material", "women_ready", "men_ethnic", "men_western"],
       "values": [
         { "value": "wedding",      "label": "Wedding" },
