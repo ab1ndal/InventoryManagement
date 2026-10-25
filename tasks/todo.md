@@ -31,9 +31,7 @@ Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/f
   garments).
 - Held branch `feat/online-orders-storefront` is already merged (PR #58). Only Account → Order history is
   still held: at go-live revert `b4a5e49` to restore the real list + its test.
-- Pre-existing test failures on main (2026-10-25, 6 tests, unrelated to online orders): App.test.js
-  ("learn react" CRA leftover), BillTable.test.js (supabase mock lacks `.in`), RevenueChart + dashboardData
-  (FY2026 live-bill totals).
+- Test suite green on main (2026-10-25): 6 stale tests fixed in PR #68; 109 suites, 685 tests pass.
 - Guide doc for the owner: https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth (setup steps + what remains).
 
 ### Go-live checklist (owner + controller, in order)
