@@ -4,6 +4,16 @@ Rewrites storefront product descriptions and proposes tags from the real product
 Spec, owner decisions and pilot results: `tasks/description-revamp-plan.md`.
 Nothing here writes to the database. Output is a review page for the owner to approve.
 
+## Tag vocabulary
+
+`tag_vocab.json` (owner-approved 2026-10-25) is the only source of allowed tag values, per category
+family. `build_prompt.js` fills the prompt's `{TAGS}` block with the values for the product's
+family, `schema.json` enums hold every value of each group, and `flag_hard.js` sends any value
+outside the family to the second opinion. After changing the vocabulary, update the schema enums to
+match (`node --test scripts/describe/tag_vocab.test.js` fails until they do) and tell the
+mockup-generator session, which keeps copies of `prompt.md` and `schema.json`. No `maxItems` in the
+schema: Claude structured outputs reject it.
+
 ## How it works
 
 1. `prepare.sh <ids.txt> [work_dir]` builds the working set in `.describe-work/` (gitignored).
@@ -17,7 +27,8 @@ Nothing here writes to the database. Output is a review page for the owner to ap
    `gpt-5.6-terra`. It sends the photos, `prompt.md` filled with the product's data
    (`build_prompt.js`), and `schema.json` as the required output shape. Result: `out_codex.json`.
 3. `node flag_hard.js <ids.txt> <work_dir>` lists the products that need a second opinion: any
-   uncertain or conflict entry, or a work tag with confidence below 0.7. In the pilot this was
+   uncertain or conflict entry, a work tag with confidence below 0.7, or a tag value the product's
+   category family may not use. In the pilot this was
    about 1 in 3.
 4. `run_claude.sh <id> [work_dir]` runs the second opinion with Claude Sonnet (`claude -p`). It
    gets the same prompt plus the first pass's flags. Result: `out_claude.json`.

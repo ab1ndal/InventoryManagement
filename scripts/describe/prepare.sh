@@ -11,7 +11,7 @@ source $repo/.env
 idlist=$(paste -sd, $ids)
 # Public fields only: never send purchaseprice to a model.
 curl -sf -H "apikey: $REACT_APP_SUPABASE_ANON_KEY" -H "Authorization: Bearer $REACT_APP_SUPABASE_ANON_KEY" \
-  "$REACT_APP_SUPABASE_URL/rest/v1/products?select=productid,name,fabric,description,categories(name),productsizecolors(color,size)&productid=in.($idlist)" > $W/products.json
+  "$REACT_APP_SUPABASE_URL/rest/v1/products?select=productid,name,fabric,description,categoryid,categories(name),productsizecolors(color,size)&productid=in.($idlist)" > $W/products.json
 curl -sf -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
   "$REACT_APP_SUPABASE_URL/rest/v1/products?select=productid,producturl&productid=in.($idlist)" \
   | node -e 'JSON.parse(require("fs").readFileSync(0,"utf8")).forEach(r=>console.log(r.productid+"\t"+(r.producturl||"")))' > $W/urls.tsv
