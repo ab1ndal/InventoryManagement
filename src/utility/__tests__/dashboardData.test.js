@@ -158,14 +158,14 @@ describe("aggregateCategories", () => {
     { category: "Saree", total: 1000, cost_price: 300, quantity: 2 }, // cost 600
     { category: "Saree", total: 500, cost_price: 100, quantity: 1 },  // cost 100
     { category: "Kurti", total: 800, cost_price: 200, quantity: 1 },  // cost 200
-    { category: null, total: 200, cost_price: null, quantity: 1 },    // Uncategorized
+    { category: null, total: 200, cost_price: null, quantity: 1 },    // Others
   ];
   test("groups, computes margin, sorts by revenue desc", () => {
     const rows = aggregateCategories(items);
-    expect(rows.map((r) => r.category)).toEqual(["Saree", "Kurti", "Uncategorized"]);
+    expect(rows.map((r) => r.category)).toEqual(["Saree", "Kurti", "Others"]);
     expect(rows[0]).toMatchObject({ category: "Saree", revenue: 1500, cost: 700 });
     expect(rows[0].margin).toBeCloseTo(((1500 - 700) / 1500) * 100, 3);
-    expect(rows[2]).toMatchObject({ category: "Uncategorized", revenue: 200, cost: 0 });
+    expect(rows[2]).toMatchObject({ category: "Others", revenue: 200, cost: 0 });
   });
 });
 
@@ -261,7 +261,7 @@ describe("buildSeasonalSeries", () => {
 
 describe("buildFyTotals", () => {
   it("sums net_amount per FY, skips NULLs in sum", () => {
-    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS);
+    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS, 2026);
     const fy22 = result.find((r) => r.label === fyLabel(2022));
     expect(fy22.total).toBe(300000); // 100k + 200k (null skipped)
     expect(fy22.isLive).toBe(false);
@@ -272,19 +272,19 @@ describe("buildFyTotals", () => {
       { fy_start_year: 2020, month_idx: 0, net_amount: null },
       { fy_start_year: 2020, month_idx: 1, net_amount: null },
     ];
-    const result = buildFyTotals(rows, []);
+    const result = buildFyTotals(rows, [], 2026);
     expect(result.find((r) => r.label === fyLabel(2020)).total).toBeNull();
   });
 
   it("includes FY2026 from bills marked isLive", () => {
-    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS);
+    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS, 2026);
     const fy26 = result.find((r) => r.label === fyLabel(2026));
     expect(fy26.total).toBe(550000); // 300k + 250k
     expect(fy26.isLive).toBe(true);
   });
 
   it("returns results sorted by FY ascending", () => {
-    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS);
+    const result = buildFyTotals(HIST_ROWS, FY2026_BILLS, 2026);
     const labels = result.map((r) => r.label);
     expect(labels[0]).toBe(fyLabel(2022));
     expect(labels[labels.length - 1]).toBe(fyLabel(2026));
@@ -293,32 +293,32 @@ describe("buildFyTotals", () => {
 
 describe("buildVsHistoryComparison", () => {
   it("returns months, currentFy, historicalAvg each with length 12", () => {
-    const result = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    const result = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS, 2026);
     expect(result.months).toHaveLength(12);
     expect(result.currentFy).toHaveLength(12);
     expect(result.historicalAvg).toHaveLength(12);
   });
 
   it("months[0] is Apr, months[11] is Mar", () => {
-    const { months } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    const { months } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS, 2026);
     expect(months[0]).toBe("Apr");
     expect(months[11]).toBe("Mar");
   });
 
   it("historicalAvg averages non-NULL values across FYs per month_idx", () => {
     // month_idx 0: FY2022=100000, FY2023=150000 → avg 125000
-    const { historicalAvg } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    const { historicalAvg } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS, 2026);
     expect(historicalAvg[0]).toBe(125000);
   });
 
   it("historicalAvg is null when all values for that month are NULL", () => {
     // month_idx 2: only FY2022 row present, net_amount=null → no valid values
-    const { historicalAvg } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    const { historicalAvg } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS, 2026);
     expect(historicalAvg[2]).toBeNull();
   });
 
   it("currentFy has FY2026 actuals from bills, null for months with no bills", () => {
-    const { currentFy } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS);
+    const { currentFy } = buildVsHistoryComparison(HIST_ROWS, FY2026_BILLS, 2026);
     expect(currentFy[0]).toBe(300000); // Apr 2026
     expect(currentFy[1]).toBe(250000); // May 2026
     expect(currentFy[2]).toBeNull();   // Jun — no bills

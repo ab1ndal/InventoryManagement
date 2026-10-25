@@ -5,7 +5,12 @@ const rows = [
   { billid: 2, bill_number: "FY26-SG0001", document_type: "invoice", customers: null, orderdate: "2026-07-13", totalamount: 1155, gst_total: 55, discount_total: 0, paymentstatus: "finalized", finalized: true, pdf_url: null },
 ];
 jest.mock("../../../lib/supabaseClient", () => ({
-  supabase: { from: () => ({ select: () => ({ order: () => ({ range: async () => ({ data: rows, error: null }) }) }) }) },
+  supabase: {
+    from: (table) =>
+      table === "bill_payments"
+        ? { select: () => ({ in: async () => ({ data: [], error: null }) }) }
+        : { select: () => ({ order: () => ({ range: async () => ({ data: rows, error: null }) }) }) },
+  },
 }));
 
 import BillTable from "../BillTable";

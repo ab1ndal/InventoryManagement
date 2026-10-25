@@ -20,9 +20,22 @@ test("renders three traces: prior bars, current bars, margin line", () => {
       prior={period(800)}
       range={{ startYear: 2026, fromIdx: 0, toIdx: 11 }}
       loading={false}
+      showComparison
     />
   );
   expect(screen.getByTestId("plot").getAttribute("data-traces")).toBe("3");
+});
+
+test("drops the prior-year bars when showComparison is off", () => {
+  render(
+    <RevenueChart
+      current={period(1000)}
+      prior={period(800)}
+      range={{ startYear: 2026, fromIdx: 0, toIdx: 11 }}
+      loading={false}
+    />
+  );
+  expect(screen.getByTestId("plot").getAttribute("data-traces")).toBe("2");
 });
 
 test("renders loading state when loading=true", () => {
