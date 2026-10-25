@@ -4,9 +4,11 @@
 
 Live DB has every migration (atomic writes, online orders, r7, refunds, ship); `checkout_live = false`.
 Merged + deployed: free-shipping nudge (#39), in-store atomic billing + product/customer delta edits (#46),
-server functions + admin Online Orders screen (#47). Edge Functions are in the repo but **not deployed**.
-Held branch: `feat/online-orders-storefront` (live checkout UI, order/track/account/refund pages, policy text
-for courier-rate shipping) — merge at go-live so policy wording matches what customers pay.
+server functions + admin Online Orders screen (#47). Storefront pages + policy text merged in PR #58
+(2026-10-24, checkout still behind the switch). **Edge Functions deployed 2026-10-25** (all 9 ACTIVE v1);
+pg_cron/pg_net on, Vault secrets + CRON_SECRET set, 3 cron jobs scheduled.
+Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/functions/deno.json`
+(without `--import-map` the server bundler can't resolve `@supabase/supabase-js`).
 
 ### RESUME HERE (session ended 2026-10-24)
 - **Names (owner 2026-10-24):** website/brand name = **Bindal's Creation** (no s; matches logo; domain
@@ -14,8 +16,8 @@ for courier-rate shipping) — merge at go-live so policy wording matches what c
   BINDALS CREATION). Shipped in PRs #49, #50, #51.
 - **Cashfree onboarding DONE 2026-10-24**: KYC passed (PAN verified, owner via DigiLocker since CKYC OTP
   refuses non-individual records, PPOB = GST address option). Dashboard: "You can start transacting now",
-  Payment Gateway/Links/Forms activated, details under review. **Still open: VCIP (video KYC)**: owner emailed
-  care@cashfree.com 2026-10-24, awaiting slot. Account manager: Saurabh Kumar. Dashboard shows "Next Steps 1/2": confirm
+  Payment Gateway/Links/Forms activated, details under review. VCIP (video KYC): **not required**
+  (Cashfree Care email 2026-10-25). Account manager: Saurabh Kumar. Dashboard shows "Next Steps 1/2": confirm
   the bank-account step (shop's current account). Next: owner copies sandbox keys into Supabase secrets
   (go-live checklist step 1).
 - **GST facts (screenshots in `docs/`, untracked):** legal name POOJA BINDAL, trade name Bindals Creation,
@@ -27,8 +29,11 @@ for courier-rate shipping) — merge at go-live so policy wording matches what c
   "Bindals Creation (Prop. Pooja Bindal)" now on footer + Privacy + Terms (PR #54, merged 2026-10-24); bills
   unchanged (owner: website only). Still open: ask CA about HSN (6210 on record vs 6204/6211/6203 for ethnic
   garments).
-- **Held branch `feat/online-orders-storefront`** now conflicts with the name changes (policyContent.js,
-  footer/SEO) — rebase on main and re-run tests before merging at go-live.
+- Held branch `feat/online-orders-storefront` is already merged (PR #58). Only Account → Order history is
+  still held: at go-live revert `b4a5e49` to restore the real list + its test.
+- Pre-existing test failures on main (2026-10-25, 6 tests, unrelated to online orders): App.test.js
+  ("learn react" CRA leftover), BillTable.test.js (supabase mock lacks `.in`), RevenueChart + dashboardData
+  (FY2026 live-bill totals).
 - Guide doc for the owner: https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth (setup steps + what remains).
 
 ### Go-live checklist (owner + controller, in order)
@@ -36,14 +41,19 @@ for courier-rate shipping) — merge at go-live so policy wording matches what c
    Gmail app password for bindalscreations@gmail.com. Owner puts secrets in Supabase (never chat):
    CASHFREE_CLIENT_ID, CASHFREE_CLIENT_SECRET, CASHFREE_ENV=sandbox, SHIPROCKET_API_EMAIL,
    SHIPROCKET_API_PASSWORD, SHIPROCKET_WEBHOOK_TOKEN, GMAIL_USER, GMAIL_APP_PASSWORD, ALLOWED_ORIGIN,
-   SITE_URL, IP_HASH_SALT, CRON_SECRET.
-2. Deploy functions: `--no-verify-jwt` for checkout-quote, create-order, order-status, cashfree-webhook,
-   run-jobs, courier-status, refund-choice, refund-sweeper; admin-order-action with JWT verification on.
-3. Enable pg_cron + pg_net; Vault secrets `online_orders_project_url`, `online_orders_cron_secret`; then run
-   `schema/golive_online_orders_cron.sql` by hand.
+   SITE_URL, IP_HASH_SALT. (Done 2026-10-25: CRON_SECRET, IP_HASH_SALT, SITE_URL=https://www.bindalscreations.com,
+   ALLOWED_ORIGIN=http://localhost:3000,https://www.bindalscreations.com; apex redirects to www.
+   GMAIL_USER=bindalscreations@gmail.com + GMAIL_APP_PASSWORD (app "Supabase orders", owner-set) done
+   2026-10-25; Gmail send VERIFIED 2026-10-25 via temp function using the real mailer.ts (nodemailer
+   works on the Supabase runtime; temp function deleted).)
+2. [X] Deploy functions (2026-10-25): `--no-verify-jwt` for checkout-quote, create-order, order-status,
+   cashfree-webhook, run-jobs, courier-status, refund-choice, refund-sweeper; admin-order-action with JWT on.
+   Redeploy after secret changes is NOT needed (secrets propagate without redeploy).
+3. [X] pg_cron 1.6 + pg_net 0.14 enabled; Vault `online_orders_project_url` + `online_orders_cron_secret`
+   (= CRON_SECRET function secret); `schema/golive_online_orders_cron.sql` applied (2026-10-25).
 4. Cashfree dashboard webhook → cashfree-webhook URL; Shiprocket webhook →
    `https://www.bindalscreations.com/hooks/courier-status` with x-api-key token.
-5. Merge `feat/online-orders-storefront`.
+5. Revert `b4a5e49` (restores Account → Order history).
 6. Sandbox end-to-end with checkout switched on for testing only: pay (UPI testsuccess@gocash), shelf check
    1 of 2 unavailable, Process (AWB/label/BoS), refund both choices, cancel, tracking webhook. Settle the
    UNVERIFIED API items (api notes files) against real responses.
@@ -117,7 +127,11 @@ Online orders get a Bill of Supply from the shop, same as in-store.
   (PR #14 rebased + 3 missed "across India" spots).
 - [X] Cashfree KYC in the **shop's** name (proprietor Pooja Bindal). KYC passed 2026-10-24; Terms/Privacy
   live (PR #38) and proprietor named on site (PR #54).
-- [ ] Owner: Cashfree VCIP (video KYC) (email sent 2026-10-24, awaiting slot); confirm bank-account step.
+- [X] Cashfree VCIP (video KYC): not required (Cashfree Care, 2026-10-25).
+- [ ] Owner: confirm Cashfree bank-account step (dashboard "Next Steps 1/2").
+- [ ] **BLOCKER 2026-10-25:** Cashfree dashboard shows "Access restricted in your region" after login from
+  the US (worked 2026-10-24). Sandbox keys, webhook URL, live keys need someone in India to log in, or
+  Saurabh to allow non-India access (email drafted). Avoid a VPN: account still under review.
 - [X] Courier: **Shiprocket** (decided 2026-10-20). Owner steps: `tasks/accounts-setup.md` §3;
   integration spec: `tasks/checkout-shipping-plan.md` Phase C.
 - [ ] Ask CA to confirm: composition shop may sell online intra-state from its own website.
