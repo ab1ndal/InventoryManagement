@@ -12,11 +12,11 @@ export const COLOUR_NOTE =
 
 export const PRICE_NOTE = "Inclusive of all taxes · Free shipping above ₹5,000";
 
-// Most designs are stocked 1-2 deep, so "Only N left" would fire on nearly
-// every product and read as false scarcity. Frame low stock as uniqueness,
-// and stay silent once stock is ample.
+// Most designs are stocked 1-2 deep, so the note speaks of "this design"
+// (true for every piece) rather than claiming it sold fast. Silent once stock
+// is ample.
 export function stockNote(stock) {
   const n = Number(stock);
   if (!Number.isFinite(n) || n <= 0 || n > 3) return null;
-  return `Limited piece — only ${n} in stock`;
+  return n === 1 ? "Last piece in this design" : `Only ${n} pieces left in this design`;
 }

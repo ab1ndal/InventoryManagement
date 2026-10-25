@@ -85,11 +85,31 @@ New Comments (done 2026-10-20, PR #31 merged + live):
 6. [X] in the Size listing where we have XL, L - Add all from XS to 2XL at the very minimum, add additional plus or minus sizes if they are in addition to there. Show the ones not in stock as out of stock.
 7. [X] In the details, replace Sizes with available sizes
 
+### Owner batch 2026-10-25 (branch fix/storefront-polish-oct25)
+
+- [X] Footer: "Shop All" moved out of Help into the Shop column.
+- [X] Header logo = bare "BC" letters, no ring (`public/logo-monogram.png` re-cut from the 4500px source);
+  full ringed logo kept in the footer.
+- [X] Low-stock line: "Last piece in this design" / "Only N pieces left in this design" (1-3 left).
+  Owner wanted "we had lots, few left" framing; rejected because most designs are stocked 1-2 deep.
+- [X] Diwali hero CTA "Shop the edit" → "Discover the glam" (owner pick).
+- [X] Shop/collection grids auto-load 48 products, then a "Load more" button, so the footer is reachable.
+- [ ] Placeholders waiting on owner content: About craftsmanship photo, Contact storefront + interior
+  photos, Size Guide measurement diagram, optional Home brand-story photo, empty Wedding + Festive
+  collections (listed on /collections, show "coming soon"), footer text payment badges (PAYTM; checkout off).
+
+### NEXT FOCUS after Diwali: Customization service (owner 2026-10-25, not designed yet)
+
+In-house designers + tailors make anything to order: lehengas, sarees, dresses, kurtis, sherwanis,
+jodhpuri suits, suits, blazers, coat-pants, formal suits. Customer submits a design photo, target price,
+quantity, optional fabric → shop replies with a quote (price + time) → 50% advance via Cashfree → balance
+when the piece is ready. Needs brainstorm/spec first (open: measurements capture, quote channel, how the
+advance fits the online-orders + Bill of Supply flow, delivery vs pickup).
+
 ### P0: quick wins before Diwali (this week)
 
 - [X] Rename "Diwali Edit" → "Diwali Glam" (2026-10-19).
-- [ ] More hero carousel images (3 today, looks sparse). **Blocked on owner supplying photos**
-  (product-only or lifestyle, either is fine). Add them, then review the look together.
+- [X] More hero carousel images: new banner photos added; owner signed off on the look 2026-10-25.
 - [X] "More like this" ranked by category/price/colour/fabric, sold-out dropped, all 8 visible on
   desktop, "View all" link, small categories borrow from their header group (2026-10-19).
 - [X] Category pages get /shop filters + sort + paging, scoped to the collection (2026-10-19).

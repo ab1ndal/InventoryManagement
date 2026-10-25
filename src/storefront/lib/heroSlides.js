@@ -16,7 +16,7 @@ export const HERO_SLIDES = [
     id: "diwali",
     headline: "Diwali Glam",
     subline: "Handpicked festive pieces for the season of lights.",
-    cta: "Shop the edit",
+    cta: "Discover the glam",
     href: "/collections/diwali",
     images: [{ url: "/hero/diwali-desktop.webp", mobileUrl: "/hero/diwali-mobile.webp" }],
   },

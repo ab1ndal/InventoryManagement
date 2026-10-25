@@ -13,6 +13,10 @@ function ProductSkeleton() {
   );
 }
 
+// Scrolling auto-loads only the first two pages; after that a button, so the
+// footer can be reached on big collections.
+const AUTO_LOAD_LIMIT = 48;
+
 export default function ProductGrid({
   products,
   loading,
@@ -21,13 +25,14 @@ export default function ProductGrid({
   fetchNextPage,
 }) {
   const sentinelRef = useRef(null);
+  const autoLoad = products.length < AUTO_LOAD_LIMIT;
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        if (entries[0].isIntersecting && autoLoad && hasMore && !loadingMore) {
           fetchNextPage();
         }
       },
@@ -35,7 +40,7 @@ export default function ProductGrid({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, fetchNextPage]);
+  }, [autoLoad, hasMore, loadingMore, fetchNextPage]);
 
   if (loading) {
     return (
@@ -76,6 +81,18 @@ export default function ProductGrid({
           {Array.from({ length: 4 }).map((_, i) => (
             <ProductSkeleton key={i} />
           ))}
+        </div>
+      )}
+
+      {hasMore && !autoLoad && !loadingMore && (
+        <div className="text-center mt-10">
+          <button
+            type="button"
+            onClick={fetchNextPage}
+            className="border border-storefront-charcoal text-storefront-charcoal hover:bg-storefront-charcoal hover:text-storefront-cream font-sans text-sm font-medium tracking-widest uppercase px-10 py-3.5 transition-colors duration-200 cursor-pointer"
+          >
+            Load more
+          </button>
         </div>
       )}
 

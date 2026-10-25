@@ -43,4 +43,11 @@ describe("StorefrontFooter — shop links", () => {
     expect(screen.queryByRole("link", { name: /dupattas/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /salwar suits/i })).not.toBeInTheDocument();
   });
+
+  it("lists Shop All once, under Shop rather than Help", () => {
+    renderFooter();
+    const shopAll = screen.getAllByRole("link", { name: "Shop All" });
+    expect(shopAll).toHaveLength(1);
+    expect(shopAll[0].closest("div")).toHaveTextContent(/^Shop/);
+  });
 });
