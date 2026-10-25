@@ -87,9 +87,9 @@ beforeEach(() => {
   mockRpcError = null;
 });
 
-const saveWith = async (variantsFor) => {
+const saveWith = async (variantsFor, productChanges = {}) => {
   mockEdit = ({ product, variants }) => [
-    { ...product, variants: variantsFor(variants) },
+    { ...product, ...productChanges, variants: variantsFor(variants) },
     [],
   ];
   render(
@@ -162,4 +162,17 @@ test("a stock_adjust failure shows the update-failed toast", async () => {
     title: "Update Failed",
     description: "stock would go negative",
   });
+});
+
+const productUpdate = () =>
+  mockOps.find((o) => o.table === "products" && o.method === "update").payload;
+
+test("editing the description marks it as manual", async () => {
+  await saveWith((vs) => vs, { description: "Zari border with scattered butis." });
+  expect(productUpdate().description_source).toBe("manual");
+});
+
+test("saving without changing the description leaves its source alone", async () => {
+  await saveWith((vs) => vs, { retailprice: 2500 });
+  expect(productUpdate()).not.toHaveProperty("description_source");
 });

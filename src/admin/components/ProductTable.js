@@ -266,6 +266,11 @@ const ProductTable = forwardRef(
             description: productData.description,
             producturl: productData.producturl,
             unit_type: productData.unit_type,
+            // A hand edit marks the copy as the shop's own, so the AI
+            // description batch skips this product from now on.
+            ...((oldProduct?.description ?? "") !== (productData.description ?? "") && {
+              description_source: "manual",
+            }),
           })
           .eq("productid", productData.productid);
 
