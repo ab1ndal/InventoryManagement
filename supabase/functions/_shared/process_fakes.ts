@@ -119,6 +119,12 @@ export class FakeDb implements OrdersDb {
   billId = 9001;
   /** Finalize events (sent_back / rebooked) with the op key and result, for idempotent repeats. */
   events: { kind: string; opKey: string; result: Record<string, unknown> }[] = [];
+  /** Returns shown on the order; photo paths by photo id. */
+  returns: Record<string, unknown>[] = [];
+  photoPaths = new Map<string, string>();
+  returnOrders = new Map<string, string>();
+  /** rpc name → message: the next call to it raises (a business-rule refusal). */
+  rpcRaises = new Map<string, string>();
 
   constructor(order: Partial<OrderRow> = {}, plan: ProcessPlan = FULL_PLAN, items = fakeItems()) {
     this.order = fakeOrder(order);
@@ -131,7 +137,15 @@ export class FakeDb implements OrdersDb {
   }
 
   getOrder(id: string): Promise<OrderRow | null> {
-    return Promise.resolve(id === this.order.id ? structuredClone(this.order) : null);
+    return Promise.resolve(id === this.order.id ? structuredClone({ ...this.order, returns: this.returns }) : null);
+  }
+
+  getReturnPhotoPath(photoId: string): Promise<string | null> {
+    return Promise.resolve(this.photoPaths.get(photoId) ?? null);
+  }
+
+  getReturnOrderId(returnId: string): Promise<string | null> {
+    return Promise.resolve(this.returnOrders.get(returnId) ?? null);
   }
 
   getItems(orderId: string): Promise<OrderItemRow[]> {
@@ -150,6 +164,8 @@ export class FakeDb implements OrdersDb {
   async rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
     this.calls.push({ fn, args });
     const o = this.order;
+    const raiseMsg = this.rpcRaises.get(fn);
+    if (raiseMsg) throw raised(fn, raiseMsg);
     const lease = () => new Date(Date.now() + 5 * 60_000).toISOString();
     switch (fn) {
       case "online_order_claim": {
@@ -366,6 +382,20 @@ export class FakeDb implements OrdersDb {
         return this.jobsReset as T;
       case "online_set_checkout_live":
         return { checkout_live: args.p_live, changed: true } as T;
+      case "online_order_mark_delivered":
+        return { delivered: true } as T;
+      case "online_return_open":
+        return "dddddddd-dddd-4ddd-8ddd-dddddddddddd" as T;
+      case "online_return_cancel":
+        return null as T;
+      case "online_return_preview":
+        return { credit_part: 100, gateway_part: 400, shipping: 0, total: 500 } as T;
+      case "online_return_receive":
+        return { status: "refunded", refund_id: "refund-return", refund: { total: 500 } } as T;
+      case "online_return_photo_path":
+        return `${o.id}/${args.p_return_id}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.${args.p_ext}` as T;
+      case "online_return_add_photo":
+        return "ffffffff-ffff-4fff-8fff-ffffffffffff" as T;
       case "online_order_apply_tracking":
         return { matched: true, changed: true, status: args.p_status } as T;
       default:

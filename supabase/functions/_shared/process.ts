@@ -114,6 +114,9 @@ export class DbError extends Error {
 export type OrdersDb = {
   rpc<T>(fn: string, args: Record<string, unknown>): Promise<T>;
   getOrder(id: string): Promise<OrderRow | null>;
+  /** Stored storage path of a return photo; staff view it through a signed URL only. */
+  getReturnPhotoPath(photoId: string): Promise<string | null>;
+  getReturnOrderId(returnId: string): Promise<string | null>;
   getItems(orderId: string): Promise<OrderItemRow[]>;
 };
 
@@ -125,9 +128,21 @@ export function supabaseOrdersDb(client: SupabaseClient): OrdersDb {
       return data as T;
     },
     async getOrder(id) {
-      const { data, error } = await client.from("orders").select("*").eq("id", id).maybeSingle();
+      const { data, error } = await client.from("orders")
+        .select("*, returns:order_returns(*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at))")
+        .eq("id", id).maybeSingle();
       if (error) throw new DbError("orders", error.code ?? null, error.message);
       return (data ?? null) as OrderRow | null;
+    },
+    async getReturnPhotoPath(photoId) {
+      const { data, error } = await client.from("order_return_photos").select("path").eq("id", photoId).maybeSingle();
+      if (error) throw new DbError("order_return_photos", error.code ?? null, error.message);
+      return (data?.path as string | undefined) ?? null;
+    },
+    async getReturnOrderId(returnId) {
+      const { data, error } = await client.from("order_returns").select("order_id").eq("id", returnId).maybeSingle();
+      if (error) throw new DbError("order_returns", error.code ?? null, error.message);
+      return (data?.order_id as string | undefined) ?? null;
     },
     async getItems(orderId) {
       const { data, error } = await client.from("order_items").select("*").eq("order_id", orderId).order("line_no");
