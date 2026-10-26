@@ -10,40 +10,20 @@ pg_cron/pg_net on, Vault secrets + CRON_SECRET set, 3 cron jobs scheduled.
 Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/functions/deno.json`
 (without `--import-map` the server bundler can't resolve `@supabase/supabase-js`).
 
-### RESUME HERE (session ended 2026-10-24)
-- **Names (owner 2026-10-24):** website/brand name = **Bindal's Creation** (no s; matches logo; domain
-  bindalscreations.com unchanged). Legal/GST name everywhere else = **Bindals Creation** (bills/labels in caps
-  BINDALS CREATION). Shipped in PRs #49, #50, #51.
-- **Cashfree onboarding DONE 2026-10-24**: KYC passed (PAN verified, owner via DigiLocker since CKYC OTP
-  refuses non-individual records, PPOB = GST address option). Dashboard: "You can start transacting now",
-  Payment Gateway/Links/Forms activated, details under review. VCIP (video KYC): **not required**
-  (Cashfree Care email 2026-10-25). Account manager: Saurabh Kumar. Dashboard shows "Next Steps 1/2": confirm
-  the bank-account step (shop's current account). Next: owner copies sandbox keys into Supabase secrets
-  (go-live checklist step 1).
-- **GST facts (screenshots in `docs/`, untracked):** legal name POOJA BINDAL, trade name Bindals Creation,
-  Proprietorship, Composition. GST principal place = *H NO-23, MIRJAJAN-58, Subhangini Fancy Saree, SIHANI GATE,
-  Chandrapuri, Ghaziabad, UP 201001*. Owner 2026-10-24: same physical shop as the site address; canonical
-  short address = *58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001* (site already uses
-  it, no change). "Subhangini Fancy Saree" is a different shop: never use it. Cashfree PPOB: accept the GST
-  prefill if it comes; if typed by hand, use the short address.
-  "Bindals Creation (Prop. Pooja Bindal)" now on footer + Privacy + Terms (PR #54, merged 2026-10-24); bills
-  unchanged (owner: website only). Still open: ask CA about HSN (6210 on record vs 6204/6211/6203 for ethnic
-  garments).
-- Held branch `feat/online-orders-storefront` is already merged (PR #58). Only Account → Order history is
-  still held: at go-live revert `b4a5e49` to restore the real list + its test.
-- Test suite green on main (2026-10-25): 6 stale tests fixed in PR #68; 109 suites, 685 tests pass.
-- Guide doc for the owner: https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth (setup steps + what remains).
+### Reference facts
+- Names: website/brand = **Bindal's Creation**; legal/GST name everywhere else = **Bindals Creation**
+  (bills/labels BINDALS CREATION). Site footer/Terms/Privacy say "Bindals Creation (Prop. Pooja Bindal)".
+- Address: always *58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001*. The GST record's
+  "Subhangini Fancy Saree" is a different shop: never use it. GST screenshots in `docs/` (untracked).
+- Cashfree: KYC passed 2026-10-24, no video KYC needed; account manager Saurabh Kumar. Owner guide:
+  https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth
 
 ### Go-live checklist (owner + controller, in order)
-1. Owner: Cashfree account active (sandbox keys first), Shiprocket KYC + API user + pickup location `Shop`,
-   Gmail app password for bindalscreations@gmail.com. Owner puts secrets in Supabase (never chat):
-   CASHFREE_CLIENT_ID, CASHFREE_CLIENT_SECRET, CASHFREE_ENV=sandbox, SHIPROCKET_API_EMAIL,
-   SHIPROCKET_API_PASSWORD, SHIPROCKET_WEBHOOK_TOKEN, GMAIL_USER, GMAIL_APP_PASSWORD, ALLOWED_ORIGIN,
-   SITE_URL, IP_HASH_SALT. (Done 2026-10-25: CRON_SECRET, IP_HASH_SALT, SITE_URL=https://www.bindalscreations.com,
-   ALLOWED_ORIGIN=http://localhost:3000,https://www.bindalscreations.com; apex redirects to www.
-   GMAIL_USER=bindalscreations@gmail.com + GMAIL_APP_PASSWORD (app "Supabase orders", owner-set) done
-   2026-10-25; Gmail send VERIFIED 2026-10-25 via temp function using the real mailer.ts (nodemailer
-   works on the Supabase runtime; temp function deleted).)
+1. Owner puts the remaining secrets in Supabase (never chat): CASHFREE_CLIENT_ID, CASHFREE_CLIENT_SECRET,
+   CASHFREE_ENV=sandbox (blocked: Cashfree dashboard region restriction, see CASHFREE section), and after
+   Shiprocket KYC + API user + pickup location `Shop`: SHIPROCKET_API_EMAIL, SHIPROCKET_API_PASSWORD,
+   SHIPROCKET_WEBHOOK_TOKEN. Already set 2026-10-25: CRON_SECRET, IP_HASH_SALT, SITE_URL, ALLOWED_ORIGIN,
+   GMAIL_USER, GMAIL_APP_PASSWORD (Gmail send verified).
 2. [X] Deploy functions (2026-10-25): `--no-verify-jwt` for checkout-quote, create-order, order-status,
    cashfree-webhook, run-jobs, courier-status, refund-choice, refund-sweeper; admin-order-action with JWT on.
    Redeploy after secret changes is NOT needed (secrets propagate without redeploy).
