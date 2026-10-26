@@ -1290,4 +1290,37 @@ begin
 end $$;
 rollback;
 
+-- ===================================================================
+-- chain check: apply_tracking keeps the CURRENT rebook behaviour (lease-bound hold, per-attempt email refs)
+-- ===================================================================
+begin;
+do $$
+declare
+  s record := pg_temp.shipped_order();
+  res jsonb;
+begin
+  update public.orders set op_action = 'rebook', op_key = 'op-rb', op_lease_until = now() + interval '5 minutes' where id = s.o_id;
+  res := public.online_order_apply_tracking(s.o_awb, 'delivered', '{"shipment_status_id":7}');
+  assert (res ->> 'held')::boolean, 'held while lease live: ' || res::text;
+  assert (select delivered_at from public.orders where id = s.o_id) is null, 'held: no delivered_at';
+  update public.orders set op_lease_until = now() - interval '1 second' where id = s.o_id;
+  res := public.online_order_apply_tracking(s.o_awb, 'delivered', '{"shipment_status_id":7}');
+  assert (res ->> 'changed')::boolean and res ->> 'status' = 'delivered', 'applies after expiry: ' || res::text;
+  assert (select delivered_at from public.orders where id = s.o_id) is not null, 'delivered_at set after expiry';
+end $$;
+rollback;
+
+begin;
+do $$
+declare
+  s record := pg_temp.shipped_order();
+begin
+  assert exists (select 1 from public.order_jobs where order_id = s.o_id and kind = 'email_shipped' and ref_id = ''), 'first shipment bare ref';
+  update public.orders set status = 'packed', sr_attempt = 2 where id = s.o_id;
+  perform public.online_order_apply_tracking(s.o_awb, 'shipped', '{"shipment_status_id":6}');
+  assert (select count(*) from public.order_jobs where order_id = s.o_id and kind = 'email_shipped') = 2, 'second shipped email';
+  assert exists (select 1 from public.order_jobs where order_id = s.o_id and kind = 'email_shipped' and ref_id = '2'), 'ref = attempt';
+end $$;
+rollback;
+
 \echo 'test_online_returns: all passed'

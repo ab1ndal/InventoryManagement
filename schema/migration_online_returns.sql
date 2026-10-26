@@ -1,6 +1,6 @@
 -- Online returns, Task 1: orders.delivered_at + manual "mark delivered".
 -- Run after migration_online_orders_rebook.sql (online_order_apply_tracking below starts from
--- the rebook definition and keeps its hold while op_action = 'rebook').
+-- the current rebook definition verbatim plus the delivered_at lines).
 
 alter table public.orders add column if not exists delivered_at timestamptz;
 
@@ -23,6 +23,7 @@ declare
   v_label text := coalesce(d ->> 'shipment_status', d ->> 'current_status', d ->> 'status');
   v_sid int := case when (d ->> 'shipment_status_id') ~ '^\d+$' then (d ->> 'shipment_status_id')::int end;
   v_from text;
+  v_job_ref text;
   v_delivered_at timestamptz;
 begin
   select * into o from public.orders where awb = p_awb for update;
@@ -36,7 +37,8 @@ begin
    where id = o.id;
 
   -- Rebook in progress: the old shipment is being cancelled, so its updates must not move the order.
-  if o.op_action = 'rebook' then
+  -- Only while the lease is live: an abandoned rebook claim must not freeze tracking forever.
+  if o.op_action = 'rebook' and o.op_lease_until > now() then
     perform public._online_event(o.id, 'tracking_held', o.status, o.status, null,
       jsonb_build_object('mapped_status', p_status, 'payload', d));
     return jsonb_build_object('matched', true, 'changed', false, 'held', true, 'status', o.status);
@@ -77,11 +79,13 @@ begin
          delivered_at = case when p_status = 'delivered' then coalesce(delivered_at, v_delivered_at, now()) else delivered_at end
    where id = o.id;
   perform public._online_event(o.id, p_status, v_from, p_status, null, d);
+  -- order_jobs is unique per (order, kind, ref): a rebooked order's later shipment needs its own ref.
+  v_job_ref := case when o.sr_attempt > 1 then o.sr_attempt::text else '' end;
   if p_status in ('shipped', 'out_for_delivery', 'delivered') and v_rank_old < 2 then
-    perform public._enqueue_job(o.id, 'email_shipped');
+    perform public._enqueue_job(o.id, 'email_shipped', v_job_ref);
   end if;
   if p_status = 'delivered' then
-    perform public._enqueue_job(o.id, 'email_delivered');
+    perform public._enqueue_job(o.id, 'email_delivered', v_job_ref);
   end if;
   return jsonb_build_object('matched', true, 'changed', true, 'status', p_status);
 end;
