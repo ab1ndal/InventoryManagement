@@ -101,6 +101,12 @@ New Comments (done 2026-10-20, PR #31 merged + live):
 - [ ] Contact storefront + interior photos and optional Home brand-story photo: owner to supply (no
   Google Photos connector; Drive folders "Display Photos"/"Archive" look personal, not opened).
 - Footer payment badges kept as-is (owner: checkout turns on soon).
+- [X] /customize page live in nav + promo + hero slide 2 (Phase A of `tasks/customization-plan.md`):
+  requests by WhatsApp/email, quotes + Cashfree Payment Links by hand. Terms/Returns got "Custom orders".
+- [X] Product price note no longer says "Inclusive of all taxes" (composition dealer).
+- [X] ₹0-price products hidden from the storefront by RLS (`schema/migration_storefront_hide_zero_price.sql`,
+  applied to live 2026-10-25, recorded in `_migrations`). [ ] Owner: fix BC25022's price in admin.
+- [ ] Flaky test: `CartContext.test.jsx` "does not write through as a guest" failed 1 of 4 runs. Fix or delete.
 
 ### NEXT FOCUS after Diwali: Customization service (owner 2026-10-25, plan drafted)
 
