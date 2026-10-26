@@ -22,6 +22,26 @@ const mockRows = {
       order_items: [{ qty: 2 }, { qty: 1 }],
     },
   ],
+  all: [
+    {
+      id: "o3",
+      order_ref: "WEB-000003",
+      created_at: "2026-10-21T10:00:00Z",
+      status: "delivered",
+      contact_name: "Meera",
+      contact_phone: "+917777777777",
+      subtotal: 900,
+      promo_discount: 0,
+      shipping: 0,
+      voucher_applied: 0,
+      credit_applied: 0,
+      gateway_amount: 900,
+      problem: null,
+      process_error: null,
+      order_items: [{ qty: 2, shipped_qty: 2 }],
+      returns: [{ status: "refunded", items: [{ received_units: 1 }] }],
+    },
+  ],
   problems: [
     {
       id: "o2",
@@ -97,4 +117,12 @@ test("clicking a row selects the order", async () => {
   render(<OrderList onSelect={(id) => picked.push(id)} refreshKey={0} />);
   fireEvent.click(await screen.findByText("WEB-000001"));
   expect(picked).toEqual(["o1"]);
+});
+
+test("shows a returns badge on a partly returned order", async () => {
+  render(<OrderList onSelect={() => {}} refreshKey={0} />);
+  await screen.findByText("WEB-000001");
+  fireEvent.click(screen.getByRole("tab", { name: "All" }));
+  const row = await screen.findByRole("row", { name: /WEB-000003/ });
+  expect(row).toHaveTextContent("Partly returned");
 });

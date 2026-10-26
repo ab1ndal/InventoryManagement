@@ -447,3 +447,53 @@ test("after a courier error the dialog offers Abandon with the dialog's opKey", 
   fireEvent.click(within(confirm).getByRole("button", { name: "Abandon" }));
   await waitFor(() => expect(mockActions).toContainEqual({ action: "release_op", orderId: "o1", opKey: "key-1" }));
 });
+
+describe("Mark delivered", () => {
+  const shipped = () => {
+    mockDetail = detail({ order: { status: "shipped", delivered_at: null } });
+  };
+  const btn = () => screen.queryByRole("button", { name: "Mark delivered…" });
+
+  test("hidden for an admin", async () => {
+    shipped();
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    await waitFor(() => expect(mockRole).toBe("admin"));
+    expect(btn()).not.toBeInTheDocument();
+  });
+
+  test("hidden for a superadmin when the order is not shipped / out for delivery", async () => {
+    mockRole = "superadmin";
+    mockDetail = detail({ order: { status: "packed" } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(btn()).not.toBeInTheDocument();
+  });
+
+  test.each(["shipped", "out_for_delivery"])("superadmin on %s needs a reason, sends ISO date", async (status) => {
+    mockRole = "superadmin";
+    mockDetail = detail({ order: { status, delivered_at: null } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    fireEvent.click(await screen.findByRole("button", { name: "Mark delivered…" }));
+    const dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByRole("button", { name: "Mark delivered" });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("Delivered at"), { target: { value: "2026-10-20T10:00" } });
+    fireEvent.change(within(dialog).getByLabelText("Delivery reason"), { target: { value: " Customer confirmed on call " } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mockActions).toHaveLength(1));
+    expect(mockActions[0]).toEqual({
+      action: "mark_delivered",
+      orderId: "o1",
+      deliveredAt: new Date("2026-10-20T10:00").toISOString(),
+      reason: "Customer confirmed on call",
+    });
+  });
+});
+
+test("a delivered order shows the Returns section", async () => {
+  mockDetail = detail({ order: { status: "delivered", delivered_at: "2026-10-20T10:00:00Z", returns: [] } });
+  render(<OrderDetail orderId="o1" />);
+  expect(await screen.findByRole("heading", { name: "Returns" })).toBeInTheDocument();
+});

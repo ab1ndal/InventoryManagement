@@ -10,6 +10,7 @@ import {
   hasProblem,
   itemCount,
   orderTotal,
+  returnBadge,
 } from "./orderHelpers";
 
 export function StatusBadge({ status }) {
@@ -20,6 +21,16 @@ export function StatusBadge({ status }) {
       }`}
     >
       {STATUS_LABELS[status] || status}
+    </span>
+  );
+}
+
+export function ReturnBadge({ order }) {
+  const label = returnBadge(order);
+  if (!label) return null;
+  return (
+    <span className="ml-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+      {label}
     </span>
   );
 }
@@ -105,6 +116,7 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
                 <td className="px-3 py-2 text-right">{formatRupees(orderTotal(o))}</td>
                 <td className="px-3 py-2">
                   <StatusBadge status={o.status} />
+                  <ReturnBadge order={o} />
                 </td>
                 <td className="px-3 py-2">
                   {hasProblem(o) && (
