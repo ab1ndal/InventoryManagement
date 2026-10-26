@@ -493,7 +493,8 @@ begin
     perform public.online_order_checkpoint(r.order_id, 'awb', '{"awb":"AWBOLD","courier_id":7,"courier_name":"T"}', 'op-old');
     perform public.online_order_checkpoint(r.order_id, 'pickup', '{}', 'op-old');
     update public.orders set manifest_url = 'https://x/m.pdf', label_url = 'https://x/l.pdf', sr_updated_at = now(),
-           problem = 'Courier cancelled shipment — rebook or cancel' where id = r.order_id;
+           problem = 'Courier cancelled shipment — rebook or cancel',
+           tracking_status_id = 6, tracking_label = 'SHIPPED', tracking_updated_at = now() where id = r.order_id;
   end if;
   update public.orders set op_lease_until = now() - interval '1 minute' where id = r.order_id;
   perform public.online_order_claim(r.order_id, 'send_back', null, 'op-sb');
@@ -556,6 +557,8 @@ begin
      and oo.sr_last_error is null and oo.awb is null and oo.courier_id is null and oo.courier_name is null
      and oo.pickup_requested_at is null and oo.manifest_url is null and oo.label_url is null
      and oo.process_plan is null and oo.process_error is null and oo.problem is null, 'shipment cleared';
+  assert oo.tracking_status_id is null and oo.tracking_label is null and oo.tracking_updated_at is null,
+    'old AWB tracking cleared';
   assert oo.op_key is null and oo.op_action is null and oo.op_actor is null and oo.op_lease_until is null
      and oo.sr_cancelled_op_key is null and oo.manual_cancel_confirmed_by is null, 'op fields cleared';
   select * into it from public.order_items where order_id = o;
@@ -709,7 +712,8 @@ begin
   perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
   perform pg_temp.pack(r.order_id);
   update public.orders set sr_order_id = '777', sr_shipment_id = '778' where id = r.order_id;
-  perform public.online_order_apply_tracking((select awb from public.orders where id = r.order_id), 'shipped', '{"shipment_status_id":6}');
+  perform public.online_order_apply_tracking((select awb from public.orders where id = r.order_id), 'shipped',
+    '{"shipment_status_id":6,"shipment_status":"SHIPPED"}');
   perform public.online_order_claim(r.order_id, 'rebook', null, 'op-rb');
   if p_cancelled then
     perform public.online_order_checkpoint(r.order_id, 'sr_cancelled', '{}', 'op-rb');
@@ -765,6 +769,8 @@ begin
   assert oo.awb is null and oo.sr_order_id is null and oo.sr_shipment_id is null and oo.label_url is null
      and oo.problem is null and oo.op_key is null and oo.op_action is null and oo.sr_cancelled_op_key is null,
      'shipment and op cleared';
+  assert oo.tracking_status_id is null and oo.tracking_label is null and oo.tracking_updated_at is null,
+    'old AWB tracking cleared';
   select * into it from public.order_items where order_id = o;
   assert it.stock_taken = 2 and it.available_qty is null and it.shipped_qty = 0 and it.lost_qty = 0
      and it.refunded_qty = 0 and it.status = 'ordered', 'item: ' || row_to_json(it)::text;
@@ -1108,6 +1114,228 @@ begin
     assert sqlerrm like '%rebook: note required%', sqlerrm;
   end;
   assert (select status from public.orders where id = o) = 'shipped', 'unchanged';
+end $$;
+rollback;
+
+-- ===================================================================
+-- Final review fixes
+-- ===================================================================
+
+-- F1: availability set while paid, Process claimed and died before prepare (no plan), send back:
+-- the unavailable-marked unit is still held (never refunded), so the next check refunds it.
+begin;
+do $$
+declare
+  r record;
+  it public.order_items;
+  p jsonb;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 5), 'qty', 2)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, 1, null) from public.order_items i where i.order_id = r.order_id;
+  perform public.online_order_claim(r.order_id, 'process', null, 'op-dead');
+  assert (select process_plan is null from public.orders where id = r.order_id), 'worker died before prepare';
+  update public.orders set op_lease_until = now() - interval '1 minute' where id = r.order_id;
+  perform public.online_order_claim(r.order_id, 'send_back', null, 'op-sb');
+  perform public.online_order_send_back(r.order_id, null, 'op-sb');
+  select * into it from public.order_items where order_id = r.order_id;
+  assert it.stock_taken = 2 and it.available_qty is null and it.refunded_qty = 0,
+    'no plan: both units still held, nothing refunded: ' || row_to_json(it)::text;
+  perform public.online_order_set_availability(r.order_id, it.id, 1, null);
+  perform public.online_order_claim(r.order_id, 'process', null, 'op-new');
+  p := public.online_order_prepare_process(r.order_id, null);
+  assert not (p ->> 'all_unavailable')::boolean and p ->> 'refund_id' is not null, 'plan: ' || p::text;
+  assert (select refunded_qty from public.order_items where order_id = r.order_id) = 1, 'missing unit refunded';
+  assert (select sum(units) from public.order_refunds where order_id = r.order_id and reason = 'unavailable') = 1,
+    'one unit refunded once';
+end $$;
+rollback;
+
+-- F3: release_op grants
+do $$
+begin
+  assert has_function_privilege('service_role', 'public.online_order_release_op(uuid,uuid,text)', 'execute'), 'service runs release';
+  assert not has_function_privilege('anon', 'public.online_order_release_op(uuid,uuid,text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.online_order_release_op(uuid,uuid,text)', 'execute'),
+     'clients cannot run release';
+end $$;
+
+-- F3: send_back released by its own key → back to a stalled Process; Retry (same key) and a new
+-- send back can take over.
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back();
+  a uuid := gen_random_uuid();
+  res jsonb;
+  oo public.orders;
+  ev public.order_events;
+  c jsonb;
+begin
+  res := public.online_order_release_op(o, a, 'op-sb');
+  select * into oo from public.orders where id = o;
+  assert oo.status = 'processing' and oo.op_action = 'process' and oo.op_key = 'op-sb' and oo.op_lease_until < now(),
+    'stalled process again: ' || row_to_json(oo)::text;
+  assert oo.awb = 'AWBOLD' and oo.sr_order_id = '111', 'booking untouched';
+  assert res ->> 'status' = 'processing', 'returns order json: ' || res::text;
+  select * into ev from public.order_events where order_id = o and kind = 'op_released';
+  assert ev.data ->> 'action' = 'send_back' and ev.data ->> 'op_key' = 'op-sb' and ev.data ->> 'actor' = a::text
+     and ev.actor = a, 'event: ' || coalesce(ev.data::text, 'none');
+  begin
+    perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
+    assert false, 'released send back can no longer record a cancel';
+  exception when raise_exception then null;
+  end;
+  c := public.online_order_claim(o, 'send_back', null, 'op-sb2');
+  assert (c ->> 'claimed')::boolean, 'new send back claims: ' || c::text;
+  update public.orders set op_lease_until = now() - interval '1 minute' where id = o;
+  perform public.online_order_release_op(o, a, 'op-other');
+  c := public.online_order_claim(o, 'process', null, 'op-sb2');
+  assert (c ->> 'claimed')::boolean and c ->> 'op_action' = 'process', 'Retry resumes with the kept key: ' || c::text;
+end $$;
+rollback;
+
+-- F3: rebook release by another key only after the lease expires; status unchanged
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2, false);
+  oo public.orders;
+begin
+  begin
+    perform public.online_order_release_op(o, null, 'op-x');
+    assert false, 'other key refused while the lease is live';
+  exception when raise_exception then
+    assert sqlerrm like '%release: stale operation%', sqlerrm;
+  end;
+  update public.orders set op_lease_until = now() - interval '1 minute' where id = o;
+  perform public.online_order_release_op(o, null, 'op-x');
+  select * into oo from public.orders where id = o;
+  assert oo.status = 'shipped' and oo.op_key is null and oo.op_action is null and oo.op_actor is null
+     and oo.op_lease_until is null and oo.awb is not null, 'rebook released: ' || row_to_json(oo)::text;
+  begin
+    perform public.online_order_release_op(o, null, 'op-x');
+    assert false, 'nothing left to release';
+  exception when raise_exception then
+    assert sqlerrm like '%release: no send back / rebook in progress%', sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- F3: rebook released by its own key while the lease is live
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2, false);
+begin
+  perform public.online_order_release_op(o, null, 'op-rb');
+  assert (select op_action is null and status = 'shipped' from public.orders where id = o), 'released';
+end $$;
+rollback;
+
+-- F3: release refused once the booking is cancelled (sr_cancelled or manual confirmation)
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2);
+  o2 uuid := pg_temp.mk_send_back();
+begin
+  begin
+    perform public.online_order_release_op(o, null, 'op-rb');
+    assert false, 'release refused after sr_cancelled';
+  exception when raise_exception then
+    assert sqlerrm like '%release: courier booking already cancelled — finish the action%', sqlerrm;
+  end;
+  -- a takeover key inherits the cancelled booking: still refused
+  update public.orders set op_lease_until = now() - interval '1 minute' where id = o;
+  perform public.online_order_claim(o, 'rebook', null, 'op-rb2');
+  begin
+    perform public.online_order_release_op(o, null, 'op-rb2');
+    assert false, 'release refused after an earlier key cancelled';
+  exception when raise_exception then
+    assert sqlerrm like '%courier booking already cancelled%', sqlerrm;
+  end;
+  perform public.online_order_confirm_manual_cancel(o2, gen_random_uuid(), 'op-sb');
+  begin
+    perform public.online_order_release_op(o2, null, 'op-sb');
+    assert false, 'release refused after manual confirmation';
+  exception when raise_exception then
+    assert sqlerrm like '%courier booking already cancelled%', sqlerrm;
+  end;
+  assert (select op_action = 'rebook' from public.orders where id = o)
+     and (select op_action = 'send_back' from public.orders where id = o2), 'claims kept';
+end $$;
+rollback;
+
+-- F3: release only for send_back / rebook
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op-p');
+begin
+  begin
+    perform public.online_order_release_op(o, null, 'op-p');
+    assert false, 'process op cannot be released';
+  exception when raise_exception then
+    assert sqlerrm like '%release: no send back / rebook in progress%', sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- F3: tracking held only while the rebook lease is live
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 1, false);
+  awb text;
+  res jsonb;
+begin
+  select o2.awb into awb from public.orders o2 where o2.id = o;
+  res := public.online_order_apply_tracking(awb, 'out_for_delivery', '{"shipment_status_id":17}');
+  assert (res ->> 'held')::boolean, 'held while live: ' || res::text;
+  update public.orders set op_lease_until = now() - interval '1 second' where id = o;
+  res := public.online_order_apply_tracking(awb, 'delivered', '{"shipment_status_id":7}');
+  assert (res ->> 'changed')::boolean and res ->> 'status' = 'delivered', 'applies after expiry: ' || res::text;
+  assert (select status from public.orders where id = o) = 'delivered', 'delivered';
+  assert (select count(*) from public.order_jobs where order_id = o and kind = 'email_delivered') = 1, 'delivered email';
+end $$;
+rollback;
+
+-- F4: the second shipment of a rebooked order sends its own shipped / delivered emails
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2);
+  awb text;
+begin
+  perform public.online_order_rebook(o, null, 'op-rb', false, 'box back');
+  perform public.online_order_set_availability(o, i.id, 2, null) from public.order_items i where i.order_id = o;
+  perform pg_temp.pack(o);
+  select o2.awb into awb from public.orders o2 where o2.id = o;
+  perform public.online_order_apply_tracking(awb, 'shipped', '{"shipment_status_id":6}');
+  assert (select count(*) from public.order_jobs where order_id = o and kind = 'email_shipped') = 2, 'second shipped email';
+  assert exists (select 1 from public.order_jobs where order_id = o and kind = 'email_shipped' and ref_id = '2'), 'ref = attempt';
+  perform public.online_order_apply_tracking(awb, 'delivered', '{"shipment_status_id":7}');
+  assert exists (select 1 from public.order_jobs where order_id = o and kind = 'email_delivered' and ref_id = '2'), 'delivered ref';
+end $$;
+rollback;
+
+-- F4: first shipment keeps the bare job ref (unchanged)
+begin;
+do $$
+declare
+  r record;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 5), 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, 1, null) from public.order_items i where i.order_id = r.order_id;
+  perform pg_temp.pack(r.order_id);
+  perform public.online_order_apply_tracking((select awb from public.orders where id = r.order_id), 'delivered', '{}');
+  assert (select array_agg(kind || ':' || ref_id order by kind) from public.order_jobs
+           where order_id = r.order_id and kind in ('email_shipped', 'email_delivered'))
+         = array['email_delivered:', 'email_shipped:'], 'bare refs';
 end $$;
 rollback;
 

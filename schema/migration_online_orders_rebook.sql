@@ -47,7 +47,8 @@
 --   op_action 'send_back'. Refuses ('courier booking not cancelled yet') unless the order has
 --   no Shiprocket ids, or sr_cancelled_op_key = this key, or manual_cancel_confirmed_by is set.
 --   Clears shipment fields, problem, op_*, sr_cancelled_op_key, manual_cancel_confirmed_by;
---   sr_attempt += 1; per item stock_taken := coalesce(available_qty, stock_taken),
+--   sr_attempt += 1; per item stock_taken := coalesce(available_qty, stock_taken) when a
+--   process_plan exists (prepare refunded the rest), else unchanged,
 --   available_qty := null, shipped_qty := 0; status paid; event sent_back. Already paid with
 --   no op -> success only for the key whose sent_back event exists (returns its old ids).
 -- online_order_confirm_manual_cancel(p_order_id uuid, p_actor uuid, p_op_key text) returns void
@@ -67,8 +68,17 @@
 --   a bill (rebooked) their refund is offset ('Rebook: unavailable' with shipping only when all
 --   unavailable; 'Cancel after rebook' with shipping).
 -- online_order_apply_tracking(p_awb text, p_status text, p_payload jsonb) returns jsonb
---   While op_action = 'rebook': raw tracking fields stored, event 'tracking_held',
---   status untouched → {matched:true, changed:false, held:true, status}.
+--   While op_action = 'rebook' and its lease is live: raw tracking fields stored, event
+--   'tracking_held', status untouched → {matched:true, changed:false, held:true, status}.
+--   email_shipped / email_delivered jobs use ref_id = sr_attempt when > 1 (else ''), so a
+--   rebooked order's second shipment sends its own emails.
+-- online_order_release_op(p_order_id uuid, p_actor uuid, p_op_key text) returns jsonb (_order_ops_json)
+--   Abandons a send_back / rebook claim whose booking was not cancelled. Allowed with the same
+--   key or, once the lease expired, any key. Raises 'release: courier booking already cancelled
+--   — finish the action' when sr_cancelled_op_key or manual_cancel_confirmed_by is set.
+--   send_back → op_action 'process', lease expired, key kept, status processing (Retry / Send
+--   back take over). rebook → op_* cleared, status unchanged. Event op_released {action, op_key, actor}.
+-- _online_resend_reset also clears tracking_status_id / tracking_label / tracking_updated_at.
 -- =====================================================================
 
 alter table public.exchanges add column if not exists order_refund_id uuid;
@@ -501,6 +511,7 @@ declare
   v_label text := coalesce(d ->> 'shipment_status', d ->> 'current_status', d ->> 'status');
   v_sid int := case when (d ->> 'shipment_status_id') ~ '^\d+$' then (d ->> 'shipment_status_id')::int end;
   v_from text;
+  v_job_ref text;
 begin
   select * into o from public.orders where awb = p_awb for update;
   if not found then
@@ -513,7 +524,8 @@ begin
    where id = o.id;
 
   -- Rebook in progress: the old shipment is being cancelled, so its updates must not move the order.
-  if o.op_action = 'rebook' then
+  -- Only while the lease is live: an abandoned rebook claim must not freeze tracking forever.
+  if o.op_action = 'rebook' and o.op_lease_until > now() then
     perform public._online_event(o.id, 'tracking_held', o.status, o.status, null,
       jsonb_build_object('mapped_status', p_status, 'payload', d));
     return jsonb_build_object('matched', true, 'changed', false, 'held', true, 'status', o.status);
@@ -544,11 +556,13 @@ begin
 
   update public.orders set status = p_status, updated_at = now() where id = o.id;
   perform public._online_event(o.id, p_status, v_from, p_status, null, d);
+  -- order_jobs is unique per (order, kind, ref): a rebooked order's later shipment needs its own ref.
+  v_job_ref := case when o.sr_attempt > 1 then o.sr_attempt::text else '' end;
   if p_status in ('shipped', 'out_for_delivery', 'delivered') and v_rank_old < 2 then
-    perform public._enqueue_job(o.id, 'email_shipped');
+    perform public._enqueue_job(o.id, 'email_shipped', v_job_ref);
   end if;
   if p_status = 'delivered' then
-    perform public._enqueue_job(o.id, 'email_delivered');
+    perform public._enqueue_job(o.id, 'email_delivered', v_job_ref);
   end if;
   return jsonb_build_object('matched', true, 'changed', true, 'status', p_status);
 end;
@@ -599,6 +613,7 @@ begin
     sr_order_id = null, sr_shipment_id = null, sr_updated_at = null, sr_sync_status = null, sr_last_error = null,
     awb = null, courier_id = null, courier_name = null, pickup_requested_at = null,
     manifest_url = null, label_url = null, process_plan = null, process_error = null, problem = null,
+    tracking_status_id = null, tracking_label = null, tracking_updated_at = null,
     sr_attempt = sr_attempt + 1, sr_cancelled_op_key = null, manual_cancel_confirmed_by = null,
     op_key = null, op_action = null, op_actor = null, op_lease_until = null,
     status = p_status, updated_at = now()
@@ -643,8 +658,12 @@ begin
     raise exception 'send_back: courier booking not cancelled yet';
   end if;
 
-  -- Units refunded as unavailable were never on the shelf; the rest are held for the next check.
-  update public.order_items set stock_taken = coalesce(available_qty, stock_taken) where order_id = o.id;
+  -- Units refunded as unavailable (prepare_process ran, so a plan exists) were never on the shelf;
+  -- the rest are held for the next check. Without a plan nothing was refunded yet: keep every unit
+  -- held so the next shelf check refunds what is missing.
+  update public.order_items set stock_taken = case when o.process_plan is null then stock_taken
+                                                   else coalesce(available_qty, stock_taken) end
+   where order_id = o.id;
   perform public._online_resend_reset(o.id, 'paid');
   perform public._online_event(o.id, 'sent_back', 'processing', 'paid', p_actor,
     jsonb_build_object('old_sr_order_id', o.sr_order_id, 'old_sr_shipment_id', o.sr_shipment_id,
@@ -854,6 +873,49 @@ begin
 end;
 $$;
 
+-- ---------- release an abandoned send back / rebook claim (Ruling R5) ----------
+
+-- Lets staff walk away from a send back / rebook whose courier booking was NOT cancelled.
+-- Same key, or any key once the lease expired. Refused once a cancel is recorded for the order
+-- (sr_cancelled by any op key, or a manual confirmation): the booking is gone, so the action
+-- must be finished. send_back → back to a stalled Process (op_action 'process', lease expired,
+-- key kept) so Retry / Send back take over; rebook → op fields cleared, status unchanged.
+create or replace function public.online_order_release_op(p_order_id uuid, p_actor uuid, p_op_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  o public.orders;
+  v_action text;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order % not found', p_order_id; end if;
+  if coalesce(o.op_action, '') not in ('send_back', 'rebook') then
+    raise exception 'release: no send back / rebook in progress (status %, op %)', o.status, o.op_action;
+  end if;
+  if p_op_key is null or p_op_key = ''
+     or (o.op_key is distinct from p_op_key and not coalesce(o.op_lease_until < now(), false)) then
+    raise exception 'release: stale operation';
+  end if;
+  if o.sr_cancelled_op_key is not null or o.manual_cancel_confirmed_by is not null then
+    raise exception 'release: courier booking already cancelled — finish the action';
+  end if;
+  v_action := o.op_action;
+  if v_action = 'send_back' then
+    update public.orders set op_action = 'process', op_lease_until = now() - interval '1 second', updated_at = now()
+     where id = o.id returning * into o;
+  else
+    update public.orders set op_key = null, op_action = null, op_actor = null, op_lease_until = null, updated_at = now()
+     where id = o.id returning * into o;
+  end if;
+  perform public._online_event(o.id, 'op_released', o.status, o.status, p_actor,
+    jsonb_build_object('action', v_action, 'op_key', p_op_key, 'actor', p_actor));
+  return public._order_ops_json(o);
+end;
+$$;
+
 do $$
 declare
   f text;
@@ -870,7 +932,8 @@ begin
     'public._online_resend_reset(uuid, text)',
     'public.online_order_rebook(uuid, uuid, text, boolean, text)',
     'public.online_order_prepare_process(uuid, uuid)',
-    'public.online_order_cancel(uuid, uuid, text)'] loop
+    'public.online_order_cancel(uuid, uuid, text)',
+    'public.online_order_release_op(uuid, uuid, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;
