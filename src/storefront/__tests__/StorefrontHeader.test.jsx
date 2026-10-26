@@ -113,7 +113,7 @@ describe("StorefrontHeader promo line", () => {
     act(() => jest.advanceTimersByTime(4000));
     expect(within(promo()).getByRole("link", { name: PROMO_MESSAGES[2].text })).toHaveAttribute(
       "href",
-      "https://wa.me/919810873280"
+      "/customize"
     );
     act(() => jest.advanceTimersByTime(4000));
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[3].text);

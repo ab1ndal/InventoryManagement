@@ -30,7 +30,7 @@ describe("collections config", () => {
       expect(collection).not.toBeNull();
       expect((collection.productIds || collection.categoryIds).length).toBeGreaterThan(0);
     });
-    const categoryLinks = NAV_LINKS.filter((l) => !["Diwali Glam", "Shop All"].includes(l.label));
+    const categoryLinks = NAV_LINKS.filter((l) => !["Diwali Glam", "Custom Tailoring", "Shop All"].includes(l.label));
     categoryLinks.forEach((l) => expect(l.to).toMatch(/^\/collections\//));
   });
 
