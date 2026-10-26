@@ -11,6 +11,10 @@ import { supabase } from "lib/supabaseClient";
 // Cached so a product rendered in multiple places is queried only once.
 const cache = new Map();
 
+// image url -> its `productcolor` tag, filled as images load, so the product
+// page can show the photo of the colour a shopper picks.
+const colorByUrl = new Map();
+
 // A grid renders one <ProductCard> per product, each asking for its images in
 // its own effect. Querying per product is an N+1 flood: ~140 requests contend
 // for the browser's 6-connections-per-host budget and stall the whole page on
@@ -28,7 +32,7 @@ async function fetchChunk(ids) {
   const grouped = new Map(ids.map((id) => [id, []]));
   const { data, error } = await supabase
     .from("productimages")
-    .select("productid,imageurl,displayorder")
+    .select("productid,imageurl,displayorder,productcolor")
     .in("productid", ids)
     .order("productid", { ascending: true })
     .order("displayorder", { ascending: true });
@@ -36,7 +40,10 @@ async function fetchChunk(ids) {
   if (!error && data) {
     for (const row of data) {
       const bucket = grouped.get(row.productid);
-      if (bucket && row.imageurl) bucket.push(row.imageurl);
+      if (bucket && row.imageurl) {
+        bucket.push(row.imageurl);
+        if (row.productcolor) colorByUrl.set(row.imageurl, row.productcolor);
+      }
     }
   }
   return grouped;
@@ -106,6 +113,11 @@ export function imageUrl(url, transform) {
  * @param {string} productid
  * @returns {Promise<string[]>}
  */
+// The colour tag of an image loaded by getProductImagePaths, or null.
+export function imageColor(url) {
+  return colorByUrl.get(url) ?? null;
+}
+
 export function getProductImagePaths(productid) {
   if (!productid) return Promise.resolve([]);
   if (!cache.has(productid)) {

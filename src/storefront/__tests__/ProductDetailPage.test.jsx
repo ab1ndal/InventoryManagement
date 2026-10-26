@@ -5,6 +5,7 @@ jest.mock("../hooks/useProduct", () => ({ useProduct: jest.fn() }));
 jest.mock("../lib/productImage", () => ({
   getProductImagePaths: jest.fn(),
   imageUrl: (path) => path,
+  imageColor: (path) => ({ "green.png": "Green", "peach.png": "Peach" })[path] ?? null,
 }));
 jest.mock("../context/CartContext", () => ({
   useCart: () => ({ addItem: jest.fn(), openCart: jest.fn() }),
@@ -204,5 +205,30 @@ describe("ProductDetailPage", () => {
   it("renders one add-to-cart button until the sticky bar is needed", () => {
     renderPage();
     expect(screen.getAllByRole("button", { name: /select size/i })).toHaveLength(1);
+  });
+});
+
+describe("ProductDetailPage — colour photos", () => {
+  // The main image is the one inside the "Enlarge image" button.
+  const mainImageSrc = () =>
+    screen.getByRole("button", { name: /enlarge image/i }).querySelector("img").getAttribute("src");
+
+  it("shows the photo of the colour the shopper picks", async () => {
+    getProductImagePaths.mockResolvedValue(["green.png", "peach.png"]);
+    renderPage();
+    await screen.findByRole("button", { name: /enlarge image/i });
+    expect(mainImageSrc()).toContain("green.png");
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(mainImageSrc()).toContain("peach.png");
+    fireEvent.click(screen.getByRole("button", { name: "Green" }));
+    expect(mainImageSrc()).toContain("green.png");
+  });
+
+  it("keeps the current photo when the picked colour has none", async () => {
+    getProductImagePaths.mockResolvedValue(["green.png", "other.png"]);
+    renderPage();
+    await screen.findByRole("button", { name: /enlarge image/i });
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(mainImageSrc()).toContain("green.png");
   });
 });

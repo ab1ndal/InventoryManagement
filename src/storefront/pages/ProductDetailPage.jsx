@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useProduct } from "../hooks/useProduct";
-import { getProductImagePaths, imageUrl } from "../lib/productImage";
+import { getProductImagePaths, imageUrl, imageColor } from "../lib/productImage";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
 import ProductSpecs from "../components/product/ProductSpecs";
@@ -262,6 +262,17 @@ function ProductDetail({ productid }) {
   function handleVariantSelect(variant) {
     setSelectedVariant(variant);
     setQuantity(1);
+    showColourPhoto(variant?.color);
+  }
+
+  // Jump to a photo of the picked colour (owner 2026-10-25). Stay put when
+  // the current photo already shows it or no photo is tagged with it.
+  function showColourPhoto(colour) {
+    if (!colour) return;
+    const isColour = (path) => imageColor(path)?.toLowerCase() === colour.toLowerCase();
+    if (isColour(imagePaths[activeImage])) return;
+    const index = imagePaths.findIndex(isColour);
+    if (index >= 0) setActiveImage(index);
   }
 
   function handleAddToCart() {
