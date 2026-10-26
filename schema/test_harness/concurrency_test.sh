@@ -83,5 +83,62 @@ fail=0
 [ "$REFUNDS_A" = "0" ] || { echo "FAIL: A should have no refund"; fail=1; }
 grep -q '"race_units": \[{"units": 1' "$OUT/b" || { echo "FAIL: B result should report 1 race unit"; fail=1; }
 [ "$WAITED" -ge 1 ] || { echo "FAIL: B did not wait for A's lock"; fail=1; }
+
+# ---- _online_bill_offset: two sessions, same refund -> exactly items + 1 shipping rows ----
+V3=33333333-3333-4333-8333-333333333333
+"${PSQL[@]}" > "$OUT/offset_refund" <<SQL
+delete from public.exchanges where order_refund_id in (select r.id from public.order_refunds r join public.orders o on o.id = r.order_id where o.contact_name = 'Concurrency Offset');
+create temp table offset_bills as select bill_id from public.orders where contact_name = 'Concurrency Offset' and bill_id is not null;
+delete from public.orders where contact_name = 'Concurrency Offset';
+delete from public.bills where billid in (select bill_id from offset_bills);
+delete from public.productsizecolors where variantid = '$V3';
+delete from public.products where productid = 'CONC3';
+insert into public.products (productid, name, purchaseprice, retailprice) values ('CONC3', 'Conc three', 500, 1000);
+insert into public.productsizecolors (productid, size, color, stock, variantid) values ('CONC3', 'M', 'Red', 5, '$V3');
+update public.storefront_settings set checkout_live = true where id = 1;
+do \$\$
+declare
+  r record; v_ref text; v_order uuid; v_item uuid; v_refund uuid;
+begin
+  v_ref := (public.online_order_create(
+    jsonb_build_object('contact', jsonb_build_object('name', 'Concurrency Offset', 'phone', '+919800000099'),
+      'address', jsonb_build_object('pincode', '201001'), 'subtotal', 2000, 'shipping', 99, 'gateway_amount', 2099),
+    jsonb_build_array(jsonb_build_object('variant_id', '$V3', 'qty', 2, 'unit_price', 1000)), null)).order_ref;
+  select id into v_order from public.orders where order_ref = v_ref;
+  perform public.online_order_confirm_payment(v_ref, 'cf_' || v_ref, 2099, 'INR');
+  select id into v_item from public.order_items where order_id = v_order;
+  perform public.online_order_set_availability(v_order, v_item, 2, null);
+  perform public.online_order_claim(v_order, 'process', null, 'op-conc');
+  perform public.online_order_prepare_process(v_order, null);
+  perform public.online_order_checkpoint(v_order, 'awb', '{"awb":"AWBCONC","courier_id":7,"courier_name":"T"}');
+  perform public.online_order_checkpoint(v_order, 'label', '{"label_url":"https://x/l.pdf"}');
+  perform public.online_order_mark_packed(v_order, '{}'::jsonb, null);
+  insert into public.order_refunds (order_id, reason, units, total_amount, shipping_amount)
+  values (v_order, 'cancel', 1, 1099, 99) returning id into v_refund;
+  insert into public.order_refund_items (refund_id, item_id, units, gateway_amount) values (v_refund, v_item, 1, 1000);
+  insert into public.order_refund_legs (refund_id, source, amount) values (v_refund, 'shipping_gateway', 99);
+end \$\$;
+select id from public.order_refunds r where r.order_id = (select id from public.orders where contact_name = 'Concurrency Offset');
+SQL
+REFUND_ID="$(tr -d '[:space:]' < "$OUT/offset_refund")"
+"${PSQL[@]}" -c "begin" -c "select public._online_bill_offset('$REFUND_ID', 'cancel', true)" \
+  -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+PID_X=$!
+sleep 0.5
+"${PSQL[@]}" -c "select public._online_bill_offset('$REFUND_ID', 'cancel', true)" > /dev/null
+wait "$PID_X"
+OFFSET_ROWS="$("${PSQL[@]}" -c "select count(*) from public.exchanges where order_refund_id = '$REFUND_ID'")"
+"${PSQL[@]}" > /dev/null <<SQL
+update public.storefront_settings set checkout_live = false where id = 1;
+delete from public.exchanges where order_refund_id in (select r.id from public.order_refunds r join public.orders o on o.id = r.order_id where o.contact_name = 'Concurrency Offset');
+create temp table offset_bills as select bill_id from public.orders where contact_name = 'Concurrency Offset' and bill_id is not null;
+delete from public.orders where contact_name = 'Concurrency Offset';
+delete from public.bills where billid in (select bill_id from offset_bills);
+delete from public.productsizecolors where variantid = '$V3';
+delete from public.products where productid = 'CONC3';
+SQL
+echo "offset rows=$OFFSET_ROWS"
+[ "$OFFSET_ROWS" = "2" ] || { echo "FAIL: two sessions should leave exactly items+1 = 2 offset rows"; fail=1; }
+
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"
