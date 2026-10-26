@@ -24,7 +24,6 @@ declare
   v_sid int := case when (d ->> 'shipment_status_id') ~ '^\d+$' then (d ->> 'shipment_status_id')::int end;
   v_from text;
   v_job_ref text;
-  v_delivered_at timestamptz;
 begin
   select * into o from public.orders where awb = p_awb for update;
   if not found then
@@ -67,16 +66,8 @@ begin
     return jsonb_build_object('matched', true, 'changed', false, 'status', o.status);
   end if;
 
-  if p_status = 'delivered' then
-    -- delivered_date is an UNVERIFIED Shiprocket key; use it only when it parses.
-    begin
-      v_delivered_at := (d ->> 'delivered_date')::timestamptz;
-    exception when others then
-      v_delivered_at := null;
-    end;
-  end if;
   update public.orders set status = p_status, updated_at = now(),
-         delivered_at = case when p_status = 'delivered' then coalesce(delivered_at, v_delivered_at, now()) else delivered_at end
+         delivered_at = case when p_status = 'delivered' then coalesce(delivered_at, now()) else delivered_at end
    where id = o.id;
   perform public._online_event(o.id, p_status, v_from, p_status, null, d);
   -- order_jobs is unique per (order, kind, ref): a rebooked order's later shipment needs its own ref.
@@ -150,7 +141,7 @@ end $$;
 -- ===================================================================
 -- Task 2: return tables, returnable units, open / cancel
 -- ===================================================================
--- Access is only through the service role (admin-order-action): RLS on, no policies.
+-- Writes only through the service role (admin-order-action); admins get read-only policies below.
 
 alter table public.order_refunds drop constraint if exists order_refunds_reason_check;
 alter table public.order_refunds add constraint order_refunds_reason_check
@@ -789,6 +780,11 @@ begin
 
     -- online bill: units in an open return or already refunded are not free either (ruling RA3)
     if o.id is not null then
+      -- a line with no order_items row (Shipping) has no unit accounting: refusing it keeps shipping
+      -- from being credited in store and then refunded again by a whole-order damaged return (M3)
+      if not exists (select 1 from public.order_items where order_id = o.id and bill_item_id = bi.bill_item_id) then
+        raise exception 'item % is not a returnable line of online order', bi.bill_item_id;
+      end if;
       select sum(i.shipped_qty), sum(f.units) into v_shipped, v_free
         from public._online_return_free_units(o.id, null) f
         join public.order_items i on i.id = f.item_id
@@ -817,3 +813,55 @@ end;
 $$;
 revoke all on function public.exchange_record(int, int, jsonb) from public, anon;
 grant execute on function public.exchange_record(int, int, jsonb) to authenticated, service_role;
+
+-- Refund notice carries the refund reason so emails can use return wording. Body is the refunds
+-- migration's definition plus 'reason' (chain rule RA1: this file loads later, so it wins).
+create or replace function public.online_refund_notice(p_refund_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  r public.order_refunds;
+  o public.orders;
+begin
+  select * into r from public.order_refunds where id = p_refund_id;
+  if not found then
+    return null;
+  end if;
+  select * into o from public.orders where id = r.order_id;
+  return jsonb_build_object(
+    'refundId', r.id,
+    'orderRef', o.order_ref,
+    'status', r.status,
+    'reason', r.reason,
+    'choice', r.choice,
+    'token', r.token,
+    'tokenExpiresAt', r.token_expires_at,
+    'amount', r.total_amount,
+    'creditPart', (select coalesce(sum(l.amount), 0) from public.order_refund_legs l
+                    where l.refund_id = r.id and l.source in ('credit', 'shipping_credit')),
+    'gatewayPart', (select coalesce(sum(l.amount), 0) from public.order_refund_legs l
+                     where l.refund_id = r.id and l.source in ('gateway', 'shipping_gateway')),
+    'email', nullif(btrim(coalesce(o.contact_email, '')), ''),
+    'name', o.contact_name,
+    'isGuest', not (o.identity_verified and o.customerid is not null),
+    'items', coalesce((select jsonb_agg(jsonb_build_object('name', i.product_name, 'size', i.size,
+                                                           'color', i.color, 'units', ri.units,
+                                                           'categoryId', i.category_id)
+                                        order by i.line_no)
+                         from public.order_refund_items ri join public.order_items i on i.id = ri.item_id
+                        where ri.refund_id = r.id), '[]'::jsonb),
+    'legs', coalesce((select jsonb_agg(jsonb_build_object(
+                         'source', l.source, 'amount', l.amount, 'status', l.status,
+                         'destination', l.destination,
+                         'voucher', case when v.voucher_id is null then null else
+                           jsonb_build_object('code', v.voucher_id, 'value', v.value, 'expiry', v.expiry_date) end)
+                       order by l.source)
+                        from public.order_refund_legs l
+                        left join public.vouchers v on v.voucher_id = l.voucher_id
+                       where l.refund_id = r.id), '[]'::jsonb));
+end;
+$$;

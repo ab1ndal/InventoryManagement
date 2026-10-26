@@ -174,8 +174,8 @@ declare
   s record := pg_temp.shipped_order();
 begin
   perform public.online_order_apply_tracking(s.o_awb, 'delivered', '{"shipment_status_id":7,"delivered_date":"2026-03-04 15:30:00+05:30"}');
-  assert (select delivered_at from public.orders where id = s.o_id) = '2026-03-04 15:30:00+05:30'::timestamptz,
-    'payload delivered_date used when parseable';
+  assert abs(extract(epoch from now() - (select delivered_at from public.orders where id = s.o_id))) < 5,
+    'payload delivered_date ignored (offset-less IST values would be misread as UTC)';
 end $$;
 rollback;
 
@@ -186,7 +186,7 @@ declare
 begin
   perform public.online_order_apply_tracking(s.o_awb, 'delivered', '{"shipment_status_id":7,"delivered_date":"not a date"}');
   assert (select status = 'delivered' and abs(extract(epoch from now() - delivered_at)) < 5
-            from public.orders where id = s.o_id), 'unparseable delivered_date falls back to now()';
+            from public.orders where id = s.o_id), 'unparseable delivered_date ignored, delivered_at = now()';
 end $$;
 rollback;
 
@@ -1355,6 +1355,41 @@ begin
   assert (select count(*) from public.order_return_items) = 0, 'non-admin sees no items';
   assert (select count(id) from public.order_return_photos) = 0, 'non-admin sees no photos';
   reset role;
+end $$;
+rollback;
+
+-- online bill: a line with no order_items row (e.g. Shipping) cannot be exchanged in store (M3)
+begin;
+do $$
+declare
+  o uuid; b int; ship_bi int;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 1)));
+  select bill_id into b from public.orders where id = o;
+  insert into public.bill_items (billid, quantity, mrp, variantid, product_name, product_code, subtotal, gst_amount, total)
+  values (b, 1, 99, null, 'Shipping', 'SHIP', 99, 0, 99) returning bill_item_id into ship_bi;
+  perform pg_temp.as_admin();
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(ship_bi, 1)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || ship_bi || ' is not a returnable line of online order', 'shipping line: ' || sqlerrm;
+  end;
+  assert not exists (select 1 from public.exchanges where original_bill_item_id = ship_bi), 'no exchange row';
+end $$;
+rollback;
+
+-- online_refund_notice exposes the refund reason (return emails branch on it)
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 1)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 1);
+  res := pg_temp.recv(rid, i, 1, 1);
+  assert public.online_refund_notice((res ->> 'refund_id')::uuid) ->> 'reason' = 'return', 'notice reason = return';
 end $$;
 rollback;
 
