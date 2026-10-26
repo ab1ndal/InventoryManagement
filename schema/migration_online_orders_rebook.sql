@@ -42,6 +42,17 @@
 -- online_order_mark_packed(p_order_id uuid, p_shipment jsonb, p_actor uuid, p_op_key text) returns int
 --   Fenced like the Process checkpoints; a repeat on an already-packed order still
 --   returns the bill id (retried Process whose first call succeeded).
+-- online_order_send_back(p_order_id uuid, p_actor uuid, p_op_key text) returns jsonb
+--   Finalizes send back: {status, old_sr_order_id, old_awb}. Fenced by op key, needs
+--   op_action 'send_back'. Refuses ('courier booking not cancelled yet') unless the order has
+--   no Shiprocket ids, or sr_cancelled_op_key = this key, or manual_cancel_confirmed_by is set.
+--   Clears shipment fields, problem, op_*, sr_cancelled_op_key, manual_cancel_confirmed_by;
+--   sr_attempt += 1; per item stock_taken := coalesce(available_qty, stock_taken),
+--   available_qty := null, shipped_qty := 0; status paid; event sent_back. Already paid with
+--   no op -> returns current (idempotent).
+-- online_order_confirm_manual_cancel(p_order_id uuid, p_actor uuid, p_op_key text) returns void
+--   Fenced; only while op_action is send_back/rebook (superadmin check is in the edge
+--   function). Sets orders.manual_cancel_confirmed_by, event manual_cancel_confirmed.
 -- online_order_apply_tracking(p_awb text, p_status text, p_payload jsonb) returns jsonb
 --   While op_action = 'rebook': raw tracking fields stored, event 'tracking_held',
 --   status untouched → {matched:true, changed:false, held:true, status}.
@@ -530,6 +541,82 @@ begin
 end;
 $$;
 
+-- ---------- send back (finalize) and manual cancel confirmation ----------
+
+alter table public.orders add column if not exists sr_attempt int not null default 1;
+-- Set by a superadmin (via the edge function) who cancelled the courier booking by hand.
+alter table public.orders add column if not exists manual_cancel_confirmed_by uuid;
+
+create or replace function public.online_order_confirm_manual_cancel(
+  p_order_id uuid, p_actor uuid, p_op_key text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  o public.orders;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order % not found', p_order_id; end if;
+  if p_op_key is null or o.op_key is distinct from p_op_key then
+    raise exception 'confirm_manual_cancel: stale operation';
+  end if;
+  if coalesce(o.op_action, '') not in ('send_back', 'rebook') then
+    raise exception 'confirm_manual_cancel: no send_back / rebook in progress (op %)', o.op_action;
+  end if;
+  update public.orders set manual_cancel_confirmed_by = p_actor, updated_at = now() where id = o.id;
+  perform public._online_event(o.id, 'manual_cancel_confirmed', o.status, o.status, p_actor,
+    jsonb_build_object('awb', o.awb, 'sr_order_id', o.sr_order_id, 'op_key', p_op_key));
+end;
+$$;
+
+create or replace function public.online_order_send_back(p_order_id uuid, p_actor uuid, p_op_key text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  o public.orders;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order % not found', p_order_id; end if;
+  -- Finished already (retry after a lost response): nothing left to do.
+  if o.status = 'paid' and o.op_action is null then
+    return jsonb_build_object('status', o.status, 'old_sr_order_id', null, 'old_awb', null);
+  end if;
+  if p_op_key is null or o.op_key is distinct from p_op_key then
+    raise exception 'send_back: stale operation';
+  end if;
+  if o.status <> 'processing' or coalesce(o.op_action, '') <> 'send_back' then
+    raise exception 'send_back: order has no send_back in progress (status %, op %)', o.status, o.op_action;
+  end if;
+  if not ((o.sr_order_id is null and o.awb is null)
+          or o.sr_cancelled_op_key is not distinct from p_op_key
+          or o.manual_cancel_confirmed_by is not null) then
+    raise exception 'send_back: courier booking not cancelled yet';
+  end if;
+
+  update public.orders set
+    sr_order_id = null, sr_shipment_id = null, sr_updated_at = null, sr_sync_status = null, sr_last_error = null,
+    awb = null, courier_id = null, courier_name = null, pickup_requested_at = null,
+    manifest_url = null, label_url = null, process_plan = null, process_error = null, problem = null,
+    sr_attempt = sr_attempt + 1, sr_cancelled_op_key = null, manual_cancel_confirmed_by = null,
+    op_key = null, op_action = null, op_actor = null, op_lease_until = null,
+    status = 'paid', updated_at = now()
+   where id = o.id;
+  -- Units refunded as unavailable were never on the shelf; the rest are held for the next check.
+  update public.order_items set stock_taken = coalesce(available_qty, stock_taken),
+         available_qty = null, shipped_qty = 0 where order_id = o.id;
+  update public.order_items i set status = public._item_status(i) where i.order_id = o.id;
+  perform public._online_event(o.id, 'sent_back', 'processing', 'paid', p_actor,
+    jsonb_build_object('old_sr_order_id', o.sr_order_id, 'old_sr_shipment_id', o.sr_shipment_id,
+                       'old_awb', o.awb, 'sr_attempt', o.sr_attempt + 1));
+  return jsonb_build_object('status', 'paid', 'old_sr_order_id', o.sr_order_id, 'old_awb', o.awb);
+end;
+$$;
+
 do $$
 declare
   f text;
@@ -540,7 +627,9 @@ begin
     'public.online_order_claim(uuid, text, uuid, text)',
     'public.online_order_checkpoint(uuid, text, jsonb, text)',
     'public.online_order_mark_packed(uuid, jsonb, uuid, text)',
-    'public.online_order_apply_tracking(text, text, jsonb)'] loop
+    'public.online_order_apply_tracking(text, text, jsonb)',
+    'public.online_order_confirm_manual_cancel(uuid, uuid, text)',
+    'public.online_order_send_back(uuid, uuid, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;

@@ -474,4 +474,211 @@ begin
 end $$;
 rollback;
 
+-- ---------- send back finalize ----------
+-- Pays a 2-unit order, shelf check finds 1, Process claimed + prepared (1 unit refunded),
+-- Shiprocket ids/awb set, lease expired, send_back claimed with key 'op-sb'. Returns order id.
+create function pg_temp.mk_send_back(p_ids boolean default true) returns uuid language plpgsql as $$
+declare
+  r record;
+  v uuid := pg_temp.mk_variant(1000, 5);
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 2)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, 1, null) from public.order_items i where i.order_id = r.order_id;
+  perform public.online_order_claim(r.order_id, 'process', null, 'op-old');
+  perform public.online_order_prepare_process(r.order_id, null);
+  if p_ids then
+    update public.orders set sr_order_id = '111', sr_shipment_id = '222', sr_sync_status = 'ok' where id = r.order_id;
+    perform public.online_order_checkpoint(r.order_id, 'awb', '{"awb":"AWBOLD","courier_id":7,"courier_name":"T"}', 'op-old');
+    perform public.online_order_checkpoint(r.order_id, 'pickup', '{}', 'op-old');
+    update public.orders set manifest_url = 'https://x/m.pdf', label_url = 'https://x/l.pdf', sr_updated_at = now(),
+           problem = 'Courier cancelled shipment — rebook or cancel' where id = r.order_id;
+  end if;
+  update public.orders set op_lease_until = now() - interval '1 minute' where id = r.order_id;
+  perform public.online_order_claim(r.order_id, 'send_back', null, 'op-sb');
+  return r.order_id;
+end $$;
+
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back();
+begin
+  begin
+    perform public.online_order_send_back(o, null, 'op-sb');
+    assert false, 'finalize refused without sr_cancelled';
+  exception when raise_exception then
+    assert sqlerrm like '%courier booking not cancelled yet%', sqlerrm;
+  end;
+  begin
+    perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
+    perform public.online_order_send_back(o, null, 'op-old');
+    assert false, 'old key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  assert (select status from public.orders where id = o) = 'processing', 'unchanged after refusals';
+end $$;
+rollback;
+
+-- finalize needs the op to be send_back, not a plain process claim
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op-p');
+begin
+  begin
+    perform public.online_order_send_back(o, null, 'op-p');
+    assert false, 'process op cannot finalize send_back';
+  exception when raise_exception then
+    assert sqlerrm like '%send_back%', sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- finalize clears shipment, keeps refund, sr_attempt 2
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back();
+  r jsonb;
+  oo public.orders;
+  it public.order_items;
+  ev jsonb;
+begin
+  perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
+  r := public.online_order_send_back(o, null, 'op-sb');
+  assert r ->> 'status' = 'paid' and r ->> 'old_sr_order_id' = '111' and r ->> 'old_awb' = 'AWBOLD', r::text;
+  select * into oo from public.orders where id = o;
+  assert oo.status = 'paid' and oo.sr_attempt = 2, 'paid, attempt 2';
+  assert oo.sr_order_id is null and oo.sr_shipment_id is null and oo.sr_updated_at is null and oo.sr_sync_status is null
+     and oo.sr_last_error is null and oo.awb is null and oo.courier_id is null and oo.courier_name is null
+     and oo.pickup_requested_at is null and oo.manifest_url is null and oo.label_url is null
+     and oo.process_plan is null and oo.process_error is null and oo.problem is null, 'shipment cleared';
+  assert oo.op_key is null and oo.op_action is null and oo.op_actor is null and oo.op_lease_until is null
+     and oo.sr_cancelled_op_key is null and oo.manual_cancel_confirmed_by is null, 'op fields cleared';
+  select * into it from public.order_items where order_id = o;
+  assert it.refunded_qty = 1 and it.stock_taken = 1 and it.available_qty is null and it.shipped_qty = 0
+     and it.status = 'ordered', 'item: ' || row_to_json(it)::text;
+  assert (select count(*) from public.order_refunds where order_id = o and reason = 'unavailable') = 1, 'refund kept';
+  select data into ev from public.order_events where order_id = o and kind = 'sent_back';
+  assert ev ->> 'old_awb' = 'AWBOLD' and ev ->> 'old_sr_order_id' = '111' and ev ->> 'old_sr_shipment_id' = '222', 'event: ' || coalesce(ev::text, 'none');
+  -- idempotent once paid with no op
+  r := public.online_order_send_back(o, null, 'op-sb');
+  assert r ->> 'status' = 'paid' and (select sr_attempt from public.orders where id = o) = 2, 'idempotent';
+end $$;
+rollback;
+
+-- no Shiprocket ids at all: no cancel evidence needed
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back(false);
+  r jsonb;
+begin
+  r := public.online_order_send_back(o, null, 'op-sb');
+  assert r ->> 'status' = 'paid' and r ->> 'old_awb' is null, r::text;
+end $$;
+rollback;
+
+-- sr_order_id alone (no awb) still needs evidence
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back(false);
+begin
+  update public.orders set sr_order_id = '999' where id = o;
+  begin
+    perform public.online_order_send_back(o, null, 'op-sb');
+    assert false, 'sr_order_id alone needs evidence';
+  exception when raise_exception then
+    assert sqlerrm like '%not cancelled yet%', sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- manual cancel confirmation (superadmin path, enforced by the edge function)
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back();
+  a uuid := gen_random_uuid();
+  ev jsonb;
+  r jsonb;
+begin
+  begin
+    perform public.online_order_confirm_manual_cancel(o, a, 'op-old');
+    assert false, 'old key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  perform public.online_order_confirm_manual_cancel(o, a, 'op-sb');
+  assert (select manual_cancel_confirmed_by from public.orders where id = o) = a, 'confirmed by recorded';
+  select data into ev from public.order_events where order_id = o and kind = 'manual_cancel_confirmed';
+  assert ev ->> 'awb' = 'AWBOLD' and ev ->> 'sr_order_id' = '111', 'event: ' || coalesce(ev::text, 'none');
+  r := public.online_order_send_back(o, a, 'op-sb');
+  assert r ->> 'status' = 'paid', 'finalizes on manual confirmation';
+  assert (select manual_cancel_confirmed_by is null from public.orders where id = o), 'confirmation cleared';
+end $$;
+rollback;
+
+-- manual confirmation only while a send_back / rebook op holds the order
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op-p');
+begin
+  begin
+    perform public.online_order_confirm_manual_cancel(o, gen_random_uuid(), 'op-p');
+    assert false, 'process op refused';
+  exception when raise_exception then
+    assert sqlerrm like '%send_back%', sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- send back then cancel: only the held unit goes back to stock
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back();
+  v uuid;
+  s0 numeric;
+begin
+  select variantid into v from public.order_items where order_id = o;
+  perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
+  perform public.online_order_send_back(o, null, 'op-sb');
+  s0 := pg_temp.stock(v);
+  perform public.online_order_cancel(o, null, 'customer asked');
+  assert pg_temp.stock(v) = s0 + 1, 'one unit back, got ' || (pg_temp.stock(v) - s0)::text;
+  assert (select status from public.orders where id = o) = 'cancelled', 'cancelled';
+end $$;
+rollback;
+
+-- send back then second check: refunds only newly missing; all missing -> cancelled with shipping
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_send_back();
+  p jsonb;
+  tot numeric;
+begin
+  perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
+  perform public.online_order_send_back(o, null, 'op-sb');
+  perform public.online_order_set_availability(o, i.id, 0, null) from public.order_items i where i.order_id = o;
+  perform public.online_order_claim(o, 'process', null, 'op-new');
+  p := public.online_order_prepare_process(o, null);
+  assert (p ->> 'all_unavailable')::boolean, 'all missing: ' || p::text;
+  assert (select status from public.orders where id = o) = 'cancelled', 'cancelled';
+  assert (select refunded_qty from public.order_items where order_id = o) = 2, 'both units refunded, once each';
+  assert (select count(*) from public.order_refunds where order_id = o and reason = 'unavailable') = 2, 'two unavailable refunds';
+  assert (select sum(shipping_amount) from public.order_refunds where order_id = o) = (select shipping from public.orders where id = o)
+     and (select count(*) from public.order_refunds where order_id = o and shipping_amount > 0) = 1,
+     'shipping refunded once, with the last refund';
+  select sum(total_amount) into tot from public.order_refunds where order_id = o;
+  assert tot = (select subtotal - promo_discount + shipping from public.orders where id = o), 'refunds total the order: ' || tot::text;
+end $$;
+rollback;
+
 select 'test_online_orders_rebook: all passed' as result;
