@@ -2,10 +2,14 @@ import { COLLECTIONS, getCollection } from "../lib/collections";
 
 describe("collections config", () => {
   it("returns the matching collection for a known slug", () => {
-    const wedding = getCollection("wedding");
-    expect(wedding).toEqual(
-      expect.objectContaining({ slug: "wedding", title: "Wedding" })
+    expect(getCollection("sarees")).toEqual(
+      expect.objectContaining({ slug: "sarees", title: "Sarees" })
     );
+  });
+
+  it("hides the uncurated Wedding and Festive collections", () => {
+    expect(getCollection("wedding")).toBeNull();
+    expect(getCollection("festive")).toBeNull();
   });
 
   it("has a Diwali collection driven by an explicit, duplicate-free product list", () => {

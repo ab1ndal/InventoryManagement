@@ -5,6 +5,7 @@ import {
   SizeGuideTable,
   SizeGuideHelp,
 } from "../components/product/SizeGuideBody";
+import MeasurementDiagram from "../components/product/MeasurementDiagram";
 
 export default function SizeGuidePage() {
   return (
@@ -15,9 +16,7 @@ export default function SizeGuidePage() {
       <SizeGuideIntro />
       <SizeGuideTable />
 
-      <div className="aspect-[16/9] bg-storefront-border/30 rounded-sm flex items-center justify-center text-storefront-muted text-xs font-sans tracking-wide mb-6">
-        [Measurement diagram]
-      </div>
+      <MeasurementDiagram />
 
       <SizeGuideHelp />
     </StaticPage>

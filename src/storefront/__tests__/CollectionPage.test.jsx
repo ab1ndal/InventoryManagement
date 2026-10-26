@@ -5,6 +5,16 @@ jest.mock("../pages/ShopPage", () => (props) => (
   </div>
 ));
 
+// A collection with no membership yet (none is configured today).
+jest.mock("../lib/collections", () => {
+  const actual = jest.requireActual("../lib/collections");
+  return {
+    ...actual,
+    getCollection: (slug) =>
+      slug === "kids" ? { slug: "kids", title: "Kids", categoryIds: [] } : actual.getCollection(slug),
+  };
+});
+
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
@@ -23,12 +33,17 @@ function renderAt(slug) {
 
 describe("CollectionPage", () => {
   it("renders the collection title", async () => {
+    renderAt("kids");
+    expect(await screen.findByText("Kids")).toBeInTheDocument();
+  });
+
+  it("treats a hidden collection as not found", async () => {
     renderAt("wedding");
-    expect(await screen.findByText("Wedding")).toBeInTheDocument();
+    expect(await screen.findByText(/collection not found/i)).toBeInTheDocument();
   });
 
   it("shows the empty state when the collection has no membership", async () => {
-    renderAt("wedding");
+    renderAt("kids");
     expect(
       await screen.findByText(/curated pieces coming soon/i)
     ).toBeInTheDocument();

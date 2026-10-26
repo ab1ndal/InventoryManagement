@@ -94,9 +94,13 @@ New Comments (done 2026-10-20, PR #31 merged + live):
   Owner wanted "we had lots, few left" framing; rejected because most designs are stocked 1-2 deep.
 - [X] Diwali hero CTA "Shop the edit" → "Discover the glam" (owner pick).
 - [X] Shop/collection grids auto-load 48 products, then a "Load more" button, so the footer is reachable.
-- [ ] Placeholders waiting on owner content: About craftsmanship photo, Contact storefront + interior
-  photos, Size Guide measurement diagram, optional Home brand-story photo, empty Wedding + Festive
-  collections (listed on /collections, show "coming soon"), footer text payment badges (PAYTM; checkout off).
+- [X] About craftsmanship slot: CC BY 2.0 Wikimedia stock (zari + mirror work, Apoorva Jinka), visible
+  credit required by the licence. Swap for a real shop photo whenever one exists.
+- [X] Size Guide: drawn kurta "how to measure" diagram (7 tailor measurements, inches).
+- [X] Wedding + Festive collections removed until curated (URLs now "Collection not found").
+- [ ] Contact storefront + interior photos and optional Home brand-story photo: owner to supply (no
+  Google Photos connector; Drive folders "Display Photos"/"Archive" look personal, not opened).
+- Footer payment badges kept as-is (owner: checkout turns on soon).
 
 ### NEXT FOCUS after Diwali: Customization service (owner 2026-10-25, not designed yet)
 

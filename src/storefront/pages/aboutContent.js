@@ -1,5 +1,5 @@
-// Brand story — owner-supplied 2026-07-11. Photography still to be provided by
-// the owner (image slots remain placeholders until real photos are uploaded).
+// Brand story — owner-supplied 2026-07-11. Craftsmanship photo is a CC BY stock
+// image (AboutPage.jsx) until the owner has shop photos.
 
 export const ABOUT = {
   title: "Our Story",
