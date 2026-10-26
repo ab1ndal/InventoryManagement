@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import OrderList from "../OrderList";
 
 let mockFilters = [];
 const mockRows = {
@@ -59,7 +60,6 @@ jest.mock("../onlineOrdersApi", () => ({
 }));
 jest.mock("sonner", () => ({ toast: { error: () => {}, success: () => {} } }));
 
-import OrderList from "../OrderList";
 
 beforeEach(() => {
   mockFilters = [];
@@ -69,7 +69,7 @@ test("opens on To check and shows ref, item count, total paid and status", async
   render(<OrderList onSelect={() => {}} refreshKey={0} />);
   expect(await screen.findByText("WEB-000001")).toBeInTheDocument();
   expect(mockFilters).toEqual(["to_check"]);
-  const row = screen.getByText("WEB-000001").closest("tr");
+  const row = screen.getByRole("row", { name: /WEB-000001/ });
   expect(row).toHaveTextContent("3"); // 2 + 1 items
   expect(row).toHaveTextContent("₹2,099.00"); // online + credit
   expect(row).toHaveTextContent("To check");
@@ -89,7 +89,7 @@ test("empty tab says so", async () => {
   render(<OrderList onSelect={() => {}} refreshKey={0} />);
   await screen.findByText("WEB-000001");
   fireEvent.click(screen.getByRole("tab", { name: "Delivered" }));
-  await waitFor(() => expect(screen.getByText("No orders here.")).toBeInTheDocument());
+  expect(await screen.findByText("No orders here.")).toBeInTheDocument();
 });
 
 test("clicking a row selects the order", async () => {

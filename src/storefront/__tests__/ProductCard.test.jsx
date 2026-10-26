@@ -1,3 +1,8 @@
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import ProductCard from "../components/ProductCard";
+
 const mockImagePaths = jest.fn();
 jest.mock("../lib/productImage", () => ({
   getProductImagePaths: (...args) => mockImagePaths(...args),
@@ -7,10 +12,6 @@ jest.mock("../context/WishlistContext", () => ({
   useWishlist: () => ({ has: () => false, toggle: jest.fn() }),
 }));
 
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import ProductCard from "../components/ProductCard";
 
 const base = {
   productid: "BC25001",

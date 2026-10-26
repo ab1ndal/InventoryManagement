@@ -19,6 +19,10 @@ export const FAQ_ITEMS = [
     a: "Most of our designs are made in very limited numbers, so many are effectively one-of-a-kind. If a design is sold out, message us on WhatsApp and we'll tell you whether a repeat is possible.",
   },
   {
+    q: "Can you make an outfit I saw online or at a wedding?",
+    a: "Yes. Send us the photo on WhatsApp with your budget and size, and our in-house tailors will quote a price and a ready-by date. We make it as close to the picture as we can, usually in 2 to 4 weeks. See Custom Tailoring for how it works.",
+  },
+  {
     q: "Do sarees come with a blouse? Is it stitched? Can you alter garments?",
     a: "Where a blouse piece is included it's noted in the product details, and it's supplied unstitched unless stated otherwise. For stitching or alterations, please ask us on WhatsApp.",
   },

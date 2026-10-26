@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useProduct } from "../hooks/useProduct";
-import { getProductImagePaths, imageUrl } from "../lib/productImage";
+import { getProductImagePaths, imageUrl, imageColor } from "../lib/productImage";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
 import ProductSpecs from "../components/product/ProductSpecs";
@@ -262,6 +262,17 @@ function ProductDetail({ productid }) {
   function handleVariantSelect(variant) {
     setSelectedVariant(variant);
     setQuantity(1);
+    showColourPhoto(variant?.color);
+  }
+
+  // Jump to a photo of the picked colour (owner 2026-10-25). Stay put when
+  // the current photo already shows it or no photo is tagged with it.
+  function showColourPhoto(colour) {
+    if (!colour) return;
+    const isColour = (path) => imageColor(path)?.toLowerCase() === colour.toLowerCase();
+    if (isColour(imagePaths[activeImage])) return;
+    const index = imagePaths.findIndex(isColour);
+    if (index >= 0) setActiveImage(index);
   }
 
   function handleAddToCart() {
@@ -425,6 +436,12 @@ function ProductDetail({ productid }) {
             <p className="flex items-center gap-2 text-xs text-storefront-charcoal font-sans tracking-wide mt-5">
               <Truck size={15} className="text-storefront-gold flex-shrink-0" aria-hidden="true" />
               {DELIVERY_ESTIMATE}
+            </p>
+            <p className="text-xs text-storefront-muted font-sans mt-2">
+              Want it in another colour or size?{" "}
+              <Link to="/customize" className="text-storefront-charcoal underline underline-offset-2 hover:text-storefront-gold">
+                Our tailors can make it for you
+              </Link>
             </p>
 
             <ul className="grid grid-cols-3 gap-2 border-y border-storefront-border/70 py-4 mt-5 mb-8">

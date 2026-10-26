@@ -99,6 +99,8 @@ describe("StorefrontHeader promo line", () => {
   it("starts on the first message in a polite live region", () => {
     renderHeader();
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[0].text);
+    // aria-live is an attribute on an inner node with no role of its own.
+    // eslint-disable-next-line testing-library/no-node-access
     expect(promo().querySelector("[aria-live='polite']")).not.toBeNull();
   });
 
@@ -113,7 +115,7 @@ describe("StorefrontHeader promo line", () => {
     act(() => jest.advanceTimersByTime(4000));
     expect(within(promo()).getByRole("link", { name: PROMO_MESSAGES[2].text })).toHaveAttribute(
       "href",
-      "https://wa.me/919810873280"
+      "/customize"
     );
     act(() => jest.advanceTimersByTime(4000));
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[3].text);

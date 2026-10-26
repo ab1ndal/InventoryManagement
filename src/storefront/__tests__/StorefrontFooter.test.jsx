@@ -43,4 +43,25 @@ describe("StorefrontFooter — shop links", () => {
     expect(screen.queryByRole("link", { name: /dupattas/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /salwar suits/i })).not.toBeInTheDocument();
   });
+
+  it("lists Shop All once, under Explore rather than Help", () => {
+    renderFooter();
+    const shopAll = screen.getAllByRole("link", { name: "Shop All" });
+    expect(shopAll).toHaveLength(1);
+    // Footer columns are plain divs (heading + list); the column is the link's
+    // nearest div.
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(shopAll[0].closest("div")).toHaveTextContent(/^Explore/);
+  });
+
+  it("splits categories (Shop) from seasonal and service pages (Explore)", () => {
+    renderFooter();
+    // eslint-disable-next-line testing-library/no-node-access -- column = heading's div, see above
+    const column = (name) => screen.getByRole("heading", { name }).closest("div");
+    expect(column("Shop")).toHaveTextContent("Sarees");
+    expect(column("Shop")).not.toHaveTextContent("Custom Tailoring");
+    expect(column("Explore")).toHaveTextContent("Diwali Glam");
+    expect(column("Explore")).toHaveTextContent("Custom Tailoring");
+    expect(column("Explore")).toHaveTextContent("Collections");
+  });
 });

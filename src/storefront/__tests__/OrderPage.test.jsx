@@ -1,3 +1,10 @@
+import React from "react";
+import { act, render, screen } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import OrderPage, { POLL_INTERVAL_MS } from "../pages/OrderPage";
+import { OrdersApiError } from "../lib/ordersApi";
+import { rememberPendingOrder } from "../lib/pendingOrder";
+
 const mockOrderStatus = jest.fn();
 jest.mock("../lib/ordersApi", () => ({
   ...jest.requireActual("../lib/ordersApi"),
@@ -8,12 +15,6 @@ jest.mock("../context/CartContext", () => ({ useCart: () => ({ clearCart: mockCl
 const mockAuth = jest.fn();
 jest.mock("../context/StorefrontAuthContext", () => ({ useStorefrontAuth: () => mockAuth() }));
 
-import React from "react";
-import { act, render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import OrderPage, { POLL_INTERVAL_MS } from "../pages/OrderPage";
-import { OrdersApiError } from "../lib/ordersApi";
-import { rememberPendingOrder } from "../lib/pendingOrder";
 
 function order(status, over = {}) {
   return {

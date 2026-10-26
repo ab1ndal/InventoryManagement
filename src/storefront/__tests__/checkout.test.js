@@ -1,4 +1,4 @@
-import { addressSchema, shippingFee, INDIAN_STATES } from "../lib/checkout";
+import { addressSchema, shippingFee } from "../lib/checkout";
 
 describe("shippingFee", () => {
   it("charges ₹99 below the ₹5000 free-shipping threshold", () => {

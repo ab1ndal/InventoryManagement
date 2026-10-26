@@ -1,3 +1,8 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import SearchResultsPage from "../pages/SearchResultsPage";
+
 const mockUseProductSearch = jest.fn();
 jest.mock("../hooks/useProductSearch", () => ({
   useProductSearch: (query) => mockUseProductSearch(query),
@@ -6,10 +11,6 @@ jest.mock("../components/ProductCard", () => (props) => (
   <div data-testid="product-card">{props.product.name}</div>
 ));
 
-import React from "react";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import SearchResultsPage from "../pages/SearchResultsPage";
 
 describe("SearchResultsPage", () => {
   beforeEach(() => {

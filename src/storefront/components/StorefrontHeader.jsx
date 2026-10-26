@@ -143,14 +143,15 @@ export default function StorefrontHeader() {
             </button>
 
             <Link to="/" className="flex items-center gap-2.5">
-              {/* Monogram only: the full logo's filigree shrinks the "BC" to
-                  illegible at header height. rem sizing so it scales with zoom. */}
+              {/* Bare "BC" letters, no ring (owner 2026-10-25): the full logo's
+                  filigree shrinks the letters to illegible at header height.
+                  rem sizing so it scales with zoom. */}
               <img
                 src="/logo-monogram.png"
                 alt="Bindal's Creation"
-                width={256}
+                width={210}
                 height={256}
-                className="h-11 w-11 md:h-14 md:w-14 object-contain"
+                className="h-11 md:h-14 w-auto object-contain"
               />
               <span className="hidden sm:block font-display font-semibold text-lg md:text-xl text-storefront-charcoal leading-tight">
                 Bindal's<br />

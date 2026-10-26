@@ -1,14 +1,16 @@
-jest.mock("lib/supabaseClient", () => ({
-  supabase: { from: jest.fn() },
-}));
-
 import { supabase } from "lib/supabaseClient";
 import {
   imageUrl,
   getProductImagePaths,
   getProductImages,
   getProductImageUrl,
+  imageColor,
 } from "../lib/productImage";
+
+jest.mock("lib/supabaseClient", () => ({
+  supabase: { from: jest.fn() },
+}));
+
 
 // Build a chainable mock for the batched query:
 //   supabase.from(...).select(...).in(...).order(...).order(...)
@@ -92,7 +94,7 @@ describe("getProductImagePaths", () => {
     });
     const paths = await getProductImagePaths("PIMG_ORDER");
     expect(supabase.from).toHaveBeenCalledWith("productimages");
-    expect(select).toHaveBeenCalledWith("productid,imageurl,displayorder");
+    expect(select).toHaveBeenCalledWith("productid,imageurl,displayorder,productcolor");
     expect(inFn).toHaveBeenCalledWith("productid", ["PIMG_ORDER"]);
     expect(orderOuter).toHaveBeenCalledWith("productid", { ascending: true });
     expect(orderInner).toHaveBeenCalledWith("displayorder", { ascending: true });
@@ -170,5 +172,20 @@ describe("getProductImages / getProductImageUrl", () => {
   it("returns null when a product has no images", async () => {
     mockTable({ data: [] });
     expect(await getProductImageUrl("PIMG_NONE")).toBeNull();
+  });
+});
+
+describe("imageColor", () => {
+  it("remembers each image's colour tag once the product's images load", async () => {
+    mockTable({
+      data: [
+        { productid: "PCOLOR", imageurl: "https://x/green.webp", displayorder: 0, productcolor: "Green" },
+        { productid: "PCOLOR", imageurl: "https://x/pink.webp", displayorder: 1, productcolor: "Pink" },
+      ],
+    });
+    await getProductImagePaths("PCOLOR");
+    expect(imageColor("https://x/green.webp")).toBe("Green");
+    expect(imageColor("https://x/pink.webp")).toBe("Pink");
+    expect(imageColor("https://x/unknown.webp")).toBeNull();
   });
 });

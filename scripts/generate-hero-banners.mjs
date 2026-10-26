@@ -97,6 +97,59 @@ radiant, confident, smiling, wearing the magenta suit with dupatta from referenc
   },
 };
 
+// Owner 2026-10-25: customization (made-to-order tailoring) is a key
+// differentiator, so it gets the second slide. A still life, no people: a
+// first version with a customer wearing the same lehenga as the dress form
+// read as AI-made and made no sense. No product refs, so it uses the
+// generations endpoint with its own style block.
+SLIDES.customize = {
+  stillLife: true,
+  scene: `SETTING: a designer's tailoring worktable in a warm Indian boutique workroom, late-afternoon window
+light. On a dress form, an unfinished deep-maroon silk blouse with tailor's pins, white chalk lines and
+basting stitches. On the table: a pencil-and-watercolour design sketch of a lehenga on cream paper, a fan
+of fabric swatches (silk, brocade, velvet, zari-bordered) in jewel tones, a yellow cloth measuring tape
+curling across the table, heavy brass tailoring scissors, spools of gold zari thread and a pin cushion.`,
+  mobileScene: `SETTING: close view of a designer's tailoring worktable in warm window light: a pencil-and-
+watercolour lehenga design sketch on cream paper, a fan of jewel-toned silk and brocade swatches, a yellow
+measuring tape, brass scissors and spools of gold zari thread; an unfinished maroon blouse with pins on a
+dress form behind.`,
+};
+
+// Portrait for the /customize page itself: no overlay, so no empty band.
+SLIDES["customize-page"] = {
+  stillLife: true,
+  layouts: {
+    mobile: `
+COMPOSITION (portrait 4:5): a balanced, filled editorial composition. Upper half: the unfinished
+maroon silk blouse on a dress form, with tailor's pins and chalk lines, slightly off-centre. Lower half:
+the worktable close up with the lehenga design sketch, the fan of swatches, measuring tape, brass scissors
+and zari spools, all in focus. No empty areas.`,
+  },
+  mobileScene: SLIDES.customize.mobileScene,
+};
+
+// Home band image: must differ from the /customize page photo (owner: the
+// same photo on both looked odd). Tells "send us the photo" instead.
+SLIDES["customize-band"] = {
+  stillLife: true,
+  layouts: {
+    mobile: `
+COMPOSITION (portrait 4:5): top-down three-quarter view of a tailor's cutting table, filled edge to edge.
+A smartphone lies on the table, its screen showing a photograph of an elegant embroidered pastel lehenga
+outfit. Beside the phone, a pencil sketch on cream paper that copies the same lehenga from the photo,
+then a few matching fabric swatches and a spool of gold zari thread, a yellow measuring tape and tailor's
+chalk. No empty areas.`,
+  },
+  mobileScene: `SETTING: a wooden tailor's cutting table in a warm Indian boutique workroom, soft window light,
+the story of turning a customer's reference photo into a design: phone with the photo, sketch, swatches.`,
+};
+
+const STILL_STYLE = `
+Photorealistic editorial still-life photograph for a luxury Indian ethnicwear e-commerce homepage banner.
+Real objects, real textures, natural imperfections, shot on a full-frame camera with a 50mm lens at f/4,
+soft directional window light, warm refined colour grade, gentle shadows, shallow depth of field.
+No people, no hands, no faces, no mannequin heads.`;
+
 const VARIANTS = {
   desktop: { size: "2560x976", layout: DESKTOP_LAYOUT, scene: (s) => s.scene, refs: (s) => s.refs },
   mobile: {
@@ -107,34 +160,63 @@ const VARIANTS = {
   },
 };
 
+const STILL_LAYOUTS = {
+  desktop: `
+COMPOSITION (wide 2.6:1 banner): the dress form and worktable fill the RIGHT 55% of the frame. Keep the
+LEFT 40% calm, uncluttered and slightly darker - a soft out-of-focus plaster wall or fabric shelves only,
+no bright highlights, no busy detail - because a white headline and button will be overlaid there.`,
+  mobile: `
+COMPOSITION (portrait 4:5 mobile banner): the objects fill the upper 70% of the frame. The bottom 30% is a
+calm, darker, uncluttered stretch of wooden table with no objects, because a white headline and button
+will be overlaid there.`,
+};
+
 function buildPrompt(slide, v) {
-  return [STYLE, v.scene(slide), v.layout, NEGATIVE].map((s) => s.trim()).join("\n\n");
+  const style = slide.stillLife ? STILL_STYLE : STYLE;
+  const variantName = v === VARIANTS.mobile ? "mobile" : "desktop";
+  const layout = slide.layouts?.[variantName] ?? (slide.stillLife ? STILL_LAYOUTS[variantName] : v.layout);
+  return [style, v.scene(slide), layout, NEGATIVE].map((s) => s.trim()).join("\n\n");
 }
 
 async function generate(id, variantName) {
   const slide = SLIDES[id];
   const v = VARIANTS[variantName];
   const prompt = buildPrompt(slide, v);
+  const refs = slide.refs ? v.refs(slide) : [];
+  if (!refs.length) return saveResult(id, variantName, prompt, await callApi(
+    ENDPOINT.replace(/edits$/, "generations"),
+    { "Content-Type": "application/json" },
+    JSON.stringify({ model: OPENAI_MODEL, prompt, size: v.size, quality: "high", n: 1 }),
+    `${id}:${variantName}`
+  ));
   const form = new FormData();
   form.append("model", OPENAI_MODEL);
   form.append("prompt", prompt);
   form.append("size", v.size);
   form.append("quality", "high");
   form.append("n", "1");
-  for (const pid of v.refs(slide)) {
+  for (const pid of refs) {
     const file = path.join(baseDir, `${pid}.webp`);
     form.append("image[]", new Blob([fs.readFileSync(file)], { type: "image/webp" }), `${pid}.webp`);
   }
+  saveResult(id, variantName, prompt, await callApi(ENDPOINT, {}, form, `${id}:${variantName}`));
+}
+
+async function callApi(url, headers, body, label) {
   const started = Date.now();
-  const res = await fetch(ENDPOINT, { method: "POST", headers: { "api-key": AZURE_KEY }, body: form });
-  const body = await res.text();
-  if (!res.ok) throw new Error(`${id}:${variantName} HTTP ${res.status}: ${body.slice(0, 500)}`);
-  const b64 = JSON.parse(body).data?.[0]?.b64_json;
-  if (!b64) throw new Error(`${id}:${variantName} no image in response: ${body.slice(0, 300)}`);
+  const res = await fetch(url, { method: "POST", headers: { "api-key": AZURE_KEY, ...headers }, body });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${label} HTTP ${res.status}: ${text.slice(0, 500)}`);
+  const b64 = JSON.parse(text).data?.[0]?.b64_json;
+  if (!b64) throw new Error(`${label} no image in response: ${text.slice(0, 300)}`);
+  return { b64, seconds: Math.round((Date.now() - started) / 1000) };
+}
+
+function saveResult(id, variantName, prompt, { b64, seconds }) {
   const out = path.join(outDir, `${id}-${variantName}.png`);
   fs.writeFileSync(out, Buffer.from(b64, "base64"));
   fs.writeFileSync(out.replace(/\.png$/, ".prompt.txt"), prompt);
-  console.log(`ok ${out} (${Math.round((Date.now() - started) / 1000)}s)`);
+  console.log(`ok ${out} (${seconds}s)`);
 }
 
 const jobs = (only.length ? only : Object.keys(SLIDES).flatMap((id) => [`${id}:desktop`, `${id}:mobile`])).map(

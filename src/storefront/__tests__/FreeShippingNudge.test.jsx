@@ -1,12 +1,13 @@
-jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
-jest.mock("../lib/productImage", () => ({ getProductImageUrl: jest.fn() }));
-
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import { getProductImageUrl } from "../lib/productImage";
 import FreeShippingNudge from "../components/FreeShippingNudge";
+
+jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
+jest.mock("../lib/productImage", () => ({ getProductImageUrl: jest.fn() }));
+
 
 // Chainable PostgREST stand-in: every filter returns the builder, awaiting it
 // resolves to `result`. Records each call so tests can assert the filters.

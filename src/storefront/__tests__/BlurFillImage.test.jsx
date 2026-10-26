@@ -4,6 +4,9 @@ import BlurFillImage from "../components/BlurFillImage";
 
 const PATH = "https://example.supabase.co/storage/v1/object/public/mockups/BC1/a.webp";
 
+// The blur layer is a decorative, aria-hidden <img>; no accessible query can
+// reach it, so these tests select it directly.
+/* eslint-disable testing-library/no-container, testing-library/no-node-access */
 describe("BlurFillImage", () => {
   it("defaults to the whole image over a blurred fill", () => {
     const { container } = render(<BlurFillImage path={PATH} alt="Saree" />);
@@ -31,3 +34,4 @@ describe("BlurFillImage", () => {
     expect(container.querySelector('img[aria-hidden="true"]')).toBeNull();
   });
 });
+/* eslint-enable testing-library/no-container, testing-library/no-node-access */

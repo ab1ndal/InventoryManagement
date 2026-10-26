@@ -1,6 +1,7 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import HomePage from "../pages/HomePage";
 
 // Stub the data-fetching sections so the test doesn't hit Supabase.
 jest.mock("../components/home/CategoryBand", () => () => <div data-testid="category-band" />);
@@ -11,7 +12,6 @@ jest.mock("../components/home/CategoryRail", () => (props) => (
   <div data-testid="category-rail">{props.title}</div>
 ));
 
-import HomePage from "../pages/HomePage";
 
 function renderHome() {
   return render(

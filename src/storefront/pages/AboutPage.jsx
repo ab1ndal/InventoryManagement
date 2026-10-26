@@ -8,7 +8,7 @@ export default function AboutPage() {
     <StaticPage
       title={ABOUT.title}
       seoTitle="About"
-      seoDescription="The story behind Bindal's Creation — a family-run ethnic-wear house in Ghaziabad."
+      seoDescription="The story behind Bindal's Creation, a family-run ethnic wear shop in Ghaziabad."
       containerClassName="max-w-5xl"
     >
       <p className="font-sans text-base text-storefront-muted leading-relaxed max-w-2xl mb-12">
@@ -24,7 +24,7 @@ export default function AboutPage() {
         ))}
       </div>
 
-      {/* Craftsmanship with image placeholder */}
+      {/* Craftsmanship */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center mb-14">
         <div>
           <h2 className="font-display text-2xl font-semibold text-storefront-charcoal mb-3">
@@ -36,9 +36,39 @@ export default function AboutPage() {
             </p>
           ))}
         </div>
-        <div className="aspect-[4/3] bg-storefront-border/30 rounded-sm flex items-center justify-center text-storefront-muted text-xs font-sans tracking-wide">
-          [Craftsmanship / artisan photo]
-        </div>
+        {/* Stock photo (owner 2026-10-25), CC BY 2.0: the licence requires
+            this visible credit. */}
+        <figure>
+          <img
+            src="/about/zari-embroidery.webp"
+            alt="Hands stitching zari and mirror work onto fabric"
+            width={1200}
+            height={900}
+            loading="lazy"
+            decoding="async"
+            className="aspect-[4/3] w-full object-cover rounded-sm"
+          />
+          <figcaption className="mt-1.5 font-sans text-[10px] text-storefront-muted">
+            Photo:{" "}
+            <a
+              href="https://commons.wikimedia.org/wiki/File:Zari_work_and_mirror_work_in_Hyderabad.jpg"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              Apoorva Jinka
+            </a>
+            ,{" "}
+            <a
+              href="https://creativecommons.org/licenses/by/2.0/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              CC BY 2.0
+            </a>
+          </figcaption>
+        </figure>
       </div>
 
       {/* Values */}

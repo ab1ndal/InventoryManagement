@@ -1,3 +1,9 @@
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { supabase } from "lib/supabaseClient";
+import AccountPage from "../pages/AccountPage";
+
 const mockSignOut = jest.fn(async () => ({ error: null }));
 jest.mock("../context/StorefrontAuthContext", () => ({
   useStorefrontAuth: () => ({ user: { id: "u1", email: "a@b.com" }, signOut: mockSignOut, loading: false }),
@@ -8,11 +14,6 @@ jest.mock("lib/supabaseClient", () => ({
   },
 }));
 
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import { supabase } from "lib/supabaseClient";
-import AccountPage from "../pages/AccountPage";
 
 beforeEach(() => {
   supabase.rpc.mockResolvedValue({

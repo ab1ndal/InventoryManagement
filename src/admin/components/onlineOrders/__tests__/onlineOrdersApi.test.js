@@ -1,3 +1,5 @@
+import { action, listOrders, OrderActionError } from "../onlineOrdersApi";
+
 // Plain functions: CRA resetMocks wipes jest.fn implementations between tests.
 let mockCalls = [];
 let mockResults = {};
@@ -24,7 +26,6 @@ jest.mock("../../../../lib/supabaseClient", () => ({
   },
 }));
 
-import { action, listOrders, OrderActionError } from "../onlineOrdersApi";
 
 beforeEach(() => {
   mockCalls = [];

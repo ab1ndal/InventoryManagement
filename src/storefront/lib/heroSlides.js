@@ -16,14 +16,24 @@ export const HERO_SLIDES = [
     id: "diwali",
     headline: "Diwali Glam",
     subline: "Handpicked festive pieces for the season of lights.",
-    cta: "Shop the edit",
+    cta: "Discover the glam",
     href: "/collections/diwali",
     images: [{ url: "/hero/diwali-desktop.webp", mobileUrl: "/hero/diwali-mobile.webp" }],
+  },
+  // Second on purpose (owner 2026-10-25): made-to-order tailoring is a key
+  // differentiator.
+  {
+    id: "customize",
+    headline: "Seen a look you love?",
+    subline: "Send us the photo. Our tailors will make it for you, in your size.",
+    cta: "Get a quote",
+    href: "/customize",
+    images: [{ url: "/hero/customize-desktop.webp", mobileUrl: "/hero/customize-mobile.webp" }],
   },
   {
     id: "sarees",
     headline: "Sarees for every celebration",
-    subline: "Rich weaves and festive reds, curated with care.",
+    subline: "Silk, chiffon, georgette and cotton sarees for weddings, pujas and every day.",
     cta: "Shop sarees",
     href: "/collections/sarees",
     images: [{ url: "/hero/sarees-desktop.webp", mobileUrl: "/hero/sarees-mobile.webp" }],
@@ -31,7 +41,7 @@ export const HERO_SLIDES = [
   {
     id: "lehengas",
     headline: "Lehengas & gowns",
-    subline: "Statement silhouettes, handpicked with love.",
+    subline: "Bridal, festive and lighter lehengas for smaller functions.",
     cta: "Shop lehengas",
     href: "/collections/lehengas",
     images: [{ url: "/hero/lehengas-desktop.webp", mobileUrl: "/hero/lehengas-mobile.webp" }],

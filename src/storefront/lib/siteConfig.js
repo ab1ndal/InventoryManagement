@@ -7,7 +7,7 @@
 export const PROMO_MESSAGES = [
   { text: "Free shipping on orders above ₹5,000" },
   { text: "Diwali Glam is live — shop festive picks", to: "/collections/diwali" },
-  { text: "WhatsApp us for help & custom fitting", href: "https://wa.me/919810873280" },
+  { text: "Seen a look you love? We'll make it for you", to: "/customize" },
   { text: "Plus sizes up to 6XL — hard to find, stocked here" },
 ];
 
@@ -21,6 +21,7 @@ export const NAV_LINKS = [
   { label: "Kurtis", to: "/collections/kurtis" },
   { label: "Gowns", to: "/collections/gowns" },
   { label: "Men", to: "/collections/men" },
+  { label: "Custom Tailoring", to: "/customize" },
   { label: "Shop All", to: "/shop" },
 ];
 

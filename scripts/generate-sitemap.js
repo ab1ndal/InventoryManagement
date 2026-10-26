@@ -23,6 +23,7 @@ const STATIC_PATHS = [
   "/collections",
   "/faq",
   "/about",
+  "/customize",
   "/contact",
   "/size-guide",
   "/policies/shipping",

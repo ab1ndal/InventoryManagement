@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import RevenueChart from "../RevenueChart";
 
 // Mock the Plotly factory so we don't render a real chart in jsdom.
 jest.mock("react-plotly.js/factory", () => () => (props) => (
@@ -6,7 +7,6 @@ jest.mock("react-plotly.js/factory", () => () => (props) => (
 ));
 jest.mock("plotly.js-basic-dist-min", () => ({}));
 
-import RevenueChart from "../RevenueChart";
 
 const period = (rev) => ({
   bills: [{ billid: 1, orderdate: "2026-04-10T00:00:00Z", net_amount: rev }],

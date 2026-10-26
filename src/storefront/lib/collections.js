@@ -42,8 +42,8 @@ export const COLLECTIONS = [
     subtitle: "Sherwanis, kurtas, jackets, suits and shirts",
     categoryIds: ["SW", "KP", "SK", "NHJ", "IW", "SJ-2P", "S2P", "S5P", "BLZ", "SHT", "T-SHT", "FRMP", "PNT"],
   },
-  { slug: "wedding", title: "Wedding", subtitle: "Lehengas & statement sarees", categoryIds: [] },
-  { slug: "festive", title: "Festive", subtitle: "Bright, celebratory pieces", categoryIds: [] },
+  // Wedding and Festive hidden until curated (owner 2026-10-25): with no
+  // membership they only showed "coming soon".
   // Owner ask (2026-10-20): everyday cord sets, shirts and kids' wear. Kurtis
   // are included because they are the main everyday women's piece; without
   // them the page is almost all men's shirts. Kids is pending: no kids'

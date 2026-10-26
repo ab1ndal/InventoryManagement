@@ -17,6 +17,8 @@ describe("Seo", () => {
     const { container } = render(
       <Seo title="P" jsonLd={{ "@type": "Product", name: "P" }} />
     );
+    // JSON-LD is a <script> tag; no accessible query reaches it.
+    // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
     const script = container.querySelector('script[type="application/ld+json"]');
     expect(script).not.toBeNull();
     expect(JSON.parse(script.innerHTML).name).toBe("P");

@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import BillingForm from "../BillingForm";
 
 // Records every supabase call so tests can assert what BillingForm wrote.
 // CRA's jest config sets resetMocks: true, so state lives in plain objects
@@ -116,7 +117,6 @@ jest.mock("../AddItemDialog", () => (props) =>
   ),
 );
 
-import BillingForm from "../BillingForm";
 
 beforeEach(() => {
   mockDb.calls = [];

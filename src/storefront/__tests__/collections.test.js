@@ -2,10 +2,14 @@ import { COLLECTIONS, getCollection } from "../lib/collections";
 
 describe("collections config", () => {
   it("returns the matching collection for a known slug", () => {
-    const wedding = getCollection("wedding");
-    expect(wedding).toEqual(
-      expect.objectContaining({ slug: "wedding", title: "Wedding" })
+    expect(getCollection("sarees")).toEqual(
+      expect.objectContaining({ slug: "sarees", title: "Sarees" })
     );
+  });
+
+  it("hides the uncurated Wedding and Festive collections", () => {
+    expect(getCollection("wedding")).toBeNull();
+    expect(getCollection("festive")).toBeNull();
   });
 
   it("has a Diwali collection driven by an explicit, duplicate-free product list", () => {
@@ -26,7 +30,7 @@ describe("collections config", () => {
       expect(collection).not.toBeNull();
       expect((collection.productIds || collection.categoryIds).length).toBeGreaterThan(0);
     });
-    const categoryLinks = NAV_LINKS.filter((l) => !["Diwali Glam", "Shop All"].includes(l.label));
+    const categoryLinks = NAV_LINKS.filter((l) => !["Diwali Glam", "Custom Tailoring", "Shop All"].includes(l.label));
     categoryLinks.forEach((l) => expect(l.to).toMatch(/^\/collections\//));
   });
 

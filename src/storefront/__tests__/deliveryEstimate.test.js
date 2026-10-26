@@ -1,9 +1,10 @@
 import { DELIVERY_ESTIMATE, stockNote } from "../lib/deliveryEstimate";
 
 describe("stockNote", () => {
-  it("shows a limited-piece note for low stock (1-3)", () => {
-    expect(stockNote(1)).toBe("Limited piece — only 1 in stock");
-    expect(stockNote(3)).toBe("Limited piece — only 3 in stock");
+  it("calls out the last piece, and counts pieces left for 2-3", () => {
+    expect(stockNote(1)).toBe("Last piece in this design");
+    expect(stockNote(2)).toBe("Only 2 pieces left in this design");
+    expect(stockNote(3)).toBe("Only 3 pieces left in this design");
   });
   it("shows nothing for ample stock", () => {
     expect(stockNote(4)).toBeNull();

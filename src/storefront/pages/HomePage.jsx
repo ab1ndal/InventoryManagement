@@ -2,6 +2,7 @@ import React from "react";
 import CategoryBand from "../components/home/CategoryBand";
 import HeroSlider from "../components/home/HeroSlider";
 import DiwaliRail from "../components/home/DiwaliRail";
+import TailoringBand from "../components/home/TailoringBand";
 import NewArrivals from "../components/home/NewArrivals";
 import CategoryRail from "../components/home/CategoryRail";
 import TrustBar from "../components/home/TrustBar";
@@ -22,11 +23,12 @@ const CATEGORY_RAILS = [
 export default function HomePage() {
   return (
     <>
-      <Seo description="Handpicked sarees, lehengas, and ethnic wear from Bindal's Creation — rooted in tradition, curated with care." />
-      <h1 className="sr-only">Bindal's Creation — handpicked Indian ethnic wear</h1>
+      <Seo description="Handpicked sarees, lehengas, suits and sherwanis from Bindal's Creation in Ghaziabad. Seen a look you love? Our in-house tailors can make it for you." />
+      <h1 className="sr-only">Bindal's Creation: handpicked Indian ethnic wear and custom tailoring</h1>
       <CategoryBand />
       <HeroSlider />
       <DiwaliRail />
+      <TailoringBand />
       <NewArrivals />
       {CATEGORY_RAILS.map((rail, i) => (
         <CategoryRail

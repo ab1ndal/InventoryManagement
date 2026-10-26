@@ -1,18 +1,3 @@
-jest.mock("lib/supabaseClient", () => ({
-  supabase: { from: jest.fn() },
-}));
-jest.mock("../hooks/useProduct", () => ({ useProduct: jest.fn() }));
-jest.mock("../lib/productImage", () => ({
-  getProductImagePaths: jest.fn(),
-  imageUrl: (path) => path,
-}));
-jest.mock("../context/CartContext", () => ({
-  useCart: () => ({ addItem: jest.fn(), openCart: jest.fn() }),
-}));
-jest.mock("../components/ProductCard", () => (props) => (
-  <div data-testid="product-card">{props.product.name}</div>
-));
-
 import React from "react";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
@@ -21,6 +6,23 @@ import { useProduct } from "../hooks/useProduct";
 import { getProductImagePaths } from "../lib/productImage";
 import ProductDetailPage from "../pages/ProductDetailPage";
 import { MEASURE_INTRO } from "../pages/sizeGuideContent";
+
+jest.mock("lib/supabaseClient", () => ({
+  supabase: { from: jest.fn() },
+}));
+jest.mock("../hooks/useProduct", () => ({ useProduct: jest.fn() }));
+jest.mock("../lib/productImage", () => ({
+  getProductImagePaths: jest.fn(),
+  imageUrl: (path) => path,
+  imageColor: (path) => ({ "green.png": "Green", "peach.png": "Peach" })[path] ?? null,
+}));
+jest.mock("../context/CartContext", () => ({
+  useCart: () => ({ addItem: jest.fn(), openCart: jest.fn() }),
+}));
+jest.mock("../components/ProductCard", () => (props) => (
+  <div data-testid="product-card">{props.product.name}</div>
+));
+
 
 const PRODUCT = {
   productid: "BC252742",
@@ -139,25 +141,29 @@ describe("ProductDetailPage", () => {
   it("has no category eyebrow above the product title", () => {
     renderPage();
     const h1 = screen.getByRole("heading", { level: 1, name: "Silk-Lehenga", hidden: true });
+    // Checks DOM order: what sits directly above the title.
+    // eslint-disable-next-line testing-library/no-node-access
     const prev = h1.previousElementSibling;
     expect(prev?.textContent ?? "").not.toBe("Lehenga");
   });
 
-  it("shows the tax and shipping line and the trust row", () => {
+  it("shows the price and shipping line and the trust row", () => {
     renderPage();
     expect(
-      screen.getByText("Inclusive of all taxes · Free shipping above ₹5,000")
+      screen.getByText("Final price · Free shipping above ₹5,000")
     ).toBeInTheDocument();
     expect(screen.getByText(/handpicked with love/i)).toBeInTheDocument();
     expect(screen.getByText(/exchange in store within 7 days/i)).toBeInTheDocument();
+    // Composition dealer: no tax claim anywhere on the page.
+    expect(document.body.textContent).not.toMatch(/inclusive of all taxes/i);
   });
 
-  it("shows Sold out instead of the price and tax line when every variant is sold out", () => {
+  it("shows Sold out instead of the price and its note when every variant is sold out", () => {
     renderPage(PRODUCT, VARIANTS.map((v) => ({ ...v, stock: 0 })));
     expect(screen.getByText("Sold out")).toBeInTheDocument();
     expect(screen.queryByText("₹12,500")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("Inclusive of all taxes · Free shipping above ₹5,000")
+      screen.queryByText("Final price · Free shipping above ₹5,000")
     ).not.toBeInTheDocument();
   });
 
@@ -202,5 +208,32 @@ describe("ProductDetailPage", () => {
   it("renders one add-to-cart button until the sticky bar is needed", () => {
     renderPage();
     expect(screen.getAllByRole("button", { name: /select size/i })).toHaveLength(1);
+  });
+});
+
+describe("ProductDetailPage — colour photos", () => {
+  // The main image is the one inside the "Enlarge image" button.
+  // The main image is alt-less inside the button, so select it directly.
+  const mainImageSrc = () =>
+    // eslint-disable-next-line testing-library/no-node-access
+    screen.getByRole("button", { name: /enlarge image/i }).querySelector("img").getAttribute("src");
+
+  it("shows the photo of the colour the shopper picks", async () => {
+    getProductImagePaths.mockResolvedValue(["green.png", "peach.png"]);
+    renderPage();
+    await screen.findByRole("button", { name: /enlarge image/i });
+    expect(mainImageSrc()).toContain("green.png");
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(mainImageSrc()).toContain("peach.png");
+    fireEvent.click(screen.getByRole("button", { name: "Green" }));
+    expect(mainImageSrc()).toContain("green.png");
+  });
+
+  it("keeps the current photo when the picked colour has none", async () => {
+    getProductImagePaths.mockResolvedValue(["green.png", "other.png"]);
+    renderPage();
+    await screen.findByRole("button", { name: /enlarge image/i });
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(mainImageSrc()).toContain("green.png");
   });
 });

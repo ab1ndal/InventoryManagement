@@ -1,9 +1,10 @@
-jest.mock("lib/supabaseClient");
-
 import React from "react";
 import { render, screen, act } from "@testing-library/react";
 import { supabase } from "lib/supabaseClient";
 import { StorefrontAuthProvider, useStorefrontAuth } from "../context/StorefrontAuthContext";
+
+jest.mock("lib/supabaseClient");
+
 
 function Probe() {
   const { signInWithOtp } = useStorefrontAuth();

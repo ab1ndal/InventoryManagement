@@ -1,3 +1,8 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import WishlistPage from "../pages/WishlistPage";
+
 const mockUseWishlist = jest.fn();
 jest.mock("../context/WishlistContext", () => ({
   useWishlist: () => mockUseWishlist(),
@@ -6,10 +11,6 @@ jest.mock("../components/ProductCard", () => (props) => (
   <div data-testid="product-card">{props.product.name}</div>
 ));
 
-import React from "react";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import WishlistPage from "../pages/WishlistPage";
 
 describe("WishlistPage", () => {
   it("renders a saved item via ProductCard", () => {

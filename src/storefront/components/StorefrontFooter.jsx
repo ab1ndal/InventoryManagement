@@ -3,15 +3,18 @@ import { Link } from "react-router-dom";
 import { Instagram, Facebook, MessageCircle, Mail, Phone } from "lucide-react";
 import { NAV_LINKS } from "../lib/siteConfig";
 
-// Same categories as the header; "Shop All" already sits under Help.
-const SHOP_LINKS = NAV_LINKS.filter(({ to }) => to !== "/shop");
+const CATEGORY_LINKS = NAV_LINKS.filter(({ to, highlight }) => to.startsWith("/collections/") && !highlight);
+const EXPLORE_LINKS = [
+  ...NAV_LINKS.filter(({ to, highlight }) => highlight || !to.startsWith("/collections/")),
+  { label: "Collections", to: "/collections" },
+];
 
 export default function StorefrontFooter() {
   return (
     <>
       <footer className="bg-storefront-charcoal text-storefront-cream font-sans">
         {/* Main footer */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.8fr_0.9fr_0.8fr_1fr_1.5fr] gap-8">
           {/* Brand */}
           <div className="lg:col-span-1">
             {/* Native gold: the asset is now transparent, so the old
@@ -48,32 +51,30 @@ export default function StorefrontFooter() {
             </div>
           </div>
 
-          {/* Shop */}
-          <div>
-            <h4 className="font-display text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
-              Shop
-            </h4>
-            <ul className="space-y-2.5 text-sm text-storefront-cream/70">
-              {SHOP_LINKS.map(({ label, to }) => (
-                <li key={to}>
-                  <Link
-                    to={to}
-                    className="hover:text-storefront-gold transition-colors"
-                  >
-                    {label}
-                  </Link>
-                </li>
-              ))}
-              <li>
-                <Link
-                  to="/collections"
-                  className="hover:text-storefront-gold transition-colors"
-                >
-                  Collections
-                </Link>
-              </li>
-            </ul>
-          </div>
+          {/* Shop: categories. Explore: seasonal, services and catalogue
+              pages (split 2026-10-25, one column had grown too long). */}
+          {[
+            { heading: "Shop", links: CATEGORY_LINKS },
+            { heading: "Explore", links: EXPLORE_LINKS },
+          ].map(({ heading, links }) => (
+            <div key={heading}>
+              <h4 className="font-display text-base font-semibold tracking-widest uppercase text-storefront-gold mb-4">
+                {heading}
+              </h4>
+              <ul className="space-y-2.5 text-sm text-storefront-cream/70">
+                {links.map(({ label, to }) => (
+                  <li key={to}>
+                    <Link
+                      to={to}
+                      className="hover:text-storefront-gold transition-colors"
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
 
           {/* Help */}
           <div>
@@ -82,7 +83,6 @@ export default function StorefrontFooter() {
             </h4>
             <ul className="space-y-2.5 text-sm text-storefront-cream/70">
               {[
-                { label: "Shop All", to: "/shop" },
                 { label: "About", to: "/about" },
                 { label: "Contact", to: "/contact" },
                 { label: "FAQ", to: "/faq" },
@@ -133,11 +133,11 @@ export default function StorefrontFooter() {
             <ul className="space-y-3 text-sm text-storefront-cream/70">
               <li className="flex items-start gap-2.5">
                 <Phone size={15} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
-                <span>+91 98108 73280</span>
+                <a href="tel:+919810873280" className="hover:text-storefront-gold transition-colors">+91 98108 73280</a>
               </li>
               <li className="flex items-start gap-2.5">
                 <Mail size={15} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
-                <span>bindalscreations@gmail.com</span>
+                <a href="mailto:bindalscreations@gmail.com" className="hover:text-storefront-gold transition-colors">bindalscreations@gmail.com</a>
               </li>
               <li className="flex items-start gap-2.5">
                 <MessageCircle size={15} className="mt-0.5 flex-shrink-0 text-storefront-gold" />

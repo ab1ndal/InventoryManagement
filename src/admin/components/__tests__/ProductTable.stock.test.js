@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import ProductTable from "../ProductTable";
 
 // Plain functions: CRA resetMocks wipes jest.fn implementations between tests.
 let mockOps = [];
@@ -72,7 +73,6 @@ jest.mock("../ProductRow", () => (props) => (
   </tr>
 ));
 
-import ProductTable from "../ProductTable";
 
 const emptyFilters = {
   productid: "", category: "", fabric: "", description: "", size: "", color: "",

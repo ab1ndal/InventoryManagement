@@ -1,3 +1,5 @@
+import { recordMarketingConsent, setCommunityStatus } from "../customerMarketing";
+
 // Plain functions (not jest.fn) because CRA's resetMocks wipes jest.fn
 // implementations between tests.
 let mockOps = [];
@@ -28,7 +30,6 @@ jest.mock("../../../lib/supabaseClient", () => ({
   },
 }));
 
-import { recordMarketingConsent, setCommunityStatus } from "../customerMarketing";
 
 beforeEach(() => {
   mockOps = [];

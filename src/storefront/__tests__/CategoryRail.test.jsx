@@ -1,3 +1,8 @@
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { supabase } from "lib/supabaseClient";
+import CategoryRail from "../components/home/CategoryRail";
+
 jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
 jest.mock("../components/home/ProductRail", () => {
   const Rail = (props) => (
@@ -8,10 +13,6 @@ jest.mock("../components/home/ProductRail", () => {
   return { __esModule: true, default: Rail, RAIL_PRODUCT_COLUMNS: "productid", RAIL_SIZE: 12 };
 });
 
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import { supabase } from "lib/supabaseClient";
-import CategoryRail from "../components/home/CategoryRail";
 
 describe("CategoryRail", () => {
   it("queries every category in the collection and links View all to it", async () => {

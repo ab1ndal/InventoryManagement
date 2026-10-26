@@ -44,13 +44,19 @@ function renderReprint(billRow, billItems, allDiscounts = []) {
       appliedStoreCredit={0}
     />,
   );
+  // Reads the printed invoice the way a customer sees it: line totals by
+  // column position, and the grand total from the page text.
+  // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
   const rows = [...container.querySelectorAll("tbody tr")];
   const isBos = billRow.document_type === "bos";
   const printedLines = rows.map((tr) => {
+    // eslint-disable-next-line testing-library/no-node-access
     const td = [...tr.querySelectorAll("td")];
     return num(td[isBos ? 5 : 9].textContent);
   });
+  // eslint-disable-next-line testing-library/no-container
   const grand = num(container.textContent.match(/Grand Total: ₹([\d.,]+)/)[1]);
+  // eslint-disable-next-line testing-library/no-container
   const text = container.textContent;
   unmount();
   return { computed, printedLines, grand, text };

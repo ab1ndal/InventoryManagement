@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import DiscountForm from "../DiscountForm";
 
 // Radix Checkbox measures itself; jsdom has no ResizeObserver.
 global.ResizeObserver = class {
@@ -32,7 +33,6 @@ jest.mock("../../../lib/supabaseClient", () => ({
 jest.mock("../../../lib/activityLog", () => ({ logActivity: () => {} }));
 jest.mock("sonner", () => ({ toast: { success: () => {}, error: () => {} } }));
 
-import DiscountForm from "../DiscountForm";
 
 beforeEach(() => {
   mockOps = [];

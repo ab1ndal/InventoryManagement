@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
+import BillingForm from "../BillingForm";
 
 // BillingForm's mount-time effects (categories, discounts, saleslocations,
 // salesmethods, salespersons) chain .select/.eq/.order/.limit/.single off
@@ -26,7 +27,6 @@ jest.mock("../../../../lib/supabaseClient", () => ({
   },
 }));
 
-import BillingForm from "../BillingForm";
 
 test("defaults to Bill of Supply and can switch to Tax Invoice", () => {
   render(<BillingForm open onOpenChange={() => {}} />);
