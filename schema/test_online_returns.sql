@@ -919,7 +919,9 @@ begin
                   where e.order_refund_id = (res ->> 'refund_id')::uuid and e.order_item_id = i
                     and e.original_bill_item_id = it.bill_item_id and e.quantity = 2 and e.credit_amount = 2000
                     and e.reason = 'Return: change of mind' and e.new_billid = b), 'item offset row';
-  assert pg_temp.returnable(o) = 0, 'online offset not double-counted as in-store exchange';
+  -- unfloored: counting the online offset row as an in-store exchange would give -2
+  assert (select units from public._online_return_free_units(o, null) where item_id = i) = 0,
+    'online offset not double-counted as in-store exchange';
 end $$;
 rollback;
 
@@ -961,6 +963,82 @@ begin
   assert not has_function_privilege('authenticated', 'public.online_return_preview(uuid,jsonb)', 'execute'), 'authenticated preview';
   assert has_function_privilege('service_role', 'public.online_return_receive(uuid,uuid,jsonb,text)', 'execute'), 'service receive';
   assert has_function_privilege('service_role', 'public.online_return_preview(uuid,jsonb)', 'execute'), 'service preview';
+end $$;
+rollback;
+
+-- photo paths and add_photo
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; p text; pid uuid; o2 uuid; i2 uuid; rid2 uuid;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 1);
+  p := public.online_return_photo_path(rid, 'JPG');
+  assert p ~ ('^' || o || '/' || rid || '/[0-9a-f-]{36}\.jpg$'), 'photo path for open return has order/return prefix: ' || p;
+  assert public.online_return_photo_path(rid, 'heic') like '%.heic', 'heic ok';
+  begin
+    perform public.online_return_photo_path(rid, 'gif');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%extension%', 'bad ext: ' || sqlerrm; end;
+  begin
+    perform public.online_return_photo_path(gen_random_uuid(), 'jpg');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%not found%', 'unknown return: ' || sqlerrm; end;
+
+  p := public.online_return_photo_path(rid, 'png');
+  pid := public.online_return_add_photo(rid, p, null);
+  assert exists (select 1 from public.order_return_photos where id = pid and return_id = rid and path = p), 'photo row inserted';
+  begin
+    perform public.online_return_add_photo(rid, p, null);
+    assert false, 'should have raised';
+  exception when unique_violation then null; end;
+
+  begin
+    perform public.online_return_add_photo(rid, 'other/' || rid || '/' || gen_random_uuid() || '.jpg', null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%invalid photo path%', 'add photo with foreign prefix raises: ' || sqlerrm; end;
+
+  o2 := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 1)));
+  i2 := pg_temp.item_of(o2);
+  rid2 := pg_temp.open_ret(o2, i2, 1);
+  begin
+    perform public.online_return_add_photo(rid, public.online_return_photo_path(rid2, 'jpg'), null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%invalid photo path%', 'other return path: ' || sqlerrm; end;
+
+  begin
+    perform public.online_return_add_photo(rid, o || '/' || rid || '/../' || gen_random_uuid() || '.jpg', null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%invalid photo path%', 'path with .. raises: ' || sqlerrm; end;
+  begin
+    perform public.online_return_add_photo(rid, o || '/' || rid || '/a/' || gen_random_uuid() || '.jpg', null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%invalid photo path%', 'extra slash: ' || sqlerrm; end;
+  begin
+    perform public.online_return_add_photo(rid, o || '/' || rid || '/' || gen_random_uuid() || '.jpg' || E'\n', null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%invalid photo path%', 'trailing newline: ' || sqlerrm; end;
+  begin
+    perform public.online_return_add_photo(rid, o || '/' || rid || '/' || gen_random_uuid() || '.gif', null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%invalid photo path%', 'bad ext path: ' || sqlerrm; end;
+
+  perform public.online_return_cancel(rid, null, 'n');
+  begin
+    perform public.online_return_photo_path(rid, 'jpg');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%cancelled%', 'photo path for cancelled return raises: ' || sqlerrm; end;
+  begin
+    perform public.online_return_add_photo(rid, p, null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%cancelled%', 'add photo to cancelled return raises: ' || sqlerrm; end;
+
+  assert not has_function_privilege('anon', 'public.online_return_photo_path(uuid,text)', 'execute'), 'anon path';
+  assert not has_function_privilege('authenticated', 'public.online_return_add_photo(uuid,text,uuid)', 'execute'), 'auth add';
+  assert has_function_privilege('service_role', 'public.online_return_photo_path(uuid,text)', 'execute'), 'service path';
+  assert has_function_privilege('service_role', 'public.online_return_add_photo(uuid,text,uuid)', 'execute'), 'service add';
 end $$;
 rollback;
 

@@ -619,3 +619,88 @@ begin
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;
 end $$;
+
+-- ===================================================================
+-- Task 4: return photos (private bucket, server-built paths)
+-- ===================================================================
+
+-- Skipped where there is no storage schema (local test harness).
+do $$
+begin
+  if exists (select 1 from information_schema.schemata where schema_name = 'storage') then
+    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    values ('order-returns', 'order-returns', false, 10485760,
+            array['image/jpeg', 'image/png', 'image/webp', 'image/heic'])
+    on conflict (id) do update
+      set public = false,
+          file_size_limit = 10485760,
+          allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+  end if;
+end $$;
+
+-- Clients never choose a path: the server asks for one per return and uploads to exactly it.
+create or replace function public.online_return_photo_path(p_return_id uuid, p_ext text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  ret public.order_returns%rowtype;
+  v_ext text := lower(btrim(coalesce(p_ext, '')));
+begin
+  select * into ret from public.order_returns where id = p_return_id;
+  if not found then
+    raise exception 'return % not found', p_return_id;
+  end if;
+  if ret.status <> 'open' then
+    raise exception 'return % is % and cannot take photos', p_return_id, ret.status;
+  end if;
+  if v_ext not in ('jpg', 'png', 'webp', 'heic') then
+    raise exception 'unsupported photo extension %, use jpg, png, webp or heic', v_ext;
+  end if;
+  return ret.order_id || '/' || ret.id || '/' || gen_random_uuid() || '.' || v_ext;
+end;
+$$;
+
+-- Records an uploaded photo. The path must be exactly the shape online_return_photo_path issues
+-- for this return; a duplicate path raises a unique violation.
+create or replace function public.online_return_add_photo(p_return_id uuid, p_path text, p_actor uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  ret public.order_returns%rowtype;
+  v_id uuid;
+begin
+  select * into ret from public.order_returns where id = p_return_id for update;
+  if not found then
+    raise exception 'return % not found', p_return_id;
+  end if;
+  if ret.status <> 'open' then
+    raise exception 'return % is % and cannot take photos', p_return_id, ret.status;
+  end if;
+  -- \A..\Z: plain $ would accept a trailing newline
+  if p_path is null or p_path !~ ('\A' || ret.order_id || '/' || ret.id || '/[0-9a-f-]{36}\.(jpg|png|webp|heic)\Z') then
+    raise exception 'invalid photo path for return %', p_return_id;
+  end if;
+  insert into public.order_return_photos (return_id, path, uploaded_by)
+  values (ret.id, p_path, p_actor)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public.online_return_photo_path(uuid, text)',
+    'public.online_return_add_photo(uuid, text, uuid)'] loop
+    execute 'revoke all on function ' || f || ' from public, anon, authenticated';
+    execute 'grant execute on function ' || f || ' to service_role';
+  end loop;
+end $$;
