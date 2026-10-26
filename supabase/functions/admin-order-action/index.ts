@@ -6,11 +6,15 @@
  *   process          {orderId, opKey}            claim → prepare → Shiprocket steps → packed
  *   cancel           {orderId, opKey, reason}
  *   retry            {orderId}                   re-run failed jobs / resume Process
+ *   send_back        {orderId, opKey, manualCancelConfirmed?}                  stalled Process → paid
+ *   rebook           {orderId, opKey, parcelLost, note, manualCancelConfirmed?} packed/shipped → paid | cancelled
  *   rto_received     {orderId}
  *   set_live         {live}                      superadmin only
  *
  * 200 {ok: true, order, refundId?, billId?}; errors {error, code}: 409 busy | bad_state,
- * 502 courier_error (order left in processing with process_error; Retry resumes).
+ * 502 courier_error (order left in processing with process_error; Retry resumes; for
+ * send_back / rebook: courier booking not cancelled, order stays claimed, same opKey resumes),
+ * 403 when manualCancelConfirmed comes from a non-superadmin.
  */
 
 import {
@@ -31,7 +35,9 @@ import {
   type OrdersDb,
   runCancel,
   runProcess,
+  runRebook,
   runRetry,
+  runSendBack,
   type ShipDeps,
   shiprocketFromEnv,
   supabaseOrdersDb,
@@ -49,6 +55,8 @@ export type Deps = {
   publicKeys: string[];
   allowedOrigins: string[];
   now?: () => Date;
+  /** REBOOK_API_CANCEL === "on": cancel-by-AWB API allowed; otherwise a superadmin confirms a dashboard cancel. */
+  rebookApiCancel?: boolean;
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -62,6 +70,13 @@ class BadRequest extends HttpError {
 function uuidField(body: Record<string, unknown>, key: string): string {
   const v = body[key];
   if (typeof v !== "string" || !UUID_RE.test(v)) throw new BadRequest(`${key} must be a uuid`);
+  return v;
+}
+
+function boolField(body: Record<string, unknown>, key: string, optional = false): boolean {
+  const v = body[key];
+  if (optional && v === undefined) return false;
+  if (typeof v !== "boolean") throw new BadRequest(`${key} must be true or false`);
   return v;
 }
 
@@ -127,8 +142,31 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         const reason = textField(body, "reason");
         const r = await runCancel(ship, orderId, user.id, opKey, reason);
         if (r.kind === "busy") return fail(409, "busy", "another staff action holds this order");
+        // Already cancelled (e.g. by a rebook that refunded everything): nothing to do.
+        if (r.kind === "bad_state" && r.status === "cancelled") return await orderBody(orderId);
         if (r.kind === "bad_state") return fail(409, "bad_state", `order is ${r.status}`);
         return await orderBody(orderId, { refundId: r.refundId });
+      }
+
+      case "send_back":
+      case "rebook": {
+        const orderId = uuidField(body, "orderId");
+        const opKey = textField(body, "opKey");
+        const rebook = action === "rebook"
+          ? { parcelLost: boolField(body, "parcelLost"), note: textField(body, "note") }
+          : null;
+        const manual = boolField(body, "manualCancelConfirmed", true);
+        if (manual && !(await deps.isSuperadmin(user.id))) {
+          throw new HttpError(403, "superadmin access required to confirm a manual courier cancel");
+        }
+        const apiCancel = deps.rebookApiCancel ?? false;
+        const r = rebook
+          ? await runRebook(ship, orderId, user.id, opKey, rebook.parcelLost, rebook.note, manual, apiCancel)
+          : await runSendBack(ship, orderId, user.id, opKey, manual, apiCancel);
+        if (r.kind === "busy") return fail(409, "busy", "another staff action holds this order");
+        if (r.kind === "bad_state") return fail(409, "bad_state", `order is ${r.status}`);
+        if (r.kind === "cancel_failed") return fail(502, "courier_error", r.problem);
+        return await orderBody(orderId, r.refundId ? { refundId: r.refundId } : {});
       }
 
       case "retry": {
@@ -196,6 +234,7 @@ if (import.meta.main) {
     publicKeys: [Deno.env.get("SUPABASE_ANON_KEY"), Deno.env.get("SUPABASE_PUBLISHABLE_KEY")]
       .filter((k): k is string => !!k),
     allowedOrigins: parseAllowedOrigins(Deno.env.get("ALLOWED_ORIGIN")),
+    rebookApiCancel: Deno.env.get("REBOOK_API_CANCEL") === "on",
   };
   Deno.serve((req) => handler(req, deps));
 }

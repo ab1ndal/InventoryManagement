@@ -1,5 +1,6 @@
 /**
- * Shiprocket side of an online order: create on payment, Process (R3), Cancel, Retry.
+ * Shiprocket side of an online order: create on payment, Process (R3), Cancel, Retry,
+ * Send back (stalled Process → paid) and Rebook (packed/shipped → paid or cancelled).
  * Plan: Tasks 7–8, R3 (claim + checkpoints), R14, R15, R17, R19.
  *
  * Postgres owns every state change; this module only sequences external calls and
@@ -332,6 +333,8 @@ type ClaimResult = {
   resumed: boolean;
   reason?: "busy" | "other_action" | "status";
   status: string;
+  /** _order_ops_json: checkpoint columns, incl. sr_cancelled_op_key. */
+  order?: { order_ref: string; awb: string | null; sr_order_id: string | null; sr_cancelled_op_key: string | null };
 };
 
 export type Refused = { kind: "busy" } | { kind: "bad_state"; status: string };
@@ -566,6 +569,161 @@ export async function runCancel(
   }
   if (problem) await setProblem(db, before.order_ref, problem);
   return { kind: "cancelled", refundId, problem };
+}
+
+// ---------- send back / rebook ----------
+
+export type AdminOpOutcome =
+  | { kind: "done"; status: string; refundId: string | null }
+  | { kind: "cancel_failed"; problem: string }
+  | Refused;
+
+type FinalizeResult = { status: string; refund_id?: string | null };
+
+/**
+ * Send back and Rebook share one shape: claim → make sure the courier booking is
+ * cancelled (once per op: the sr_cancelled checkpoint, or a superadmin's manual
+ * confirmation) → finalize in Postgres. A failed or disallowed cancel stops with the
+ * order still claimed, so the same op key resumes after the dashboard cancel.
+ */
+async function runResend(
+  deps: ShipDeps,
+  action: "send_back" | "rebook",
+  orderId: string,
+  actor: string,
+  opKey: string,
+  manualCancelConfirmed: boolean,
+  apiCancel: boolean,
+  finalize: () => Promise<FinalizeResult>,
+): Promise<AdminOpOutcome> {
+  const { db } = deps;
+  const claim = await db.rpc<ClaimResult>("online_order_claim", {
+    p_order_id: orderId,
+    p_action: action,
+    p_actor: actor,
+    p_op_key: opKey,
+  });
+  if (!claim.claimed) {
+    if (claim.reason !== "status") return refused(claim);
+    // Lost response after finalizing: the finalize function returns its stored result
+    // for the key that finalized, and refuses (stale operation) any other key.
+    try {
+      const r = await finalize();
+      return { kind: "done", status: r.status, refundId: r.refund_id ?? null };
+    } catch (err) {
+      if (isStaleOp(err)) return refused(claim);
+      throw err;
+    }
+  }
+
+  const o = claim.order;
+  if (!o) throw new Error(`online_order_claim(${action}) returned no order`);
+  const { order_ref: orderRef } = o;
+  if ((o.awb || o.sr_order_id) && o.sr_cancelled_op_key !== opKey) {
+    if (manualCancelConfirmed) {
+      await db.rpc("online_order_confirm_manual_cancel", { p_order_id: orderId, p_actor: actor, p_op_key: opKey });
+      logEvent("info", "manual_cancel_confirmed", { order_ref: orderRef, action, op_key: opKey, awb: o.awb });
+    } else if (o.awb && !apiCancel) {
+      // Cancel-by-AWB is unverified against the live API (REBOOK_API_CANCEL off).
+      const problem = `Courier booking AWB ${o.awb} must be cancelled in the Shiprocket dashboard; ` +
+        "a superadmin then confirms it here.";
+      await setProblem(db, orderRef, problem);
+      return { kind: "cancel_failed", problem };
+    } else {
+      try {
+        if (o.awb) await deps.shiprocket.cancelAwbs([o.awb]);
+        else {
+          const srOrderId = Number(o.sr_order_id);
+          if (!Number.isFinite(srOrderId)) throw new Error(`invalid Shiprocket order id ${o.sr_order_id}`);
+          await deps.shiprocket.cancel([srOrderId]);
+        }
+      } catch (err) {
+        const problem = [o.awb && `Cancel AWB ${o.awb}`, o.sr_order_id && `Shiprocket order ${o.sr_order_id}`]
+          .filter(Boolean).join(" / ") + " in Shiprocket dashboard";
+        logEvent("warn", "sr_cancel_failed", {
+          order_ref: orderRef,
+          action,
+          awb: o.awb,
+          sr_order_id: o.sr_order_id,
+          error: errorText(err),
+        });
+        await setProblem(db, orderRef, problem);
+        return { kind: "cancel_failed", problem };
+      }
+      await db.rpc("online_order_checkpoint", {
+        p_order_id: orderId,
+        p_step: "sr_cancelled",
+        p_data: { awb: o.awb, sr_order_id: o.sr_order_id },
+        p_op_key: opKey,
+      });
+    }
+  }
+
+  const r = await finalize();
+  logEvent("info", action === "send_back" ? "order_sent_back" : "order_rebooked", {
+    order_ref: orderRef,
+    op_key: opKey,
+    status: r.status,
+    old_awb: o.awb,
+    old_sr_order_id: o.sr_order_id,
+  });
+  return { kind: "done", status: r.status, refundId: r.refund_id ?? null };
+}
+
+/** Stalled Process (expired lease) → order back to paid for a fresh Process. */
+export function runSendBack(
+  deps: ShipDeps,
+  orderId: string,
+  actor: string,
+  opKey: string,
+  manualCancelConfirmed: boolean,
+  apiCancel: boolean,
+): Promise<AdminOpOutcome> {
+  return runResend(
+    deps,
+    "send_back",
+    orderId,
+    actor,
+    opKey,
+    manualCancelConfirmed,
+    apiCancel,
+    () =>
+      deps.db.rpc<FinalizeResult>("online_order_send_back", {
+        p_order_id: orderId,
+        p_actor: actor,
+        p_op_key: opKey,
+      }),
+  );
+}
+
+/** Packed / shipped / out for delivery → paid (re-send) or cancelled (nothing left, refunded). */
+export function runRebook(
+  deps: ShipDeps,
+  orderId: string,
+  actor: string,
+  opKey: string,
+  parcelLost: boolean,
+  note: string,
+  manualCancelConfirmed: boolean,
+  apiCancel: boolean,
+): Promise<AdminOpOutcome> {
+  return runResend(
+    deps,
+    "rebook",
+    orderId,
+    actor,
+    opKey,
+    manualCancelConfirmed,
+    apiCancel,
+    () =>
+      deps.db.rpc<FinalizeResult>("online_order_rebook", {
+        p_order_id: orderId,
+        p_actor: actor,
+        p_op_key: opKey,
+        p_parcel_lost: parcelLost,
+        p_note: note,
+      }),
+  );
 }
 
 // ---------- retry ----------
