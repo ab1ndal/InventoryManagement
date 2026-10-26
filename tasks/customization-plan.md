@@ -15,14 +15,17 @@ jodhpuri suits, suits, blazers, coat-pants, formal suits.
 1. **Measurements:** store visit preferred; otherwise a guided video call. The form only asks for an
    overall size (e.g. M / 38); exact measurements are taken in store or on the call and staff enter
    them in admin. No self-measure form online.
-2. **Quotes go out on WhatsApp** (preferred). Email is secondary: the shop rarely checks it, so email
-   is never the only alert for new requests.
+2. **Quotes go out on WhatsApp** (preferred). Phone and WhatsApp are the best way to reach the shop;
+   email is checked as often as possible. New requests alert the shop by email plus a count badge in
+   admin. Every customer screen and email shows the shop phone and WhatsApp.
 3. **Pickup or delivery within UP**, delivery for a fee (quoted per order).
 4. **Minimum order ₹3,000** (quote total).
-5. **Turnaround 2–4 weeks.** **Rush orders allowed for a rush fee.**
-6. **Cancellation:** after the advance, a short grace window (a few days, and only while fabric is not
-   bought and cutting has not started) gives a refund. After that the advance is forfeited. The shop
-   can cancel at any point, and then refunds the whole amount paid.
+5. **Turnaround 2–4 weeks.** **Under 2 weeks = rush**, allowed for a rush fee. No fixed rate yet: the
+   rush fee and the delivery fee are set in each quote.
+6. **Cancellation:** work starts right after the advance, so refunds are not guaranteed. Within
+   **1 day** of paying, the customer can ask by phone or WhatsApp, and the shop decides case by case.
+   After 1 day the advance is forfeited. The shop can cancel at any point, and then refunds the whole
+   amount paid.
 7. **Budget is not binding; the quote is.** The quote reflects design complexity, tailor availability
    and rush.
 8. **One fitting + free alteration, in store only.** Shipped orders are not taken back for
@@ -95,12 +98,11 @@ advance_paid | in_production ──admin cancel──▶ cancelled (refund per r
 Transitions happen only in SECURITY DEFINER SQL functions (like `online_order_*`), each writing an
 event row. Payment-driven transitions only after re-reading Cashfree (never trust the webhook body).
 
-**Advance refund rule (owner 2026-10-25):** the customer may cancel with a full refund only within
-the grace window: `advance_paid` for at most N days (N open, default 3) and still not
-`in_production`. Admin moves the request to `in_production` the moment fabric is bought or cutting
-starts, which closes the window early. After the window the advance is forfeited. A shop cancel at
-any state refunds everything paid. v1: customers ask to cancel on WhatsApp and the admin applies the
-rule (the admin action shows whether the window is still open); no self-serve cancel button.
+**Advance refund rule (owner 2026-10-25):** no automatic refund. Within 1 day of `advance_paid_at`
+the customer may ask (phone or WhatsApp) and the shop decides: the admin cancel action offers
+"refund advance" only inside that window, otherwise "forfeit advance". A shop cancel at any state
+refunds everything paid. No self-serve cancel button. Terms wording: the shop *may* refund within
+1 day; it is not guaranteed.
 
 ## Data model (migration sketch, `schema/migration_custom_orders.sql`)
 ```sql
@@ -248,15 +250,8 @@ on WhatsApp, advance and balance by Cashfree Payment Links made by hand in the d
 owner's "easy first contact, bring people to the store" goal and tests demand before phases 2–9.
 
 ## Still open (owner)
-1. Grace window length for a refundable cancel after the advance: **3 days** (and only before fabric
-   is bought or cutting starts).
-2. How the shop hears about new requests, since email is rarely checked: **Gmail app notifications on
-   the shop phone for a dedicated "New custom request" email, plus a count badge in admin.** A
-   WhatsApp Business API alert is possible later but costs money and setup.
-3. Rush fee: **set per quote** (no fixed rate), and what "rush" means on the landing page (e.g.
-   **"under 2 weeks, extra charge"**).
-4. Delivery fee within UP: **quoted per order**, or a flat fee?
-5. Start with the Phase A bridge right after Diwali? **Yes.**
+1. Start with the Phase A bridge right after Diwali (a `/customize` page whose button opens a WhatsApp
+   chat with the shop number; not the shop's WhatsApp group)? **Recommended: yes.**
 
-Answered 2026-10-25: measurements, quote channel, delivery/pickup, minimum, turnaround, cancellation,
+Answered 2026-10-25: refund window (1 day, shop's call), shop alerts, rush (under 2 weeks, fee per quote), delivery fee (per quote), measurements, quote channel, delivery/pickup, minimum, turnaround, cancellation,
 budget vs quote, fittings, own fabric, contact (WhatsApp or email required; see Owner decisions).
