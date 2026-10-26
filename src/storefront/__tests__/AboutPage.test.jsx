@@ -24,4 +24,13 @@ describe("AboutPage", () => {
     expect(screen.getByRole("link", { name: /cc by 2\.0/i })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/\[craftsmanship/i);
   });
+
+  it("keeps the copy plain: no em dashes (owner found them AI-sounding)", () => {
+    render(
+      <MemoryRouter>
+        <AboutPage />
+      </MemoryRouter>
+    );
+    expect(document.body.textContent).not.toMatch(/—/);
+  });
 });

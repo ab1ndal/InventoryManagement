@@ -1,22 +1,24 @@
 // Brand story — owner-supplied 2026-07-11. Craftsmanship photo is a CC BY stock
 // image (AboutPage.jsx) until the owner has shop photos.
 
+// Rewritten 2026-10-25 in plainer words (owner: the first version read as
+// AI-written). Facts unchanged from the owner's 2026-07-11 text.
 export const ABOUT = {
   title: "Our Story",
-  lede: "Bindal's Creation is a family-run ethnic-wear house in Ghaziabad, offering a curated, hand-selected collection of sarees, lehengas, suits and more — since 2018.",
+  lede: "Bindal's Creation is a family-run ethnic wear shop in Ghaziabad. We've been selling sarees, lehengas, suits and more since 2018.",
   story: [
-    "We started in 2018 with a simple belief: every garment we offer should be chosen with care. Each piece in our collection is curated and hand-selected, not picked in bulk from a catalogue.",
-    "We take great pride in our collection and in the customers who visit us. If you're looking for something specific, tell us — we can often source it especially for you.",
+    "When we opened in 2018, we wanted every garment in the shop to be one we had chosen ourselves. That hasn't changed. We pick each piece by hand instead of ordering in bulk from a catalogue.",
+    "We're proud of our collection and of the people who shop with us. If you're looking for something particular, tell us. Often we can find it for you.",
   ],
   craftsmanship: {
-    title: "Curated with care",
+    title: "Picked by hand",
     body: [
-      "Every piece is chosen for its fabric, work and finish. Have a particular occasion, colour or embroidery in mind? Ask us and we'll help you find — or source — the right piece.",
+      "Before anything goes on our shelves, we look closely at the fabric, the work and the finish. Have an occasion, a colour or a kind of embroidery in mind? Ask us, and we'll help you find the right piece or source it for you.",
     ],
   },
   values: [
-    { title: "Hand-selected", desc: "Every garment chosen with care, not picked in bulk." },
-    { title: "A real store", desc: "Visit us in person at Sihani Gate Market, Ghaziabad." },
-    { title: "Here to help", desc: "Message us on WhatsApp anytime before you buy." },
+    { title: "Chosen by us", desc: "Every piece is picked by hand, never bought in bulk." },
+    { title: "Visit the shop", desc: "Come and see us at Sihani Gate Market, Ghaziabad." },
+    { title: "Ask us first", desc: "Questions before you buy? Message us on WhatsApp." },
   ],
 };
