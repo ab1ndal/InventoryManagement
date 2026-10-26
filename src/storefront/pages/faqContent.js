@@ -12,7 +12,8 @@ export const FAQ_ITEMS = [
   },
   {
     q: "What is your return and exchange policy?",
-    a: "Damaged or wrong items: tell us within 48 hours of delivery, with photos, and we arrange pickup. Change of mind: return an unused piece with tags attached and in original packaging within 7 days of delivery; the product price is refunded, the shipping charge is not. We do not send replacement parcels, but you can exchange in store within 7 days of delivery with the bill. Online orders can also be cancelled before dispatch for a full refund. See our Returns & Exchange policy at /policies/returns for details.",
+    a: "Damaged or wrong items: tell us within 48 hours of delivery, with photos, and we arrange pickup. Change of mind: return an unused piece with tags attached and in original packaging within 7 days of delivery; the product price is refunded, the shipping charge is not. We do not send replacement parcels, but you can exchange in store within 7 days of delivery with the bill. Online orders can also be cancelled before dispatch for a full refund. See our",
+    link: { to: "/policies/returns", label: "Returns & Exchange policy" },
   },
   {
     q: "Why is only one piece available? Can I reorder a sold-out design?",
