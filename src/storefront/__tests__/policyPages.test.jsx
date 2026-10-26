@@ -49,7 +49,7 @@ describe("Policy pages", () => {
   it("returns page states online cancellation and damaged-item rules", () => {
     const { container } = render(<ReturnsPolicyPage />);
     expect(screen.getByText(/cancel an online order any time before it is dispatched/i)).toBeInTheDocument();
-    expect(screen.getByText(/within 48 hours of delivery/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/within 48 hours of delivery/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/we arrange pickup at our cost/i)).toBeInTheDocument();
     expect(screen.getByText(/whole order comes back.*including shipping/i)).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/send a replacement/i);
