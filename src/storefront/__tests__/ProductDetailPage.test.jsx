@@ -153,7 +153,7 @@ describe("ProductDetailPage", () => {
       screen.getByText("Final price · Free shipping above ₹5,000")
     ).toBeInTheDocument();
     expect(screen.getByText(/handpicked with love/i)).toBeInTheDocument();
-    expect(screen.getByText(/exchange in store within 7 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/7-day returns & exchange/i)).toBeInTheDocument();
     // Composition dealer: no tax claim anywhere on the page.
     expect(document.body.textContent).not.toMatch(/inclusive of all taxes/i);
   });

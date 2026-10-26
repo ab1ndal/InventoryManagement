@@ -7,7 +7,7 @@ export default function ReturnsPolicyPage() {
   return (
     <StaticPage
       title="Returns & Exchange"
-      seoDescription="Our exchange policy: 7-day in-store exchange on unworn items. No returns."
+      seoDescription="Returns within 7 days of delivery, damaged or wrong items within 48 hours, and 7-day in-store exchange."
     >
       {RETURNS.map((s) => (
         <PolicySection key={s.heading} {...s} />

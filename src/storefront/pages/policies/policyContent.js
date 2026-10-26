@@ -31,7 +31,7 @@ export const RETURNS = [
   {
     heading: "Returns",
     body: [
-      "Online orders can be returned if the item arrives damaged or wrong, or if you change your mind, as described below. We do not send replacement parcels: if you want a different piece, you can place a new order, or exchange in store (see Exchanges).",
+      "Online orders can be returned if the item arrives damaged or wrong (reported within 48 hours of delivery), or if you change your mind (within 7 days of delivery), as described below. We do not send replacement parcels: if you want a different piece, you can place a new order, or exchange in store (see Exchanges).",
       "Change of mind: you can return an item within 7 days of delivery if it is unused, with tags attached and in its original packaging. You can send it back at your own cost or bring it to our shop. The product price is refunded; the shipping charge is not refunded. If a returned piece fails our check, it is sent back to you at your cost.",
       "Refunds are made only after the item reaches us and passes our check, to the original payment method within 5–7 working days, or as instant store credit if you choose.",
       "To start a return, message us on WhatsApp at +91 98108 73280 or email bindalscreations@gmail.com.",
