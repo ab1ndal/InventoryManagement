@@ -246,3 +246,34 @@ Deno.test("runProcess: stale operation from a checkpoint → busy, no error chec
   assertEquals(db.order.awb, null);
   assert(!db.fns().includes("checkpoint:error"), "no error checkpoint over the new op");
 });
+
+Deno.test("runProcess: takeover during a courier call that then fails → no error written under the new op", async () => {
+  const lease = new Date(Date.now() + 5 * 60_000).toISOString();
+  class TakeoverDb extends FakeDb {
+    override async rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+      const out = await super.rpc<T>(fn, args);
+      // Send back takes over while assignAwb is in flight (after the renewal).
+      if (fn === "online_order_claim" && this.calls.filter((c) => c.fn === fn).length === 2) {
+        Object.assign(this.order, { op_key: "sb-1", op_action: "send_back", op_lease_until: lease });
+      }
+      return out;
+    }
+  }
+  const db = new TakeoverDb();
+  const sr = new FakeShiprocket();
+  sr.failOnce.add("assignAwb");
+  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  assertEquals(out, { kind: "busy" });
+  assertEquals(db.order.process_error, null);
+  assertEquals(db.order.op_lease_until, lease);
+  for (const c of db.calls.filter((c) => c.fn === "online_order_checkpoint")) assertEquals(c.args.p_op_key, "op-1");
+});
+
+Deno.test("runProcess: inline Shiprocket create checkpoints with the op key", async () => {
+  const db = new FakeDb({ sr_order_id: null, sr_shipment_id: null });
+  const sr = new FakeShiprocket();
+  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  assertEquals(out.kind, "packed");
+  const create = db.calls.find((c) => c.fn === "online_order_checkpoint" && c.args.p_step === "sr_create")!;
+  assertEquals(create.args.p_op_key, "op-1");
+});

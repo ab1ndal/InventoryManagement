@@ -32,10 +32,13 @@
 --   the lease is live → {claimed:false, reason:'busy'}; expired lease → take over.
 -- online_order_checkpoint(p_order_id uuid, p_step text, p_data jsonb, p_op_key text default null)
 --   Steps sr_update/awb/pickup/manifest/label/sr_cancelled raise 'stale operation' unless
---   p_op_key = orders.op_key. sr_cancelled {awb?, sr_order_id?} (default: the order's):
---   only while op_action is send_back/rebook; event data {step, op_key, data:{at, awb,
---   sr_order_id}}; skipped when this op already recorded it. Other steps unchanged
---   (job/webhook callers pass null).
+--   p_op_key is given and = orders.op_key. Steps error/sr_create/sr_create_failed do the
+--   same when p_op_key is given (Process); keyless (job/webhook) calls are unchanged,
+--   except a keyless sr_create/sr_create_failed during send_back/rebook is skipped.
+--   sr_cancelled {awb?, sr_order_id?} (default: the order's): only while op_action is
+--   send_back/rebook; sets orders.sr_cancelled_op_key = p_op_key (exposed by
+--   _order_ops_json, so in claim results); event data {step, op_key, data:{at, awb,
+--   sr_order_id}}; skipped when this op already recorded it.
 -- online_order_mark_packed(p_order_id uuid, p_shipment jsonb, p_actor uuid, p_op_key text) returns int
 --   Fenced like the Process checkpoints; a repeat on an already-packed order still
 --   returns the bill id (retried Process whose first call succeeded).
@@ -158,6 +161,24 @@ $$;
 
 -- ---------- operation fencing and admin-op claims ----------
 
+-- Which op recorded checkpoint sr_cancelled (finalize checks it equals the op key).
+alter table public.orders add column if not exists sr_cancelled_op_key text;
+
+create or replace function public._order_ops_json(o public.orders)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  select jsonb_build_object('id', o.id, 'order_ref', o.order_ref, 'status', o.status,
+    'quoted_courier_id', o.quoted_courier_id, 'sr_order_id', o.sr_order_id, 'sr_shipment_id', o.sr_shipment_id,
+    'sr_updated_at', o.sr_updated_at, 'awb', o.awb, 'courier_id', o.courier_id, 'courier_name', o.courier_name,
+    'pickup_requested_at', o.pickup_requested_at, 'manifest_url', o.manifest_url, 'label_url', o.label_url,
+    'bill_id', o.bill_id, 'process_plan', o.process_plan, 'process_error', o.process_error,
+    'sr_cancelled_op_key', o.sr_cancelled_op_key)
+$$;
+revoke all on function public._order_ops_json(public.orders) from public, anon, authenticated;
+
 alter table public.orders drop constraint if exists online_orders_op_action_check;
 alter table public.orders add constraint online_orders_op_action_check
   check (op_action is null or op_action in ('process', 'cancel', 'send_back', 'rebook'));
@@ -249,15 +270,15 @@ begin
 
   -- process / cancel (unchanged except: a same-key resume must also be the same action)
   if o.status in ('processing', 'cancelling') then
-    if o.op_key = p_op_key and o.op_action = p_action then
+    if o.op_key = p_op_key and coalesce(o.op_action, '') = p_action then
       update public.orders set op_lease_until = now() + interval '5 minutes', updated_at = now()
        where id = o.id returning * into o;
       return jsonb_build_object('claimed', true, 'resumed', true, 'op_key', o.op_key, 'op_action', o.op_action,
         'status', o.status, 'order', public._order_ops_json(o));
     end if;
-    if o.op_lease_until > now() or o.op_action <> p_action then
+    if o.op_lease_until > now() or coalesce(o.op_action, '') <> p_action then
       return jsonb_build_object('claimed', false, 'resumed', false,
-        'reason', case when o.op_action <> p_action then 'other_action' else 'busy' end,
+        'reason', case when coalesce(o.op_action, '') <> p_action then 'other_action' else 'busy' end,
         'op_key', o.op_key, 'op_action', o.op_action, 'lease_until', o.op_lease_until,
         'status', o.status, 'order', public._order_ops_json(o));
     end if;
@@ -304,8 +325,12 @@ begin
   select * into o from public.orders where id = p_order_id for update;
   if not found then raise exception 'order % not found', p_order_id; end if;
 
-  if p_step in ('sr_update', 'awb', 'pickup', 'manifest', 'label', 'sr_cancelled')
-     and o.op_key is distinct from p_op_key then
+  -- Operation steps always need the owning key; shared steps are fenced when a key is given
+  -- (Process passes its key; the shiprocket_create job and webhooks pass none).
+  if (p_step in ('sr_update', 'awb', 'pickup', 'manifest', 'label', 'sr_cancelled')
+      and (p_op_key is null or o.op_key is distinct from p_op_key))
+     or (p_step in ('error', 'sr_create', 'sr_create_failed')
+      and p_op_key is not null and o.op_key is distinct from p_op_key) then
     raise exception 'checkpoint %: stale operation', p_step;
   end if;
   v_event := jsonb_build_object('step', p_step, 'data', d);
@@ -320,7 +345,9 @@ begin
     if o.status not in ('paid', 'processing', 'cancelling') then
       raise exception 'checkpoint %: order is %', p_step, o.status;
     end if;
-    v_skip := o.sr_order_id is not null;
+    -- A keyless (job) create landing during send back / rebook must not write ids that the
+    -- op is about to clear; skipping lets the job settle.
+    v_skip := o.sr_order_id is not null or coalesce(o.op_action, '') in ('send_back', 'rebook');
     if not v_skip and p_step = 'sr_create' then
       update public.orders set sr_order_id = d ->> 'sr_order_id', sr_shipment_id = d ->> 'sr_shipment_id',
              sr_sync_status = 'ok', sr_last_error = null, updated_at = now() where id = o.id;
@@ -333,17 +360,17 @@ begin
     end if;
     update public.orders set process_error = d ->> 'error', op_lease_until = now(), updated_at = now() where id = o.id;
   elsif p_step = 'sr_cancelled' then
-    if o.op_action is null or o.op_action not in ('send_back', 'rebook') then
+    if coalesce(o.op_action, '') not in ('send_back', 'rebook') then
       raise exception 'checkpoint sr_cancelled: no send back / rebook in progress (op %)', o.op_action;
     end if;
     -- Recorded once per op, so a retry with the same key never cancels twice.
-    v_skip := exists (select 1 from public.order_events e
-                       where e.order_id = o.id and e.kind = 'checkpoint'
-                         and e.data ->> 'step' = 'sr_cancelled' and e.data ->> 'op_key' = p_op_key);
+    v_skip := o.sr_cancelled_op_key is not distinct from p_op_key;
     v_event := jsonb_build_object('step', p_step, 'op_key', p_op_key, 'data', jsonb_build_object(
       'at', now(), 'awb', coalesce(nullif(d ->> 'awb', ''), o.awb),
       'sr_order_id', coalesce(nullif(d ->> 'sr_order_id', ''), o.sr_order_id)));
-    if not v_skip then update public.orders set updated_at = now() where id = o.id; end if;
+    if not v_skip then
+      update public.orders set sr_cancelled_op_key = p_op_key, updated_at = now() where id = o.id;
+    end if;
   elsif p_step in ('sr_update', 'awb', 'pickup', 'manifest', 'label') then
     if o.status <> 'processing' then raise exception 'checkpoint %: order is %', p_step, o.status; end if;
     if p_step = 'sr_update' then
@@ -404,8 +431,10 @@ begin
   if o.status in ('packed', 'shipped', 'out_for_delivery', 'delivered') and o.bill_id is not null then
     return o.bill_id;
   end if;
-  if o.op_key is distinct from p_op_key then raise exception 'mark_packed: stale operation'; end if;
-  if o.status <> 'processing' or o.op_action <> 'process' then
+  if p_op_key is null or o.op_key is distinct from p_op_key then
+    raise exception 'mark_packed: stale operation';
+  end if;
+  if o.status <> 'processing' or coalesce(o.op_action, '') <> 'process' then
     raise exception 'mark_packed: order must be claimed for processing (now %)', o.status;
   end if;
   if o.process_plan is null or coalesce((o.process_plan ->> 'all_unavailable')::boolean, false) then

@@ -189,9 +189,14 @@ export class FakeDb implements OrdersDb {
         const step = args.p_step as string;
         const d = (args.p_data ?? {}) as Record<string, unknown>;
         let skipped = false;
+        const key = (args.p_op_key ?? null) as string | null;
+        const shared = step === "sr_create" || step === "sr_create_failed" || step === "error";
+        if (shared ? key !== null && key !== o.op_key : key === null || key !== o.op_key) {
+          throw raised(fn, `checkpoint ${step}: stale operation`);
+        }
         if (step === "sr_create" || step === "sr_create_failed") {
           if (!["paid", "processing", "cancelling"].includes(o.status)) throw raised(fn, `order is ${o.status}`);
-          skipped = o.sr_order_id !== null;
+          skipped = o.sr_order_id !== null || o.op_action === "send_back" || o.op_action === "rebook";
           if (!skipped && step === "sr_create") {
             Object.assign(o, { sr_order_id: d.sr_order_id, sr_shipment_id: d.sr_shipment_id, sr_sync_status: "ok" });
           } else if (!skipped) {
@@ -201,7 +206,6 @@ export class FakeDb implements OrdersDb {
           if (!["paid", "processing", "cancelling"].includes(o.status)) throw raised(fn, `order is ${o.status}`);
           Object.assign(o, { process_error: d.error, op_lease_until: new Date().toISOString() });
         } else {
-          if ((args.p_op_key ?? null) !== o.op_key) throw raised(fn, `checkpoint ${step}: stale operation`);
           if (o.status !== "processing") throw raised(fn, `checkpoint ${step}: order is ${o.status}`);
           const col = {
             sr_update: "sr_updated_at",
@@ -223,7 +227,7 @@ export class FakeDb implements OrdersDb {
         return { step, skipped } as T;
       }
       case "online_order_mark_packed": {
-        if ((args.p_op_key ?? null) !== o.op_key) throw raised(fn, "mark_packed: stale operation");
+        if (!args.p_op_key || args.p_op_key !== o.op_key) throw raised(fn, "mark_packed: stale operation");
         if (o.status !== "processing" || o.op_action !== "process") throw raised(fn, `order is ${o.status}`);
         if (!o.awb || !o.label_url) throw raised(fn, "awb and label_url are required");
         Object.assign(o, { status: "packed", bill_id: this.billId, process_error: null });

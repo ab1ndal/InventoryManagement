@@ -279,8 +279,10 @@ async function mustGetOrder(db: OrdersDb, orderId: string): Promise<OrderRow> {
  * Creates the Shiprocket order once. Skips when sr_order_id is stored, or when the
  * order is no longer shippable (cancelled before the job ran). A Shiprocket failure
  * is recorded as sr_create_failed and rethrown as CourierError so the job retries.
+ * `opKey` (Process running it inline) fences the checkpoints; the job passes none.
  */
-export async function ensureSrOrder(deps: ShipDeps, orderId: string): Promise<EnsureResult> {
+export async function ensureSrOrder(deps: ShipDeps, orderId: string, opKey?: string): Promise<EnsureResult> {
+  const fence = opKey ? { p_op_key: opKey } : {};
   const o = await mustGetOrder(deps.db, orderId);
   if (o.sr_order_id) return "exists";
   if (o.status !== "paid" && o.status !== "processing") {
@@ -301,6 +303,7 @@ export async function ensureSrOrder(deps: ShipDeps, orderId: string): Promise<En
       p_order_id: orderId,
       p_step: "sr_create_failed",
       p_data: { error },
+      ...fence,
     });
     logEvent("warn", "sr_create_failed", { order_ref: o.order_ref, error });
     throw new CourierError("sr_create", error);
@@ -309,6 +312,7 @@ export async function ensureSrOrder(deps: ShipDeps, orderId: string): Promise<En
     p_order_id: orderId,
     p_step: "sr_create",
     p_data: { sr_order_id: String(ids.srOrderId), sr_shipment_id: String(ids.shipmentId) },
+    ...fence,
   });
   logEvent("info", "sr_created", { order_ref: o.order_ref, sr_order_id: ids.srOrderId });
   return "created";
@@ -343,16 +347,23 @@ function isStaleOp(err: unknown): boolean {
     (err instanceof DbError && err.isRaised && err.message.includes("stale operation"));
 }
 
-/** Best effort: the original failure is what the caller reports. */
-async function recordError(db: OrdersDb, orderId: string, err: unknown): Promise<void> {
+/**
+ * Best effort: the original failure is what the caller reports. With the op key the
+ * write is fenced; returns true when the fence refused it (another op owns the order).
+ */
+async function recordError(db: OrdersDb, orderId: string, err: unknown, opKey: string): Promise<boolean> {
   try {
     await db.rpc("online_order_checkpoint", {
       p_order_id: orderId,
       p_step: "error",
       p_data: { error: errorText(err) },
+      p_op_key: opKey,
     });
+    return false;
   } catch (cpErr) {
+    if (isStaleOp(cpErr)) return true;
     logEvent("error", "checkpoint_error_failed", { order_id: orderId, error: errorText(cpErr), cause: errorText(err) });
+    return false;
   }
 }
 
@@ -432,7 +443,7 @@ export async function runProcess(
     if (!o.sr_order_id) {
       // shiprocket_create job hasn't succeeded yet: run it inline.
       await renew("sr_create");
-      await ensureSrOrder(deps, orderId);
+      await ensureSrOrder(deps, orderId, opKey);
       o = await mustGetOrder(db, orderId);
     }
     const { srOrderId, shipmentId } = srIds(o);
@@ -490,12 +501,12 @@ export async function runProcess(
     logEvent("info", "order_packed", { order_ref: o.order_ref, awb, bill_id: billId });
     return { kind: "packed", billId, refundId: plan.refund_id };
   } catch (err) {
-    if (isStaleOp(err)) {
-      // The order belongs to another op now: an error checkpoint would end its lease.
+    // The order belongs to another op now: the fenced error checkpoint is refused too,
+    // so the new op's lease and process_error stay untouched.
+    if (isStaleOp(err) || await recordError(db, orderId, err, opKey)) {
       logEvent("warn", "process_superseded", { order_id: orderId, op_key: opKey, error: errorText(err) });
       return { kind: "busy" };
     }
-    await recordError(db, orderId, err);
     logEvent("warn", "process_failed", { order_id: orderId, error: errorText(err) });
     if (err instanceof CourierError) return { kind: "courier_error", step: err.step, message: err.message };
     throw err;
@@ -531,7 +542,7 @@ export async function runCancel(
       p_reason: reason,
     });
   } catch (err) {
-    await recordError(db, orderId, err);
+    await recordError(db, orderId, err, opKey);
     throw err;
   }
 

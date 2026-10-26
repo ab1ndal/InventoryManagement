@@ -279,6 +279,9 @@ begin
   end;
   cp := public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
   assert not (cp ->> 'skipped')::boolean, 'sr_cancelled recorded';
+  assert (select sr_cancelled_op_key from public.orders where id = o) = 'op-sb', 'sr_cancelled_op_key set';
+  c := public.online_order_claim(o, 'send_back', null, 'op-sb');
+  assert c #>> '{order,sr_cancelled_op_key}' = 'op-sb', 'claim result exposes sr_cancelled_op_key: ' || c::text;
   cp := public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
   assert (cp ->> 'skipped')::boolean, 'sr_cancelled idempotent';
   select data into ev from public.order_events where order_id = o and kind = 'checkpoint' and data ->> 'step' = 'sr_cancelled';
@@ -393,6 +396,81 @@ begin
             from public.orders where id = r.order_id), 'status held, raw tracking stored';
   assert (select count(*) from public.order_events where order_id = r.order_id and kind = 'tracking_held') = 1, 'held event';
   assert (select count(*) from public.order_jobs where order_id = r.order_id and kind = 'email_delivered') = 0, 'no delivered email';
+end $$;
+rollback;
+
+-- R2: stale worker's 'error' / 'sr_create' can't touch the new op; keyless job sr_create is skipped
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op-old');
+  v_lease timestamptz;
+  cp jsonb;
+begin
+  update public.orders set sr_order_id = null, sr_shipment_id = null, op_lease_until = now() - interval '1 minute' where id = o;
+  perform public.online_order_claim(o, 'send_back', null, 'op-sb');
+  select op_lease_until into v_lease from public.orders where id = o;
+  begin
+    perform public.online_order_checkpoint(o, 'error', '{"error":"courier timeout"}', 'op-old');
+    assert false, 'stale error checkpoint refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  assert (select process_error is null and op_lease_until = v_lease from public.orders where id = o),
+    'lease and process_error untouched';
+  begin
+    perform public.online_order_checkpoint(o, 'sr_create', '{"sr_order_id":"9","sr_shipment_id":"8"}', 'op-old');
+    assert false, 'stale sr_create refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  cp := public.online_order_checkpoint(o, 'sr_create', '{"sr_order_id":"9","sr_shipment_id":"8"}');
+  assert (cp ->> 'skipped')::boolean, 'keyless job sr_create skipped during send_back';
+  cp := public.online_order_checkpoint(o, 'sr_create_failed', '{"error":"x"}');
+  assert (cp ->> 'skipped')::boolean, 'keyless job sr_create_failed skipped during send_back';
+  assert (select sr_order_id is null and sr_shipment_id is null and sr_sync_status is distinct from 'failed'
+            from public.orders where id = o), 'no ids written';
+  -- the owning op's own error checkpoint still works
+  perform public.online_order_checkpoint(o, 'error', '{"error":"own"}', 'op-sb');
+  assert (select process_error = 'own' from public.orders where id = o), 'owner records error';
+end $$;
+rollback;
+
+-- R2/4: a keyless call never passes a fenced step, even when the order has no op key
+begin;
+do $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 5);
+  r record;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  perform public.online_order_claim(r.order_id, 'process', null, 'op1');
+  perform public.online_order_prepare_process(r.order_id, null);
+  perform public.online_order_checkpoint(r.order_id, 'awb', '{"awb":"AWBN"}', 'op1');
+  perform public.online_order_checkpoint(r.order_id, 'label', '{"label_url":"https://x/l.pdf"}', 'op1');
+  update public.orders set op_key = null, op_action = null where id = r.order_id;  -- invalid state on purpose
+  begin
+    perform public.online_order_checkpoint(r.order_id, 'pickup', '{}');
+    assert false, 'keyless fenced step refused on null op_key';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  begin
+    perform public.online_order_mark_packed(r.order_id, '{}', null, null);
+    assert false, 'keyless mark_packed refused on null op_key';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  update public.orders set op_key = 'op1' where id = r.order_id;  -- key matches, op_action still null
+  begin
+    perform public.online_order_mark_packed(r.order_id, '{}', null, 'op1');
+    assert false, 'mark_packed refused with null op_action';
+  exception when raise_exception then
+    assert sqlerrm like '%claimed for processing%', sqlerrm;
+  end;
 end $$;
 rollback;
 
