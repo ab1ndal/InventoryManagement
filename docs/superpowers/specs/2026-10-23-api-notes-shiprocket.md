@@ -180,6 +180,7 @@ The recommendation sits at `data.recommended_courier_company_id`. Look up that i
   - Only before "Out for Pickup"; up to 2,000 AWBs.
   - Returns 204 with `"Bulk Shipment cancellation is in progress"`. It's asynchronous, so confirm via tracking or webhook.
   - Docs § Shipments > Cancel a Shipment.
+  - **UNVERIFIED:** our `cancelAwbs` client sends `{ awbs: [...] }` and treats any 2xx as success without reading the body; the real response has not been seen on a live shipment. Rebook keeps the API cancel off (`REBOOK_API_CANCEL` unset) until it is verified on a real shipment.
 - Freight is credited back to the wallet on cancellation (https://support.shiprocket.in/support/solutions/articles/43000614621-explaining-shiprocket-passbook-charges).
 
 ## 8. Tracking

@@ -8,6 +8,7 @@ let mockActions = [];
 let mockActionImpl = null;
 let mockToasts = [];
 let mockKeyCounter = 0;
+let mockRole = "admin";
 
 jest.mock("../onlineOrdersApi", () => ({
   getOrder: async () => {
@@ -20,6 +21,7 @@ jest.mock("../onlineOrdersApi", () => ({
     return mockActionImpl ? mockActionImpl(payload) : { ok: true };
   },
   newOpKey: () => `key-${++mockKeyCounter}`,
+  getMyRole: async () => mockRole,
 }));
 jest.mock("sonner", () => ({
   toast: {
@@ -81,6 +83,7 @@ beforeEach(() => {
   mockActionImpl = null;
   mockToasts = [];
   mockKeyCounter = 0;
+  mockRole = "admin";
 });
 
 const processButton = () => screen.getByRole("button", { name: "Process" });
@@ -257,4 +260,190 @@ test("rto order offers Parcel received back; shows shipment links and refunds", 
   const dialog = await screen.findByRole("dialog");
   fireEvent.click(within(dialog).getByRole("button", { name: "Parcel received back" }));
   await waitFor(() => expect(mockActions).toContainEqual({ action: "rto_received", orderId: "o1" }));
+});
+
+const stuck = (over = {}) => ({
+  status: "processing",
+  op_action: "process",
+  op_lease_until: "2020-01-01T00:00:00Z",
+  process_error: "AWB assignment failed",
+  awb: "AWB9",
+  ...over,
+});
+
+test("Send back shown on processing order with error and expired lease", async () => {
+  mockDetail = detail({ order: stuck() });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Send back to To-check" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent(
+    "Cancels the courier booking (AWB AWB9) and returns this order to To-check. Refunds already made stay."
+  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Send back" }));
+  await waitFor(() =>
+    expect(mockActions).toContainEqual({ action: "send_back", orderId: "o1", opKey: "key-1" })
+  );
+});
+
+test("Send back hidden on packed, and when the lease is still live", async () => {
+  mockDetail = detail({ order: { status: "packed", awb: "A1", op_action: null, op_lease_until: null } });
+  const { unmount } = render(<OrderDetail orderId="o1" />);
+  await screen.findByText("Kurta");
+  expect(screen.queryByRole("button", { name: "Send back to To-check" })).not.toBeInTheDocument();
+  unmount();
+  mockDetail = detail({ order: stuck({ op_lease_until: "2999-01-01T00:00:00Z" }) });
+  render(<OrderDetail orderId="o1" />);
+  await screen.findByText("Kurta");
+  expect(screen.queryByRole("button", { name: "Send back to To-check" })).not.toBeInTheDocument();
+});
+
+test("Rebook on shipped requires note", async () => {
+  mockDetail = detail({ order: { status: "shipped", awb: "AWB9" } });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Rebook…" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent(
+    "Cancels AWB AWB9. Parcel still at shop: re-send the same pieces. Parcel lost: take new pieces from stock; anything we can't replace is refunded."
+  );
+  const confirm = within(dialog).getByRole("button", { name: "Rebook" });
+  expect(confirm).toBeDisabled();
+  fireEvent.change(within(dialog).getByLabelText("Rebook note"), { target: { value: " Wrong size " } });
+  expect(confirm).toBeEnabled();
+  fireEvent.click(confirm);
+  await waitFor(() =>
+    expect(mockActions).toContainEqual({
+      action: "rebook",
+      orderId: "o1",
+      opKey: "key-1",
+      parcelLost: false,
+      note: "Wrong size",
+    })
+  );
+});
+
+test("parcel lost sends parcelLost true", async () => {
+  mockDetail = detail({ order: { status: "out_for_delivery", awb: "AWB9" } });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Rebook…" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(within(dialog).getByLabelText("Parcel lost"));
+  fireEvent.change(within(dialog).getByLabelText("Rebook note"), { target: { value: "Lost in transit" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Rebook" }));
+  await waitFor(() =>
+    expect(mockActions).toContainEqual(expect.objectContaining({ action: "rebook", parcelLost: true }))
+  );
+});
+
+const courierFail = (p) => {
+  if (p.manualCancelConfirmed) return { ok: true };
+  throw Object.assign(new Error("Cancel AWB AWB9 / Shiprocket order WEB-000007 in Shiprocket dashboard"), {
+    code: "courier_error",
+    status: 502,
+  });
+};
+
+async function rebookUntilCourierError() {
+  mockDetail = detail({ order: { status: "shipped", awb: "AWB9" } });
+  mockActionImpl = courierFail;
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Rebook…" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Rebook note"), { target: { value: "n" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Rebook" }));
+  return dialog;
+}
+
+test("courier_error shows problem text; no manual button for admin", async () => {
+  await rebookUntilCourierError();
+  const dialog = screen.getByRole("dialog");
+  expect(
+    await within(dialog).findByText("Cancel AWB AWB9 / Shiprocket order WEB-000007 in Shiprocket dashboard")
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "I cancelled it in Shiprocket" })).not.toBeInTheDocument();
+});
+
+test("courier_error for superadmin offers I cancelled it in Shiprocket, resent with the same opKey", async () => {
+  mockRole = "superadmin";
+  await rebookUntilCourierError();
+  fireEvent.click(await screen.findByRole("button", { name: "I cancelled it in Shiprocket" }));
+  await waitFor(() => expect(mockActions.filter((a) => a.action === "rebook")).toHaveLength(2));
+  const [first, second] = mockActions.filter((a) => a.action === "rebook");
+  expect(second).toEqual({ ...first, manualCancelConfirmed: true });
+  expect(second.opKey).toBe("key-1");
+});
+
+const RELEASE_TEXT =
+  "Releases this order without cancelling the courier booking. Use only if the booking was not cancelled.";
+
+test("send back left claimed after a courier error can be resumed once its lease expires (new opKey)", async () => {
+  mockDetail = detail({ order: stuck({ op_action: "send_back", process_error: null }) });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Resume send back" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Send back" }));
+  await waitFor(() =>
+    expect(mockActions).toContainEqual({ action: "send_back", orderId: "o1", opKey: "key-1" })
+  );
+});
+
+test("send back claim with a live lease: no resume, no abandon", async () => {
+  mockDetail = detail({ order: stuck({ op_action: "send_back", op_lease_until: "2999-01-01T00:00:00Z" }) });
+  render(<OrderDetail orderId="o1" />);
+  await screen.findByText("Kurta");
+  expect(screen.queryByRole("button", { name: "Resume send back" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Abandon" })).not.toBeInTheDocument();
+});
+
+test("rebook claim: hidden while its lease is live, Resume rebook… once expired", async () => {
+  mockDetail = detail({
+    order: { status: "shipped", awb: "AWB9", op_action: "rebook", op_lease_until: "2999-01-01T00:00:00Z" },
+  });
+  const { unmount } = render(<OrderDetail orderId="o1" />);
+  await screen.findByText("Kurta");
+  expect(screen.queryByRole("button", { name: /Rebook…/ })).not.toBeInTheDocument();
+  unmount();
+  mockDetail = detail({
+    order: { status: "shipped", awb: "AWB9", op_action: "rebook", op_lease_until: "2020-01-01T00:00:00Z" },
+  });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Resume rebook…" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Rebook note"), { target: { value: "again" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Rebook" }));
+  await waitFor(() =>
+    expect(mockActions).toContainEqual(expect.objectContaining({ action: "rebook", opKey: "key-1", note: "again" }))
+  );
+});
+
+test("Abandon next to the resume button confirms, then sends release_op with a new opKey", async () => {
+  mockDetail = detail({
+    order: { status: "shipped", awb: "AWB9", op_action: "rebook", op_lease_until: "2020-01-01T00:00:00Z" },
+  });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Abandon" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent(RELEASE_TEXT);
+  expect(dialog).toHaveTextContent("Abandon rebook of WEB-000007?");
+  expect(mockActions).toEqual([]);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Abandon" }));
+  await waitFor(() => expect(mockActions).toContainEqual({ action: "release_op", orderId: "o1", opKey: "key-1" }));
+});
+
+test("Abandon not offered for a plain stalled Process", async () => {
+  mockDetail = detail({ order: stuck() });
+  render(<OrderDetail orderId="o1" />);
+  await screen.findByRole("button", { name: "Send back to To-check" });
+  expect(screen.queryByRole("button", { name: "Abandon" })).not.toBeInTheDocument();
+});
+
+test("after a courier error the dialog offers Abandon with the dialog's opKey", async () => {
+  await rebookUntilCourierError();
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(await within(dialog).findByRole("button", { name: "Abandon" }));
+  const confirm = await screen.findByRole("dialog");
+  expect(confirm).toHaveTextContent(RELEASE_TEXT);
+  expect(confirm).toHaveTextContent("Abandon rebook of WEB-000007?");
+  mockActionImpl = null;
+  fireEvent.click(within(confirm).getByRole("button", { name: "Abandon" }));
+  await waitFor(() => expect(mockActions).toContainEqual({ action: "release_op", orderId: "o1", opKey: "key-1" }));
 });

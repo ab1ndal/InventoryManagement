@@ -1,5 +1,6 @@
 /**
- * Shiprocket side of an online order: create on payment, Process (R3), Cancel, Retry.
+ * Shiprocket side of an online order: create on payment, Process (R3), Cancel, Retry,
+ * Send back (stalled Process → paid) and Rebook (packed/shipped → paid or cancelled).
  * Plan: Tasks 7–8, R3 (claim + checkpoints), R14, R15, R17, R19.
  *
  * Postgres owns every state change; this module only sequences external calls and
@@ -80,6 +81,7 @@ export type OrderRow = {
   op_action: string | null;
   op_lease_until: string | null;
   process_error: string | null;
+  sr_attempt: number;
   [column: string]: unknown;
 };
 
@@ -222,6 +224,12 @@ export function shippableDiffers(items: OrderItemRow[], plan: ProcessPlan): bool
   return false;
 }
 
+/** Shiprocket order id: Shiprocket never reuses cancelled ids, so attempt n >= 2 gets `-n`. */
+export function srOrderRef(o: OrderRow): string {
+  const attempt = o.sr_attempt ?? 1;
+  return attempt > 1 ? `${o.order_ref}-${attempt}` : o.order_ref;
+}
+
 export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   const a = (o.address ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
@@ -236,7 +244,7 @@ export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   );
   const address2 = str(a.line2);
   return {
-    orderRef: o.order_ref,
+    orderRef: srOrderRef(o),
     orderDate: new Date(o.paid_at ?? o.created_at),
     billing: {
       name: o.contact_name,
@@ -279,8 +287,10 @@ async function mustGetOrder(db: OrdersDb, orderId: string): Promise<OrderRow> {
  * Creates the Shiprocket order once. Skips when sr_order_id is stored, or when the
  * order is no longer shippable (cancelled before the job ran). A Shiprocket failure
  * is recorded as sr_create_failed and rethrown as CourierError so the job retries.
+ * `opKey` (Process running it inline) fences the checkpoints; the job passes none.
  */
-export async function ensureSrOrder(deps: ShipDeps, orderId: string): Promise<EnsureResult> {
+export async function ensureSrOrder(deps: ShipDeps, orderId: string, opKey?: string): Promise<EnsureResult> {
+  const fence = opKey ? { p_op_key: opKey } : {};
   const o = await mustGetOrder(deps.db, orderId);
   if (o.sr_order_id) return "exists";
   if (o.status !== "paid" && o.status !== "processing") {
@@ -301,6 +311,7 @@ export async function ensureSrOrder(deps: ShipDeps, orderId: string): Promise<En
       p_order_id: orderId,
       p_step: "sr_create_failed",
       p_data: { error },
+      ...fence,
     });
     logEvent("warn", "sr_create_failed", { order_ref: o.order_ref, error });
     throw new CourierError("sr_create", error);
@@ -309,6 +320,7 @@ export async function ensureSrOrder(deps: ShipDeps, orderId: string): Promise<En
     p_order_id: orderId,
     p_step: "sr_create",
     p_data: { sr_order_id: String(ids.srOrderId), sr_shipment_id: String(ids.shipmentId) },
+    ...fence,
   });
   logEvent("info", "sr_created", { order_ref: o.order_ref, sr_order_id: ids.srOrderId });
   return "created";
@@ -321,6 +333,8 @@ type ClaimResult = {
   resumed: boolean;
   reason?: "busy" | "other_action" | "status";
   status: string;
+  /** _order_ops_json: checkpoint columns, incl. sr_cancelled_op_key. */
+  order?: { order_ref: string; awb: string | null; sr_order_id: string | null; sr_cancelled_op_key: string | null };
 };
 
 export type Refused = { kind: "busy" } | { kind: "bad_state"; status: string };
@@ -329,16 +343,37 @@ function refused(c: ClaimResult): Refused {
   return c.reason === "status" ? { kind: "bad_state", status: c.status } : { kind: "busy" };
 }
 
-/** Best effort: the original failure is what the caller reports. */
-async function recordError(db: OrdersDb, orderId: string, err: unknown): Promise<void> {
+/** Another operation (Send back) now owns the order; this worker must stop without writing. */
+class OpSuperseded extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OpSuperseded";
+  }
+}
+
+/** The DB fence refused a write because the order's op key changed. */
+function isStaleOp(err: unknown): boolean {
+  return err instanceof OpSuperseded ||
+    (err instanceof DbError && err.isRaised && err.message.includes("stale operation"));
+}
+
+/**
+ * Best effort: the original failure is what the caller reports. With the op key the
+ * write is fenced; returns true when the fence refused it (another op owns the order).
+ */
+async function recordError(db: OrdersDb, orderId: string, err: unknown, opKey: string): Promise<boolean> {
   try {
     await db.rpc("online_order_checkpoint", {
       p_order_id: orderId,
       p_step: "error",
       p_data: { error: errorText(err) },
+      p_op_key: opKey,
     });
+    return false;
   } catch (cpErr) {
+    if (isStaleOp(cpErr)) return true;
     logEvent("error", "checkpoint_error_failed", { order_id: orderId, error: errorText(cpErr), cause: errorText(err) });
+    return false;
   }
 }
 
@@ -380,7 +415,22 @@ export async function runProcess(
   if (!claim.claimed) return refused(claim);
 
   const checkpoint = (step: string, data: Record<string, unknown>) =>
-    db.rpc("online_order_checkpoint", { p_order_id: orderId, p_step: step, p_data: data });
+    db.rpc("online_order_checkpoint", { p_order_id: orderId, p_step: step, p_data: data, p_op_key: opKey });
+  // An expired lease doesn't stop this worker, so renew it (same key) right before each
+  // Shiprocket call; if Send back took the order over, stop before touching the courier.
+  const renew = async (step: string): Promise<void> => {
+    const renewal = await db.rpc<ClaimResult>("online_order_claim", {
+      p_order_id: orderId,
+      p_action: "process",
+      p_actor: actor,
+      p_op_key: opKey,
+    });
+    if (!renewal.claimed) throw new OpSuperseded(`lease renewal refused before ${step} (${renewal.reason})`);
+  };
+  const courier = async <T>(step: string, call: () => Promise<T>): Promise<T> => {
+    await renew(step);
+    return ext(step, call);
+  };
 
   try {
     const plan = await db.rpc<ProcessPlan>("online_order_prepare_process", { p_order_id: orderId, p_actor: actor });
@@ -402,14 +452,15 @@ export async function runProcess(
 
     if (!o.sr_order_id) {
       // shiprocket_create job hasn't succeeded yet: run it inline.
-      await ensureSrOrder(deps, orderId);
+      await renew("sr_create");
+      await ensureSrOrder(deps, orderId, opKey);
       o = await mustGetOrder(db, orderId);
     }
     const { srOrderId, shipmentId } = srIds(o);
     const items = await db.getItems(orderId);
 
     if (!o.sr_updated_at && shippableDiffers(items, plan)) {
-      const ids = await ext(
+      const ids = await courier(
         "sr_update",
         () => sr.updateOrder(buildSrInput(o, shippableLines(items, plan)), deps.shopEmail),
       );
@@ -426,22 +477,22 @@ export async function runProcess(
 
     let { awb, courier_id: courierId, courier_name: courierName, manifest_url: manifestUrl, label_url: labelUrl } = o;
     if (!awb) {
-      const r = await ext("awb", () => sr.assignAwb(shipmentId, o.quoted_courier_id ?? undefined));
+      const r = await courier("awb", () => sr.assignAwb(shipmentId, o.quoted_courier_id ?? undefined));
       courierId = Number.isFinite(r.courierId) ? r.courierId : null;
       courierName = r.courierName || null;
       awb = r.awb;
       await checkpoint("awb", { awb, courier_id: courierId, courier_name: courierName });
     }
     if (!o.pickup_requested_at) {
-      const p = await ext("pickup", () => sr.pickup(shipmentId));
+      const p = await courier("pickup", () => sr.pickup(shipmentId));
       await checkpoint("pickup", { scheduled_date: p.scheduledDate, token_number: p.tokenNumber });
     }
     if (!manifestUrl) {
-      manifestUrl = await ext("manifest", () => sr.manifest(shipmentId, srOrderId));
+      manifestUrl = await courier("manifest", () => sr.manifest(shipmentId, srOrderId));
       await checkpoint("manifest", { manifest_url: manifestUrl });
     }
     if (!labelUrl) {
-      labelUrl = await ext("label", () => sr.label(shipmentId));
+      labelUrl = await courier("label", () => sr.label(shipmentId));
       await checkpoint("label", { label_url: labelUrl });
     }
 
@@ -455,11 +506,17 @@ export async function runProcess(
         label_url: labelUrl,
       },
       p_actor: actor,
+      p_op_key: opKey,
     });
     logEvent("info", "order_packed", { order_ref: o.order_ref, awb, bill_id: billId });
     return { kind: "packed", billId, refundId: plan.refund_id };
   } catch (err) {
-    await recordError(db, orderId, err);
+    // The order belongs to another op now: the fenced error checkpoint is refused too,
+    // so the new op's lease and process_error stay untouched.
+    if (isStaleOp(err) || await recordError(db, orderId, err, opKey)) {
+      logEvent("warn", "process_superseded", { order_id: orderId, op_key: opKey, error: errorText(err) });
+      return { kind: "busy" };
+    }
     logEvent("warn", "process_failed", { order_id: orderId, error: errorText(err) });
     if (err instanceof CourierError) return { kind: "courier_error", step: err.step, message: err.message };
     throw err;
@@ -495,7 +552,7 @@ export async function runCancel(
       p_reason: reason,
     });
   } catch (err) {
-    await recordError(db, orderId, err);
+    await recordError(db, orderId, err, opKey);
     throw err;
   }
 
@@ -512,6 +569,161 @@ export async function runCancel(
   }
   if (problem) await setProblem(db, before.order_ref, problem);
   return { kind: "cancelled", refundId, problem };
+}
+
+// ---------- send back / rebook ----------
+
+export type AdminOpOutcome =
+  | { kind: "done"; status: string; refundId: string | null }
+  | { kind: "cancel_failed"; problem: string }
+  | Refused;
+
+type FinalizeResult = { status: string; refund_id?: string | null };
+
+/**
+ * Send back and Rebook share one shape: claim → make sure the courier booking is
+ * cancelled (once per op: the sr_cancelled checkpoint, or a superadmin's manual
+ * confirmation) → finalize in Postgres. A failed or disallowed cancel stops with the
+ * order still claimed, so the same op key resumes after the dashboard cancel.
+ */
+async function runResend(
+  deps: ShipDeps,
+  action: "send_back" | "rebook",
+  orderId: string,
+  actor: string,
+  opKey: string,
+  manualCancelConfirmed: boolean,
+  apiCancel: boolean,
+  finalize: () => Promise<FinalizeResult>,
+): Promise<AdminOpOutcome> {
+  const { db } = deps;
+  const claim = await db.rpc<ClaimResult>("online_order_claim", {
+    p_order_id: orderId,
+    p_action: action,
+    p_actor: actor,
+    p_op_key: opKey,
+  });
+  if (!claim.claimed) {
+    if (claim.reason !== "status") return refused(claim);
+    // Lost response after finalizing: the finalize function returns its stored result
+    // for the key that finalized, and refuses (stale operation) any other key.
+    try {
+      const r = await finalize();
+      return { kind: "done", status: r.status, refundId: r.refund_id ?? null };
+    } catch (err) {
+      if (isStaleOp(err)) return refused(claim);
+      throw err;
+    }
+  }
+
+  const o = claim.order;
+  if (!o) throw new Error(`online_order_claim(${action}) returned no order`);
+  const { order_ref: orderRef } = o;
+  if ((o.awb || o.sr_order_id) && o.sr_cancelled_op_key !== opKey) {
+    if (manualCancelConfirmed) {
+      await db.rpc("online_order_confirm_manual_cancel", { p_order_id: orderId, p_actor: actor, p_op_key: opKey });
+      logEvent("info", "manual_cancel_confirmed", { order_ref: orderRef, action, op_key: opKey, awb: o.awb });
+    } else if (o.awb && !apiCancel) {
+      // Cancel-by-AWB is unverified against the live API (REBOOK_API_CANCEL off).
+      const problem = `Courier booking AWB ${o.awb} must be cancelled in the Shiprocket dashboard; ` +
+        "a superadmin then confirms it here.";
+      await setProblem(db, orderRef, problem);
+      return { kind: "cancel_failed", problem };
+    } else {
+      try {
+        if (o.awb) await deps.shiprocket.cancelAwbs([o.awb]);
+        else {
+          const srOrderId = Number(o.sr_order_id);
+          if (!Number.isFinite(srOrderId)) throw new Error(`invalid Shiprocket order id ${o.sr_order_id}`);
+          await deps.shiprocket.cancel([srOrderId]);
+        }
+      } catch (err) {
+        const problem = [o.awb && `Cancel AWB ${o.awb}`, o.sr_order_id && `Shiprocket order ${o.sr_order_id}`]
+          .filter(Boolean).join(" / ") + " in Shiprocket dashboard";
+        logEvent("warn", "sr_cancel_failed", {
+          order_ref: orderRef,
+          action,
+          awb: o.awb,
+          sr_order_id: o.sr_order_id,
+          error: errorText(err),
+        });
+        await setProblem(db, orderRef, problem);
+        return { kind: "cancel_failed", problem };
+      }
+      await db.rpc("online_order_checkpoint", {
+        p_order_id: orderId,
+        p_step: "sr_cancelled",
+        p_data: { awb: o.awb, sr_order_id: o.sr_order_id },
+        p_op_key: opKey,
+      });
+    }
+  }
+
+  const r = await finalize();
+  logEvent("info", action === "send_back" ? "order_sent_back" : "order_rebooked", {
+    order_ref: orderRef,
+    op_key: opKey,
+    status: r.status,
+    old_awb: o.awb,
+    old_sr_order_id: o.sr_order_id,
+  });
+  return { kind: "done", status: r.status, refundId: r.refund_id ?? null };
+}
+
+/** Stalled Process (expired lease) → order back to paid for a fresh Process. */
+export function runSendBack(
+  deps: ShipDeps,
+  orderId: string,
+  actor: string,
+  opKey: string,
+  manualCancelConfirmed: boolean,
+  apiCancel: boolean,
+): Promise<AdminOpOutcome> {
+  return runResend(
+    deps,
+    "send_back",
+    orderId,
+    actor,
+    opKey,
+    manualCancelConfirmed,
+    apiCancel,
+    () =>
+      deps.db.rpc<FinalizeResult>("online_order_send_back", {
+        p_order_id: orderId,
+        p_actor: actor,
+        p_op_key: opKey,
+      }),
+  );
+}
+
+/** Packed / shipped / out for delivery → paid (re-send) or cancelled (nothing left, refunded). */
+export function runRebook(
+  deps: ShipDeps,
+  orderId: string,
+  actor: string,
+  opKey: string,
+  parcelLost: boolean,
+  note: string,
+  manualCancelConfirmed: boolean,
+  apiCancel: boolean,
+): Promise<AdminOpOutcome> {
+  return runResend(
+    deps,
+    "rebook",
+    orderId,
+    actor,
+    opKey,
+    manualCancelConfirmed,
+    apiCancel,
+    () =>
+      deps.db.rpc<FinalizeResult>("online_order_rebook", {
+        p_order_id: orderId,
+        p_actor: actor,
+        p_op_key: opKey,
+        p_parcel_lost: parcelLost,
+        p_note: note,
+      }),
+  );
 }
 
 // ---------- retry ----------

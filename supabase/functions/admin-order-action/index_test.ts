@@ -10,7 +10,11 @@ const SHOPPER = "33333333-3333-4333-8333-333333333333";
 const TOKENS: Record<string, string> = { "admin-jwt": ADMIN, "super-jwt": SUPER, "shopper-jwt": SHOPPER };
 const ORIGIN = "https://www.bindalscreations.com";
 
-function setup(order: ConstructorParameters<typeof FakeDb>[0] = {}, plan: ProcessPlan = FULL_PLAN) {
+function setup(
+  order: ConstructorParameters<typeof FakeDb>[0] = {},
+  plan: ProcessPlan = FULL_PLAN,
+  rebookApiCancel = false,
+) {
   const db = new FakeDb(order, plan);
   const sr = new FakeShiprocket();
   const deps: Deps = {
@@ -22,6 +26,7 @@ function setup(order: ConstructorParameters<typeof FakeDb>[0] = {}, plan: Proces
     isSuperadmin: (id) => Promise.resolve(id === SUPER),
     publicKeys: ["anon-key"],
     allowedOrigins: [ORIGIN],
+    rebookApiCancel,
   };
   const call = async (body: unknown, jwt = "admin-jwt") => {
     const res = await handler(
@@ -92,12 +97,17 @@ Deno.test("process happy path: steps in order, checkpoints after each, marks pac
   assertEquals(sr.methods(), ["assignAwb", "pickup", "manifest", "label"]);
   assertEquals(sr.calls[0].args, [222, 10]); // quoted courier preferred
   assertEquals(sr.calls[2].args, [222, 111]);
+  // the lease is renewed (same op key) right before each Shiprocket call
   assertEquals(db.fns(), [
     "online_order_claim",
     "online_order_prepare_process",
+    "online_order_claim",
     "checkpoint:awb",
+    "online_order_claim",
     "checkpoint:pickup",
+    "online_order_claim",
     "checkpoint:manifest",
+    "online_order_claim",
     "checkpoint:label",
     "online_order_mark_packed",
   ]);
@@ -130,7 +140,7 @@ Deno.test("process with partial availability updates the Shiprocket order first"
   ]]);
   assertEquals(input.subTotal, 3500);
   assertEquals(input.weightKg, 2.5);
-  assertEquals(db.fns().slice(2, 3), ["checkpoint:sr_update"]);
+  assertEquals(db.fns().slice(2, 4), ["online_order_claim", "checkpoint:sr_update"]);
 });
 
 Deno.test("process when the create job never succeeded runs it inline first", async () => {
@@ -157,9 +167,9 @@ for (const failing of STEPS) {
     for (const step of STEPS) {
       assertEquals(sr.count(step), step === failing ? 2 : 1, `${step} calls after ${failing} failed`);
     }
-    // retry reused the stored op key
+    // retry reused the stored op key (initial claims and per-step renewals alike)
     const claims = db.calls.filter((c) => c.fn === "online_order_claim").map((c) => c.args.p_op_key);
-    assertEquals(claims, ["op-1", "op-1"]);
+    assertEquals(new Set(claims), new Set(["op-1"]));
   });
 }
 
@@ -283,4 +293,143 @@ Deno.test("set_live: admin → 403; superadmin → DB function", async () => {
   assertEquals(ok.status, 200);
   assertEquals(ok.body, { ok: true, order: null, live: true });
   assertEquals(db.calls, [{ fn: "online_set_checkout_live", args: { p_live: true, p_actor: SUPER } }]);
+});
+
+Deno.test("cancel on an order a rebook already cancelled → 200 with the order, no refundId", async () => {
+  const { db, sr, call } = setup({ status: "cancelled" });
+  const r = await call({ action: "cancel", orderId: ORDER_ID, opKey: "c-1", reason: "customer asked" });
+  assertEquals(r.status, 200);
+  assertEquals(r.body.ok, true);
+  assertEquals(r.body.order.status, "cancelled");
+  assert(!("refundId" in r.body));
+  assertEquals(db.fns(), ["online_order_claim"]);
+  assertEquals(sr.calls.length, 0);
+});
+
+const STUCK = { status: "processing", op_key: "op-1", op_action: "process", op_lease_until: "2026-10-26T00:00:00Z" };
+const PACKED = { status: "packed", awb: "AWB1", label_url: "https://example.test/label.pdf", bill_id: 9001 };
+const SEND_BACK = { action: "send_back", orderId: ORDER_ID, opKey: "sb-1" };
+const REBOOK = { action: "rebook", orderId: ORDER_ID, opKey: "rb-1", parcelLost: false, note: "wrong item packed" };
+
+Deno.test("send_back: cancels the AWB and returns the order back in paid", async () => {
+  const { db, sr, call } = setup({ ...STUCK, awb: "AWB1" }, FULL_PLAN, true);
+  const r = await call(SEND_BACK);
+  assertEquals(r.status, 200);
+  assertEquals(r.body.ok, true);
+  assertEquals(r.body.order.status, "paid");
+  assert(!("refundId" in r.body));
+  assertEquals(sr.methods(), ["cancelAwbs"]);
+  assertEquals(db.fns(), ["online_order_claim", "checkpoint:sr_cancelled", "online_order_send_back"]);
+});
+
+Deno.test("send_back: live Process → 409 busy; paid order → 409 bad_state; missing opKey → 400", async () => {
+  const live = setup({ ...STUCK, op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  const busy = await live.call(SEND_BACK);
+  assertEquals([busy.status, busy.body.code], [409, "busy"]);
+  const paid = setup();
+  const r = await paid.call(SEND_BACK);
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+  assertEquals((await paid.call({ action: "send_back", orderId: ORDER_ID })).status, 400);
+});
+
+Deno.test("send_back: courier cancel fails → 502 courier_error with the problem text", async () => {
+  const { sr, call } = setup({ ...STUCK, awb: "AWB1" }, FULL_PLAN, true);
+  sr.failOnce.add("cancelAwbs");
+  const r = await call(SEND_BACK);
+  assertEquals([r.status, r.body.code], [502, "courier_error"]);
+  assertEquals(r.body.error, "Cancel AWB AWB1 / Shiprocket order 111 in Shiprocket dashboard");
+});
+
+Deno.test("manual cancel confirmation by an admin → 403, no DB call", async () => {
+  const { db, call } = setup(PACKED);
+  const r = await call({ ...REBOOK, manualCancelConfirmed: true });
+  assertEquals([r.status, r.body.code], [403, "forbidden"]);
+  const sb = await call({ ...SEND_BACK, manualCancelConfirmed: true });
+  assertEquals(sb.status, 403);
+  assertEquals(db.calls.length, 0);
+});
+
+Deno.test("manual cancel confirmation by a superadmin finalizes without the API", async () => {
+  const { db, sr, call } = setup(PACKED);
+  const r = await call({ ...REBOOK, manualCancelConfirmed: true }, "super-jwt");
+  assertEquals(r.status, 200);
+  assertEquals(r.body.order.status, "paid");
+  assertEquals(sr.calls.length, 0);
+  assertEquals(db.fns(), ["online_order_claim", "online_order_confirm_manual_cancel", "online_order_rebook"]);
+  assertEquals(db.calls[1].args, { p_order_id: ORDER_ID, p_actor: SUPER, p_op_key: "rb-1" });
+});
+
+Deno.test("rebook with REBOOK_API_CANCEL off and no confirmation → 502 asking for manual confirmation", async () => {
+  const { db, sr, call } = setup(PACKED);
+  const r = await call(REBOOK);
+  assertEquals([r.status, r.body.code], [502, "courier_error"]);
+  assertEquals(
+    r.body.error,
+    "Courier booking AWB AWB1 must be cancelled in the Shiprocket dashboard; a superadmin then confirms it here.",
+  );
+  assertEquals(sr.calls.length, 0);
+  assertEquals(db.order.status, "packed");
+});
+
+Deno.test("rebook with REBOOK_API_CANCEL on: parcel lost, nothing left → cancelled with refundId", async () => {
+  const { sr, call } = setup(PACKED, FULL_PLAN, true);
+  const r = await call({ ...REBOOK, parcelLost: true });
+  assertEquals(r.status, 200);
+  assertEquals(r.body.refundId, "refund-rebook");
+  assertEquals(r.body.order.status, "cancelled");
+  assertEquals(sr.methods(), ["cancelAwbs"]);
+});
+
+Deno.test("rebook note required (400)", async () => {
+  const { db, call } = setup(PACKED);
+  const r = await call({ ...REBOOK, note: "  " });
+  assertEquals([r.status, r.body.code], [400, "invalid_request"]);
+  assertEquals((await call({ ...REBOOK, note: undefined })).status, 400);
+  assertEquals(db.calls.length, 0);
+});
+
+Deno.test("rebook parcelLost must be boolean (400); manualCancelConfirmed must be boolean (400)", async () => {
+  const { db, call } = setup(PACKED);
+  assertEquals((await call({ ...REBOOK, parcelLost: "yes" })).status, 400);
+  assertEquals((await call({ ...REBOOK, parcelLost: undefined })).status, 400);
+  assertEquals((await call({ ...REBOOK, manualCancelConfirmed: "true" })).status, 400);
+  assertEquals(db.calls.length, 0);
+});
+
+const RELEASE = { action: "release_op", orderId: ORDER_ID, opKey: "rb-1" };
+
+Deno.test("release_op: abandons a rebook claim (any admin) → 200 with the order, op cleared", async () => {
+  const { db, sr, call } = setup({ ...PACKED, op_key: "rb-1", op_action: "rebook", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  const r = await call(RELEASE);
+  assertEquals(r.status, 200);
+  assertEquals(r.body.ok, true);
+  assertEquals(r.body.order.status, "packed");
+  assertEquals(r.body.order.op_action, null);
+  assertEquals(db.calls, [{ fn: "online_order_release_op", args: { p_order_id: ORDER_ID, p_actor: ADMIN, p_op_key: "rb-1" } }]);
+  assertEquals(sr.calls.length, 0);
+});
+
+Deno.test("release_op: send_back released → stalled Process again (lease expired, Retry can resume)", async () => {
+  const { db, call } = setup({ ...STUCK, op_key: "sb-1", op_action: "send_back", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  const r = await call({ ...RELEASE, opKey: "sb-1" });
+  assertEquals(r.status, 200);
+  assertEquals([r.body.order.status, r.body.order.op_action, r.body.order.op_key], ["processing", "process", "sb-1"]);
+  assert(Date.parse(db.order.op_lease_until!) < Date.now());
+});
+
+Deno.test("release_op refused by the DB (booking already cancelled / other key, live lease) → 409 bad_state", async () => {
+  const cancelled = setup({ ...PACKED, op_key: "rb-1", op_action: "rebook", sr_cancelled_op_key: "rb-1", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  const r = await cancelled.call(RELEASE);
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+  assert(r.body.error.includes("release: courier booking already cancelled — finish the action"), r.body.error);
+  assertEquals(cancelled.db.order.op_action, "rebook");
+  const live = setup({ ...PACKED, op_key: "rb-other", op_action: "rebook", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  assertEquals((await live.call(RELEASE)).body.code, "bad_state");
+});
+
+Deno.test("release_op: opKey and orderId required (400), no DB call", async () => {
+  const { db, call } = setup(PACKED);
+  assertEquals((await call({ action: "release_op", orderId: ORDER_ID })).status, 400);
+  assertEquals((await call({ action: "release_op", orderId: "x", opKey: "k" })).status, 400);
+  assertEquals(db.calls.length, 0);
 });

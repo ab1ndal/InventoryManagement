@@ -92,6 +92,7 @@ export type ShiprocketClient = {
   manifest(shipmentId: number, srOrderId: number): Promise<string>;
   label(shipmentId: number): Promise<string>;
   cancel(srOrderIds: number[]): Promise<void>;
+  cancelAwbs(awbs: string[]): Promise<void>;
   track(awb: string): Promise<TrackResult>;
 };
 
@@ -414,6 +415,12 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
       if (srOrderIds.length === 0) return;
       // Success is 204 with no body.
       await ok("POST", "/orders/cancel", { ids: srOrderIds });
+    },
+
+    async cancelAwbs(awbs) {
+      if (awbs.length === 0) return;
+      // UNVERIFIED: success body (docs: 204 "Bulk Shipment cancellation is in progress"); any 2xx counts, body ignored.
+      await ok("POST", "/orders/cancel/shipment/awbs", { awbs });
     },
 
     async track(awb) {

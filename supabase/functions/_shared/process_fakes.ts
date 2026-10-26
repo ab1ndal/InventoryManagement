@@ -1,7 +1,9 @@
 /**
  * Test doubles for process.ts callers: an in-memory OrdersDb that mimics the
- * online_order_* state rules the edge code relies on (claim lease, checkpoint skips,
- * status guards), and a recording Shiprocket client with failure injection.
+ * online_order_* state rules the edge code relies on (claim lease, op-key fence on
+ * Process checkpoints and mark_packed, checkpoint skips, status guards, send back / rebook claims,
+ * sr_cancelled, manual cancel confirmation and the two finalize functions), and a recording
+ * Shiprocket client with failure injection.
  * The real SQL behaviour is covered by schema/test_online_orders*.sql.
  */
 
@@ -56,6 +58,9 @@ export function fakeOrder(over: Partial<OrderRow> = {}): OrderRow {
     problem: null,
     sr_sync_status: null,
     sr_last_error: null,
+    sr_attempt: 1,
+    sr_cancelled_op_key: null,
+    manual_cancel_confirmed_by: null,
     ...over,
   };
 }
@@ -112,6 +117,8 @@ export class FakeDb implements OrdersDb {
   calls: { fn: string; args: Record<string, unknown> }[] = [];
   jobsReset = 0;
   billId = 9001;
+  /** Finalize events (sent_back / rebooked) with the op key and result, for idempotent repeats. */
+  events: { kind: string; opKey: string; result: Record<string, unknown> }[] = [];
 
   constructor(order: Partial<OrderRow> = {}, plan: ProcessPlan = FULL_PLAN, items = fakeItems()) {
     this.order = fakeOrder(order);
@@ -149,8 +156,34 @@ export class FakeDb implements OrdersDb {
         const action = args.p_action as string;
         const key = args.p_op_key as string;
         const target = action === "process" ? "processing" : "cancelling";
-        if (o.status === "processing" || o.status === "cancelling") {
+        const res = (claimed: boolean, resumed: boolean, reason?: string) =>
+          ({ claimed, resumed, ...(reason ? { reason } : {}), status: o.status, order: structuredClone(o) }) as T;
+        if ((action === "send_back" || action === "rebook") && o.op_action === action) {
           if (o.op_key === key) {
+            o.op_lease_until = lease();
+            return res(true, true);
+          }
+          if (this.leaseLive()) return res(false, false, "busy");
+          Object.assign(o, { op_key: key, op_lease_until: lease() });
+          return res(true, true);
+        }
+        if (action === "send_back") {
+          if (o.status !== "processing") return res(false, false, "status");
+          if (o.op_action !== "process" || this.leaseLive()) {
+            return res(false, false, o.op_action !== "process" ? "other_action" : "busy");
+          }
+          if (o.op_key === key) throw raised(fn, "online_order_claim: send_back needs a new op key");
+          Object.assign(o, { op_key: key, op_action: action, op_lease_until: lease() });
+          return res(true, false);
+        }
+        if (action === "rebook") {
+          if (!["packed", "shipped", "out_for_delivery"].includes(o.status)) return res(false, false, "status");
+          if (o.op_action !== null) return res(false, false, "other_action");
+          Object.assign(o, { op_key: key, op_action: action, op_lease_until: lease() });
+          return res(true, false);
+        }
+        if (o.status === "processing" || o.status === "cancelling") {
+          if (o.op_key === key && o.op_action === action) {
             o.op_lease_until = lease();
             return { claimed: true, resumed: true, status: o.status } as T;
           }
@@ -189,9 +222,20 @@ export class FakeDb implements OrdersDb {
         const step = args.p_step as string;
         const d = (args.p_data ?? {}) as Record<string, unknown>;
         let skipped = false;
-        if (step === "sr_create" || step === "sr_create_failed") {
+        const key = (args.p_op_key ?? null) as string | null;
+        const shared = step === "sr_create" || step === "sr_create_failed" || step === "error";
+        if (shared ? key !== null && key !== o.op_key : key === null || key !== o.op_key) {
+          throw raised(fn, `checkpoint ${step}: stale operation`);
+        }
+        if (step === "sr_cancelled") {
+          if (o.op_action !== "send_back" && o.op_action !== "rebook") {
+            throw raised(fn, `checkpoint sr_cancelled: no send back / rebook in progress (op ${o.op_action})`);
+          }
+          skipped = o.sr_cancelled_op_key === key;
+          o.sr_cancelled_op_key = key;
+        } else if (step === "sr_create" || step === "sr_create_failed") {
           if (!["paid", "processing", "cancelling"].includes(o.status)) throw raised(fn, `order is ${o.status}`);
-          skipped = o.sr_order_id !== null;
+          skipped = o.sr_order_id !== null || o.op_action === "send_back" || o.op_action === "rebook";
           if (!skipped && step === "sr_create") {
             Object.assign(o, { sr_order_id: d.sr_order_id, sr_shipment_id: d.sr_shipment_id, sr_sync_status: "ok" });
           } else if (!skipped) {
@@ -222,11 +266,83 @@ export class FakeDb implements OrdersDb {
         return { step, skipped } as T;
       }
       case "online_order_mark_packed": {
+        if (!args.p_op_key || args.p_op_key !== o.op_key) throw raised(fn, "mark_packed: stale operation");
         if (o.status !== "processing" || o.op_action !== "process") throw raised(fn, `order is ${o.status}`);
         if (!o.awb || !o.label_url) throw raised(fn, "awb and label_url are required");
         Object.assign(o, { status: "packed", bill_id: this.billId, process_error: null });
         this.clearOp();
         return this.billId as T;
+      }
+      case "online_order_confirm_manual_cancel": {
+        if (!args.p_op_key || args.p_op_key !== o.op_key) throw raised(fn, "confirm_manual_cancel: stale operation");
+        if (o.op_action !== "send_back" && o.op_action !== "rebook") {
+          throw raised(fn, `confirm_manual_cancel: no send_back / rebook in progress (op ${o.op_action})`);
+        }
+        o.manual_cancel_confirmed_by = args.p_actor as string;
+        return null as T;
+      }
+      case "online_order_send_back":
+      case "online_order_rebook": {
+        const action = fn === "online_order_send_back" ? "send_back" : "rebook";
+        const kind = action === "send_back" ? "sent_back" : "rebooked";
+        const key = args.p_op_key as string;
+        const done = this.events.find((e) => e.kind === kind && e.opKey === key);
+        if (done && o.op_action === null) return structuredClone(done.result) as T;
+        if (!key || key !== o.op_key) throw raised(fn, `${action}: stale operation`);
+        const from = action === "send_back" ? ["processing"] : ["packed", "shipped", "out_for_delivery"];
+        if (!from.includes(o.status) || o.op_action !== action) {
+          throw raised(fn, `${action}: order has no ${action} in progress (status ${o.status}, op ${o.op_action})`);
+        }
+        if (action === "rebook" && !String(args.p_note ?? "").trim()) throw raised(fn, "rebook: note required");
+        if (
+          !((o.sr_order_id === null && o.awb === null) || o.sr_cancelled_op_key === key ||
+            o.manual_cancel_confirmed_by !== null)
+        ) throw raised(fn, `${action}: courier booking not cancelled yet`);
+        // Fake rule: a lost parcel with nothing left on the shelf cancels and refunds.
+        const lostAll = action === "rebook" && args.p_parcel_lost === true;
+        const status = lostAll ? "cancelled" : "paid";
+        const result: Record<string, unknown> = {
+          status,
+          old_sr_order_id: o.sr_order_id,
+          old_awb: o.awb,
+          ...(action === "rebook" ? { refund_id: lostAll ? "refund-rebook" : null } : {}),
+        };
+        Object.assign(o, {
+          sr_order_id: null,
+          sr_shipment_id: null,
+          sr_updated_at: null,
+          awb: null,
+          courier_id: null,
+          courier_name: null,
+          pickup_requested_at: null,
+          manifest_url: null,
+          label_url: null,
+          process_plan: null,
+          process_error: null,
+          problem: null,
+          sr_attempt: o.sr_attempt + 1,
+          sr_cancelled_op_key: null,
+          manual_cancel_confirmed_by: null,
+          status,
+        });
+        this.clearOp();
+        this.events.push({ kind, opKey: key, result });
+        return structuredClone(result) as T;
+      }
+      case "online_order_release_op": {
+        if (o.op_action !== "send_back" && o.op_action !== "rebook") {
+          throw raised(fn, `release: no send back / rebook in progress (status ${o.status}, op ${o.op_action})`);
+        }
+        if (!args.p_op_key || (args.p_op_key !== o.op_key && this.leaseLive())) {
+          throw raised(fn, "release: stale operation");
+        }
+        if (o.sr_cancelled_op_key !== null || o.manual_cancel_confirmed_by !== null) {
+          throw raised(fn, "release: courier booking already cancelled — finish the action");
+        }
+        if (o.op_action === "send_back") {
+          Object.assign(o, { op_action: "process", op_lease_until: new Date(Date.now() - 1000).toISOString() });
+        } else this.clearOp();
+        return structuredClone(o) as T;
       }
       case "online_order_cancel": {
         if (!(o.status === "paid" || (o.status === "cancelling" && o.op_action === "cancel"))) {
@@ -327,6 +443,9 @@ export class FakeShiprocket implements ShiprocketClient {
   }
   async cancel(srOrderIds: number[]): Promise<void> {
     await this.hit("cancel", [srOrderIds]);
+  }
+  async cancelAwbs(awbs: string[]): Promise<void> {
+    await this.hit("cancelAwbs", [awbs]);
   }
   async track(awb: string): Promise<TrackResult> {
     await this.hit("track", [awb]);
