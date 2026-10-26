@@ -14,6 +14,7 @@ import {
   localInputToIso,
   outsideReturnWindow,
   returnableUnits,
+  ceilToMinute,
   toLocalInputValue,
   windowLabel,
 } from "./orderHelpers";
@@ -94,7 +95,7 @@ export default function OpenReturnDialog({ open, order, items, role, pending, er
               aria-label="Contacted at"
               className="h-9 w-full rounded-md border border-input bg-white px-2"
               value={contactedAt}
-              min={order.delivered_at ? toLocalInputValue(new Date(order.delivered_at)) : undefined}
+              min={order.delivered_at ? toLocalInputValue(ceilToMinute(new Date(order.delivered_at))) : undefined}
               max={toLocalInputValue(new Date())}
               onChange={(e) => setContactedAt(e.target.value)}
             />

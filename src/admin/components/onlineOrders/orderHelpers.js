@@ -160,6 +160,11 @@ export function returnableUnits(item, returns = []) {
   return Math.max(0, Number(item.shipped_qty || 0) - used);
 }
 
+// A datetime-local minimum must not fall before a seconds-precise instant, so round up to the next minute.
+export function ceilToMinute(date) {
+  return new Date(Math.ceil(date.getTime() / 60000) * 60000);
+}
+
 // Value for <input type="datetime-local"> in the browser's local zone.
 export function toLocalInputValue(date) {
   const pad = (n) => String(n).padStart(2, "0");

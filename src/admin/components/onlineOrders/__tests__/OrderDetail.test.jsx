@@ -491,6 +491,22 @@ describe("Mark delivered", () => {
     });
   });
 
+  test("Delivered at min rounds the payment time up a minute plus one of slack", async () => {
+    mockRole = "superadmin";
+    // far-future payment so the paid_at bound always beats the 30-day bound
+    mockDetail = detail({ order: { status: "shipped", delivered_at: null, paid_at: "2099-01-01T10:00:30Z" } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    fireEvent.click(await screen.findByRole("button", { name: "Mark delivered…" }));
+    const input = within(await screen.findByRole("dialog")).getByLabelText("Delivered at");
+    const d = new Date("2099-01-01T10:02:00Z");
+    const pad = (n) => String(n).padStart(2, "0");
+    expect(input).toHaveAttribute(
+      "min",
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
+  });
+
   test("a server refusal keeps the dialog open with the message and the typed reason", async () => {
     mockRole = "superadmin";
     mockDetail = detail({ order: { status: "shipped", delivered_at: null } });

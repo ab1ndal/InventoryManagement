@@ -19,6 +19,7 @@ import {
   formatRupees,
   localInputToIso,
   processRefundPreview,
+  ceilToMinute,
   toLocalInputValue,
 } from "./orderHelpers";
 
@@ -261,9 +262,12 @@ export default function OrderDetail({ orderId, onChanged }) {
   const canMarkDelivered =
     role === "superadmin" && ["shipped", "out_for_delivery"].includes(order.status) && !order.delivered_at;
   const deliveredIso = localInputToIso(deliveredAt);
-  // The server allows at most 30 days back and nothing before payment.
+  // The server allows at most 30 days back and nothing before payment; a minute of slack covers the
+  // time between rendering and submitting.
   const deliveredMin = toLocalInputValue(
-    new Date(Math.max(Date.now() - 30 * 24 * 3600 * 1000, order.paid_at ? new Date(order.paid_at) : 0))
+    ceilToMinute(
+      new Date(Math.max(Date.now() - 30 * 24 * 3600 * 1000, order.paid_at ? new Date(order.paid_at) : 0) + 60000)
+    )
   );
   const canRelease = ["send_back", "rebook"].includes(order.op_action) && leaseExpired;
   const backPayload = (extra) =>

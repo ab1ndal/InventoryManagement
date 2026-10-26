@@ -79,7 +79,11 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
           returnId: ret.id,
           contentType: photoContentType(file),
         });
-        const put = await fetch(uploadUrl, { method: "PUT", body: file });
+        const put = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": photoContentType(file) },
+          body: file,
+        });
         if (!put.ok) throw new Error(`Upload of ${file.name} failed (${put.status})`);
         await action({ action: "return_photo_add", returnId: ret.id, path });
       }

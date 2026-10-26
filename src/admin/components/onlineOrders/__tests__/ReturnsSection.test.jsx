@@ -177,7 +177,7 @@ test("a change-of-mind return can be received without photos; closed returns hav
 test("photo upload: signed url, PUT, then add", async () => {
   const puts = [];
   global.fetch = async (url, init) => {
-    puts.push([url, init.method, init.body]);
+    puts.push([url, init.method, init.body, init.headers]);
     return { ok: true };
   };
   mockActionImpl = (p) =>
@@ -195,7 +195,7 @@ test("photo upload: signed url, PUT, then add", async () => {
   fireEvent.change(screen.getByLabelText("Add photos"), { target: { files: [file] } });
   await waitFor(() => expect(mockActions).toHaveLength(2));
   expect(mockActions[0]).toEqual({ action: "return_photo_url", returnId: "r1", contentType: "image/heif" });
-  expect(puts).toEqual([["https://up/x", "PUT", file]]);
+  expect(puts).toEqual([["https://up/x", "PUT", file, { "Content-Type": "image/heif" }]]);
   expect(mockActions[1]).toEqual({ action: "return_photo_add", returnId: "r1", path: "o1/r1/u.jpg" });
   await waitFor(() => expect(onChanged).toHaveBeenCalled());
 });
@@ -415,4 +415,34 @@ test("Receive sends one preview for a burst of edits", async () => {
   fireEvent.change(input, { target: { value: "1" } });
   await waitFor(() => expect(dialog).toHaveTextContent("₹10.00"));
   expect(mockActions.filter((a) => a.action === "return_preview")).toHaveLength(1);
+});
+
+test("photo upload PUT sends the inferred type even when the browser gives an empty file.type", async () => {
+  const puts = [];
+  global.fetch = async (url, init) => {
+    puts.push(init.headers);
+    return { ok: true };
+  };
+  mockActionImpl = (p) =>
+    p.action === "return_photo_url" ? { ok: true, uploadUrl: "https://up/x", path: "o1/r1/u.heic" } : { ok: true };
+  render(
+    <ReturnsSection
+      order={order({ returns: [openReturn({ reason: "damaged_wrong" })] })}
+      items={items}
+      role="admin"
+      onChanged={jest.fn()}
+    />
+  );
+  const file = new File(["x"], "IMG_1.HEIC", { type: "" });
+  fireEvent.change(screen.getByLabelText("Add photos"), { target: { files: [file] } });
+  await waitFor(() => expect(mockActions).toHaveLength(2));
+  expect(mockActions[0].contentType).toBe("image/heic");
+  expect(puts).toEqual([{ "Content-Type": "image/heic" }]);
+});
+
+test("Open return Contacted at min rounds a seconds-precise delivery up to the next minute", async () => {
+  renderSection({ order: order({ delivered_at: "2026-10-20T10:00:30Z" }) });
+  fireEvent.click(screen.getByRole("button", { name: "Open return…" }));
+  const input = within(await screen.findByRole("dialog")).getByLabelText("Contacted at");
+  expect(input).toHaveAttribute("min", toLocalInputValue(new Date("2026-10-20T10:01:00Z")));
 });
