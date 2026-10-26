@@ -587,6 +587,7 @@ $$;
 -- Shared by send back and rebook once the caller has set each item's stock_taken: clears the
 -- Shiprocket booking, shipment, plan, problem and op fields, bumps sr_attempt, resets the
 -- per-item shelf-check state and sets the status.
+-- Callers must hold the order row lock and have checked the op-key fence first.
 create or replace function public._online_resend_reset(p_order_id uuid, p_status text)
 returns void
 language plpgsql

@@ -895,6 +895,90 @@ begin
 end $$;
 rollback;
 
+-- still at shop rebook then cancel: full shipped qty back, item + shipping offsets
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2);
+  v uuid;
+  s0 numeric;
+  rf uuid;
+  b int;
+begin
+  select variantid into v from public.order_items where order_id = o;
+  perform public.online_order_rebook(o, null, 'op-rb', false, 'at shop');
+  s0 := pg_temp.stock(v);
+  rf := public.online_order_cancel(o, null, 'customer gave up');
+  assert pg_temp.stock(v) = s0 + 2, 'both packed units back, got ' || (pg_temp.stock(v) - s0)::text;
+  select bill_id into b from public.orders where id = o;
+  assert (select count(*) from public.exchanges where order_refund_id = rf and order_item_id is not null
+            and reason = 'Cancel after rebook' and quantity = 2 and new_billid = b) = 1, 'item offset of 2';
+  assert (select credit_amount from public.exchanges where order_refund_id = rf and order_item_id is null) = 99, 'shipping offset';
+end $$;
+rollback;
+
+-- qty 3, 1 unavailable at the first check, 2 packed; rebook (at shop / lost) then cancel
+create function pg_temp.mk_rebook_partial(out o_order uuid, out o_var uuid) language plpgsql as $$
+declare
+  r record;
+begin
+  perform pg_temp.go_live();
+  o_var := pg_temp.mk_variant(1000, 10);
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', o_var, 'qty', 3)),
+                                         jsonb_build_object('shipping', 99));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, 2, null) from public.order_items i where i.order_id = r.order_id;
+  perform pg_temp.pack(r.order_id);
+  perform public.online_order_claim(r.order_id, 'rebook', null, 'op-rb');
+  perform public.online_order_checkpoint(r.order_id, 'sr_cancelled', '{}', 'op-rb');
+  o_order := r.order_id;
+end $$;
+
+begin;
+do $$
+declare
+  f record;
+  it public.order_items;
+  s0 numeric;
+  rf uuid;
+begin
+  select * into f from pg_temp.mk_rebook_partial();
+  select * into it from public.order_items where order_id = f.o_order;
+  assert it.shipped_qty = 2 and it.refunded_qty = 1, 'packed 2 of 3';
+  perform public.online_order_rebook(f.o_order, null, 'op-rb', false, 'at shop');
+  select * into it from public.order_items where order_id = f.o_order;
+  assert it.stock_taken = 2 and it.refunded_qty = 1 and it.lost_qty = 0, 'item: ' || row_to_json(it)::text;
+  s0 := pg_temp.stock(f.o_var);
+  rf := public.online_order_cancel(f.o_order, null, 'customer gave up');
+  assert pg_temp.stock(f.o_var) = s0 + 2, 'two back, got ' || (pg_temp.stock(f.o_var) - s0)::text;
+  assert (select units from public.order_refunds where id = rf) = 2, 'cancel refunds 2 units';
+  assert (select quantity from public.exchanges where order_refund_id = rf and order_item_id is not null) = 2, 'offset 2 units';
+  assert (select refunded_qty from public.order_items where order_id = f.o_order) = 3, 'all 3 refunded once';
+end $$;
+rollback;
+
+begin;
+do $$
+declare
+  f record;
+  it public.order_items;
+  s0 numeric;
+  rf uuid;
+begin
+  select * into f from pg_temp.mk_rebook_partial();
+  s0 := pg_temp.stock(f.o_var);
+  perform public.online_order_rebook(f.o_order, null, 'op-rb', true, 'lost');
+  assert pg_temp.stock(f.o_var) = s0 - 2, 'two replacements taken';
+  select * into it from public.order_items where order_id = f.o_order;
+  assert it.stock_taken = 2 and it.refunded_qty = 1 and it.lost_qty = 2, 'item: ' || row_to_json(it)::text;
+  rf := public.online_order_cancel(f.o_order, null, 'customer gave up');
+  assert pg_temp.stock(f.o_var) = s0, 'replacements back only';
+  assert (select units from public.order_refunds where id = rf) = 2, 'cancel refunds 2 units';
+  assert (select quantity from public.exchanges where order_refund_id = rf and order_item_id is not null) = 2, 'offset 2 units';
+  assert (select credit_amount from public.exchanges where order_refund_id = rf and order_item_id is null) = 99, 'shipping offset';
+end $$;
+rollback;
+
 -- cancel of a paid order without a bill: no offsets (unchanged behaviour)
 begin;
 do $$
