@@ -80,6 +80,16 @@ Deno.test("optionalUser: absent → null; anon/public key → null", async () =>
   assertEquals(await optionalUser(req({ authorization: `Bearer ${ANON}` }), verify, [ANON]), null);
 });
 
+// The project's SUPABASE_ANON_KEY is now the sb_publishable_ key, while the
+// storefront still sends the legacy anon JWT; its role claim marks it public.
+Deno.test("optionalUser: legacy anon-role JWT not in publicKeys → null", async () => {
+  const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const legacyAnon = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ iss: "supabase", role: "anon" })}.sig`;
+  assertEquals(await optionalUser(req({ authorization: `Bearer ${legacyAnon}` }), verify, ["sb_publishable_x"]), null);
+  const authed = `${b64({ alg: "HS256" })}.${b64({ role: "authenticated", sub: "u-9" })}.sig`;
+  assertEquals((await assertRejects(() => optionalUser(req({ authorization: `Bearer ${authed}` }), verify), HttpError)).status, 401);
+});
+
 Deno.test("optionalUser: valid → user", async () => {
   assertEquals(await optionalUser(req({ authorization: "Bearer valid.jwt" }), verify), { id: "u-1" });
 });

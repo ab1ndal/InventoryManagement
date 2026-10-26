@@ -67,13 +67,31 @@ function bearer(req: Request): string | null {
   return m[1];
 }
 
+/**
+ * Unverified `role` claim of a JWT, or null. Only used to recognise the
+ * legacy anon key: SUPABASE_ANON_KEY now holds the sb_publishable_ key while
+ * browsers still send the legacy anon JWT. Trusting the claim unverified is
+ * safe because "anon" only ever yields guest access, the same as no token.
+ */
+function jwtRole(token: string): string | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=")));
+    return typeof claims?.role === "string" ? claims.role : null;
+  } catch {
+    return null; // not a decodable JWT: let verify() reject it
+  }
+}
+
 export async function optionalUser(
   req: Request,
   verify: VerifyJwt,
   publicKeys: string[] = [],
 ): Promise<VerifiedUser | null> {
   const token = bearer(req);
-  if (token === null || publicKeys.includes(token)) return null;
+  if (token === null || publicKeys.includes(token) || jwtRole(token) === "anon") return null;
   const user = await verify(token);
   if (!user) throw new HttpError(401, "invalid or expired session");
   return user;
