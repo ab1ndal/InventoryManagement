@@ -159,9 +159,11 @@ Exact rules to state (spec "Policy text"): damaged/wrong — tell us within 48 h
 
 ### Task 9: Ship (main loop, owner-approved steps)
 
-- [ ] **Step 1:** PR, checks, merge (owner approval).
-- [ ] **Step 2:** `npm run migrate` for `schema/migration_online_returns.sql` (owner approval). Verify bucket: `supabase db query --linked "select id, public from storage.buckets where id='order-returns'"` → `public = false`; backfill count of `delivered_at`.
-- [ ] **Step 3:** Deploy `admin-order-action`. Vercel auto-deploys the frontend from main.
+Order matters: the frontend embeds `order_returns` (Online Orders list/detail) and ExchangePage reads `orders.delivered_at` and calls `exchange_record`, so merging (Vercel deploys the frontend) before the migration breaks the Online Orders screens and every in-store exchange. The migration and the function are backward compatible with the current frontend.
+
+- [ ] **Step 1:** `npm run migrate` (owner approval): applies the Plan B rebook migration first if still pending, then `schema/migration_online_returns.sql`. Verify bucket: `supabase db query --linked "select id, public from storage.buckets where id='order-returns'"` → `public = false`; backfill count of `delivered_at`.
+- [ ] **Step 2:** Deploy `admin-order-action` (`--use-api --import-map supabase/functions/deno.json`).
+- [ ] **Step 3:** PR, checks, merge (owner approval). Vercel auto-deploys the frontend from main.
 - [ ] **Step 4:** Sandbox run: deliver a test order via `online_order_mark_delivered`, open damaged return with photo, receive, refund both choices; record in `docs/testing/`. Rebuild graphify; update `tasks/todo.md`.
 
 ## Future phase (not in this plan)

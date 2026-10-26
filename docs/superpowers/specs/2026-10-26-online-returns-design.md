@@ -166,8 +166,10 @@ When the parcel is at the shop and checked:
   time the webhook arrived.
 - **Mark delivered (manual):** any admin can mark a `shipped` / `out_for_delivery` order delivered with a
   date, for when the courier webhook is missed (sets `delivered_at`, sends the existing delivered email).
-- After a return is refunded the order **stays `delivered`**; the admin list and the customer order page
+- After a return is refunded the order **stays `delivered`**; the admin list and detail
   show a "Returned" / "Partly returned" badge derived from its returns. No new order status.
+  The customer order page badge is **deferred** (review M5): customers have no return request flow yet,
+  so it ships with the future customer "Request return" phase.
 
 ### In-store exchange of an online order
 
