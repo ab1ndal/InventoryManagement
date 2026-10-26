@@ -24,9 +24,9 @@ export const HERO_SLIDES = [
   // differentiator.
   {
     id: "customize",
-    headline: "Made to order, made for you",
-    subline: "Send us your design. Our in-house tailors will stitch it to your size.",
-    cta: "Start your design",
+    headline: "Seen a look you love?",
+    subline: "Send us the photo. Our tailors will make it for you, in your size.",
+    cta: "Get a quote",
     href: "/customize",
     images: [{ url: "/hero/customize-desktop.webp", mobileUrl: "/hero/customize-mobile.webp" }],
   },

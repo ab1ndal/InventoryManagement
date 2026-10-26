@@ -175,7 +175,7 @@ export const TERMS = [
   {
     heading: "Custom orders",
     body: [
-      "For made-to-order pieces we send a quote with the price and a ready-by date. The quote is the final price; any budget you share only helps us plan. The minimum order is ₹3,000, and rush orders (under 2 weeks) carry an extra charge shown in the quote.",
+      "For made-to-order pieces we send a quote with the price and a ready-by date. We make the piece as close to your photos as we can; fabric, handwork and colour may differ slightly, and we tell you about any change in the quote. The quote is the final price; any budget you share only helps us plan. The minimum order is ₹3,000, and rush orders (under 2 weeks) carry an extra charge shown in the quote.",
       "Work starts once you pay 50% of the quote as an advance. The balance is due when the piece is ready, before collection or dispatch.",
       "Because work starts straight away, the advance is not refundable. If you contact us by phone or WhatsApp within 1 day of paying, we will tell you whether a refund is still possible; this is at our discretion. If we cancel a custom order, we refund everything you paid.",
       "One fitting and free alterations are offered at our shop. Pieces delivered to you cannot be sent back for alterations, but you are welcome to bring them to the shop.",
