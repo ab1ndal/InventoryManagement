@@ -16,6 +16,8 @@ import { StatusBadge } from "./OrderList";
 import { formatDateTime, formatRupees, processRefundPreview } from "./orderHelpers";
 
 const BUSY_MESSAGE = "Another staff member is working on this order";
+const RELEASE_MESSAGE =
+  "Releases this order without cancelling the courier booking. Use only if the booking was not cancelled.";
 
 function ConfirmDialog({ open, title, description, confirmLabel, confirmDisabled, pending, onConfirm, onClose, children }) {
   return (
@@ -65,7 +67,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [avail, setAvail] = useState({});
   const [checked, setChecked] = useState(() => new Set());
   const [savingLine, setSavingLine] = useState(null);
-  const [dialog, setDialog] = useState(null); // 'process' | 'cancel' | 'rto' | 'sendback' | 'rebook'
+  const [dialog, setDialog] = useState(null); // 'process' | 'cancel' | 'rto' | 'sendback' | 'rebook' | 'release'
   const [pending, setPending] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [courierError, setCourierError] = useState(null);
@@ -75,6 +77,8 @@ export default function OrderDetail({ orderId, onChanged }) {
   // Courier cancel failure inside a send-back/rebook dialog; the dialog stays open so the
   // same op key can be resumed (retry, or superadmin manual-cancel confirmation).
   const [dialogProblem, setDialogProblem] = useState(null);
+  // release_op target {key, label}: key is the open send-back/rebook dialog's key, or a new one.
+  const [release, setRelease] = useState(null);
   // One op key per Process/Cancel click; reused if that click's request is retried.
   const opRef = useRef(null);
 
@@ -127,6 +131,13 @@ export default function OrderDetail({ orderId, onChanged }) {
   const openBackDialog = (kind) => {
     opRef.current = { kind, key: newOpKey() };
     setDialog(kind);
+  };
+
+  // Captures the key before closeDialog clears opRef, so a dialog's own claim can be released.
+  const openRelease = (key, label) => {
+    closeDialog();
+    setRelease({ key, label });
+    setDialog("release");
   };
 
   const runBack = async (payload, successMessage) => {
@@ -222,8 +233,13 @@ export default function OrderDetail({ orderId, onChanged }) {
   const showRetry = Boolean(order.process_error || failedJobs.length || courierError);
   const preview = processRefundPreview(items, avail, order.shipping);
   const leaseExpired = order.op_lease_until && new Date(order.op_lease_until) < new Date();
-  const canSendBack = order.status === "processing" && order.op_action === "process" && leaseExpired;
-  const canRebook = ["packed", "shipped", "out_for_delivery"].includes(order.status);
+  // A send back / rebook left claimed (e.g. courier cancel failed) is resumable once its lease expires.
+  const canSendBack =
+    order.status === "processing" && ["process", "send_back"].includes(order.op_action) && leaseExpired;
+  const canRebook =
+    ["packed", "shipped", "out_for_delivery"].includes(order.status) &&
+    (!order.op_action || (order.op_action === "rebook" && leaseExpired));
+  const canRelease = ["send_back", "rebook"].includes(order.op_action) && leaseExpired;
   const backPayload = (extra) =>
     dialog === "sendback"
       ? { action: "send_back", orderId, opKey: opRef.current.key, ...extra }
@@ -443,12 +459,21 @@ export default function OrderDetail({ orderId, onChanged }) {
         )}
         {canSendBack && (
           <Button variant="outline" disabled={pending} onClick={() => openBackDialog("sendback")}>
-            Send back to To-check
+            {order.op_action === "send_back" ? "Resume send back" : "Send back to To-check"}
           </Button>
         )}
         {canRebook && (
           <Button variant="outline" disabled={pending} onClick={() => openBackDialog("rebook")}>
-            Rebook…
+            {order.op_action === "rebook" ? "Resume rebook…" : "Rebook…"}
+          </Button>
+        )}
+        {canRelease && (
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => openRelease(newOpKey(), order.op_action === "send_back" ? "send back" : "rebook")}
+          >
+            Abandon
           </Button>
         )}
         {order.status === "rto" && (
@@ -643,9 +668,26 @@ export default function OrderDetail({ orderId, onChanged }) {
                 I cancelled it in Shiprocket
               </Button>
             )}
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => openRelease(opRef.current.key, dialog === "sendback" ? "send back" : "rebook")}
+            >
+              Abandon
+            </Button>
           </div>
         )}
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={dialog === "release"}
+        title={`Abandon ${release?.label ?? "action"} of ${order.order_ref}?`}
+        description={RELEASE_MESSAGE}
+        confirmLabel="Abandon"
+        pending={pending}
+        onClose={closeDialog}
+        onConfirm={() => run({ action: "release_op", orderId, opKey: release?.key }, "Order released")}
+      />
 
       <ConfirmDialog
         open={dialog === "rto"}

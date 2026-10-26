@@ -371,3 +371,79 @@ test("courier_error for superadmin offers I cancelled it in Shiprocket, resent w
   expect(second).toEqual({ ...first, manualCancelConfirmed: true });
   expect(second.opKey).toBe("key-1");
 });
+
+const RELEASE_TEXT =
+  "Releases this order without cancelling the courier booking. Use only if the booking was not cancelled.";
+
+test("send back left claimed after a courier error can be resumed once its lease expires (new opKey)", async () => {
+  mockDetail = detail({ order: stuck({ op_action: "send_back", process_error: null }) });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Resume send back" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Send back" }));
+  await waitFor(() =>
+    expect(mockActions).toContainEqual({ action: "send_back", orderId: "o1", opKey: "key-1" })
+  );
+});
+
+test("send back claim with a live lease: no resume, no abandon", async () => {
+  mockDetail = detail({ order: stuck({ op_action: "send_back", op_lease_until: "2999-01-01T00:00:00Z" }) });
+  render(<OrderDetail orderId="o1" />);
+  await screen.findByText("Kurta");
+  expect(screen.queryByRole("button", { name: "Resume send back" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Abandon" })).not.toBeInTheDocument();
+});
+
+test("rebook claim: hidden while its lease is live, Resume rebook… once expired", async () => {
+  mockDetail = detail({
+    order: { status: "shipped", awb: "AWB9", op_action: "rebook", op_lease_until: "2999-01-01T00:00:00Z" },
+  });
+  const { unmount } = render(<OrderDetail orderId="o1" />);
+  await screen.findByText("Kurta");
+  expect(screen.queryByRole("button", { name: /Rebook…/ })).not.toBeInTheDocument();
+  unmount();
+  mockDetail = detail({
+    order: { status: "shipped", awb: "AWB9", op_action: "rebook", op_lease_until: "2020-01-01T00:00:00Z" },
+  });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Resume rebook…" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Rebook note"), { target: { value: "again" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Rebook" }));
+  await waitFor(() =>
+    expect(mockActions).toContainEqual(expect.objectContaining({ action: "rebook", opKey: "key-1", note: "again" }))
+  );
+});
+
+test("Abandon next to the resume button confirms, then sends release_op with a new opKey", async () => {
+  mockDetail = detail({
+    order: { status: "shipped", awb: "AWB9", op_action: "rebook", op_lease_until: "2020-01-01T00:00:00Z" },
+  });
+  render(<OrderDetail orderId="o1" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Abandon" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent(RELEASE_TEXT);
+  expect(dialog).toHaveTextContent("Abandon rebook of WEB-000007?");
+  expect(mockActions).toEqual([]);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Abandon" }));
+  await waitFor(() => expect(mockActions).toContainEqual({ action: "release_op", orderId: "o1", opKey: "key-1" }));
+});
+
+test("Abandon not offered for a plain stalled Process", async () => {
+  mockDetail = detail({ order: stuck() });
+  render(<OrderDetail orderId="o1" />);
+  await screen.findByRole("button", { name: "Send back to To-check" });
+  expect(screen.queryByRole("button", { name: "Abandon" })).not.toBeInTheDocument();
+});
+
+test("after a courier error the dialog offers Abandon with the dialog's opKey", async () => {
+  await rebookUntilCourierError();
+  const dialog = screen.getByRole("dialog");
+  fireEvent.click(await within(dialog).findByRole("button", { name: "Abandon" }));
+  const confirm = await screen.findByRole("dialog");
+  expect(confirm).toHaveTextContent(RELEASE_TEXT);
+  expect(confirm).toHaveTextContent("Abandon rebook of WEB-000007?");
+  mockActionImpl = null;
+  fireEvent.click(within(confirm).getByRole("button", { name: "Abandon" }));
+  await waitFor(() => expect(mockActions).toContainEqual({ action: "release_op", orderId: "o1", opKey: "key-1" }));
+});
