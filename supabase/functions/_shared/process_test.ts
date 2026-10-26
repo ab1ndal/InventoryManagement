@@ -8,6 +8,7 @@ import {
   PARCEL_BREADTH_CM,
   PARCEL_HEIGHT_CM,
   PARCEL_LENGTH_CM,
+  runProcess,
   shippableDiffers,
 } from "./process.ts";
 import { FakeDb, fakeItems, fakeOrder, FakeShiprocket, FULL_PLAN, ITEM_A, ITEM_B, ORDER_ID } from "./process_fakes.ts";
@@ -182,4 +183,66 @@ Deno.test("shiprocket_create job: no Shiprocket config → recorded failure, thr
   const db = new FakeDb({ sr_order_id: null, sr_shipment_id: null });
   await assertRejects(() => handle(jobCtx(db, null), JOB), Error, "not configured");
   assertEquals(db.fns(), ["checkpoint:sr_create_failed"]);
+});
+
+// ---------- runProcess: lease renewal and fencing ----------
+
+Deno.test("runProcess renews claim before AWB call", async () => {
+  const db = new FakeDb();
+  const sr = new FakeShiprocket();
+  let release!: () => void;
+  sr.gates.set("assignAwb", new Promise<void>((r) => (release = r)));
+  const run = runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  while (sr.count("assignAwb") === 0) await new Promise((r) => setTimeout(r, 0));
+  const last = db.calls.at(-1)!;
+  assertEquals(last.fn, "online_order_claim");
+  assertEquals(last.args, { p_order_id: ORDER_ID, p_action: "process", p_actor: "admin-1", p_op_key: "op-1" });
+  release();
+  const out = await run;
+  assertEquals(out.kind, "packed");
+  // every fenced write carries the op key
+  for (const c of db.calls.filter((c) => c.fn === "online_order_checkpoint" || c.fn === "online_order_mark_packed")) {
+    assertEquals(c.args.p_op_key, "op-1", c.fn);
+  }
+  // one renewal before each Shiprocket call (awb, pickup, manifest, label) after the first claim
+  assertEquals(db.calls.filter((c) => c.fn === "online_order_claim").length, 5);
+});
+
+Deno.test("runProcess stops when renewal not claimed", async () => {
+  class TakenOverDb extends FakeDb {
+    override async rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+      const out = await super.rpc<T>(fn, args);
+      // Send back takes over (new key) while this worker is between steps.
+      if (fn === "online_order_prepare_process") Object.assign(this.order, { op_key: "sb-1", op_action: "send_back" });
+      return out;
+    }
+  }
+  const db = new TakenOverDb();
+  const sr = new FakeShiprocket();
+  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  assertEquals(out, { kind: "busy" });
+  assertEquals(sr.calls.length, 0);
+  assert(!db.fns().includes("checkpoint:error"), "no error checkpoint over the new op");
+  assertEquals(db.order.op_key, "sb-1");
+  assertEquals(db.order.process_error, null);
+});
+
+Deno.test("runProcess: stale operation from a checkpoint → busy, no error checkpoint", async () => {
+  class StaleDb extends FakeDb {
+    override async rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+      const out = await super.rpc<T>(fn, args);
+      // Takeover lands during the AWB call, after the renewal.
+      if (fn === "online_order_claim" && this.calls.filter((c) => c.fn === fn).length === 2) {
+        Object.assign(this.order, { op_key: "sb-1", op_action: "send_back" });
+      }
+      return out;
+    }
+  }
+  const db = new StaleDb();
+  const sr = new FakeShiprocket();
+  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  assertEquals(out, { kind: "busy" });
+  assertEquals(sr.methods(), ["assignAwb"]);
+  assertEquals(db.order.awb, null);
+  assert(!db.fns().includes("checkpoint:error"), "no error checkpoint over the new op");
 });

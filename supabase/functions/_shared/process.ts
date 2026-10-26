@@ -329,6 +329,20 @@ function refused(c: ClaimResult): Refused {
   return c.reason === "status" ? { kind: "bad_state", status: c.status } : { kind: "busy" };
 }
 
+/** Another operation (Send back) now owns the order; this worker must stop without writing. */
+class OpSuperseded extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OpSuperseded";
+  }
+}
+
+/** The DB fence refused a write because the order's op key changed. */
+function isStaleOp(err: unknown): boolean {
+  return err instanceof OpSuperseded ||
+    (err instanceof DbError && err.isRaised && err.message.includes("stale operation"));
+}
+
 /** Best effort: the original failure is what the caller reports. */
 async function recordError(db: OrdersDb, orderId: string, err: unknown): Promise<void> {
   try {
@@ -380,7 +394,22 @@ export async function runProcess(
   if (!claim.claimed) return refused(claim);
 
   const checkpoint = (step: string, data: Record<string, unknown>) =>
-    db.rpc("online_order_checkpoint", { p_order_id: orderId, p_step: step, p_data: data });
+    db.rpc("online_order_checkpoint", { p_order_id: orderId, p_step: step, p_data: data, p_op_key: opKey });
+  // An expired lease doesn't stop this worker, so renew it (same key) right before each
+  // Shiprocket call; if Send back took the order over, stop before touching the courier.
+  const renew = async (step: string): Promise<void> => {
+    const renewal = await db.rpc<ClaimResult>("online_order_claim", {
+      p_order_id: orderId,
+      p_action: "process",
+      p_actor: actor,
+      p_op_key: opKey,
+    });
+    if (!renewal.claimed) throw new OpSuperseded(`lease renewal refused before ${step} (${renewal.reason})`);
+  };
+  const courier = async <T>(step: string, call: () => Promise<T>): Promise<T> => {
+    await renew(step);
+    return ext(step, call);
+  };
 
   try {
     const plan = await db.rpc<ProcessPlan>("online_order_prepare_process", { p_order_id: orderId, p_actor: actor });
@@ -402,6 +431,7 @@ export async function runProcess(
 
     if (!o.sr_order_id) {
       // shiprocket_create job hasn't succeeded yet: run it inline.
+      await renew("sr_create");
       await ensureSrOrder(deps, orderId);
       o = await mustGetOrder(db, orderId);
     }
@@ -409,7 +439,7 @@ export async function runProcess(
     const items = await db.getItems(orderId);
 
     if (!o.sr_updated_at && shippableDiffers(items, plan)) {
-      const ids = await ext(
+      const ids = await courier(
         "sr_update",
         () => sr.updateOrder(buildSrInput(o, shippableLines(items, plan)), deps.shopEmail),
       );
@@ -426,22 +456,22 @@ export async function runProcess(
 
     let { awb, courier_id: courierId, courier_name: courierName, manifest_url: manifestUrl, label_url: labelUrl } = o;
     if (!awb) {
-      const r = await ext("awb", () => sr.assignAwb(shipmentId, o.quoted_courier_id ?? undefined));
+      const r = await courier("awb", () => sr.assignAwb(shipmentId, o.quoted_courier_id ?? undefined));
       courierId = Number.isFinite(r.courierId) ? r.courierId : null;
       courierName = r.courierName || null;
       awb = r.awb;
       await checkpoint("awb", { awb, courier_id: courierId, courier_name: courierName });
     }
     if (!o.pickup_requested_at) {
-      const p = await ext("pickup", () => sr.pickup(shipmentId));
+      const p = await courier("pickup", () => sr.pickup(shipmentId));
       await checkpoint("pickup", { scheduled_date: p.scheduledDate, token_number: p.tokenNumber });
     }
     if (!manifestUrl) {
-      manifestUrl = await ext("manifest", () => sr.manifest(shipmentId, srOrderId));
+      manifestUrl = await courier("manifest", () => sr.manifest(shipmentId, srOrderId));
       await checkpoint("manifest", { manifest_url: manifestUrl });
     }
     if (!labelUrl) {
-      labelUrl = await ext("label", () => sr.label(shipmentId));
+      labelUrl = await courier("label", () => sr.label(shipmentId));
       await checkpoint("label", { label_url: labelUrl });
     }
 
@@ -455,10 +485,16 @@ export async function runProcess(
         label_url: labelUrl,
       },
       p_actor: actor,
+      p_op_key: opKey,
     });
     logEvent("info", "order_packed", { order_ref: o.order_ref, awb, bill_id: billId });
     return { kind: "packed", billId, refundId: plan.refund_id };
   } catch (err) {
+    if (isStaleOp(err)) {
+      // The order belongs to another op now: an error checkpoint would end its lease.
+      logEvent("warn", "process_superseded", { order_id: orderId, op_key: opKey, error: errorText(err) });
+      return { kind: "busy" };
+    }
     await recordError(db, orderId, err);
     logEvent("warn", "process_failed", { order_id: orderId, error: errorText(err) });
     if (err instanceof CourierError) return { kind: "courier_error", step: err.step, message: err.message };

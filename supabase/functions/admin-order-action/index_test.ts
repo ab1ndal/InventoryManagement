@@ -92,12 +92,17 @@ Deno.test("process happy path: steps in order, checkpoints after each, marks pac
   assertEquals(sr.methods(), ["assignAwb", "pickup", "manifest", "label"]);
   assertEquals(sr.calls[0].args, [222, 10]); // quoted courier preferred
   assertEquals(sr.calls[2].args, [222, 111]);
+  // the lease is renewed (same op key) right before each Shiprocket call
   assertEquals(db.fns(), [
     "online_order_claim",
     "online_order_prepare_process",
+    "online_order_claim",
     "checkpoint:awb",
+    "online_order_claim",
     "checkpoint:pickup",
+    "online_order_claim",
     "checkpoint:manifest",
+    "online_order_claim",
     "checkpoint:label",
     "online_order_mark_packed",
   ]);
@@ -130,7 +135,7 @@ Deno.test("process with partial availability updates the Shiprocket order first"
   ]]);
   assertEquals(input.subTotal, 3500);
   assertEquals(input.weightKg, 2.5);
-  assertEquals(db.fns().slice(2, 3), ["checkpoint:sr_update"]);
+  assertEquals(db.fns().slice(2, 4), ["online_order_claim", "checkpoint:sr_update"]);
 });
 
 Deno.test("process when the create job never succeeded runs it inline first", async () => {
@@ -157,9 +162,9 @@ for (const failing of STEPS) {
     for (const step of STEPS) {
       assertEquals(sr.count(step), step === failing ? 2 : 1, `${step} calls after ${failing} failed`);
     }
-    // retry reused the stored op key
+    // retry reused the stored op key (initial claims and per-step renewals alike)
     const claims = db.calls.filter((c) => c.fn === "online_order_claim").map((c) => c.args.p_op_key);
-    assertEquals(claims, ["op-1", "op-1"]);
+    assertEquals(new Set(claims), new Set(["op-1"]));
   });
 }
 

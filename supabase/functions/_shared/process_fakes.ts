@@ -1,7 +1,7 @@
 /**
  * Test doubles for process.ts callers: an in-memory OrdersDb that mimics the
- * online_order_* state rules the edge code relies on (claim lease, checkpoint skips,
- * status guards), and a recording Shiprocket client with failure injection.
+ * online_order_* state rules the edge code relies on (claim lease, op-key fence on
+ * Process checkpoints and mark_packed, checkpoint skips, status guards), and a recording Shiprocket client with failure injection.
  * The real SQL behaviour is covered by schema/test_online_orders*.sql.
  */
 
@@ -150,7 +150,7 @@ export class FakeDb implements OrdersDb {
         const key = args.p_op_key as string;
         const target = action === "process" ? "processing" : "cancelling";
         if (o.status === "processing" || o.status === "cancelling") {
-          if (o.op_key === key) {
+          if (o.op_key === key && o.op_action === action) {
             o.op_lease_until = lease();
             return { claimed: true, resumed: true, status: o.status } as T;
           }
@@ -201,6 +201,7 @@ export class FakeDb implements OrdersDb {
           if (!["paid", "processing", "cancelling"].includes(o.status)) throw raised(fn, `order is ${o.status}`);
           Object.assign(o, { process_error: d.error, op_lease_until: new Date().toISOString() });
         } else {
+          if ((args.p_op_key ?? null) !== o.op_key) throw raised(fn, `checkpoint ${step}: stale operation`);
           if (o.status !== "processing") throw raised(fn, `checkpoint ${step}: order is ${o.status}`);
           const col = {
             sr_update: "sr_updated_at",
@@ -222,6 +223,7 @@ export class FakeDb implements OrdersDb {
         return { step, skipped } as T;
       }
       case "online_order_mark_packed": {
+        if ((args.p_op_key ?? null) !== o.op_key) throw raised(fn, "mark_packed: stale operation");
         if (o.status !== "processing" || o.op_action !== "process") throw raised(fn, `order is ${o.status}`);
         if (!o.awb || !o.label_url) throw raised(fn, "awb and label_url are required");
         Object.assign(o, { status: "packed", bill_id: this.billId, process_error: null });

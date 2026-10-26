@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Two-session concurrency test for the online order functions (plan review focus #4, R1).
-# Needs the throwaway DB from scripts/test-db.sh with both migrations applied:
+# Needs the throwaway DB from scripts/test-db.sh with all online-order migrations applied (through _rebook):
 #   scripts/test-db.sh up
-#   scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql schema/migration_online_orders.sql
+#   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_rebook.sql>
 #   schema/test_harness/concurrency_test.sh
 # Session A confirms an order for the last unit and holds its transaction open;
 # session B confirms a second order for the same unit and must block, then race.
@@ -110,9 +110,9 @@ begin
   perform public.online_order_set_availability(v_order, v_item, 2, null);
   perform public.online_order_claim(v_order, 'process', null, 'op-conc');
   perform public.online_order_prepare_process(v_order, null);
-  perform public.online_order_checkpoint(v_order, 'awb', '{"awb":"AWBCONC","courier_id":7,"courier_name":"T"}');
-  perform public.online_order_checkpoint(v_order, 'label', '{"label_url":"https://x/l.pdf"}');
-  perform public.online_order_mark_packed(v_order, '{}'::jsonb, null);
+  perform public.online_order_checkpoint(v_order, 'awb', '{"awb":"AWBCONC","courier_id":7,"courier_name":"T"}', 'op-conc');
+  perform public.online_order_checkpoint(v_order, 'label', '{"label_url":"https://x/l.pdf"}', 'op-conc');
+  perform public.online_order_mark_packed(v_order, '{}'::jsonb, null, 'op-conc');
   insert into public.order_refunds (order_id, reason, units, total_amount, shipping_amount)
   values (v_order, 'cancel', 1, 1099, 99) returning id into v_refund;
   insert into public.order_refund_items (refund_id, item_id, units, gateway_amount) values (v_refund, v_item, 1, 1000);

@@ -4,7 +4,9 @@
 -- Run locally:
 --   scripts/test-db.sh up
 --   scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql \
---     schema/migration_online_orders.sql schema/test_online_orders.sql
+--     schema/migration_online_orders.sql schema/migration_online_orders_r7.sql \
+--     schema/migration_online_orders_refunds.sql schema/migration_online_orders_ship.sql \
+--     schema/migration_online_orders_rebook.sql schema/test_online_orders.sql
 -- Concurrency (two real sessions): schema/test_harness/concurrency_test.sh
 \set ON_ERROR_STOP 1
 set client_min_messages = warning;
@@ -124,9 +126,9 @@ create function pg_temp.pack(p_order uuid) returns int language plpgsql as $$
 begin
   perform public.online_order_claim(p_order, 'process', null, 'op-pack');
   perform public.online_order_prepare_process(p_order, null);
-  perform public.online_order_checkpoint(p_order, 'awb', jsonb_build_object('awb', 'AWB' || left(p_order::text, 8), 'courier_id', 7, 'courier_name', 'Test Courier'));
-  perform public.online_order_checkpoint(p_order, 'label', '{"label_url":"https://x/label.pdf"}');
-  return public.online_order_mark_packed(p_order, '{}'::jsonb, null);
+  perform public.online_order_checkpoint(p_order, 'awb', jsonb_build_object('awb', 'AWB' || left(p_order::text, 8), 'courier_id', 7, 'courier_name', 'Test Courier'), 'op-pack');
+  perform public.online_order_checkpoint(p_order, 'label', '{"label_url":"https://x/label.pdf"}', 'op-pack');
+  return public.online_order_mark_packed(p_order, '{}'::jsonb, null, 'op-pack');
 end $$;
 
 -- ===================================================================
@@ -756,18 +758,18 @@ begin
   perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
   perform public.online_order_claim(r.order_id, 'process', null, 'op1');
   perform public.online_order_prepare_process(r.order_id, null);
-  cp := public.online_order_checkpoint(r.order_id, 'awb', '{"awb":"AWB123","courier_id":12,"courier_name":"Delhivery"}');
+  cp := public.online_order_checkpoint(r.order_id, 'awb', '{"awb":"AWB123","courier_id":12,"courier_name":"Delhivery"}', 'op1');
   assert not (cp ->> 'skipped')::boolean, 'awb stored';
-  cp := public.online_order_checkpoint(r.order_id, 'awb', '{"awb":"AWB999"}');
+  cp := public.online_order_checkpoint(r.order_id, 'awb', '{"awb":"AWB999"}', 'op1');
   assert (cp ->> 'skipped')::boolean and (select awb from public.orders where id = r.order_id) = 'AWB123', 'awb checkpoint skipped';
-  perform public.online_order_checkpoint(r.order_id, 'pickup', '{}');
-  assert (public.online_order_checkpoint(r.order_id, 'pickup', '{}') ->> 'skipped')::boolean, 'pickup skipped';
+  perform public.online_order_checkpoint(r.order_id, 'pickup', '{}', 'op1');
+  assert (public.online_order_checkpoint(r.order_id, 'pickup', '{}', 'op1') ->> 'skipped')::boolean, 'pickup skipped';
   begin
-    perform public.online_order_mark_packed(r.order_id, '{}', null);
+    perform public.online_order_mark_packed(r.order_id, '{}', null, 'op1');
     assert false, 'label required';
   exception when raise_exception then null;
   end;
-  bill := public.online_order_mark_packed(r.order_id, '{"label_url":"https://x/l.pdf"}', null);
+  bill := public.online_order_mark_packed(r.order_id, '{"label_url":"https://x/l.pdf"}', null, 'op1');
   select * into b from public.bills where billid = bill;
   assert b.document_type = 'bos' and b.finalized and b.bill_number ~ '^FY\d{2}-\d{6}$', 'bos numbered by trigger';
   assert b.totalamount = 2800 - 100 + 80 and b.gst_total = 0 and b.discount_total = 100, 'bill totals';
@@ -777,7 +779,7 @@ begin
   assert (select count(*) from public.bill_items where billid = bill and gst_amount <> 0) = 0, 'no GST';
   assert pg_temp.stock(v) = 4 and pg_temp.stock(v2) = 3, 'bill changes no stock';
   assert (select status from public.orders where id = r.order_id) = 'packed', 'packed';
-  assert public.online_order_mark_packed(r.order_id, '{}', null) = bill, 'mark_packed idempotent';
+  assert public.online_order_mark_packed(r.order_id, '{}', null, 'op1') = bill, 'mark_packed idempotent';
   assert (select billid from public.discount_usage where code = 'FLAT100') = bill, 'usage linked to bill';
 end $$;
 rollback;

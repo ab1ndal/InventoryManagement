@@ -1,4 +1,4 @@
--- Tests for schema/migration_online_orders_rebook.sql (_online_bill_offset).
+-- Tests for schema/migration_online_orders_rebook.sql (_online_bill_offset, op-key fencing, send_back/rebook claims).
 -- Run locally:
 --   scripts/test-db.sh up
 --   scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql \
@@ -124,9 +124,9 @@ create function pg_temp.pack(p_order uuid) returns int language plpgsql as $$
 begin
   perform public.online_order_claim(p_order, 'process', null, 'op-pack');
   perform public.online_order_prepare_process(p_order, null);
-  perform public.online_order_checkpoint(p_order, 'awb', jsonb_build_object('awb', 'AWB' || left(p_order::text, 8), 'courier_id', 7, 'courier_name', 'Test Courier'));
-  perform public.online_order_checkpoint(p_order, 'label', '{"label_url":"https://x/label.pdf"}');
-  return public.online_order_mark_packed(p_order, '{}'::jsonb, null);
+  perform public.online_order_checkpoint(p_order, 'awb', jsonb_build_object('awb', 'AWB' || left(p_order::text, 8), 'courier_id', 7, 'courier_name', 'Test Courier'), 'op-pack');
+  perform public.online_order_checkpoint(p_order, 'label', '{"label_url":"https://x/label.pdf"}', 'op-pack');
+  return public.online_order_mark_packed(p_order, '{}'::jsonb, null, 'op-pack');
 end $$;
 
 
@@ -202,6 +202,197 @@ begin
   insert into public.order_refunds (order_id, reason, units, total_amount) values (r.order_id, 'cancel', 1, 1000);
   perform public._online_bill_offset((select id from public.order_refunds where order_id = r.order_id), 'cancel', true);
   assert (select count(*) from public.exchanges where order_refund_id is not null) = 0, 'no bill → no-op';
+end $$;
+rollback;
+
+-- ===================================================================
+-- Operation fencing and admin-op claims (Task 2)
+-- ===================================================================
+
+-- Pays a 1-unit order, marks it available and claims Process with p_key. Returns order id.
+create function pg_temp.mk_claimed(p_key text) returns uuid language plpgsql as $$
+declare
+  r record;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 5), 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  perform public.online_order_claim(r.order_id, 'process', null, p_key);
+  perform public.online_order_prepare_process(r.order_id, null);
+  return r.order_id;
+end $$;
+
+-- grants on the re-defined functions: service role only
+do $$
+declare
+  f text;
+begin
+  foreach f in array array['public.online_order_claim(uuid,text,uuid,text)',
+    'public.online_order_checkpoint(uuid,text,jsonb,text)', 'public.online_order_mark_packed(uuid,jsonb,uuid,text)',
+    'public.online_order_apply_tracking(text,text,jsonb)'] loop
+    assert has_function_privilege('service_role', f, 'execute'), 'service runs ' || f;
+    assert not has_function_privilege('anon', f, 'execute') and not has_function_privilege('authenticated', f, 'execute'),
+      'clients cannot run ' || f;
+  end loop;
+end $$;
+
+-- old worker checkpoint after send_back claim → stale operation
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op-old');
+  c jsonb;
+  cp jsonb;
+  ev jsonb;
+begin
+  update public.orders set sr_order_id = '111', sr_shipment_id = '222' where id = o;
+  perform public.online_order_checkpoint(o, 'awb', '{"awb":"AWBOLD","courier_id":7,"courier_name":"T"}', 'op-old');
+  update public.orders set op_lease_until = now() - interval '1 minute' where id = o;
+  c := public.online_order_claim(o, 'send_back', null, 'op-sb');
+  assert (c ->> 'claimed')::boolean and not (c ->> 'resumed')::boolean, 'send_back claimed: ' || c::text;
+  assert c ->> 'op_action' = 'send_back' and c ->> 'status' = 'processing', 'status stays processing';
+  assert (select op_key from public.orders where id = o) = 'op-sb', 'new key replaces old';
+  begin
+    perform public.online_order_checkpoint(o, 'label', '{"label_url":"https://x/l.pdf"}', 'op-old');
+    assert false, 'old worker label refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  begin
+    perform public.online_order_checkpoint(o, 'pickup', '{}');
+    assert false, 'fenced step without key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  assert (select label_url is null and pickup_requested_at is null from public.orders where id = o), 'nothing written';
+  c := public.online_order_claim(o, 'process', null, 'op-old');
+  assert not (c ->> 'claimed')::boolean, 'old worker renewal refused';
+  c := public.online_order_claim(o, 'send_back', null, 'op-sb');
+  assert (c ->> 'claimed')::boolean and (c ->> 'resumed')::boolean, 'same key resumes send_back';
+  -- sr_cancelled: fenced, idempotent per op, records the cancelled shipment
+  begin
+    perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-old');
+    assert false, 'sr_cancelled with old key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  cp := public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
+  assert not (cp ->> 'skipped')::boolean, 'sr_cancelled recorded';
+  cp := public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-sb');
+  assert (cp ->> 'skipped')::boolean, 'sr_cancelled idempotent';
+  select data into ev from public.order_events where order_id = o and kind = 'checkpoint' and data ->> 'step' = 'sr_cancelled';
+  assert ev #>> '{data,awb}' = 'AWBOLD' and ev #>> '{data,sr_order_id}' = '111' and ev #>> '{data,at}' is not null
+     and ev ->> 'op_key' = 'op-sb', 'event: ' || ev::text;
+end $$;
+rollback;
+
+-- sr_cancelled only while an admin op (send_back/rebook) holds the order
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op1');
+begin
+  begin
+    perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op1');
+    assert false, 'sr_cancelled refused for a process op';
+  exception when raise_exception then null;
+  end;
+end $$;
+rollback;
+
+-- mark_packed with wrong key raises
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op1');
+  bill int;
+begin
+  perform public.online_order_checkpoint(o, 'awb', '{"awb":"AWB1","courier_id":7,"courier_name":"T"}', 'op1');
+  perform public.online_order_checkpoint(o, 'label', '{"label_url":"https://x/l.pdf"}', 'op1');
+  begin
+    perform public.online_order_mark_packed(o, '{}', null, 'op-x');
+    assert false, 'wrong key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  assert (select status from public.orders where id = o) = 'processing', 'still processing';
+  bill := public.online_order_mark_packed(o, '{}', null, 'op1');
+  assert bill is not null and (select status from public.orders where id = o) = 'packed', 'right key packs';
+  assert public.online_order_mark_packed(o, '{}', null, 'op1') = bill, 'repeat after packed returns bill';
+end $$;
+rollback;
+
+-- send_back claim refused while lease live; only from processing
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op1');
+  c jsonb;
+  r record;
+begin
+  c := public.online_order_claim(o, 'send_back', null, 'op-sb');
+  assert not (c ->> 'claimed')::boolean and c ->> 'reason' = 'busy', 'busy while lease live: ' || c::text;
+  assert (select op_key = 'op1' and op_action = 'process' from public.orders where id = o), 'process op untouched';
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(500, 5), 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  c := public.online_order_claim(r.order_id, 'send_back', null, 'op-sb2');
+  assert not (c ->> 'claimed')::boolean and c ->> 'reason' = 'status', 'send_back needs processing';
+end $$;
+rollback;
+
+-- rebook claim from shipped keeps status; second admin busy; same key resumes
+begin;
+do $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 5);
+  r record;
+  c jsonb;
+  st text;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  c := public.online_order_claim(r.order_id, 'rebook', null, 'rb1');
+  assert not (c ->> 'claimed')::boolean and c ->> 'reason' = 'status', 'rebook refused from paid';
+  perform pg_temp.pack(r.order_id);
+  perform public.online_order_apply_tracking((select awb from public.orders where id = r.order_id), 'shipped', '{"shipment_status_id":6}');
+  c := public.online_order_claim(r.order_id, 'rebook', null, 'rb1');
+  assert (c ->> 'claimed')::boolean and not (c ->> 'resumed')::boolean, 'rebook claimed: ' || c::text;
+  select status into st from public.orders where id = r.order_id;
+  assert st = 'shipped' and c ->> 'status' = 'shipped', 'status unchanged';
+  assert (select op_key = 'rb1' and op_action = 'rebook' and op_lease_until > now() from public.orders where id = r.order_id), 'op set';
+  c := public.online_order_claim(r.order_id, 'rebook', null, 'rb2');
+  assert not (c ->> 'claimed')::boolean and c ->> 'reason' = 'busy', 'second admin busy';
+  c := public.online_order_claim(r.order_id, 'rebook', null, 'rb1');
+  assert (c ->> 'claimed')::boolean and (c ->> 'resumed')::boolean, 'same key resumes';
+end $$;
+rollback;
+
+-- tracking delivered during rebook claim → held, status shipped
+begin;
+do $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 5);
+  r record;
+  awb text;
+  res jsonb;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  perform pg_temp.pack(r.order_id);
+  select o.awb into awb from public.orders o where o.id = r.order_id;
+  perform public.online_order_apply_tracking(awb, 'shipped', '{"shipment_status_id":6}');
+  perform public.online_order_claim(r.order_id, 'rebook', null, 'rb1');
+  res := public.online_order_apply_tracking(awb, 'delivered', '{"shipment_status_id":7,"shipment_status":"DELIVERED"}');
+  assert (res ->> 'matched')::boolean and not (res ->> 'changed')::boolean and (res ->> 'held')::boolean, res::text;
+  assert (select status = 'shipped' and tracking_status_id = 7 and tracking_label = 'DELIVERED'
+            from public.orders where id = r.order_id), 'status held, raw tracking stored';
+  assert (select count(*) from public.order_events where order_id = r.order_id and kind = 'tracking_held') = 1, 'held event';
+  assert (select count(*) from public.order_jobs where order_id = r.order_id and kind = 'email_delivered') = 0, 'no delivered email';
 end $$;
 rollback;
 
