@@ -704,3 +704,87 @@ begin
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;
 end $$;
+
+-- ===================================================================
+-- Task 7: in-store exchange as one locked RPC
+-- ===================================================================
+-- Replaces ExchangePage's three browser writes (restock, manual stock, exchanges insert) with one
+-- transaction, and re-checks the returnable quantity under the same locks online_return_receive takes
+-- (order row, then bill_items by id), so a unit can't be exchanged in store and refunded online.
+-- p_items: [{bill_item_id, quantity, credit_amount, reason, product_name, product_code, variantid,
+-- manual_item_id}]. Returns the new exchange ids in input order.
+create or replace function public.exchange_record(p_billid int, p_customerid int, p_items jsonb)
+returns int[]
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order uuid;
+  e jsonb;
+  bi public.bill_items;
+  v_qty int;
+  v_used numeric;
+  v_shipped int;
+  v_free int;
+  v_id int;
+  v_ids int[] := '{}';
+begin
+  if not public.is_admin() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if coalesce(jsonb_typeof(p_items), '') <> 'array' or p_items = '[]'::jsonb then
+    raise exception 'exchange_record: no items';
+  end if;
+
+  select id into v_order from public.orders where bill_id = p_billid for update;
+  perform 1 from public.bill_items
+   where bill_item_id in (select (x ->> 'bill_item_id')::int from jsonb_array_elements(p_items) x)
+   order by bill_item_id for update;
+
+  for e in select * from jsonb_array_elements(p_items) loop
+    select * into bi from public.bill_items where bill_item_id = (e ->> 'bill_item_id')::int;
+    if not found or bi.billid <> p_billid then
+      raise exception 'item % is not on bill %', e ->> 'bill_item_id', p_billid;
+    end if;
+    v_qty := (e ->> 'quantity')::int;
+    if v_qty is null or v_qty <= 0 then
+      raise exception 'item %: quantity must be positive', bi.bill_item_id;
+    end if;
+
+    -- every exchanges row on the line counts, online refund offsets included
+    select coalesce(sum(quantity), 0) into v_used from public.exchanges where original_bill_item_id = bi.bill_item_id;
+    if v_used + v_qty > bi.quantity then
+      raise exception 'item % already returned (% of %)', bi.bill_item_id, v_used, trim_scale(bi.quantity);
+    end if;
+
+    -- online bill: units in an open return or already refunded are not free either (ruling RA3)
+    if v_order is not null then
+      select sum(i.shipped_qty), sum(f.units) into v_shipped, v_free
+        from public._online_return_free_units(v_order, null) f
+        join public.order_items i on i.id = f.item_id
+       where i.bill_item_id = bi.bill_item_id;
+      if v_free is not null and v_qty > v_free then
+        raise exception 'item % already returned (% of %)', bi.bill_item_id, v_shipped - v_free, v_shipped;
+      end if;
+    end if;
+
+    if bi.variantid is not null then
+      perform public._stock_apply(bi.variantid, v_qty);
+    elsif nullif(e ->> 'manual_item_id', '') is not null then
+      update public.manual_items set stock = coalesce(stock, 0) + v_qty
+       where manual_item_id = e ->> 'manual_item_id';
+    end if;
+
+    insert into public.exchanges (original_bill_item_id, quantity, reason, customerid, credit_amount, voucher_id,
+                                  product_name, product_code)
+    values (bi.bill_item_id, v_qty, e ->> 'reason', p_customerid, (e ->> 'credit_amount')::numeric, null,
+            e ->> 'product_name', e ->> 'product_code')
+    returning exchangeid into v_id;
+    v_ids := v_ids || v_id;
+  end loop;
+  return v_ids;
+end;
+$$;
+revoke all on function public.exchange_record(int, int, jsonb) from public, anon;
+grant execute on function public.exchange_record(int, int, jsonb) to authenticated, service_role;

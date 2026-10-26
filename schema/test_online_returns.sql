@@ -1042,4 +1042,219 @@ begin
 end $$;
 rollback;
 
+-- ===================================================================
+-- Task 7: in-store exchange as one locked RPC (exchange_record)
+-- ===================================================================
+-- Signs in as a fresh admin (claims are transaction-local).
+create function pg_temp.as_admin() returns uuid language plpgsql as $$
+declare
+  u uuid := gen_random_uuid();
+begin
+  insert into auth.users (id) values (u);
+  insert into public.profiles (id, email, role, is_active) values (u, u || '@t.in', 'admin', true);
+  perform set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
+  return u;
+end $$;
+
+-- In-store bill with one line per element of p_lines: [{v: variant uuid | null, code, qty}]. Returns billid.
+create function pg_temp.instore_bill(p_lines jsonb) returns int language plpgsql as $$
+declare
+  b int;
+  e jsonb;
+begin
+  insert into public.bills (paymentstatus, finalized) values ('finalized', true) returning billid into b;
+  for e in select * from jsonb_array_elements(p_lines) loop
+    insert into public.bill_items (billid, quantity, mrp, variantid, product_name, product_code, subtotal, gst_amount, total)
+    values (b, (e ->> 'qty')::numeric, 1000, (e ->> 'v')::uuid, 'Line ' || coalesce(e ->> 'code', ''), e ->> 'code',
+            1000 * (e ->> 'qty')::numeric, 0, 1000 * (e ->> 'qty')::numeric);
+  end loop;
+  return b;
+end $$;
+
+create function pg_temp.bi(p_bill int, p_n int) returns int language sql as $$
+  select bill_item_id from public.bill_items where billid = p_bill order by bill_item_id offset p_n - 1 limit 1
+$$;
+
+create function pg_temp.ex_item(p_bill_item int, p_qty int, p_variant uuid default null, p_manual text default null)
+returns jsonb language sql as $$
+  select jsonb_build_object('bill_item_id', p_bill_item, 'quantity', p_qty, 'credit_amount', 1000 * p_qty,
+    'reason', 'size mismatch', 'product_name', 'Snap ' || p_bill_item, 'product_code', 'SNAP' || p_bill_item,
+    'variantid', p_variant, 'manual_item_id', p_manual)
+$$;
+
+-- in-store bill: restock, row snapshot, cumulative cap, ids in input order
+begin;
+do $$
+declare
+  v1 uuid := pg_temp.mk_variant(1000, 5);
+  v2 uuid := pg_temp.mk_variant(1000, 5);
+  c int := pg_temp.mk_customer(0, '+919800000701', false);
+  b int := pg_temp.instore_bill(jsonb_build_array(jsonb_build_object('v', v1, 'code', 'A', 'qty', 2),
+                                                  jsonb_build_object('v', v2, 'code', 'B', 'qty', 1)));
+  ids int[];
+  ex public.exchanges;
+begin
+  perform pg_temp.as_admin();
+  ids := public.exchange_record(b, c, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b, 2), 1, v2),
+                                                        pg_temp.ex_item(pg_temp.bi(b, 1), 1, v1)));
+  assert array_length(ids, 1) = 2, 'two ids: ' || ids::text;
+  assert (select original_bill_item_id from public.exchanges where exchangeid = ids[1]) = pg_temp.bi(b, 2)
+     and (select original_bill_item_id from public.exchanges where exchangeid = ids[2]) = pg_temp.bi(b, 1),
+    'ids in input order';
+  select * into ex from public.exchanges where exchangeid = ids[2];
+  assert ex.quantity = 1 and ex.credit_amount = 1000 and ex.reason = 'size mismatch' and ex.customerid = c
+     and ex.voucher_id is null and ex.new_billid is null and ex.order_refund_id is null
+     and ex.product_name = 'Snap ' || pg_temp.bi(b, 1) and ex.product_code = 'SNAP' || pg_temp.bi(b, 1),
+    'exchange row snapshot: ' || row_to_json(ex)::text;
+  assert pg_temp.stock(v1) = 6 and pg_temp.stock(v2) = 6, 'variants restocked';
+  perform public.exchange_record(b, c, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b, 1), 1, v1)));
+  assert pg_temp.stock(v1) = 7, 'second unit restocked';
+  begin
+    perform public.exchange_record(b, c, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b, 1), 1, v1)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || pg_temp.bi(b, 1) || ' already returned (2 of 2)', 'cap: ' || sqlerrm;
+  end;
+  assert pg_temp.stock(v1) = 7, 'refused exchange leaves stock';
+  begin
+    perform public.exchange_record(b, c, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b, 2), 1, v2)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || pg_temp.bi(b, 2) || ' already returned (1 of 1)', 'cap other line: ' || sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- exchange_record restocks variant and manual item atomically (a failing item rolls back the others)
+begin;
+create table if not exists public.manual_items (   -- not in the generated harness; mirrors schema/manual_items.sql
+  manual_item_id character varying(20) primary key, name character varying(100) not null,
+  stock integer not null default 1);
+do $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 5);
+  b int;
+  n_ex int;
+begin
+  insert into public.manual_items (manual_item_id, name, stock) values ('M0001', 'Manual dupatta', 0);
+  b := pg_temp.instore_bill(jsonb_build_array(jsonb_build_object('v', v, 'code', 'A', 'qty', 1),
+                                              jsonb_build_object('code', 'M0001', 'qty', 1),
+                                              jsonb_build_object('v', v, 'code', 'C', 'qty', 1)));
+  perform pg_temp.as_admin();
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(
+      pg_temp.ex_item(pg_temp.bi(b, 1), 1, v), pg_temp.ex_item(pg_temp.bi(b, 2), 1, null, 'M0001'),
+      pg_temp.ex_item(pg_temp.bi(b, 3), 2, v)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || pg_temp.bi(b, 3) || ' already returned (0 of 1)', 'third item over cap: ' || sqlerrm;
+  end;
+  select count(*) into n_ex from public.exchanges e join public.bill_items bi on bi.bill_item_id = e.original_bill_item_id
+   where bi.billid = b;
+  assert n_ex = 0 and pg_temp.stock(v) = 5
+     and (select stock from public.manual_items where manual_item_id = 'M0001') = 0, 'all or nothing';
+  perform public.exchange_record(b, null, jsonb_build_array(
+    pg_temp.ex_item(pg_temp.bi(b, 1), 1, v), pg_temp.ex_item(pg_temp.bi(b, 2), 1, null, 'M0001')));
+  assert pg_temp.stock(v) = 6 and (select stock from public.manual_items where manual_item_id = 'M0001') = 1,
+    'variant and manual restocked';
+end $$;
+rollback;
+
+-- exchange_record caps cumulative qty incl. online return offsets (and open returns: RA3)
+begin;
+do $$
+declare
+  o uuid; i uuid; b int; bi_id int; rid uuid; v uuid; s0 numeric;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 3)));
+  i := pg_temp.item_of(o);
+  v := pg_temp.variant_of(i);
+  select bill_id into b from public.orders where id = o;
+  select bill_item_id into bi_id from public.order_items where id = i;
+  -- one unit refunded online (offset row), one unit in an open return
+  rid := pg_temp.open_ret(o, i, 1);
+  perform pg_temp.recv(rid, i, 1, 1);
+  rid := pg_temp.open_ret(o, i, 1);
+  s0 := pg_temp.stock(v);
+  perform pg_temp.as_admin();
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(bi_id, 2, v)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || bi_id || ' already returned (2 of 3)', 'refunded + open return count: ' || sqlerrm;
+  end;
+  assert pg_temp.stock(v) = s0, 'stock untouched';
+  assert array_length(public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(bi_id, 1, v))), 1) = 1,
+    'last free unit exchanges';
+  assert pg_temp.stock(v) = s0 + 1, 'restocked';
+  assert (select units from public._online_return_free_units(o, null) where item_id = i) = 0, 'no free units left';
+  -- the open return's own unit is still there to receive
+  assert pg_temp.recv(rid, i, 1, 1) ->> 'status' = 'refunded', 'open return still receivable';
+end $$;
+rollback;
+
+-- online bill: an open return alone blocks the unit (bill-line cap alone would allow it)
+begin;
+do $$
+declare
+  o uuid; i uuid; b int; bi_id int;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 1)));
+  i := pg_temp.item_of(o);
+  select bill_id into b from public.orders where id = o;
+  select bill_item_id into bi_id from public.order_items where id = i;
+  perform pg_temp.open_ret(o, i, 1);
+  perform pg_temp.as_admin();
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(bi_id, 1, pg_temp.variant_of(i))));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || bi_id || ' already returned (1 of 1)', 'open return: ' || sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- input checks and privileges
+begin;
+do $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 5);
+  b int := pg_temp.instore_bill(jsonb_build_array(jsonb_build_object('v', v, 'code', 'A', 'qty', 1)));
+  b2 int := pg_temp.instore_bill(jsonb_build_array(jsonb_build_object('v', v, 'code', 'B', 'qty', 1)));
+  u uuid := gen_random_uuid();
+begin
+  insert into auth.users (id) values (u);
+  insert into public.profiles (id, email, role) values (u, 'user@t.in', 'user');
+  perform set_config('request.jwt.claims', json_build_object('sub', u, 'role', 'authenticated')::text, true);
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b, 1), 1, v)));
+    assert false, 'should have raised';
+  exception when insufficient_privilege then null;
+  end;
+  perform pg_temp.as_admin();
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b2, 1), 1, v)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || pg_temp.bi(b2, 1) || ' is not on bill ' || b, 'other bill: ' || sqlerrm;
+  end;
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b, 1), 0, v)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm like '%quantity must be positive%', 'zero qty: ' || sqlerrm;
+  end;
+  begin
+    perform public.exchange_record(b, null, '[]'::jsonb);
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm like '%no items%', 'empty: ' || sqlerrm;
+  end;
+  assert pg_temp.stock(v) = 5, 'nothing restocked';
+  assert not has_function_privilege('anon', 'public.exchange_record(int,int,jsonb)', 'execute'), 'anon';
+  assert has_function_privilege('authenticated', 'public.exchange_record(int,int,jsonb)', 'execute'), 'authenticated';
+  assert has_function_privilege('service_role', 'public.exchange_record(int,int,jsonb)', 'execute'), 'service_role';
+end $$;
+rollback;
+
 \echo 'test_online_returns: all passed'

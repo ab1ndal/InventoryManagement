@@ -175,4 +175,19 @@ describe("daysSinceBill / isWithinExchangeWindow", () => {
   it("day 30 — rejected", () => {
     expect(isWithinExchangeWindow(makeDate(30))).toBe(false);
   });
+
+  it("online bill: window from delivery (bill 9 days ago, delivered 3 → within)", () => {
+    expect(daysSinceBill(makeDate(9), makeDate(3))).toBe(3);
+    expect(isWithinExchangeWindow(makeDate(9), makeDate(3))).toBe(true);
+  });
+
+  it("online bill: delivered 8 days ago — rejected", () => {
+    expect(isWithinExchangeWindow(makeDate(10), makeDate(8))).toBe(false);
+  });
+
+  it("in-store bill unchanged (no deliveredAt → orderdate)", () => {
+    expect(daysSinceBill(makeDate(9), null)).toBe(9);
+    expect(isWithinExchangeWindow(makeDate(9), undefined)).toBe(false);
+    expect(isWithinExchangeWindow(makeDate(5), null)).toBe(true);
+  });
 });

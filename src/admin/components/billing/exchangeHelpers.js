@@ -5,17 +5,20 @@ import { round2 } from "./billUtils";
 
 export const EXCHANGE_WINDOW_DAYS = 7;
 
-/** Calendar days since bill's orderdate (0 = same day, 7 = exactly 7 days later). */
-export function daysSinceBill(orderdate) {
-  const bd = new Date(orderdate);
+/**
+ * Calendar days since the bill's orderdate (0 = same day, 7 = exactly 7 days later).
+ * Online bills pass deliveredAt: their window runs from delivery, not from the bill.
+ */
+export function daysSinceBill(orderdate, deliveredAt) {
+  const bd = new Date(deliveredAt || orderdate);
   const today = new Date();
   const a = new Date(bd.getFullYear(), bd.getMonth(), bd.getDate());
   const b = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   return Math.floor((b - a) / 86_400_000);
 }
 
-export function isWithinExchangeWindow(orderdate) {
-  return daysSinceBill(orderdate) <= EXCHANGE_WINDOW_DAYS;
+export function isWithinExchangeWindow(orderdate, deliveredAt) {
+  return daysSinceBill(orderdate, deliveredAt) <= EXCHANGE_WINDOW_DAYS;
 }
 
 /** Items with alteration_charge > 0 are ineligible — service already rendered. */

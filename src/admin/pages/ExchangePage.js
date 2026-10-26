@@ -172,17 +172,36 @@ export default function ExchangePage() {
 
   // --- load bill ---
   async function handleLoadBill(bill) {
-    if (!isSuperAdmin && !isWithinExchangeWindow(bill.orderdate)) {
-      const days = daysSinceBill(bill.orderdate);
+    // Online bills (linked from orders.bill_id): the window runs from delivery, not from the bill date
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .select("delivered_at")
+      .eq("bill_id", bill.billid)
+      .maybeSingle();
+    if (orderErr) {
+      toast.error("Could not load bill", { description: orderErr.message });
+      return;
+    }
+    const notDelivered = !!order && !order.delivered_at;
+    const deliveredAt = order?.delivered_at || null;
+    const billLabel = `Bill #${bill.bill_number || bill.billid}`;
+    const days = daysSinceBill(bill.orderdate, deliveredAt);
+    const ageText = deliveredAt ? `${billLabel} was delivered ${days} days ago` : `${billLabel} is ${days} days old`;
+    const withinWindow = !notDelivered && isWithinExchangeWindow(bill.orderdate, deliveredAt);
+
+    if (!isSuperAdmin && !withinWindow) {
       toast.error("Exchange window closed", {
-        description: `Bill #${bill.bill_number || bill.billid} is ${days} days old. Exchanges accepted within ${EXCHANGE_WINDOW_DAYS} days of purchase only.`,
+        description: notDelivered
+          ? "This online order hasn't been delivered yet."
+          : `${ageText}. Exchanges accepted within ${EXCHANGE_WINDOW_DAYS} days of ${deliveredAt ? "delivery" : "purchase"} only.`,
       });
       return;
     }
-    if (isSuperAdmin && !isWithinExchangeWindow(bill.orderdate)) {
-      const days = daysSinceBill(bill.orderdate);
+    if (isSuperAdmin && !withinWindow) {
       toast.warning("Exchange window override", {
-        description: `Bill #${bill.bill_number || bill.billid} is ${days} days old (window: ${EXCHANGE_WINDOW_DAYS} days). Proceeding as superadmin.`,
+        description: notDelivered
+          ? "This online order hasn't been delivered yet. Proceeding as superadmin."
+          : `${ageText} (window: ${EXCHANGE_WINDOW_DAYS} days). Proceeding as superadmin.`,
       });
     }
 
@@ -285,62 +304,27 @@ export default function ExchangePage() {
     if (selected.length === 0) return;
     setConfirmSaving(true);
     try {
-      // 1. Restock inventory variants — atomic stock + qty in the DB, because online
-      // orders change the same stock concurrently
-      for (const ri of selected) {
-        if (ri.variantid) {
-          const { error } = await supabase.rpc("stock_adjust", {
-            p_variant: ri.variantid,
-            p_delta: Number(ri.returnQty),
-            p_reason: "exchange_return",
-            p_ref: String(loadedBill.billid),
-          });
-          if (error) throw new Error(`Inventory restock failed: ${error.message}`);
-        }
-      }
-
-      // 2. Restock manual items
-      for (const ri of selected) {
-        if (!ri.variantid && ri.manual_item_id) {
-          const { data: mi, error: me } = await supabase
-            .from("manual_items")
-            .select("stock")
-            .eq("manual_item_id", ri.manual_item_id)
-            .single();
-          if (me) {
-            console.warn(`Manual item lookup failed: ${me.message}`);
-            continue;
-          }
-          if (mi) {
-            await supabase
-              .from("manual_items")
-              .update({ stock: Number(mi.stock || 0) + Number(ri.returnQty) })
-              .eq("manual_item_id", ri.manual_item_id);
-          }
-        }
-      }
-
-      // 3. Insert exchange rows — capture IDs for linking to the new bill
-      const exchangeRows = selected.map(ri => ({
-        original_bill_item_id: ri.bill_item_id,
-        quantity: ri.returnQty,
-        reason: reasonMap[ri.bill_item_id]?.trim() || null,
-        customerid: loadedBill.customerid || null,
-        credit_amount: ri.creditAmount,
-        voucher_id: null,
-        // Snapshot so the record survives a later edit of the source bill,
-        // which deletes + reinserts bill_items and nulls original_bill_item_id.
-        product_name: ri.product_name || null,
-        product_code: ri.product_code || null,
-      }));
-      const { data: insertedExchanges, error: exErr } = await supabase
-        .from("exchanges")
-        .insert(exchangeRows)
-        .select("exchangeid");
+      // Restock, re-check the returnable qty and insert the exchange rows in one locked transaction;
+      // ids come back in input order for linking to the new bill.
+      const { data: exchangeIds, error: exErr } = await supabase.rpc("exchange_record", {
+        p_billid: loadedBill.billid,
+        p_customerid: loadedBill.customerid || null,
+        p_items: selected.map(ri => ({
+          bill_item_id: ri.bill_item_id,
+          quantity: ri.returnQty,
+          credit_amount: ri.creditAmount,
+          reason: reasonMap[ri.bill_item_id]?.trim() || null,
+          // Snapshot so the record survives a later edit of the source bill,
+          // which deletes + reinserts bill_items and nulls original_bill_item_id.
+          product_name: ri.product_name || null,
+          product_code: ri.product_code || null,
+          variantid: ri.variantid || null,
+          manual_item_id: ri.manual_item_id || null,
+        })),
+      });
       if (exErr) throw new Error(`Exchange record failed: ${exErr.message}`);
-      const exchangeIds = (insertedExchanges || []).map(e => e.exchangeid);
 
-      // 4. Print return receipt
+      // Print return receipt
       flushSync(() => {
         setReceiptReadyItems(selected);
         setReceiptReadyCredit(totalCredit);
