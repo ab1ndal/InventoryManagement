@@ -127,6 +127,8 @@ export class FakeDb implements OrdersDb {
   returnOrders = new Map<string, string>();
   /** rpc name → message: the next call to it raises (a business-rule refusal). */
   rpcRaises = new Map<string, string>();
+  /** rpc name → Postgres SQLSTATE: the next call to it fails with that code. */
+  rpcErrorCodes = new Map<string, string>();
 
   constructor(order: Partial<OrderRow> = {}, plan: ProcessPlan = FULL_PLAN, items = fakeItems()) {
     this.order = fakeOrder(order);
@@ -174,6 +176,8 @@ export class FakeDb implements OrdersDb {
     const o = this.order;
     const raiseMsg = this.rpcRaises.get(fn);
     if (raiseMsg) throw raised(fn, raiseMsg);
+    const errCode = this.rpcErrorCodes.get(fn);
+    if (errCode) throw new DbError(fn, errCode, "simulated database error");
     const lease = () => new Date(Date.now() + 5 * 60_000).toISOString();
     switch (fn) {
       case "online_order_claim": {

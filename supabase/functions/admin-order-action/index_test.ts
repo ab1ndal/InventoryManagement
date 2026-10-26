@@ -575,6 +575,14 @@ Deno.test("return_photo_add → RPC with actor; the client path is passed throug
   );
 });
 
+Deno.test("return_photo_add replayed path (unique violation 23505) → 409 bad_state, not 500", async () => {
+  const { db, call } = setup();
+  db.returnOrders.set(RETURN_ID, ORDER_ID);
+  db.rpcErrorCodes.set("online_return_add_photo", "23505");
+  const r = await call({ action: "return_photo_add", returnId: RETURN_ID, path: "p.jpg" });
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+});
+
 Deno.test("return_photo_view: unknown photo → 404; known → signed url for 10 minutes", async () => {
   const { db, call, storageCalls } = setup();
   const miss = await call({ action: "return_photo_view", photoId: PHOTO_ID });

@@ -357,6 +357,10 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
       return fail(err.status, code, err.message);
     }
     if (err instanceof DbError && err.isRaised) return fail(409, "bad_state", err.message);
+    // Only return_photo_add inserts a client-supplied unique value: a replayed path.
+    if (err instanceof DbError && err.isUniqueViolation && err.fn === "online_return_add_photo") {
+      return fail(409, "bad_state", "photo already recorded");
+    }
     logEvent("error", "admin_order_action_failed", { error: err instanceof Error ? err.message : String(err) });
     return fail(500, "internal", "internal error");
   }

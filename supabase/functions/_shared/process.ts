@@ -111,6 +111,9 @@ export class DbError extends Error {
   get isRaised(): boolean {
     return this.code === "P0001";
   }
+  get isUniqueViolation(): boolean {
+    return this.code === "23505";
+  }
 }
 
 const byKey = (key: string) => (a: Record<string, unknown>, b: Record<string, unknown>) =>
