@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
-import { action, getOrder, newOpKey } from "./onlineOrdersApi";
+import { action, getMyRole, getOrder, newOpKey } from "./onlineOrdersApi";
 import { StatusBadge } from "./OrderList";
 import { formatDateTime, formatRupees, processRefundPreview } from "./orderHelpers";
 
@@ -65,10 +65,16 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [avail, setAvail] = useState({});
   const [checked, setChecked] = useState(() => new Set());
   const [savingLine, setSavingLine] = useState(null);
-  const [dialog, setDialog] = useState(null); // 'process' | 'cancel' | 'rto'
+  const [dialog, setDialog] = useState(null); // 'process' | 'cancel' | 'rto' | 'sendback' | 'rebook'
   const [pending, setPending] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [courierError, setCourierError] = useState(null);
+  const [role, setRole] = useState(null);
+  const [parcelLost, setParcelLost] = useState(false);
+  const [rebookNote, setRebookNote] = useState("");
+  // Courier cancel failure inside a send-back/rebook dialog; the dialog stays open so the
+  // same op key can be resumed (retry, or superadmin manual-cancel confirmation).
+  const [dialogProblem, setDialogProblem] = useState(null);
   // One op key per Process/Cancel click; reused if that click's request is retried.
   const opRef = useRef(null);
 
@@ -97,6 +103,12 @@ export default function OrderDetail({ orderId, onChanged }) {
     load();
   }, [load]);
 
+  useEffect(() => {
+    getMyRole()
+      .then(setRole)
+      .catch(() => setRole(null)); // role only gates the superadmin button; the server enforces it
+  }, []);
+
   const opKeyFor = (kind) => {
     if (opRef.current?.kind !== kind) opRef.current = { kind, key: newOpKey() };
     return opRef.current.key;
@@ -105,7 +117,43 @@ export default function OrderDetail({ orderId, onChanged }) {
   const closeDialog = () => {
     setDialog(null);
     setCancelReason("");
+    setParcelLost(false);
+    setRebookNote("");
+    setDialogProblem(null);
     opRef.current = null;
+  };
+
+  // send_back / rebook: opKey is created when the dialog opens and kept until it closes.
+  const openBackDialog = (kind) => {
+    opRef.current = { kind, key: newOpKey() };
+    setDialog(kind);
+  };
+
+  const runBack = async (payload, successMessage) => {
+    setPending(true);
+    try {
+      await action(payload);
+      toast.success(successMessage);
+      closeDialog();
+      await load();
+      onChanged?.();
+    } catch (err) {
+      if (err.code === "busy") {
+        toast.error(BUSY_MESSAGE);
+      } else if (err.code === "courier_error") {
+        setDialogProblem(err.message);
+        toast.error("Courier error", { description: err.message });
+      } else if (err.code === "bad_state") {
+        toast.error("This order has changed", { description: err.message });
+        closeDialog();
+        await load();
+        onChanged?.();
+      } else {
+        toast.error("Action failed", { description: err.message });
+      }
+    } finally {
+      setPending(false);
+    }
   };
 
   // Runs one admin-order-action call. Returns true on success.
@@ -173,6 +221,20 @@ export default function OrderDetail({ orderId, onChanged }) {
   const failedJobs = jobs.filter((j) => j.status === "failed");
   const showRetry = Boolean(order.process_error || failedJobs.length || courierError);
   const preview = processRefundPreview(items, avail, order.shipping);
+  const leaseExpired = order.op_lease_until && new Date(order.op_lease_until) < new Date();
+  const canSendBack = order.status === "processing" && order.op_action === "process" && leaseExpired;
+  const canRebook = ["packed", "shipped", "out_for_delivery"].includes(order.status);
+  const backPayload = (extra) =>
+    dialog === "sendback"
+      ? { action: "send_back", orderId, opKey: opRef.current.key, ...extra }
+      : {
+          action: "rebook",
+          orderId,
+          opKey: opRef.current.key,
+          parcelLost,
+          note: rebookNote.trim(),
+          ...extra,
+        };
   const shipUnits = items.reduce((s, it) => s + (avail[it.id] ?? 0), 0);
 
   return (
@@ -379,6 +441,16 @@ export default function OrderDetail({ orderId, onChanged }) {
             Retry
           </Button>
         )}
+        {canSendBack && (
+          <Button variant="outline" disabled={pending} onClick={() => openBackDialog("sendback")}>
+            Send back to To-check
+          </Button>
+        )}
+        {canRebook && (
+          <Button variant="outline" disabled={pending} onClick={() => openBackDialog("rebook")}>
+            Rebook…
+          </Button>
+        )}
         {order.status === "rto" && (
           <Button variant="outline" disabled={pending} onClick={() => setDialog("rto")}>
             Parcel received back
@@ -503,6 +575,76 @@ export default function OrderDetail({ orderId, onChanged }) {
             placeholder="e.g. Customer asked to cancel on WhatsApp"
           />
         </label>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={dialog === "sendback" || dialog === "rebook"}
+        title={dialog === "sendback" ? `Send back ${order.order_ref}?` : `Rebook ${order.order_ref}?`}
+        description={
+          dialog === "sendback"
+            ? `Cancels the courier booking (AWB ${order.awb ?? "—"}) and returns this order to To-check. Refunds already made stay.`
+            : `Cancels AWB ${order.awb ?? "—"}. Parcel still at shop: re-send the same pieces. Parcel lost: take new pieces from stock; anything we can't replace is refunded.`
+        }
+        confirmLabel={dialog === "sendback" ? "Send back" : "Rebook"}
+        confirmDisabled={dialog === "rebook" && !rebookNote.trim()}
+        pending={pending}
+        onClose={closeDialog}
+        onConfirm={() =>
+          runBack(backPayload(), dialog === "sendback" ? "Order sent back to To-check" : "Order rebooked")
+        }
+      >
+        {dialog === "rebook" && (
+          <div className="space-y-3 text-sm">
+            <div role="radiogroup" aria-label="Parcel" className="space-y-1">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="parcel"
+                  checked={!parcelLost}
+                  onChange={() => setParcelLost(false)}
+                />
+                Parcel at shop
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="parcel"
+                  checked={parcelLost}
+                  onChange={() => setParcelLost(true)}
+                />
+                Parcel lost
+              </label>
+            </div>
+            <label className="block">
+              <span className="mb-1 block font-medium">Note (required)</span>
+              <Textarea
+                aria-label="Rebook note"
+                value={rebookNote}
+                onChange={(e) => setRebookNote(e.target.value)}
+                placeholder="e.g. Courier returned the parcel to the shop"
+              />
+            </label>
+          </div>
+        )}
+        {dialogProblem && (
+          <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <p>{dialogProblem}</p>
+            {role === "superadmin" && (
+              <Button
+                variant="outline"
+                disabled={pending}
+                onClick={() =>
+                  runBack(
+                    backPayload({ manualCancelConfirmed: true }),
+                    dialog === "sendback" ? "Order sent back to To-check" : "Order rebooked"
+                  )
+                }
+              >
+                I cancelled it in Shiprocket
+              </Button>
+            )}
+          </div>
+        )}
       </ConfirmDialog>
 
       <ConfirmDialog
