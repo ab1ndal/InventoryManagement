@@ -97,3 +97,24 @@ test("getOrder exposes the order's returns (items, photo ids only) on order.retu
   expect(sel).toContain("order_return_photos(id, uploaded_at)");
   expect(sel).not.toContain("path");
 });
+
+test("getOrder sorts embedded return items and photos in JS and never orders by embedded table", async () => {
+  mockResults.orders = { data: { id: "o1" }, error: null };
+  mockResults.order_returns = {
+    data: [{
+      id: "r1",
+      items: [{ item_id: "b" }, { item_id: "a" }],
+      // same instant at different precision/offset: a string compare would put p2 first
+      photos: [
+        { id: "p2", uploaded_at: "2026-10-26T10:00:00.5+00:00" },
+        { id: "p3", uploaded_at: "2026-10-26T10:00:00.12+00:00" },
+        { id: "p1", uploaded_at: "2026-10-26T15:29:59+05:30" },
+      ],
+    }],
+    error: null,
+  };
+  const d = await getOrder("o1");
+  expect(d.order.returns[0].items.map((i) => i.item_id)).toEqual(["a", "b"]);
+  expect(d.order.returns[0].photos.map((p) => p.id)).toEqual(["p1", "p3", "p2"]);
+  expect(opsOf("order_returns").some((o) => o[0] === "order" && o[2]?.referencedTable)).toBe(false);
+});

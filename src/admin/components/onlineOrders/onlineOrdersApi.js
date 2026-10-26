@@ -64,6 +64,16 @@ export async function listOrders(filter = "all") {
   return data || [];
 }
 
+// Embeds are aliased (items:, photos:), so they are ordered here instead of with referencedTable.
+const byId = (a, b) => (a.item_id < b.item_id ? -1 : a.item_id > b.item_id ? 1 : 0);
+const byUploadedAt = (a, b) => Date.parse(a.uploaded_at) - Date.parse(b.uploaded_at);
+const sortReturns = (returns) =>
+  returns.map((r) => ({
+    ...r,
+    items: [...(r.items || [])].sort(byId),
+    photos: [...(r.photos || [])].sort(byUploadedAt),
+  }));
+
 export async function getOrder(id) {
   const [order, items, events, refunds, jobs, returns] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
@@ -76,9 +86,7 @@ export async function getOrder(id) {
       .from("order_returns")
       .select("*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at)")
       .eq("order_id", id)
-      .order("opened_at")
-      .order("item_id", { referencedTable: "order_return_items" })
-      .order("uploaded_at", { referencedTable: "order_return_photos" }),
+      .order("opened_at"),
   ]);
   for (const [what, res] of [
     ["order", order],
@@ -104,7 +112,7 @@ export async function getOrder(id) {
   }
 
   return {
-    order: { ...order.data, returns: returns.data || [] },
+    order: { ...order.data, returns: sortReturns(returns.data || []) },
     items: items.data || [],
     events: events.data || [],
     refunds: refunds.data || [],
