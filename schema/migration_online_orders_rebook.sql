@@ -53,6 +53,19 @@
 -- online_order_confirm_manual_cancel(p_order_id uuid, p_actor uuid, p_op_key text) returns void
 --   Fenced; only while op_action is send_back/rebook (superadmin check is in the edge
 --   function). Sets orders.manual_cancel_confirmed_by, event manual_cancel_confirmed.
+-- order_items.lost_qty int not null default 0: units of a lost parcel written off.
+-- online_order_rebook(p_order_id uuid, p_actor uuid, p_op_key text, p_parcel_lost boolean, p_note text)
+--   returns jsonb {status, refund_id, old_sr_order_id, old_awb}. Fenced, needs op_action 'rebook'
+--   (status packed/shipped/out_for_delivery), note non-blank, same cancel evidence as send back.
+--   Still at shop: stock_taken := shipped_qty. Lost: lost_qty += shipped_qty; replacements taken
+--   (variants locked by variantid, line_no), stock_taken := n; units not replaced refunded
+--   ('unavailable') and offset on the bill ('Rebook: not re-sent'), with shipping when nothing is
+--   left to send. Then the send-back clearing (_online_resend_reset); status paid, or cancelled
+--   when nothing is left; event rebooked {op_key, parcel_lost, note, old_awb, old_sr_order_id,
+--   refund_id}. Repeat with the finalizing key returns the original result.
+-- online_order_prepare_process / online_order_cancel: unchanged, except that when the order has
+--   a bill (rebooked) their refund is offset ('Rebook: unavailable' with shipping only when all
+--   unavailable; 'Cancel after rebook' with shipping).
 -- online_order_apply_tracking(p_awb text, p_status text, p_payload jsonb) returns jsonb
 --   While op_action = 'rebook': raw tracking fields stored, event 'tracking_held',
 --   status untouched → {matched:true, changed:false, held:true, status}.
@@ -571,6 +584,29 @@ begin
 end;
 $$;
 
+-- Shared by send back and rebook once the caller has set each item's stock_taken: clears the
+-- Shiprocket booking, shipment, plan, problem and op fields, bumps sr_attempt, resets the
+-- per-item shelf-check state and sets the status.
+create or replace function public._online_resend_reset(p_order_id uuid, p_status text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.orders set
+    sr_order_id = null, sr_shipment_id = null, sr_updated_at = null, sr_sync_status = null, sr_last_error = null,
+    awb = null, courier_id = null, courier_name = null, pickup_requested_at = null,
+    manifest_url = null, label_url = null, process_plan = null, process_error = null, problem = null,
+    sr_attempt = sr_attempt + 1, sr_cancelled_op_key = null, manual_cancel_confirmed_by = null,
+    op_key = null, op_action = null, op_actor = null, op_lease_until = null,
+    status = p_status, updated_at = now()
+   where id = p_order_id;
+  update public.order_items set available_qty = null, shipped_qty = 0 where order_id = p_order_id;
+  update public.order_items i set status = public._item_status(i) where i.order_id = p_order_id;
+end;
+$$;
+
 create or replace function public.online_order_send_back(p_order_id uuid, p_actor uuid, p_op_key text)
 returns jsonb
 language plpgsql
@@ -606,22 +642,214 @@ begin
     raise exception 'send_back: courier booking not cancelled yet';
   end if;
 
-  update public.orders set
-    sr_order_id = null, sr_shipment_id = null, sr_updated_at = null, sr_sync_status = null, sr_last_error = null,
-    awb = null, courier_id = null, courier_name = null, pickup_requested_at = null,
-    manifest_url = null, label_url = null, process_plan = null, process_error = null, problem = null,
-    sr_attempt = sr_attempt + 1, sr_cancelled_op_key = null, manual_cancel_confirmed_by = null,
-    op_key = null, op_action = null, op_actor = null, op_lease_until = null,
-    status = 'paid', updated_at = now()
-   where id = o.id;
   -- Units refunded as unavailable were never on the shelf; the rest are held for the next check.
-  update public.order_items set stock_taken = coalesce(available_qty, stock_taken),
-         available_qty = null, shipped_qty = 0 where order_id = o.id;
-  update public.order_items i set status = public._item_status(i) where i.order_id = o.id;
+  update public.order_items set stock_taken = coalesce(available_qty, stock_taken) where order_id = o.id;
+  perform public._online_resend_reset(o.id, 'paid');
   perform public._online_event(o.id, 'sent_back', 'processing', 'paid', p_actor,
     jsonb_build_object('old_sr_order_id', o.sr_order_id, 'old_sr_shipment_id', o.sr_shipment_id,
                        'old_awb', o.awb, 'sr_attempt', o.sr_attempt + 1, 'op_key', p_op_key));
   return jsonb_build_object('status', 'paid', 'old_sr_order_id', o.sr_order_id, 'old_awb', o.awb);
+end;
+$$;
+
+-- ---------- rebook (finalize), bill-aware shelf check and cancel ----------
+
+-- Units of a lost parcel written off (stock was already reduced at payment).
+alter table public.order_items add column if not exists lost_qty int not null default 0 check (lost_qty >= 0);
+
+create or replace function public.online_order_rebook(
+  p_order_id uuid, p_actor uuid, p_op_key text, p_parcel_lost boolean, p_note text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  o public.orders;
+  it public.order_items;
+  v_done jsonb;
+  v_n int;
+  v_units jsonb := '[]'::jsonb;
+  v_none_left boolean;
+  v_refund uuid;
+  v_status text;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order % not found', p_order_id; end if;
+  -- Retry after a lost response: only the op that finalized may see success.
+  if o.status in ('paid', 'cancelled') and o.op_action is null and p_op_key is not null then
+    select data into v_done from public.order_events
+     where order_id = o.id and kind = 'rebooked' and data ->> 'op_key' = p_op_key
+     order by created_at desc limit 1;
+    if found then
+      return jsonb_build_object('status', o.status, 'refund_id', v_done -> 'refund_id',
+                                'old_sr_order_id', v_done ->> 'old_sr_order_id', 'old_awb', v_done ->> 'old_awb');
+    end if;
+  end if;
+  if p_op_key is null or o.op_key is distinct from p_op_key then
+    raise exception 'rebook: stale operation';
+  end if;
+  if o.status not in ('packed', 'shipped', 'out_for_delivery') or coalesce(o.op_action, '') <> 'rebook' then
+    raise exception 'rebook: order has no rebook in progress (status %, op %)', o.status, o.op_action;
+  end if;
+  if coalesce(btrim(p_note), '') = '' then raise exception 'rebook: note required'; end if;
+  if not ((o.sr_order_id is null and o.awb is null)
+          or o.sr_cancelled_op_key is not distinct from p_op_key
+          or o.manual_cancel_confirmed_by is not null) then
+    raise exception 'rebook: courier booking not cancelled yet';
+  end if;
+
+  if coalesce(p_parcel_lost, false) then
+    -- Replacements come off the shelf now; fixed lock order as in online_order_confirm_payment.
+    for it in select * from public.order_items where order_id = o.id order by variantid, line_no loop
+      v_n := 0;
+      if it.shipped_qty > 0 then
+        select least(it.shipped_qty, greatest(floor(coalesce(stock, 0)), 0)::int) into v_n
+          from public.productsizecolors where variantid = it.variantid for update;
+        v_n := coalesce(v_n, 0);
+        if v_n > 0 then
+          perform public._stock_apply(it.variantid, -v_n);
+        end if;
+        if it.shipped_qty > v_n then
+          v_units := v_units || jsonb_build_object('item_id', it.id, 'units', it.shipped_qty - v_n);
+        end if;
+      end if;
+      update public.order_items set lost_qty = lost_qty + it.shipped_qty, stock_taken = v_n, available_qty = null
+       where id = it.id;
+    end loop;
+  else
+    -- The packed units are back on hand.
+    update public.order_items set stock_taken = shipped_qty, available_qty = null where order_id = o.id;
+  end if;
+
+  v_none_left := not exists (select 1 from public.order_items where order_id = o.id and stock_taken > 0);
+  v_refund := public._online_refund_create(o.id, 'unavailable', v_units, v_none_left, p_actor);
+  if v_refund is not null then
+    perform public._online_bill_offset(v_refund, 'Rebook: not re-sent', v_none_left);
+  end if;
+
+  v_status := case when v_none_left then 'cancelled' else 'paid' end;
+  perform public._online_resend_reset(o.id, v_status);
+  perform public._online_event(o.id, 'rebooked', o.status, v_status, p_actor,
+    jsonb_build_object('op_key', p_op_key, 'parcel_lost', coalesce(p_parcel_lost, false), 'note', p_note,
+                       'old_awb', o.awb, 'old_sr_order_id', o.sr_order_id, 'refund_id', v_refund));
+  return jsonb_build_object('status', v_status, 'refund_id', v_refund,
+                            'old_sr_order_id', o.sr_order_id, 'old_awb', o.awb);
+end;
+$$;
+
+create or replace function public.online_order_prepare_process(p_order_id uuid, p_actor uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  o public.orders;
+  it public.order_items;
+  v_units jsonb := '[]'::jsonb;
+  v_ship jsonb := '[]'::jsonb;
+  v_avail int := 0;
+  v_refund uuid;
+  v_all boolean;
+  v_plan jsonb;
+  v_left int;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order % not found', p_order_id; end if;
+  if o.process_plan is not null then
+    return o.process_plan;
+  end if;
+  if o.status <> 'processing' or o.op_action <> 'process' then
+    raise exception 'prepare_process: order must be claimed for processing (now %)', o.status;
+  end if;
+  if exists (select 1 from public.order_items i where i.order_id = o.id and i.stock_taken > 0 and i.available_qty is null) then
+    raise exception 'availability not set for every item';
+  end if;
+
+  for it in select * from public.order_items where order_id = o.id order by line_no loop
+    v_left := it.stock_taken - coalesce(it.available_qty, 0);
+    if v_left > 0 then
+      v_units := v_units || jsonb_build_object('item_id', it.id, 'units', v_left);
+    end if;
+    v_avail := v_avail + coalesce(it.available_qty, 0);
+  end loop;
+  v_all := v_avail = 0;
+
+  v_refund := public._online_refund_create(o.id, 'unavailable', v_units, v_all, p_actor);
+  -- Second shelf check of a rebooked order: the bill already lists these units.
+  if v_refund is not null and o.bill_id is not null then
+    perform public._online_bill_offset(v_refund, 'Rebook: unavailable', v_all);
+  end if;
+
+  for it in select * from public.order_items where order_id = o.id and coalesce(available_qty, 0) > 0 order by line_no loop
+    v_ship := v_ship || jsonb_build_object('item_id', it.id, 'variant_id', it.variantid, 'product_id', it.productid,
+      'name', it.product_name, 'size', it.size, 'color', it.color, 'units', it.available_qty,
+      'unit_price', it.unit_price,
+      'paid_value', it.paid_value - coalesce((select sum(ri.credit_amount + ri.gateway_amount)
+                                                from public.order_refund_items ri where ri.item_id = it.id), 0));
+  end loop;
+
+  v_plan := jsonb_build_object('shippable_items', v_ship, 'all_unavailable', v_all, 'refund_id', v_refund);
+  if v_all then
+    update public.orders set status = 'cancelled', process_plan = v_plan, op_key = null, op_action = null,
+           op_actor = null, op_lease_until = null, updated_at = now() where id = o.id;
+    perform public._online_event(o.id, 'cancelled', 'processing', 'cancelled', p_actor,
+      jsonb_build_object('reason', 'no item available', 'refund_id', v_refund));
+  else
+    update public.orders set process_plan = v_plan, updated_at = now() where id = o.id;
+    perform public._online_event(o.id, 'process_prepared', o.status, o.status, p_actor, v_plan);
+  end if;
+  return v_plan;
+end;
+$$;
+
+create or replace function public.online_order_cancel(p_order_id uuid, p_actor uuid, p_reason text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  o public.orders;
+  it public.order_items;
+  v_units jsonb := '[]'::jsonb;
+  v_back int;
+  v_refund uuid;
+  v_from text;
+begin
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then raise exception 'order % not found', p_order_id; end if;
+  if o.status = 'cancelled' then
+    return (select r.id from public.order_refunds r where r.order_id = o.id and r.reason = 'cancel');
+  end if;
+  if not (o.status = 'paid' or (o.status = 'cancelling' and o.op_action = 'cancel')) then
+    raise exception 'cancel is only allowed for paid orders (now %)', o.status;
+  end if;
+  if coalesce(btrim(p_reason), '') = '' then raise exception 'cancel reason is required'; end if;
+  v_from := o.status;
+
+  for it in select * from public.order_items where order_id = o.id order by variantid, line_no loop
+    if it.qty - it.refunded_qty > 0 then
+      v_units := v_units || jsonb_build_object('item_id', it.id, 'units', it.qty - it.refunded_qty);
+    end if;
+    -- units marked not available were never on the shelf: no stock back for them
+    v_back := coalesce(it.available_qty, it.stock_taken);
+    if v_back > 0 then
+      perform public._stock_apply(it.variantid, v_back);
+    end if;
+  end loop;
+
+  v_refund := public._online_refund_create(o.id, 'cancel', v_units, true, p_actor);
+  -- Only a rebooked order is cancellable while holding a bill.
+  if v_refund is not null and o.bill_id is not null then
+    perform public._online_bill_offset(v_refund, 'Cancel after rebook', true);
+  end if;
+  update public.orders set status = 'cancelled', op_key = null, op_action = null, op_actor = null,
+         op_lease_until = null, updated_at = now() where id = o.id;
+  perform public._online_event(o.id, 'cancelled', v_from, 'cancelled', p_actor,
+    jsonb_build_object('reason', p_reason, 'refund_id', v_refund));
+  return v_refund;
 end;
 $$;
 
@@ -637,7 +865,11 @@ begin
     'public.online_order_mark_packed(uuid, jsonb, uuid, text)',
     'public.online_order_apply_tracking(text, text, jsonb)',
     'public.online_order_confirm_manual_cancel(uuid, uuid, text)',
-    'public.online_order_send_back(uuid, uuid, text)'] loop
+    'public.online_order_send_back(uuid, uuid, text)',
+    'public._online_resend_reset(uuid, text)',
+    'public.online_order_rebook(uuid, uuid, text, boolean, text)',
+    'public.online_order_prepare_process(uuid, uuid)',
+    'public.online_order_cancel(uuid, uuid, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;

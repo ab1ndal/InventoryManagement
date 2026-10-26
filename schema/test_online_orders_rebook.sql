@@ -1,4 +1,4 @@
--- Tests for schema/migration_online_orders_rebook.sql (_online_bill_offset, op-key fencing, send_back/rebook claims).
+-- Tests for schema/migration_online_orders_rebook.sql (_online_bill_offset, op-key fencing, send_back/rebook claims and finalize).
 -- Run locally:
 --   scripts/test-db.sh up
 --   scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql \
@@ -691,6 +691,339 @@ begin
      'shipping refunded once, with the last refund';
   select sum(total_amount) into tot from public.order_refunds where order_id = o;
   assert tot = (select subtotal - promo_discount + shipping from public.orders where id = o), 'refunds total the order: ' || tot::text;
+end $$;
+rollback;
+
+-- ---------- rebook finalize (Task 4) ----------
+-- Pays a p_qty-unit order (shipping 99) from a variant with p_stock, packs all units, marks
+-- it shipped, claims rebook 'op-rb' and records sr_cancelled. Returns order id.
+create function pg_temp.mk_rebook(p_stock numeric default 5, p_qty int default 2, p_cancelled boolean default true)
+returns uuid language plpgsql as $$
+declare
+  r record;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, p_stock), 'qty', p_qty)),
+                                         jsonb_build_object('shipping', 99));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  perform pg_temp.pack(r.order_id);
+  update public.orders set sr_order_id = '777', sr_shipment_id = '778' where id = r.order_id;
+  perform public.online_order_apply_tracking((select awb from public.orders where id = r.order_id), 'shipped', '{"shipment_status_id":6}');
+  perform public.online_order_claim(r.order_id, 'rebook', null, 'op-rb');
+  if p_cancelled then
+    perform public.online_order_checkpoint(r.order_id, 'sr_cancelled', '{}', 'op-rb');
+  end if;
+  return r.order_id;
+end $$;
+
+-- grants: service role only
+do $$
+begin
+  assert has_function_privilege('service_role', 'public.online_order_rebook(uuid,uuid,text,boolean,text)', 'execute'), 'service runs rebook';
+  assert not has_function_privilege('anon', 'public.online_order_rebook(uuid,uuid,text,boolean,text)', 'execute')
+     and not has_function_privilege('authenticated', 'public.online_order_rebook(uuid,uuid,text,boolean,text)', 'execute'),
+     'clients cannot run rebook';
+end $$;
+
+-- rebook still at shop: paid, stock unchanged, one bill after re-pack
+begin;
+do $$
+declare
+  o uuid;
+  oo public.orders;
+  it public.order_items;
+  v uuid;
+  s0 numeric;
+  b0 int;
+  res jsonb;
+  ev jsonb;
+begin
+  o := pg_temp.mk_rebook(5, 2, false);
+  select variantid into v from public.order_items where order_id = o;
+  s0 := pg_temp.stock(v);
+  select bill_id, awb into oo.bill_id, oo.awb from public.orders where id = o;
+  b0 := oo.bill_id;
+  begin
+    perform public.online_order_rebook(o, null, 'op-rb', false, 'box back from courier');
+    assert false, 'needs cancel evidence';
+  exception when raise_exception then
+    assert sqlerrm like '%courier booking not cancelled yet%', sqlerrm;
+  end;
+  perform public.online_order_checkpoint(o, 'sr_cancelled', '{}', 'op-rb');
+  begin
+    perform public.online_order_rebook(o, null, 'op-other', false, 'box back from courier');
+    assert false, 'stale key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  res := public.online_order_rebook(o, null, 'op-rb', false, 'box back from courier');
+  assert res ->> 'status' = 'paid' and res ->> 'refund_id' is null and res ->> 'old_sr_order_id' = '777'
+     and res ->> 'old_awb' = oo.awb, res::text;
+  select * into oo from public.orders where id = o;
+  assert oo.status = 'paid' and oo.sr_attempt = 2 and oo.bill_id = b0, 'paid, attempt 2, bill kept';
+  assert oo.awb is null and oo.sr_order_id is null and oo.sr_shipment_id is null and oo.label_url is null
+     and oo.problem is null and oo.op_key is null and oo.op_action is null and oo.sr_cancelled_op_key is null,
+     'shipment and op cleared';
+  select * into it from public.order_items where order_id = o;
+  assert it.stock_taken = 2 and it.available_qty is null and it.shipped_qty = 0 and it.lost_qty = 0
+     and it.refunded_qty = 0 and it.status = 'ordered', 'item: ' || row_to_json(it)::text;
+  assert pg_temp.stock(v) = s0, 'stock unchanged';
+  select data into ev from public.order_events where order_id = o and kind = 'rebooked';
+  assert ev ->> 'op_key' = 'op-rb' and not (ev ->> 'parcel_lost')::boolean and ev ->> 'note' = 'box back from courier'
+     and ev ->> 'old_awb' = res ->> 'old_awb' and ev ->> 'old_sr_order_id' = '777' and ev ? 'refund_id',
+     'event: ' || coalesce(ev::text, 'none');
+  -- idempotent repeat for the finalizing key only
+  res := public.online_order_rebook(o, null, 'op-rb', false, 'box back from courier');
+  assert res ->> 'status' = 'paid' and res ->> 'old_sr_order_id' = '777'
+     and (select sr_attempt from public.orders where id = o) = 2, 'repeat: ' || res::text;
+  begin
+    perform public.online_order_rebook(o, null, 'op-unknown', false, 'x');
+    assert false, 'unknown key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  -- re-pack: same bill, still one bill for the order
+  perform public.online_order_set_availability(o, i.id, 2, null) from public.order_items i where i.order_id = o;
+  assert pg_temp.pack(o) = b0, 're-pack keeps the bill';
+  assert (select count(*) from public.bills where notes = 'Online order ' || (select order_ref from public.orders where id = o)) = 1, 'one bill';
+  assert (select status from public.orders where id = o) = 'packed', 'packed again';
+  assert pg_temp.stock(v) = s0, 'stock still unchanged';
+end $$;
+rollback;
+
+-- rebook lost with stock: replacement taken, lost_qty
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2);
+  v uuid;
+  s0 numeric;
+  it public.order_items;
+  res jsonb;
+begin
+  select variantid into v from public.order_items where order_id = o;
+  s0 := pg_temp.stock(v);
+  res := public.online_order_rebook(o, null, 'op-rb', true, 'parcel lost in transit');
+  assert res ->> 'status' = 'paid' and res ->> 'refund_id' is null, res::text;
+  assert pg_temp.stock(v) = s0 - 2, 'two replacements taken, stock ' || pg_temp.stock(v)::text;
+  select * into it from public.order_items where order_id = o;
+  assert it.lost_qty = 2 and it.stock_taken = 2 and it.refunded_qty = 0 and it.shipped_qty = 0
+     and it.available_qty is null, 'item: ' || row_to_json(it)::text;
+  assert (select count(*) from public.order_refunds where order_id = o) = 0, 'no refund';
+  assert (select (data ->> 'parcel_lost')::boolean from public.order_events where order_id = o and kind = 'rebooked'), 'event parcel_lost';
+end $$;
+rollback;
+
+-- rebook lost with partial stock: one replaced, one refunded, no shipping refund
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(3, 2);
+  v uuid;
+  res jsonb;
+  it public.order_items;
+begin
+  select variantid into v from public.order_items where order_id = o;
+  assert pg_temp.stock(v) = 1, 'one left on the shelf';
+  res := public.online_order_rebook(o, null, 'op-rb', true, 'lost');
+  assert res ->> 'status' = 'paid' and res ->> 'refund_id' is not null, res::text;
+  assert pg_temp.stock(v) = 0, 'last unit taken';
+  select * into it from public.order_items where order_id = o;
+  assert it.lost_qty = 2 and it.stock_taken = 1 and it.refunded_qty = 1, 'item: ' || row_to_json(it)::text;
+  assert (select units = 1 and shipping_amount = 0 and reason = 'unavailable' from public.order_refunds
+           where id = (res ->> 'refund_id')::uuid), 'one unit, no shipping';
+  assert (select count(*) from public.exchanges where order_refund_id = (res ->> 'refund_id')::uuid and order_item_id is not null
+            and reason = 'Rebook: not re-sent') = 1
+     and (select count(*) from public.exchanges where order_refund_id = (res ->> 'refund_id')::uuid and order_item_id is null) = 0,
+     'item offset only';
+end $$;
+rollback;
+
+-- rebook lost without stock: cancelled, refund incl shipping, item + shipping offsets
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(2, 2);
+  v uuid;
+  res jsonb;
+  rf public.order_refunds;
+  oo public.orders;
+  it public.order_items;
+begin
+  select variantid into v from public.order_items where order_id = o;
+  assert pg_temp.stock(v) = 0, 'shelf empty';
+  res := public.online_order_rebook(o, null, 'op-rb', true, 'lost');
+  assert res ->> 'status' = 'cancelled' and res ->> 'refund_id' is not null, res::text;
+  select * into oo from public.orders where id = o;
+  assert oo.status = 'cancelled' and oo.op_action is null and oo.awb is null, 'cancelled and cleared';
+  assert pg_temp.stock(v) = 0, 'stock untouched';
+  select * into rf from public.order_refunds where id = (res ->> 'refund_id')::uuid;
+  assert rf.reason = 'unavailable' and rf.units = 2 and rf.shipping_amount = 99
+     and rf.total_amount = oo.subtotal - oo.promo_discount + oo.shipping, 'full refund: ' || row_to_json(rf)::text;
+  select * into it from public.order_items where order_id = o;
+  assert it.lost_qty = 2 and it.stock_taken = 0 and it.refunded_qty = 2 and it.status = 'refunded', 'item: ' || row_to_json(it)::text;
+  assert (select count(*) from public.exchanges where order_refund_id = rf.id and order_item_id is not null
+            and reason = 'Rebook: not re-sent' and new_billid = oo.bill_id) = 1, 'item offset';
+  assert (select credit_amount from public.exchanges where order_refund_id = rf.id and order_item_id is null) = 99, 'shipping offset';
+  assert (select count(*) from public.order_events where order_id = o and kind = 'rebooked'
+            and from_status = 'shipped' and to_status = 'cancelled') = 1, 'rebooked event to cancelled';
+end $$;
+rollback;
+
+-- cancel after lost rebook: stock back = replacement only, bill offset incl shipping
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2);
+  v uuid;
+  s0 numeric;
+  rf uuid;
+  b int;
+begin
+  select variantid into v from public.order_items where order_id = o;
+  s0 := pg_temp.stock(v);
+  perform public.online_order_rebook(o, null, 'op-rb', true, 'lost');
+  assert pg_temp.stock(v) = s0 - 2, 'replacements taken';
+  rf := public.online_order_cancel(o, null, 'customer gave up');
+  assert pg_temp.stock(v) = s0, 'replacements back, lost units not';
+  select bill_id into b from public.orders where id = o;
+  assert (select count(*) from public.exchanges where order_refund_id = rf and order_item_id is not null
+            and reason = 'Cancel after rebook' and quantity = 2 and new_billid = b) = 1, 'item offset';
+  assert (select credit_amount from public.exchanges where order_refund_id = rf and order_item_id is null) = 99, 'shipping offset';
+  assert (select shipping_amount from public.order_refunds where id = rf) = 99, 'shipping refunded';
+end $$;
+rollback;
+
+-- cancel of a paid order without a bill: no offsets (unchanged behaviour)
+begin;
+do $$
+declare
+  r record;
+  rf uuid;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 5), 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  rf := public.online_order_cancel(r.order_id, null, 'changed mind');
+  assert rf is not null and (select count(*) from public.exchanges where order_refund_id = rf) = 0, 'no bill, no offset';
+end $$;
+rollback;
+
+-- second shelf check after rebook: offset item, no shipping
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2);
+  p jsonb;
+  rf uuid;
+begin
+  perform public.online_order_rebook(o, null, 'op-rb', false, 'at shop');
+  perform public.online_order_set_availability(o, i.id, 1, null) from public.order_items i where i.order_id = o;
+  perform public.online_order_claim(o, 'process', null, 'op-p2');
+  p := public.online_order_prepare_process(o, null);
+  rf := (p ->> 'refund_id')::uuid;
+  assert rf is not null and not (p ->> 'all_unavailable')::boolean, p::text;
+  assert (select count(*) from public.exchanges where order_refund_id = rf and order_item_id is not null
+            and reason = 'Rebook: unavailable' and quantity = 1) = 1, 'item offset';
+  assert (select count(*) from public.exchanges where order_refund_id = rf and order_item_id is null) = 0, 'no shipping offset';
+end $$;
+rollback;
+
+-- second shelf check after rebook finds nothing: cancelled, item + shipping offsets
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 2);
+  p jsonb;
+  rf uuid;
+begin
+  perform public.online_order_rebook(o, null, 'op-rb', false, 'at shop');
+  perform public.online_order_set_availability(o, i.id, 0, null) from public.order_items i where i.order_id = o;
+  perform public.online_order_claim(o, 'process', null, 'op-p2');
+  p := public.online_order_prepare_process(o, null);
+  rf := (p ->> 'refund_id')::uuid;
+  assert (p ->> 'all_unavailable')::boolean, p::text;
+  assert (select count(*) from public.exchanges where order_refund_id = rf and order_item_id is not null) = 1, 'item offset';
+  assert (select credit_amount from public.exchanges where order_refund_id = rf and order_item_id is null) = 99, 'shipping offset';
+end $$;
+rollback;
+
+-- old AWB ignored after rebook
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 1);
+  awb text;
+  res jsonb;
+begin
+  select o2.awb into awb from public.orders o2 where o2.id = o;
+  perform public.online_order_rebook(o, null, 'op-rb', false, 'at shop');
+  res := public.online_order_apply_tracking(awb, 'delivered', '{"shipment_status_id":7}');
+  assert not (res ->> 'matched')::boolean, res::text;
+  assert (select status from public.orders where id = o) = 'paid', 'still paid';
+end $$;
+rollback;
+
+-- rebook from delivered raises
+begin;
+do $$
+declare
+  r record;
+  c jsonb;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 5), 'qty', 1)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  perform pg_temp.pack(r.order_id);
+  perform public.online_order_apply_tracking((select awb from public.orders where id = r.order_id), 'delivered', '{"shipment_status_id":7}');
+  c := public.online_order_claim(r.order_id, 'rebook', null, 'op-rb');
+  assert not (c ->> 'claimed')::boolean and c ->> 'reason' = 'status', c::text;
+  begin
+    perform public.online_order_rebook(r.order_id, null, 'op-rb', false, 'too late');
+    assert false, 'rebook of delivered refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  assert (select status from public.orders where id = r.order_id) = 'delivered', 'still delivered';
+end $$;
+rollback;
+
+-- finalize needs a rebook op (process op with the same key refused)
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_claimed('op-p');
+begin
+  begin
+    perform public.online_order_rebook(o, null, 'op-p', false, 'x');
+    assert false, 'process op cannot finalize rebook';
+  exception when raise_exception then
+    assert sqlerrm like '%no rebook in progress%', sqlerrm;
+  end;
+end $$;
+rollback;
+
+-- blank note raises
+begin;
+do $$
+declare
+  o uuid := pg_temp.mk_rebook(5, 1);
+begin
+  begin
+    perform public.online_order_rebook(o, null, 'op-rb', false, '   ');
+    assert false, 'blank note refused';
+  exception when raise_exception then
+    assert sqlerrm like '%rebook: note required%', sqlerrm;
+  end;
+  begin
+    perform public.online_order_rebook(o, null, 'op-rb', false, null);
+    assert false, 'null note refused';
+  exception when raise_exception then
+    assert sqlerrm like '%rebook: note required%', sqlerrm;
+  end;
+  assert (select status from public.orders where id = o) = 'shipped', 'unchanged';
 end $$;
 rollback;
 
