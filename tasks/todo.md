@@ -102,13 +102,13 @@ New Comments (done 2026-10-20, PR #31 merged + live):
   Google Photos connector; Drive folders "Display Photos"/"Archive" look personal, not opened).
 - Footer payment badges kept as-is (owner: checkout turns on soon).
 
-### NEXT FOCUS after Diwali: Customization service (owner 2026-10-25, not designed yet)
+### NEXT FOCUS after Diwali: Customization service (owner 2026-10-25, plan drafted)
 
 In-house designers + tailors make anything to order: lehengas, sarees, dresses, kurtis, sherwanis,
 jodhpuri suits, suits, blazers, coat-pants, formal suits. Customer submits a design photo, target price,
 quantity, optional fabric → shop replies with a quote (price + time) → 50% advance via Cashfree → balance
-when the piece is ready. Needs brainstorm/spec first (open: measurements capture, quote channel, how the
-advance fits the online-orders + Bill of Supply flow, delivery vs pickup).
+when the piece is ready. Plan drafted: `tasks/customization-plan.md` (2026-10-25). Before build: owner
+answers its 10 open questions, CA answers the tax questions (advance time-of-supply, own-fabric stitching).
 
 ### P0: quick wins before Diwali (this week)
 
