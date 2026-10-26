@@ -194,9 +194,9 @@ alter table public.order_returns enable row level security;
 alter table public.order_return_items enable row level security;
 alter table public.order_return_photos enable row level security;
 
--- Units of each item that can still be returned. Callers that act on the result must hold the
--- order row lock (online_return_open does).
-create or replace function public.online_return_returnable(p_order_id uuid)
+-- Units of each item still free to return, not floored at 0, leaving out open return
+-- p_exclude_return (receive re-checks its own return's units against this).
+create or replace function public._online_return_free_units(p_order_id uuid, p_exclude_return uuid)
 returns table (item_id uuid, units int)
 language sql
 stable
@@ -204,11 +204,11 @@ security definer
 set search_path = public
 as $$
   select i.id,
-    greatest(0,
-      i.shipped_qty
+    (i.shipped_qty
       - coalesce((select sum(ri.units) from public.order_return_items ri
                     join public.order_returns r on r.id = ri.return_id
-                   where ri.item_id = i.id and r.order_id = i.order_id and r.status = 'open'), 0)
+                   where ri.item_id = i.id and r.order_id = i.order_id and r.status = 'open'
+                     and r.id is distinct from p_exclude_return), 0)
       - coalesce((select sum(coalesce(ri.received_units, 0)) from public.order_return_items ri
                     join public.order_returns r on r.id = ri.return_id
                    where ri.item_id = i.id and r.order_id = i.order_id and r.status = 'refunded'), 0)
@@ -219,6 +219,18 @@ as $$
     )::int
   from public.order_items i
   where i.order_id = p_order_id;
+$$;
+
+-- Units of each item that can still be returned. Callers that act on the result must hold the
+-- order row lock (online_return_open does).
+create or replace function public.online_return_returnable(p_order_id uuid)
+returns table (item_id uuid, units int)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select f.item_id, greatest(0, f.units) from public._online_return_free_units(p_order_id, null) f;
 $$;
 
 create or replace function public.online_return_open(
@@ -339,6 +351,270 @@ begin
     'public.online_return_returnable(uuid)',
     'public.online_return_open(uuid, uuid, boolean, text, timestamptz, jsonb, text, text, text)',
     'public.online_return_cancel(uuid, uuid, text)'] loop
+    execute 'revoke all on function ' || f || ' from public, anon, authenticated';
+    execute 'grant execute on function ' || f || ' to service_role';
+  end loop;
+end $$;
+
+-- ===================================================================
+-- Task 3: receive and refund, preview
+-- ===================================================================
+
+-- Validates receive input for an open return and works out what to refund:
+-- {units: [{item_id, units}] (received > 0 only), include_shipping, received, short}.
+-- Shipping (damaged_wrong only) when, after this receive, every shipped unit of the order has
+-- been received back across refunded returns. Receive calls this under its locks; preview without.
+create or replace function public._online_return_plan(p_return_id uuid, p_items jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  ret public.order_returns;
+  e jsonb;
+  ri public.order_return_items;
+  v_item uuid;
+  v_recv int;
+  v_restock int;
+  v_avail int;
+  v_seen uuid[] := '{}';
+  v_units jsonb := '[]'::jsonb;
+  v_received int := 0;
+  v_short boolean := false;
+  v_shipped int;
+  v_back int;
+begin
+  select * into ret from public.order_returns where id = p_return_id;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' then
+    raise exception 'received items must be a list';
+  end if;
+  for e in select * from jsonb_array_elements(p_items) loop
+    v_item := (e ->> 'item_id')::uuid;
+    v_recv := (e ->> 'received_units')::int;
+    v_restock := (e ->> 'restock_units')::int;
+    select * into ri from public.order_return_items where return_id = ret.id and item_id = v_item;
+    if not found then
+      raise exception 'item % is not on return %', v_item, ret.id;
+    end if;
+    if v_item = any(v_seen) then
+      raise exception 'item % listed twice', v_item;
+    end if;
+    v_seen := v_seen || v_item;
+    if v_recv is null or v_recv < 0 or v_recv > ri.units then
+      raise exception 'received pieces for item % must be 0 to %, got %', v_item, ri.units, v_recv;
+    end if;
+    if v_restock is null or v_restock < 0 or v_restock > v_recv then
+      raise exception 'restock pieces for item % must be 0 to % (received), got %', v_item, v_recv, v_restock;
+    end if;
+    -- unfloored, so units exchanged in store beyond this return's own count still show
+    select f.units into v_avail from public._online_return_free_units(ret.order_id, ret.id) f where f.item_id = v_item;
+    if v_recv > v_avail then
+      raise exception 'item % was exchanged in store; reduce received pieces', v_item;
+    end if;
+    if v_recv > 0 then
+      v_units := v_units || jsonb_build_object('item_id', v_item, 'units', v_recv);
+    end if;
+    v_received := v_received + v_recv;
+    v_short := v_short or v_recv < ri.units;
+  end loop;
+  if cardinality(v_seen) <> (select count(*) from public.order_return_items where return_id = ret.id) then
+    raise exception 'every item on return % must be listed', ret.id;
+  end if;
+
+  select coalesce(sum(i.shipped_qty), 0) into v_shipped from public.order_items i where i.order_id = ret.order_id;
+  select coalesce(sum(x.received_units), 0) into v_back
+    from public.order_return_items x join public.order_returns r on r.id = x.return_id
+   where r.order_id = ret.order_id and r.status = 'refunded';
+  return jsonb_build_object('units', v_units, 'received', v_received, 'short', v_short,
+    'include_shipping', ret.reason = 'damaged_wrong' and v_received > 0 and v_back + v_received >= v_shipped);
+end;
+$$;
+
+-- Amounts _online_refund_create would refund for p_units (same _cum_alloc split from the current
+-- refunded_qty, same shipping rule), without writing. Keep in step with _online_refund_create:
+-- online_return_receive raises if the two ever disagree.
+create or replace function public._online_return_amounts(p_order_id uuid, p_units jsonb, p_include_shipping boolean)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  o public.orders;
+  it public.order_items;
+  u record;
+  v_credit numeric(12,2) := 0;
+  v_gateway numeric(12,2) := 0;
+  v_ship numeric(12,2) := 0;
+begin
+  select * into o from public.orders where id = p_order_id;
+  if p_include_shipping and o.shipping > 0 and not exists (
+       select 1 from public.order_refund_legs l join public.order_refunds r on r.id = l.refund_id
+        where r.order_id = o.id and l.source in ('shipping_credit', 'shipping_gateway')) then
+    v_ship := o.shipping_credit_part + o.shipping_gateway_part;
+  end if;
+  for u in select x.item_id, x.units from jsonb_to_recordset(coalesce(p_units, '[]'::jsonb)) as x(item_id uuid, units int)
+            where x.units > 0 loop
+    select * into it from public.order_items where id = u.item_id and order_id = o.id;
+    if not found then
+      raise exception 'refund: item % not in order %', u.item_id, o.order_ref;
+    end if;
+    if it.refunded_qty + u.units > it.qty then
+      raise exception 'refund: item % would refund % of % units', it.id, it.refunded_qty + u.units, it.qty;
+    end if;
+    v_credit := v_credit + public._cum_alloc(it.credit_part, it.qty, it.refunded_qty + u.units)
+                         - public._cum_alloc(it.credit_part, it.qty, it.refunded_qty);
+    v_gateway := v_gateway + public._cum_alloc(it.gateway_part, it.qty, it.refunded_qty + u.units)
+                           - public._cum_alloc(it.gateway_part, it.qty, it.refunded_qty);
+  end loop;
+  return jsonb_build_object('credit_part', v_credit, 'gateway_part', v_gateway, 'shipping', v_ship,
+                            'total', v_credit + v_gateway + v_ship);
+end;
+$$;
+
+create or replace function public._online_return_refund_json(p_refund uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object('credit_part', r.credit_amount, 'gateway_part', r.gateway_amount,
+                            'shipping', r.shipping_amount, 'total', r.total_amount)
+    from public.order_refunds r where r.id = p_refund
+$$;
+
+-- Read-only refund preview for the receive dialog; receive recomputes under its locks.
+create or replace function public.online_return_preview(p_return_id uuid, p_items jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  ret public.order_returns;
+  v_plan jsonb;
+begin
+  select * into ret from public.order_returns where id = p_return_id;
+  if not found then
+    raise exception 'return % not found', p_return_id;
+  end if;
+  if ret.status <> 'open' then
+    raise exception 'return % is %', p_return_id, ret.status;
+  end if;
+  v_plan := public._online_return_plan(ret.id, p_items);
+  return public._online_return_amounts(ret.order_id, v_plan -> 'units', (v_plan ->> 'include_shipping')::boolean);
+end;
+$$;
+
+-- p_items: [{item_id, received_units, restock_units}] for every item on the return.
+-- Returns {status, refund_id, refund: {credit_part, gateway_part, shipping, total}}; a repeat call on a
+-- refunded / rejected return returns the stored result.
+create or replace function public.online_return_receive(p_return_id uuid, p_actor uuid, p_items jsonb, p_note text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  ret public.order_returns;
+  o public.orders;
+  v_plan jsonb;
+  v_ship boolean;
+  v_note text := nullif(btrim(coalesce(p_note, '')), '');
+  v_expected jsonb;
+  v_refund uuid;
+  v_actual jsonb;
+  e jsonb;
+  v_restocked int := 0;
+begin
+  select * into ret from public.order_returns where id = p_return_id;
+  if not found then
+    raise exception 'return % not found', p_return_id;
+  end if;
+  -- Lock order shared with open/cancel and the in-store exchange RPC: order, bill items by id, return.
+  select * into o from public.orders where id = ret.order_id for update;
+  perform 1 from public.bill_items where billid = o.bill_id order by bill_item_id for update;
+  select * into ret from public.order_returns where id = p_return_id for update;
+
+  if ret.status in ('refunded', 'rejected') then
+    return jsonb_build_object('status', ret.status, 'refund_id', ret.refund_id,
+                              'refund', public._online_return_refund_json(ret.refund_id));
+  end if;
+  if ret.status <> 'open' then
+    raise exception 'return % is % and cannot be received', p_return_id, ret.status;
+  end if;
+
+  v_plan := public._online_return_plan(ret.id, p_items);
+  v_ship := (v_plan ->> 'include_shipping')::boolean;
+  if (v_plan ->> 'short')::boolean and v_note is null then
+    raise exception 'a note is required when pieces fail the check';
+  end if;
+  if ret.reason = 'damaged_wrong'
+     and not exists (select 1 from public.order_return_photos where return_id = ret.id) then
+    raise exception 'add at least one photo before receiving a damaged/wrong return';
+  end if;
+
+  for e in select * from jsonb_array_elements(p_items) loop
+    update public.order_return_items
+       set received_units = (e ->> 'received_units')::int, restock_units = (e ->> 'restock_units')::int
+     where return_id = ret.id and item_id = (e ->> 'item_id')::uuid;
+  end loop;
+
+  if (v_plan ->> 'received')::int = 0 then
+    update public.order_returns
+       set status = 'rejected', received_by = p_actor, received_at = now(), receive_note = v_note, updated_at = now()
+     where id = ret.id;
+    perform public._online_event(o.id, 'return_rejected', o.status, o.status, p_actor,
+      jsonb_build_object('return_id', ret.id, 'note', v_note));
+    return jsonb_build_object('status', 'rejected', 'refund_id', null, 'refund', null);
+  end if;
+
+  for e in select x.value from jsonb_array_elements(p_items) x where (x.value ->> 'restock_units')::int > 0 loop
+    perform public._stock_apply(
+      (select i.variantid from public.order_items i where i.id = (e ->> 'item_id')::uuid),
+      (e ->> 'restock_units')::int);
+    v_restocked := v_restocked + (e ->> 'restock_units')::int;
+  end loop;
+
+  v_expected := public._online_return_amounts(o.id, v_plan -> 'units', v_ship);
+  v_refund := public._online_refund_create(o.id, 'return', v_plan -> 'units', v_ship, p_actor);
+  v_actual := public._online_return_refund_json(v_refund);
+  if v_actual is distinct from v_expected then
+    raise exception 'return refund % differs from preview % (return %)', v_actual, v_expected, ret.id;
+  end if;
+  perform public._online_bill_offset(v_refund,
+    case ret.reason when 'damaged_wrong' then 'Return: damaged/wrong' else 'Return: change of mind' end, v_ship);
+
+  update public.order_returns
+     set status = 'refunded', refund_id = v_refund, received_by = p_actor, received_at = now(),
+         receive_note = v_note, updated_at = now()
+   where id = ret.id;
+  perform public._online_event(o.id, 'return_refunded', o.status, o.status, p_actor,
+    jsonb_build_object('return_id', ret.id, 'refund_id', v_refund, 'received', (v_plan ->> 'received')::int,
+      'restocked', v_restocked, 'include_shipping', v_ship, 'amounts', v_actual));
+  return jsonb_build_object('status', 'refunded', 'refund_id', v_refund, 'refund', v_actual);
+end;
+$$;
+
+do $$
+declare
+  f text;
+begin
+  foreach f in array array[
+    'public._online_return_free_units(uuid, uuid)',
+    'public._online_return_plan(uuid, jsonb)',
+    'public._online_return_amounts(uuid, jsonb, boolean)',
+    'public._online_return_refund_json(uuid)'] loop
+    execute 'revoke all on function ' || f || ' from public, anon, authenticated';
+  end loop;
+  foreach f in array array[
+    'public.online_return_preview(uuid, jsonb)',
+    'public.online_return_receive(uuid, uuid, jsonb, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;

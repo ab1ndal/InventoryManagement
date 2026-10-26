@@ -597,3 +597,371 @@ begin
   assert has_function_privilege('service_role', 'public.online_return_cancel(uuid,uuid,text)', 'execute'), 'service cancel';
 end $$;
 rollback;
+
+-- ===================================================================
+-- Task 3: receive and refund, preview
+-- ===================================================================
+-- Delivered order from p_lines/p_opt (see mk_order); 2 days ago. Gateway 0 → paid without gateway.
+create function pg_temp.delivered_multi(p_lines jsonb, p_opt jsonb default '{}'::jsonb) returns uuid
+language plpgsql as $$
+declare
+  r record;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(p_lines, p_opt);
+  perform public.online_order_confirm_payment(r.order_ref,
+    case when pg_temp.gw(r.order_ref) = 0 then 'NO_GATEWAY' else 'cfpay_' || r.order_ref end, pg_temp.gw(r.order_ref), 'INR');
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  perform pg_temp.pack(r.order_id);
+  update public.orders set paid_at = now() - interval '20 days' where id = r.order_id;
+  perform public.online_order_apply_tracking((select awb from public.orders where id = r.order_id), 'shipped', '{"shipment_status_id":6}');
+  perform public.online_order_mark_delivered(r.order_id, null, now() - interval '2 days', 'test');
+  return r.order_id;
+end $$;
+
+create function pg_temp.item_of(p_order uuid) returns uuid language sql as $$
+  select id from public.order_items where order_id = p_order order by line_no limit 1
+$$;
+
+create function pg_temp.variant_of(p_item uuid) returns uuid language sql as $$
+  select variantid from public.order_items where id = p_item
+$$;
+
+create function pg_temp.recv_items(p_item uuid, p_received int, p_restock int) returns jsonb language sql as $$
+  select jsonb_build_array(jsonb_build_object('item_id', p_item, 'received_units', p_received, 'restock_units', p_restock))
+$$;
+
+create function pg_temp.recv(p_ret uuid, p_item uuid, p_received int, p_restock int, p_note text default null)
+returns jsonb language sql as $$
+  select public.online_return_receive(p_ret, null, pg_temp.recv_items(p_item, p_received, p_restock), p_note)
+$$;
+
+create function pg_temp.photo(p_ret uuid) returns void language sql as $$
+  insert into public.order_return_photos (return_id, path)
+  select p_ret, r.order_id || '/' || p_ret || '/' || gen_random_uuid() || '.jpg' from public.order_returns r where r.id = p_ret
+$$;
+
+-- preview equals receive amounts on an order with an earlier partial refund and mixed voucher/gateway payment
+begin;
+do $$
+declare
+  o uuid; i uuid; r1 uuid; r2 uuid; p jsonb; res jsonb; ref public.order_refunds; n_ref int;
+begin
+  insert into public.vouchers (voucher_id, expiry_date, value, source) values ('RETVOUCHER000001', current_date + 30, 1000, 'online_refund');
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 3)),
+                               '{"voucher_code":"RETVOUCHER000001"}');
+  i := pg_temp.item_of(o);
+  assert (select credit_part = 1000 and gateway_part = 2000 from public.order_items where id = i), 'mixed payment fixture';
+  r1 := pg_temp.open_ret(o, i, 1);
+  res := pg_temp.recv(r1, i, 1, 1);
+  assert res ->> 'status' = 'refunded', 'earlier partial refund: ' || res::text;
+  assert (res #>> '{refund,credit_part}')::numeric = 333.34 and (res #>> '{refund,gateway_part}')::numeric = 666.67,
+    'first unit carries the paise remainder: ' || res::text;
+  r2 := pg_temp.open_ret(o, i, 1);
+  select count(*) into n_ref from public.order_refunds where order_id = o;
+  p := public.online_return_preview(r2, pg_temp.recv_items(i, 1, 1));
+  assert (select count(*) from public.order_refunds where order_id = o) = n_ref, 'preview writes nothing';
+  assert (select refunded_qty from public.order_items where id = i) = 1, 'preview leaves refunded_qty';
+  assert (select status from public.order_returns where id = r2) = 'open', 'preview leaves return open';
+  res := pg_temp.recv(r2, i, 1, 1);
+  select * into ref from public.order_refunds where id = (res ->> 'refund_id')::uuid;
+  assert (p ->> 'credit_part')::numeric = ref.credit_amount and (p ->> 'gateway_part')::numeric = ref.gateway_amount
+     and (p ->> 'shipping')::numeric = ref.shipping_amount and (p ->> 'total')::numeric = ref.total_amount,
+    'preview ' || p::text || ' = refund ' || row_to_json(ref)::text;
+  assert (p ->> 'credit_part')::numeric = 333.33 and (p ->> 'gateway_part')::numeric = 666.67 and (p ->> 'shipping')::numeric = 0, p::text;
+  assert res -> 'refund' = p, 'receive returns the same amounts: ' || res::text;
+end $$;
+rollback;
+
+-- change of mind: product value only, no shipping, stock +restock
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; s0 numeric; ref public.order_refunds;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  s0 := pg_temp.stock(pg_temp.variant_of(i));
+  rid := pg_temp.open_ret(o, i, 2);
+  assert (public.online_return_preview(rid, pg_temp.recv_items(i, 2, 1)) ->> 'shipping')::numeric = 0, 'preview: no shipping';
+  res := pg_temp.recv(rid, i, 2, 1);
+  select * into ref from public.order_refunds where id = (res ->> 'refund_id')::uuid;
+  assert ref.reason = 'return' and ref.total_amount = 2000 and ref.shipping_amount = 0 and ref.units = 2, row_to_json(ref)::text;
+  assert pg_temp.stock(pg_temp.variant_of(i)) = s0 + 1, 'stock + restock only';
+  assert (select status = 'refunded' and refund_id = ref.id and received_at is not null
+            from public.order_returns where id = rid), 'return refunded';
+  assert (select received_units = 2 and restock_units = 1 from public.order_return_items where return_id = rid), 'units stored';
+  assert (select status from public.orders where id = o) = 'delivered', 'order stays delivered';
+  assert exists (select 1 from public.order_events where order_id = o and kind = 'return_refunded'
+                   and data ->> 'return_id' = rid::text and data ->> 'refund_id' = ref.id::text), 'event';
+  assert ref.status = 'awaiting_choice', 'gateway part waits for choice: ' || ref.status;
+end $$;
+rollback;
+
+-- damaged whole order: shipping included (and offset on the bill)
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; ref public.order_refunds;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 2, 'damaged_wrong', now() - interval '1 day');
+  perform pg_temp.photo(rid);
+  assert (public.online_return_preview(rid, pg_temp.recv_items(i, 2, 0)) ->> 'shipping')::numeric = 99, 'preview: shipping';
+  res := pg_temp.recv(rid, i, 2, 0);
+  select * into ref from public.order_refunds where id = (res ->> 'refund_id')::uuid;
+  assert ref.shipping_amount = 99 and ref.total_amount = 2099, row_to_json(ref)::text;
+  assert exists (select 1 from public.exchanges where order_refund_id = ref.id and order_item_id is null
+                   and product_name = 'Shipping' and credit_amount = 99 and reason = 'Return: damaged/wrong'), 'shipping offset row';
+end $$;
+rollback;
+
+-- damaged partial: no shipping
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; ref public.order_refunds;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 1, 'damaged_wrong', now() - interval '1 day');
+  perform pg_temp.photo(rid);
+  res := pg_temp.recv(rid, i, 1, 0);
+  select * into ref from public.order_refunds where id = (res ->> 'refund_id')::uuid;
+  assert ref.shipping_amount = 0 and ref.total_amount = 1000, row_to_json(ref)::text;
+  assert not exists (select 1 from public.exchanges where order_refund_id = ref.id and order_item_id is null), 'no shipping offset';
+end $$;
+rollback;
+
+-- damaged whole order via two returns (one change of mind, one damaged): shipping on the one that completes it;
+-- damaged whole order where only part passed the check: no shipping
+begin;
+do $$
+declare
+  o uuid; i uuid; r1 uuid; r2 uuid; res jsonb;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  r1 := pg_temp.open_ret(o, i, 2, 'damaged_wrong', now() - interval '1 day');
+  perform pg_temp.photo(r1);
+  res := pg_temp.recv(r1, i, 1, 0, 'one piece worn');
+  assert (res #>> '{refund,shipping}')::numeric = 0, 'not every unit back: ' || res::text;
+  r2 := pg_temp.open_ret(o, i, 1, 'damaged_wrong', now() - interval '1 day');
+  perform pg_temp.photo(r2);
+  res := pg_temp.recv(r2, i, 1, 0);
+  assert (res #>> '{refund,shipping}')::numeric = 99, 'second return completes the order: ' || res::text;
+end $$;
+rollback;
+
+-- second damaged return after shipping refunded: no shipping again
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; p jsonb;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  -- shipping already refunded by an earlier refund on this order
+  perform public._online_refund_create(o, 'return', '[]'::jsonb, true, null);
+  assert (select count(*) from public.order_refund_legs l join public.order_refunds r on r.id = l.refund_id
+           where r.order_id = o and l.source like 'shipping%') = 1, 'shipping leg exists';
+  rid := pg_temp.open_ret(o, i, 2, 'damaged_wrong', now() - interval '1 day');
+  perform pg_temp.photo(rid);
+  p := public.online_return_preview(rid, pg_temp.recv_items(i, 2, 0));
+  res := pg_temp.recv(rid, i, 2, 0);
+  assert (p ->> 'shipping')::numeric = 0 and (res #>> '{refund,shipping}')::numeric = 0, 'no shipping twice: ' || res::text;
+  assert (res #>> '{refund,total}')::numeric = 2000, res::text;
+end $$;
+rollback;
+
+-- voucher-paid part completes at once
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; ref public.order_refunds;
+begin
+  insert into public.vouchers (voucher_id, expiry_date, value, source) values ('RETVOUCHER000002', current_date + 30, 5000, 'online_refund');
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)),
+                               '{"voucher_code":"RETVOUCHER000002"}');
+  assert (select gateway_amount from public.orders where id = o) = 0, 'fully voucher-paid';
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 1);
+  res := pg_temp.recv(rid, i, 1, 1);
+  select * into ref from public.order_refunds where id = (res ->> 'refund_id')::uuid;
+  assert ref.status = 'completed' and ref.credit_amount = 1000 and ref.gateway_amount = 0, row_to_json(ref)::text;
+  assert (select bool_and(status = 'completed') and bool_and(source = 'credit') from public.order_refund_legs where refund_id = ref.id),
+    'credit leg completed';
+end $$;
+rollback;
+
+-- failed pieces: received 1 of 2 refunds 1, note required
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; s0 numeric;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  s0 := pg_temp.stock(pg_temp.variant_of(i));
+  rid := pg_temp.open_ret(o, i, 2);
+  begin
+    perform pg_temp.recv(rid, i, 1, 1, '  ');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%note%', 'note required: ' || sqlerrm; end;
+  res := pg_temp.recv(rid, i, 1, 1, 'tags removed on one');
+  assert (res #>> '{refund,total}')::numeric = 1000, res::text;
+  assert (select receive_note from public.order_returns where id = rid) = 'tags removed on one', 'note stored';
+  assert pg_temp.stock(pg_temp.variant_of(i)) = s0 + 1, 'stock +1';
+  assert pg_temp.returnable(o) = 1, 'failed piece is returnable again: ' || pg_temp.returnable(o);
+end $$;
+rollback;
+
+-- nothing passed → rejected, no refund
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; s0 numeric;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  s0 := pg_temp.stock(pg_temp.variant_of(i));
+  rid := pg_temp.open_ret(o, i, 2);
+  begin
+    perform pg_temp.recv(rid, i, 0, 0);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%note%', 'note required to reject: ' || sqlerrm; end;
+  res := pg_temp.recv(rid, i, 0, 0, 'both worn');
+  assert res ->> 'status' = 'rejected' and res ->> 'refund_id' is null, res::text;
+  assert (select status from public.order_returns where id = rid) = 'rejected', 'rejected';
+  assert not exists (select 1 from public.order_refunds where order_id = o), 'no refund';
+  assert pg_temp.stock(pg_temp.variant_of(i)) = s0, 'stock unchanged';
+  assert exists (select 1 from public.order_events where order_id = o and kind = 'return_rejected'), 'event';
+  res := pg_temp.recv(rid, i, 0, 0, 'both worn');
+  assert res ->> 'status' = 'rejected', 'repeat on rejected returns stored result';
+end $$;
+rollback;
+
+-- receive twice returns same refund
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; a jsonb; b jsonb; s0 numeric;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  s0 := pg_temp.stock(pg_temp.variant_of(i));
+  rid := pg_temp.open_ret(o, i, 2);
+  a := pg_temp.recv(rid, i, 2, 2);
+  b := pg_temp.recv(rid, i, 2, 2);
+  assert a = b, a::text || ' vs ' || b::text;
+  assert (select count(*) from public.order_refunds where order_id = o) = 1, 'one refund';
+  assert pg_temp.stock(pg_temp.variant_of(i)) = s0 + 2, 'stock restored once';
+  assert (select count(*) from public.order_events where order_id = o and kind = 'return_refunded') = 1, 'one event';
+end $$;
+rollback;
+
+-- damaged without photo raises
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 1, 'damaged_wrong', now() - interval '1 day');
+  begin
+    perform pg_temp.recv(rid, i, 1, 0);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%photo%', 'photo required: ' || sqlerrm; end;
+  assert (select status from public.order_returns where id = rid) = 'open', 'still open';
+end $$;
+rollback;
+
+-- in-store exchange meanwhile → raises
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 2);
+  insert into public.exchanges (original_bill_item_id, quantity, reason)
+  values ((select bill_item_id from public.order_items where id = i), 1, 'In-store exchange');
+  begin
+    perform pg_temp.recv(rid, i, 2, 2);
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'item ' || i || ' was exchanged in store; reduce received pieces', 'race: ' || sqlerrm;
+  end;
+  begin
+    perform public.online_return_preview(rid, pg_temp.recv_items(i, 2, 2));
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%exchanged in store%', 'preview race: ' || sqlerrm; end;
+  res := pg_temp.recv(rid, i, 1, 1, 'one exchanged in store');
+  assert res ->> 'status' = 'refunded', res::text;
+end $$;
+rollback;
+
+-- exchanges rows written with order_refund_id
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid; res jsonb; b int;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 2);
+  res := pg_temp.recv(rid, i, 2, 2);
+  select bill_id into b from public.orders where id = o;
+  assert exists (select 1 from public.exchanges e join public.order_items it on it.id = e.order_item_id
+                  where e.order_refund_id = (res ->> 'refund_id')::uuid and e.order_item_id = i
+                    and e.original_bill_item_id = it.bill_item_id and e.quantity = 2 and e.credit_amount = 2000
+                    and e.reason = 'Return: change of mind' and e.new_billid = b), 'item offset row';
+  assert pg_temp.returnable(o) = 0, 'online offset not double-counted as in-store exchange';
+end $$;
+rollback;
+
+-- input validation
+begin;
+do $$
+declare
+  o uuid; i uuid; rid uuid;
+begin
+  o := pg_temp.delivered_multi(jsonb_build_array(jsonb_build_object('v', pg_temp.mk_variant(1000, 10), 'qty', 2)));
+  i := pg_temp.item_of(o);
+  rid := pg_temp.open_ret(o, i, 1);
+  begin
+    perform pg_temp.recv(rid, i, 2, 0, 'n');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%received%', 'received above units: ' || sqlerrm; end;
+  begin
+    perform pg_temp.recv(rid, i, 1, 2, 'n');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%restock%', 'restock above received: ' || sqlerrm; end;
+  begin
+    perform pg_temp.recv(rid, i, 1, null, 'n');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%restock%', 'restock required: ' || sqlerrm; end;
+  begin
+    perform pg_temp.recv(rid, gen_random_uuid(), 1, 1, 'n');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%not on return%', 'unknown item: ' || sqlerrm; end;
+  begin
+    perform public.online_return_receive(rid, null, '[]'::jsonb, 'n');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%every item%', 'item missing: ' || sqlerrm; end;
+  perform public.online_return_cancel(rid, null, 'n');
+  begin
+    perform pg_temp.recv(rid, i, 1, 1);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%cancelled%', 'cancelled return: ' || sqlerrm; end;
+  assert not has_function_privilege('anon', 'public.online_return_receive(uuid,uuid,jsonb,text)', 'execute'), 'anon receive';
+  assert not has_function_privilege('authenticated', 'public.online_return_preview(uuid,jsonb)', 'execute'), 'authenticated preview';
+  assert has_function_privilege('service_role', 'public.online_return_receive(uuid,uuid,jsonb,text)', 'execute'), 'service receive';
+  assert has_function_privilege('service_role', 'public.online_return_preview(uuid,jsonb)', 'execute'), 'service preview';
+end $$;
+rollback;
+
+\echo 'test_online_returns: all passed'
