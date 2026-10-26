@@ -113,6 +113,23 @@ export class DbError extends Error {
   }
 }
 
+const byKey = (key: string) => (a: Record<string, unknown>, b: Record<string, unknown>) =>
+  String(a[key] ?? "").localeCompare(String(b[key] ?? ""));
+
+/** Deterministic order for the embedded returns (PostgREST orders embeds by alias, so sort here). */
+export function sortReturns(order: OrderRow): OrderRow {
+  if (!order.returns) return order;
+  const list = (v: unknown) => (Array.isArray(v) ? v as Record<string, unknown>[] : []);
+  return {
+    ...order,
+    returns: [...order.returns].sort(byKey("opened_at")).map((r) => ({
+      ...r,
+      items: [...list(r.items)].sort(byKey("item_id")),
+      photos: [...list(r.photos)].sort(byKey("uploaded_at")),
+    })),
+  };
+}
+
 export type OrdersDb = {
   rpc<T>(fn: string, args: Record<string, unknown>): Promise<T>;
   getOrder(id: string): Promise<OrderRow | null>;
@@ -139,13 +156,9 @@ export function supabaseOrdersDb(client: SupabaseClient): OrdersDb {
     async getOrderWithReturns(id) {
       const { data, error } = await client.from("orders")
         .select("*, returns:order_returns(*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at))")
-        .eq("id", id)
-        .order("opened_at", { referencedTable: "order_returns", ascending: true })
-        .order("item_id", { referencedTable: "order_returns.order_return_items", ascending: true })
-        .order("uploaded_at", { referencedTable: "order_returns.order_return_photos", ascending: true })
-        .maybeSingle();
+        .eq("id", id).maybeSingle();
       if (error) throw new DbError("orders", error.code ?? null, error.message);
-      return (data ?? null) as OrderRow | null;
+      return data ? sortReturns(data as OrderRow) : null;
     },
     async getReturnPhotoPath(photoId) {
       const { data, error } = await client.from("order_return_photos").select("path").eq("id", photoId).maybeSingle();

@@ -693,10 +693,19 @@ Deno.test("return_photo_view: object missing in Storage → 404 not_found", asyn
   assertEquals([r.status, r.body.code], [404, "not_found"]);
 });
 
-Deno.test("internal reads use getOrder (no returns embed); only the response uses getOrderWithReturns", async () => {
-  const { db, call } = setup();
-  await call(PROCESS);
-  assert(db.orderReads.includes("getOrder"));
-  assertEquals(db.orderReads.filter((r) => r === "getOrderWithReturns").length, 1);
-  assertEquals(db.orderReads.at(-1), "getOrderWithReturns");
-});
+for (
+  const [name, order, body] of [
+    ["process", {}, PROCESS],
+    ["cancel", {}, { action: "cancel", orderId: ORDER_ID, opKey: "c-1", reason: "customer asked" }],
+    ["send_back", { ...STUCK, awb: "AWB1" }, SEND_BACK],
+  ] as const
+) {
+  Deno.test(`${name}: internal reads use getOrder; only the response uses getOrderWithReturns`, async () => {
+    const { db, call } = setup({ ...order }, FULL_PLAN, true);
+    const r = await call(body);
+    assertEquals(r.status, 200);
+    // everything before the final response read is a plain getOrder (or no order read at all)
+    assertEquals(db.orderReads.at(-1), "getOrderWithReturns");
+    assertEquals(db.orderReads.slice(0, -1).filter((x) => x !== "getOrder"), []);
+  });
+}

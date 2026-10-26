@@ -1,4 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
+import { sortReturns } from "./process.ts";
+import { fakeOrder } from "./process_fakes.ts";
 import { HttpError } from "./http.ts";
 import { isoTimestamp, mapOpenReturn, mapReceiveItems, photoExtFor } from "./returns.ts";
 
@@ -103,4 +105,22 @@ Deno.test("isoTimestamp requires a zone", () => {
   );
   is400(() => isoTimestamp("2026-10-20T10:00:00", "t"));
   is400(() => isoTimestamp("2026-13-40T10:00:00Z", "t"));
+});
+
+Deno.test("sortReturns orders returns by opened_at, items by item_id, photos by uploaded_at", () => {
+  const out = sortReturns(fakeOrder({
+    returns: [
+      { id: "r2", opened_at: "2026-10-22", items: [{ item_id: "b" }, { item_id: "a" }], photos: [] },
+      {
+        id: "r1",
+        opened_at: "2026-10-21",
+        items: [],
+        photos: [{ id: "p2", uploaded_at: "2026-10-23" }, { id: "p1", uploaded_at: "2026-10-22" }],
+      },
+    ],
+  }));
+  assertEquals(out.returns!.map((r) => r.id), ["r1", "r2"]);
+  assertEquals((out.returns![1].items as { item_id: string }[]).map((i) => i.item_id), ["a", "b"]);
+  assertEquals((out.returns![0].photos as { id: string }[]).map((p) => p.id), ["p1", "p2"]);
+  assertEquals(sortReturns(fakeOrder()).returns, undefined);
 });
