@@ -43,6 +43,7 @@ export type FakeRefund = {
   status: RefundStatus;
   choice: RefundChoice | null;
   isGuest: boolean;
+  reason: string;
   email: string | null;
   name: string;
   items: { name: string; size: string | null; color: string | null; units: number; categoryId: string | null }[];
@@ -68,7 +69,7 @@ export class FakeRefundDb implements RefundDb {
   constructor(readonly clock: FakeClock) {}
 
   /** A refund with a gateway leg (and optional credit leg) awaiting the shopper's choice. */
-  add(opts: { gateway: number; credit?: number; shippingGateway?: number; isGuest?: boolean; email?: string | null } = {
+  add(opts: { gateway: number; credit?: number; shippingGateway?: number; isGuest?: boolean; email?: string | null; reason?: string } = {
     gateway: 1000,
   }): FakeRefund {
     const now = this.clock.now();
@@ -96,6 +97,7 @@ export class FakeRefundDb implements RefundDb {
       status: "awaiting_choice",
       choice: null,
       isGuest: opts.isGuest ?? true,
+      reason: opts.reason ?? "cancel",
       email: opts.email === undefined ? "shopper@example.com" : opts.email,
       name: "Test Shopper",
       items: [{ name: "Test Kurti", size: "M", color: "Red", units: 1, categoryId: "Kurti" }],
@@ -272,6 +274,7 @@ export class FakeRefundDb implements RefundDb {
       email: r.email,
       name: r.name,
       isGuest: r.isGuest,
+      reason: r.reason,
       items: r.items,
       legs: r.legs.map((l) => ({
         source: l.source,

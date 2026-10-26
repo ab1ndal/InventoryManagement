@@ -70,17 +70,22 @@ function settledLines(n: RefundNotice): string[] {
   return lines;
 }
 
+/** Return refunds get their own wording and no "similar pieces" nudge. */
+const isReturn = (n: RefundNotice) => n.reason === "return";
+
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export function refundChoiceEmail(n: RefundNotice, siteUrl: string): Email {
   if (!n.token || !n.tokenExpiresAt) throw new Error(`refund ${n.refundId} has no choice link`);
   const link = `${siteUrl}/refund-choice/${n.token}`;
-  const similar = similarPiecesUrl(n, siteUrl);
+  const similar = isReturn(n) ? null : similarPiecesUrl(n, siteUrl);
   const settled = settledLines(n);
   const text = [
     greeting(n),
     "",
-    `We're sorry: some pieces from your order ${n.orderRef} are no longer available.`,
+    isReturn(n)
+      ? `We've received your returned item(s) from order ${n.orderRef} and they passed our check.`
+      : `We're sorry: some pieces from your order ${n.orderRef} are no longer available.`,
     "",
     ...itemLines(n),
     "",
@@ -106,11 +111,14 @@ export function refundCompletedEmail(n: RefundNotice, siteUrl: string): Email {
   const original = n.legs
     .filter((l) => l.status === "completed" && l.destination === "original")
     .reduce((s, l) => s + l.amount, 0);
-  const similar = similarPiecesUrl(n, siteUrl);
+  const similar = isReturn(n) ? null : similarPiecesUrl(n, siteUrl);
   const text = [
     greeting(n),
     "",
-    `Your refund of ${rupees(n.amount)} for order ${n.orderRef} is complete.`,
+    isReturn(n)
+      ? `We've received your returned item(s) from order ${n.orderRef} and they passed our check. ` +
+        `Your refund of ${rupees(n.amount)} is complete.`
+      : `Your refund of ${rupees(n.amount)} for order ${n.orderRef} is complete.`,
     "",
     ...itemLines(n),
     "",
