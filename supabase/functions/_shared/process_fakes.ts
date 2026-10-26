@@ -121,6 +121,8 @@ export class FakeDb implements OrdersDb {
   events: { kind: string; opKey: string; result: Record<string, unknown> }[] = [];
   /** Returns shown on the order; photo paths by photo id. */
   returns: Record<string, unknown>[] = [];
+  /** Which order reader was used, in order. */
+  orderReads: string[] = [];
   photoPaths = new Map<string, string>();
   returnOrders = new Map<string, string>();
   /** rpc name → message: the next call to it raises (a business-rule refusal). */
@@ -137,6 +139,12 @@ export class FakeDb implements OrdersDb {
   }
 
   getOrder(id: string): Promise<OrderRow | null> {
+    this.orderReads.push("getOrder");
+    return Promise.resolve(id === this.order.id ? structuredClone(this.order) : null);
+  }
+
+  getOrderWithReturns(id: string): Promise<OrderRow | null> {
+    this.orderReads.push("getOrderWithReturns");
     return Promise.resolve(id === this.order.id ? structuredClone({ ...this.order, returns: this.returns }) : null);
   }
 

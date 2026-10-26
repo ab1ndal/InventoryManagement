@@ -35,7 +35,7 @@ function setup(
       },
       createViewUrl: (path, seconds) => {
         storageCalls.push({ fn: "view", path, seconds });
-        return Promise.resolve(`https://storage.test/view/${path}`);
+        return Promise.resolve(path.startsWith("gone/") ? null : `https://storage.test/view/${path}`);
       },
     },
     publicKeys: ["anon-key"],
@@ -684,4 +684,19 @@ Deno.test("the order in a response carries its returns", async () => {
     availableQty: 1,
   });
   assertEquals(r.body.order.returns[0].photos[0].id, PHOTO_ID);
+});
+
+Deno.test("return_photo_view: object missing in Storage → 404 not_found", async () => {
+  const { db, call } = setup();
+  db.photoPaths.set(PHOTO_ID, "gone/r/p.jpg");
+  const r = await call({ action: "return_photo_view", photoId: PHOTO_ID });
+  assertEquals([r.status, r.body.code], [404, "not_found"]);
+});
+
+Deno.test("internal reads use getOrder (no returns embed); only the response uses getOrderWithReturns", async () => {
+  const { db, call } = setup();
+  await call(PROCESS);
+  assert(db.orderReads.includes("getOrder"));
+  assertEquals(db.orderReads.filter((r) => r === "getOrderWithReturns").length, 1);
+  assertEquals(db.orderReads.at(-1), "getOrderWithReturns");
 });

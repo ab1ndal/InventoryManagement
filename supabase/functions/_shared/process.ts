@@ -82,6 +82,8 @@ export type OrderRow = {
   op_lease_until: string | null;
   process_error: string | null;
   sr_attempt: number;
+  /** Only present on getOrderWithReturns. */
+  returns?: Record<string, unknown>[];
   [column: string]: unknown;
 };
 
@@ -114,6 +116,8 @@ export class DbError extends Error {
 export type OrdersDb = {
   rpc<T>(fn: string, args: Record<string, unknown>): Promise<T>;
   getOrder(id: string): Promise<OrderRow | null>;
+  /** getOrder plus the order's returns (items, photo ids): only for staff responses, never internal reads. */
+  getOrderWithReturns(id: string): Promise<OrderRow | null>;
   /** Stored storage path of a return photo; staff view it through a signed URL only. */
   getReturnPhotoPath(photoId: string): Promise<string | null>;
   getReturnOrderId(returnId: string): Promise<string | null>;
@@ -128,9 +132,18 @@ export function supabaseOrdersDb(client: SupabaseClient): OrdersDb {
       return data as T;
     },
     async getOrder(id) {
+      const { data, error } = await client.from("orders").select("*").eq("id", id).maybeSingle();
+      if (error) throw new DbError("orders", error.code ?? null, error.message);
+      return (data ?? null) as OrderRow | null;
+    },
+    async getOrderWithReturns(id) {
       const { data, error } = await client.from("orders")
         .select("*, returns:order_returns(*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at))")
-        .eq("id", id).maybeSingle();
+        .eq("id", id)
+        .order("opened_at", { referencedTable: "order_returns", ascending: true })
+        .order("item_id", { referencedTable: "order_returns.order_return_items", ascending: true })
+        .order("uploaded_at", { referencedTable: "order_returns.order_return_photos", ascending: true })
+        .maybeSingle();
       if (error) throw new DbError("orders", error.code ?? null, error.message);
       return (data ?? null) as OrderRow | null;
     },

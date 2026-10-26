@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { HttpError } from "./http.ts";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const RETURN_REASONS = ["damaged_wrong", "change_of_mind"] as const;
 export type ReturnReason = typeof RETURN_REASONS[number];
@@ -23,7 +23,8 @@ export const PHOTO_VIEW_TTL_SECONDS = 600;
 export type ReturnsStorage = {
   /** A URL the browser PUTs the file to, plus the upload token. */
   createUploadUrl(path: string): Promise<{ uploadUrl: string; token: string }>;
-  createViewUrl(path: string, expiresInSeconds: number): Promise<string>;
+  /** null when the object is gone from Storage. */
+  createViewUrl(path: string, expiresInSeconds: number): Promise<string | null>;
 };
 
 export const RETURN_PHOTO_BUCKET = "order-returns";
@@ -45,6 +46,7 @@ export function supabaseReturnsStorage(client: SupabaseClient): ReturnsStorage {
         path,
         expiresInSeconds,
       );
+      if (error && /not.?found/i.test(error.message)) return null;
       if (error || !data) {
         throw new Error(
           `createSignedUrl failed for ${path}: ${error?.message}`,

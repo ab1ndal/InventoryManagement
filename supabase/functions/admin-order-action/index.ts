@@ -61,6 +61,7 @@ import {
   requiredText,
   type ReturnsStorage,
   supabaseReturnsStorage,
+  UUID_RE,
 } from "../_shared/returns.ts";
 import type { ShiprocketClient } from "../_shared/shiprocket.ts";
 
@@ -79,8 +80,6 @@ export type Deps = {
   /** REBOOK_API_CANCEL === "on": cancel-by-AWB API allowed; otherwise a superadmin confirms a dashboard cancel. */
   rebookApiCancel?: boolean;
 };
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 class BadRequest extends HttpError {
   constructor(message: string) {
@@ -130,7 +129,7 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
     const ship: ShipDeps = { db: deps.db, shiprocket: deps.shiprocket, shopEmail: deps.shopEmail };
     const action = body.action;
     const orderBody = async (orderId: string, extra: Record<string, unknown> = {}) =>
-      json(200, { ok: true, order: await deps.db.getOrder(orderId), ...extra }, cors);
+      json(200, { ok: true, order: await deps.db.getOrderWithReturns(orderId), ...extra }, cors);
 
     const orderIdOfReturn = async (returnId: string) => {
       const id = await deps.db.getReturnOrderId(returnId);
@@ -287,10 +286,9 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
           uuidField(body, "photoId"),
         );
         if (!path) return fail(404, "not_found", "photo not found");
-        return json(200, {
-          ok: true,
-          url: await deps.storage.createViewUrl(path, PHOTO_VIEW_TTL_SECONDS),
-        }, cors);
+        const url = await deps.storage.createViewUrl(path, PHOTO_VIEW_TTL_SECONDS);
+        if (!url) return fail(404, "not_found", "photo file not found");
+        return json(200, { ok: true, url }, cors);
       }
 
       case "return_preview": {
