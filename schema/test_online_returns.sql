@@ -1214,6 +1214,28 @@ begin
 end $$;
 rollback;
 
+-- online bill not yet delivered: refused for everyone (RA6)
+begin;
+do $$
+declare
+  s record := pg_temp.shipped_order();
+  b int; bi_id int; v uuid;
+begin
+  select o.bill_id, i.bill_item_id, i.variantid into b, bi_id, v
+    from public.orders o join public.order_items i on i.order_id = o.id where o.id = s.o_id;
+  assert b is not null and bi_id is not null, 'shipped order has a bill';
+  perform pg_temp.as_admin();
+  update public.profiles set role = 'superadmin' where id = auth.uid();
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(bi_id, 1, v)));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm = 'online order not delivered yet', 'undelivered: ' || sqlerrm;
+  end;
+  assert not exists (select 1 from public.exchanges where original_bill_item_id = bi_id), 'no exchange row';
+end $$;
+rollback;
+
 -- input checks and privileges
 begin;
 do $$
@@ -1231,6 +1253,17 @@ begin
     assert false, 'should have raised';
   exception when insufficient_privilege then null;
   end;
+  -- deactivated admin (RA5: same guard as stock_adjust)
+  update public.profiles set role = 'admin', is_active = false where id = u;
+  begin
+    perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b, 1), 1, v)));
+    assert false, 'deactivated admin should be refused';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
+  assert array_length(public.exchange_record(b2, null, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b2, 1), 1, v))), 1) = 1,
+    'service_role may record';
+  assert pg_temp.stock(v) = 6, 'service_role exchange restocked';
   perform pg_temp.as_admin();
   begin
     perform public.exchange_record(b, null, jsonb_build_array(pg_temp.ex_item(pg_temp.bi(b2, 1), 1, v)));
@@ -1250,7 +1283,7 @@ begin
   exception when others then
     assert sqlerrm like '%no items%', 'empty: ' || sqlerrm;
   end;
-  assert pg_temp.stock(v) = 5, 'nothing restocked';
+  assert pg_temp.stock(v) = 6, 'nothing else restocked';
   assert not has_function_privilege('anon', 'public.exchange_record(int,int,jsonb)', 'execute'), 'anon';
   assert has_function_privilege('authenticated', 'public.exchange_record(int,int,jsonb)', 'execute'), 'authenticated';
   assert has_function_privilege('service_role', 'public.exchange_record(int,int,jsonb)', 'execute'), 'service_role';

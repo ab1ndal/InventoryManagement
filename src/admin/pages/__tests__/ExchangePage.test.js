@@ -104,6 +104,28 @@ test("online bill not yet delivered is outside the window", async () => {
   expect(screen.queryByText(/Return items from Bill/)).not.toBeInTheDocument();
 });
 
+test("superadmin cannot load an undelivered online bill", async () => {
+  mockTables.profiles = { data: { role: "superadmin" }, error: null };
+  mockOrder = { delivered_at: null };
+  await loadBill();
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Exchange window closed", {
+    description: "This online order hasn't been delivered yet.",
+  }));
+  expect(toast.warning).not.toHaveBeenCalled();
+  expect(screen.queryByText(/Return items from Bill/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Review & Confirm" })).not.toBeInTheDocument();
+  expect(supabase.rpc).not.toHaveBeenCalled();
+});
+
+test("superadmin still overrides a delivered online bill outside the window", async () => {
+  mockTables.profiles = { data: { role: "superadmin" }, error: null };
+  mockBill.orderdate = daysAgo(20);
+  mockOrder = { delivered_at: daysAgo(10) };
+  await loadBill();
+  expect(await screen.findByText(/Return items from Bill #FY26-000501/)).toBeInTheDocument();
+  expect(toast.warning).toHaveBeenCalledWith("Exchange window override", expect.anything());
+});
+
 test("confirm calls exchange_record once and links the returned ids", async () => {
   await loadBill();
   await screen.findByText(/Return items from Bill #FY26-000501/);

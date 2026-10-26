@@ -284,5 +284,85 @@ grep -q 'already returned' "$OUT/exch_b_err" || { echo "FAIL: B should fail on a
 [ "$EX_STOCK" = "5.000" ] || { echo "FAIL: stock should be 5 - 1 sold + 1 restocked = 5"; fail=1; }
 [ "$EX_WAITED" -ge 1 ] || { echo "FAIL: B did not wait for A's order lock"; fail=1; }
 
+# ---- exchange_record vs online_return_open: free last unit, no return yet -> exactly one succeeds ----
+V6=66666666-6666-4666-8666-666666666666
+ADMIN6=66666666-0000-4000-8000-000000000006
+cleanup_exch_open() {
+  "${PSQL[@]}" > /dev/null <<SQL
+update public.storefront_settings set checkout_live = false where id = 1;
+create temp table eo_bills as select bill_id from public.orders where contact_name = 'Concurrency ExchOpen' and bill_id is not null;
+delete from public.exchanges where original_bill_item_id in (select bill_item_id from public.bill_items where billid in (select bill_id from eo_bills));
+delete from public.orders where contact_name = 'Concurrency ExchOpen';
+delete from public.bills where billid in (select bill_id from eo_bills);
+delete from public.productsizecolors where variantid = '$V6';
+delete from public.products where productid = 'CONC6';
+delete from public.profiles where id = '$ADMIN6';
+delete from auth.users where id = '$ADMIN6';
+SQL
+}
+cleanup_exch_open
+"${PSQL[@]}" > "$OUT/eo_ids" <<SQL
+insert into auth.users (id) values ('$ADMIN6');
+insert into public.profiles (id, email, role, is_active) values ('$ADMIN6', 'conc6@t.in', 'admin', true);
+insert into public.products (productid, name, purchaseprice, retailprice) values ('CONC6', 'Conc six', 500, 1000);
+insert into public.productsizecolors (productid, size, color, stock, variantid) values ('CONC6', 'M', 'Red', 5, '$V6');
+update public.storefront_settings set checkout_live = true where id = 1;
+create temp table eo_ids (order_id uuid, item_id uuid, bill_id int, bill_item_id int);
+do \$\$
+declare
+  v_ref text; v_order uuid; v_item uuid;
+begin
+  v_ref := (public.online_order_create(
+    jsonb_build_object('contact', jsonb_build_object('name', 'Concurrency ExchOpen', 'phone', '+919800000096'),
+      'address', jsonb_build_object('pincode', '201001'), 'subtotal', 1000, 'shipping', 99, 'gateway_amount', 1099),
+    jsonb_build_array(jsonb_build_object('variant_id', '$V6', 'qty', 1, 'unit_price', 1000)), null)).order_ref;
+  select id into v_order from public.orders where order_ref = v_ref;
+  perform public.online_order_confirm_payment(v_ref, 'cf_' || v_ref, 1099, 'INR');
+  select id into v_item from public.order_items where order_id = v_order;
+  perform public.online_order_set_availability(v_order, v_item, 1, null);
+  perform public.online_order_claim(v_order, 'process', null, 'op-eo');
+  perform public.online_order_prepare_process(v_order, null);
+  perform public.online_order_checkpoint(v_order, 'awb', '{"awb":"AWBEO","courier_id":7,"courier_name":"T"}', 'op-eo');
+  perform public.online_order_checkpoint(v_order, 'label', '{"label_url":"https://x/l.pdf"}', 'op-eo');
+  perform public.online_order_mark_packed(v_order, '{}'::jsonb, null, 'op-eo');
+  perform public.online_order_apply_tracking('AWBEO', 'shipped', '{"shipment_status_id":6}');
+  perform public.online_order_apply_tracking('AWBEO', 'delivered', '{"shipment_status_id":7}');
+  insert into eo_ids select v_order, v_item, o.bill_id, i.bill_item_id
+    from public.orders o join public.order_items i on i.order_id = o.id where o.id = v_order;
+end \$\$;
+select order_id || ' ' || item_id || ' ' || bill_id || ' ' || bill_item_id from eo_ids;
+SQL
+read -r EO_ORDER EO_ITEM EO_BILL EO_BI < "$OUT/eo_ids"
+# A: in-store exchange of the only unit, as an admin, holding its locks
+"${PSQL[@]}" -c "begin" \
+  -c "select set_config('request.jwt.claims', '{\"sub\":\"$ADMIN6\",\"role\":\"authenticated\"}', true)" \
+  -c "select array_length(public.exchange_record($EO_BILL, null, jsonb_build_array(jsonb_build_object('bill_item_id', $EO_BI, 'quantity', 1, 'credit_amount', 1000, 'reason', 'conc', 'product_name', 'Conc six', 'product_code', 'CONC6'))), 1)" \
+  -c "select pg_sleep(1.5)" -c "commit" > "$OUT/eo_a" 2> "$OUT/eo_a_err" &
+PID_EO=$!
+sleep 0.5
+# B: online return of the same unit: must wait for A's order lock, then find nothing returnable
+set +e
+START=$(date +%s)
+"${PSQL[@]}" -c "select public.online_return_open('$EO_ORDER', null, false, 'change_of_mind', now(), jsonb_build_array(jsonb_build_object('item_id', '$EO_ITEM', 'units', 1)), 'conc', null, null)" \
+  > "$OUT/eo_b" 2> "$OUT/eo_b_err"
+EO_B_RC=$?
+EO_WAITED=$(( $(date +%s) - START ))
+set -e
+wait "$PID_EO" || true
+"${PSQL[@]}" > "$OUT/eo_check" <<SQL
+select (select count(*) from public.exchanges where original_bill_item_id = $EO_BI) || ' '
+    || (select count(*) from public.order_returns where order_id = '$EO_ORDER') || ' '
+    || (select stock from public.productsizecolors where variantid = '$V6');
+SQL
+read -r EO_EX EO_RET EO_STOCK < "$OUT/eo_check"
+cleanup_exch_open
+echo "exchange vs return open: A=$(tr '\n' ' ' < "$OUT/eo_a") A_err=$(tr '\n' ' ' < "$OUT/eo_a_err") B_rc=$EO_B_RC waitedB=${EO_WAITED}s exchanges=$EO_EX returns=$EO_RET stock=$EO_STOCK B_err=$(tr '\n' ' ' < "$OUT/eo_b_err")"
+grep -qx '1' "$OUT/eo_a" || { echo "FAIL: A's exchange should record one row"; fail=1; }
+[ "$EO_B_RC" != "0" ] || { echo "FAIL: return open after the exchange should be refused"; fail=1; }
+grep -q 'returnable' "$OUT/eo_b_err" || { echo "FAIL: B should fail on returnable units"; fail=1; }
+[ "$EO_EX" = "1" ] && [ "$EO_RET" = "0" ] || { echo "FAIL: exactly one of exchange/return should exist"; fail=1; }
+[ "$EO_STOCK" = "5.000" ] || { echo "FAIL: stock should be 5 - 1 sold + 1 exchanged back = 5"; fail=1; }
+[ "$EO_WAITED" -ge 1 ] || { echo "FAIL: B did not wait for A's order lock"; fail=1; }
+
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"

@@ -187,21 +187,23 @@ export default function ExchangePage() {
     const billLabel = `Bill #${bill.bill_number || bill.billid}`;
     const days = daysSinceBill(bill.orderdate, deliveredAt);
     const ageText = deliveredAt ? `${billLabel} was delivered ${days} days ago` : `${billLabel} is ${days} days old`;
-    const withinWindow = !notDelivered && isWithinExchangeWindow(bill.orderdate, deliveredAt);
+    const withinWindow = isWithinExchangeWindow(bill.orderdate, deliveredAt);
 
+    // No override, superadmin included: an in-transit exchange plus a later RTO would
+    // restock and offset the same unit twice (exchange_record refuses it too).
+    if (notDelivered) {
+      toast.error("Exchange window closed", { description: "This online order hasn't been delivered yet." });
+      return;
+    }
     if (!isSuperAdmin && !withinWindow) {
       toast.error("Exchange window closed", {
-        description: notDelivered
-          ? "This online order hasn't been delivered yet."
-          : `${ageText}. Exchanges accepted within ${EXCHANGE_WINDOW_DAYS} days of ${deliveredAt ? "delivery" : "purchase"} only.`,
+        description: `${ageText}. Exchanges accepted within ${EXCHANGE_WINDOW_DAYS} days of ${deliveredAt ? "delivery" : "purchase"} only.`,
       });
       return;
     }
     if (isSuperAdmin && !withinWindow) {
       toast.warning("Exchange window override", {
-        description: notDelivered
-          ? "This online order hasn't been delivered yet. Proceeding as superadmin."
-          : `${ageText} (window: ${EXCHANGE_WINDOW_DAYS} days). Proceeding as superadmin.`,
+        description: `${ageText} (window: ${EXCHANGE_WINDOW_DAYS} days). Proceeding as superadmin.`,
       });
     }
 

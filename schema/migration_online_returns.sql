@@ -720,7 +720,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_order uuid;
+  o public.orders;
   e jsonb;
   bi public.bill_items;
   v_qty int;
@@ -730,14 +730,19 @@ declare
   v_id int;
   v_ids int[] := '{}';
 begin
-  if not public.is_admin() then
+  -- same guard as stock_adjust: active admins (and service_role) only
+  if not public._is_staff_or_service() then
     raise exception 'not authorized' using errcode = '42501';
   end if;
   if coalesce(jsonb_typeof(p_items), '') <> 'array' or p_items = '[]'::jsonb then
     raise exception 'exchange_record: no items';
   end if;
 
-  select id into v_order from public.orders where bill_id = p_billid for update;
+  select * into o from public.orders where bill_id = p_billid for update;
+  -- in transit: a later RTO would restock and offset the same unit again (ruling RA6)
+  if o.id is not null and o.delivered_at is null then
+    raise exception 'online order not delivered yet';
+  end if;
   perform 1 from public.bill_items
    where bill_item_id in (select (x ->> 'bill_item_id')::int from jsonb_array_elements(p_items) x)
    order by bill_item_id for update;
@@ -759,9 +764,9 @@ begin
     end if;
 
     -- online bill: units in an open return or already refunded are not free either (ruling RA3)
-    if v_order is not null then
+    if o.id is not null then
       select sum(i.shipped_qty), sum(f.units) into v_shipped, v_free
-        from public._online_return_free_units(v_order, null) f
+        from public._online_return_free_units(o.id, null) f
         join public.order_items i on i.id = f.item_id
        where i.bill_item_id = bi.bill_item_id;
       if v_free is not null and v_qty > v_free then
