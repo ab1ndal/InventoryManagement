@@ -4,13 +4,13 @@ import { Heart, MessageCircle, RefreshCw, Ruler, Truck } from "lucide-react";
 const WHATSAPP_URL =
   "https://wa.me/919810873280?text=Hi,%20I%20have%20a%20question%20about%20a%20product";
 
-// Keep every claim factual: no returns (in-store exchange only), no secure-checkout
+// Keep every claim factual: 7-day returns for online orders, no secure-checkout
 // claim before online checkout ships.
 const SIGNALS = [
   { icon: Heart, title: "Handpicked with love", desc: "Every piece chosen by our family" },
   // 2XL–6XL: ~140 of the visible products in stock (2026-10-14).
   { icon: Ruler, title: "Plus sizes up to 6XL", desc: "Hard to find in stores; we keep 2XL to 6XL" },
-  { icon: RefreshCw, title: "Easy exchanges in store", desc: "Exchange within 7 days at our store" },
+  { icon: RefreshCw, title: "7-day returns & exchange", desc: "Within 7 days of delivery or purchase" },
   { icon: MessageCircle, title: "WhatsApp help", desc: "Ask us about size, fabric or fit", href: WHATSAPP_URL },
   { icon: Truck, title: "Free shipping over ₹5,000", desc: "Delivered across Uttar Pradesh" },
 ];

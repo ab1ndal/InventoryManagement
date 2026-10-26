@@ -35,19 +35,34 @@ describe("Policy pages", () => {
   it("terms cancellation paragraph matches the refund choice and RTO rule", () => {
     render(<TermsPage />);
     expect(screen.getByText(/cancelled before dispatch.*instant store credit if you choose.*shipping charge is not refundable/i)).toBeInTheDocument();
+    expect(screen.getByText(/within 7 days of delivery.*Returns & Exchange Policy/i)).toBeInTheDocument();
   });
 
-  it("returns page states no-returns / 7-day in-store exchange", () => {
+  it("returns page states 7-day in-store exchange counted from delivery for online orders", () => {
     render(<ReturnsPolicyPage />);
     expect(screen.getByRole("heading", { name: /returns.*exchange/i })).toBeInTheDocument();
     expect(screen.getByText(/exchange.*within 7 days/i)).toBeInTheDocument();
     expect(screen.getByText(/in-store only/i)).toBeInTheDocument();
+    expect(screen.getByText(/online orders, the 7 days count from the day of delivery/i)).toBeInTheDocument();
   });
 
-  it("returns page states online cancellation and damaged-item refunds", () => {
-    render(<ReturnsPolicyPage />);
+  it("returns page states online cancellation and damaged-item rules", () => {
+    const { container } = render(<ReturnsPolicyPage />);
     expect(screen.getByText(/cancel an online order any time before it is dispatched/i)).toBeInTheDocument();
     expect(screen.getByText(/within 48 hours of delivery/i)).toBeInTheDocument();
+    expect(screen.getByText(/we arrange pickup at our cost/i)).toBeInTheDocument();
+    expect(screen.getByText(/whole order comes back.*including shipping/i)).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/send a replacement/i);
+  });
+
+  it("returns page states change-of-mind rules: 7 days of delivery, shipping not refunded", () => {
+    const { container } = render(<ReturnsPolicyPage />);
+    expect(screen.getByText(/within 7 days of delivery.*unused.*tags attached.*original packaging/i)).toBeInTheDocument();
+    expect(screen.getByText(/product price is refunded; the shipping charge is not refunded/i)).toBeInTheDocument();
+    expect(screen.getByText(/fails our check.*sent back to you at your cost/i)).toBeInTheDocument();
+    expect(screen.getByText(/only after the item reaches us and passes our check/i)).toBeInTheDocument();
+    expect(screen.getByText(/we do not send replacement parcels/i)).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/do not accept returns/i);
   });
 
   it("privacy and terms are real content naming the payment partner", () => {

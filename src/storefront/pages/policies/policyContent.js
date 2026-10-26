@@ -31,7 +31,10 @@ export const RETURNS = [
   {
     heading: "Returns",
     body: [
-      "We do not accept returns, except for damaged or wrong items as described below.",
+      "Online orders can be returned if the item arrives damaged or wrong, or if you change your mind, as described below. We do not send replacement parcels: if you want a different piece, you can place a new order, or exchange in store (see Exchanges).",
+      "Change of mind: you can return an item within 7 days of delivery if it is unused, with tags attached and in its original packaging. You can send it back at your own cost or bring it to our shop. The product price is refunded; the shipping charge is not refunded. If a returned piece fails our check, it is sent back to you at your cost.",
+      "Refunds are made only after the item reaches us and passes our check, to the original payment method within 5–7 working days, or as instant store credit if you choose.",
+      "To start a return, message us on WhatsApp at +91 98108 73280 or email bindalscreations@gmail.com.",
     ],
   },
   {
@@ -52,7 +55,7 @@ export const RETURNS = [
     heading: "Damaged or wrong item",
     body: [
       "If your online order arrives damaged or you receive the wrong item, tell us within 48 hours of delivery on WhatsApp or by email, with photos of the item and packaging.",
-      "We will send a replacement or, if one is not available, refund you in full to the original payment method within 5–7 working days, or as instant store credit if you choose.",
+      "We arrange pickup at our cost. If the whole order comes back, we refund the full amount including shipping; otherwise we refund the value of the returned items. The refund is made after the item reaches us and passes our check, to the original payment method within 5–7 working days, or as instant store credit if you choose.",
     ],
   },
   {
@@ -65,7 +68,7 @@ export const RETURNS = [
   {
     heading: "Exchanges",
     body: [
-      "Exchanges are accepted within 7 days of purchase, in-store only, with the original bill.",
+      "Exchanges are accepted within 7 days of purchase, in-store only, with the original bill. For online orders, the 7 days count from the day of delivery.",
       "The garment must be unworn, unwashed and in original condition with tags intact.",
     ],
   },
@@ -169,7 +172,7 @@ export const TERMS = [
   {
     heading: "Cancellations, exchanges and refunds",
     body: [
-      "Online orders can be cancelled before dispatch for a full refund, to the original payment method within 5–7 working days or as instant store credit if you choose. If a prepaid parcel is refused or undeliverable and returns to us, we refund the item value; the shipping charge is not refundable. After dispatch, items cannot be returned, except damaged or wrong items reported within 48 hours of delivery. Exchanges follow our Returns & Exchange Policy.",
+      "Online orders can be cancelled before dispatch for a full refund, to the original payment method within 5–7 working days or as instant store credit if you choose. If a prepaid parcel is refused or undeliverable and returns to us, we refund the item value; the shipping charge is not refundable. After delivery, items can be returned if damaged or wrong (reported within 48 hours of delivery) or, if unused and in original packaging with tags attached, within 7 days of delivery for a change of mind; refunds are made after the returned item reaches us and passes our check. Exchanges follow our Returns & Exchange Policy.",
     ],
   },
   {
