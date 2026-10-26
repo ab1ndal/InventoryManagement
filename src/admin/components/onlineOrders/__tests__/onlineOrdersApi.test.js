@@ -1,4 +1,4 @@
-import { action, listOrders, OrderActionError } from "../onlineOrdersApi";
+import { action, getOrder, listOrders, OrderActionError } from "../onlineOrdersApi";
 
 // Plain functions: CRA resetMocks wipes jest.fn implementations between tests.
 let mockCalls = [];
@@ -83,4 +83,17 @@ test("action turns a non-2xx response into OrderActionError with status and code
     message: "order busy",
   });
   expect(OrderActionError).toBeDefined();
+});
+
+test("getOrder exposes the order's returns (items, photo ids only) on order.returns", async () => {
+  mockResults.orders = { data: { id: "o1", status: "delivered" }, error: null };
+  mockResults.order_returns = { data: [{ id: "r1", items: [], photos: [{ id: "p1", uploaded_at: "t" }] }], error: null };
+  const d = await getOrder("o1");
+  expect(d.order.returns).toEqual([{ id: "r1", items: [], photos: [{ id: "p1", uploaded_at: "t" }] }]);
+  expect(d.order.status).toBe("delivered");
+  const ops = opsOf("order_returns");
+  expect(ops).toContainEqual(["eq", "order_id", "o1"]);
+  const sel = ops.find((o) => o[0] === "select")[1];
+  expect(sel).toContain("order_return_photos(id, uploaded_at)");
+  expect(sel).not.toContain("path");
 });

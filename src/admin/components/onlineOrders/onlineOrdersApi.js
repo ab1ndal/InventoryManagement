@@ -65,12 +65,20 @@ export async function listOrders(filter = "all") {
 }
 
 export async function getOrder(id) {
-  const [order, items, events, refunds, jobs] = await Promise.all([
+  const [order, items, events, refunds, jobs, returns] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_items").select("*").eq("order_id", id).order("line_no"),
     supabase.from("order_events").select("*").eq("order_id", id).order("id"),
     supabase.from("order_refunds").select("*").eq("order_id", id).order("created_at"),
     supabase.from("order_jobs").select("*").eq("order_id", id).order("created_at"),
+    // Photo storage paths are never selected: staff view a photo through return_photo_view.
+    supabase
+      .from("order_returns")
+      .select("*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at)")
+      .eq("order_id", id)
+      .order("opened_at")
+      .order("item_id", { referencedTable: "order_return_items" })
+      .order("uploaded_at", { referencedTable: "order_return_photos" }),
   ]);
   for (const [what, res] of [
     ["order", order],
@@ -78,6 +86,7 @@ export async function getOrder(id) {
     ["order events", events],
     ["refunds", refunds],
     ["jobs", jobs],
+    ["returns", returns],
   ]) {
     if (res.error) raise(`Loading ${what}`, res.error);
   }
@@ -95,7 +104,7 @@ export async function getOrder(id) {
   }
 
   return {
-    order: order.data,
+    order: { ...order.data, returns: returns.data || [] },
     items: items.data || [],
     events: events.data || [],
     refunds: refunds.data || [],
