@@ -33,7 +33,7 @@ export const HERO_SLIDES = [
   {
     id: "sarees",
     headline: "Sarees for every celebration",
-    subline: "Rich weaves and festive reds, curated with care.",
+    subline: "Silk, chiffon, georgette and cotton sarees for weddings, pujas and every day.",
     cta: "Shop sarees",
     href: "/collections/sarees",
     images: [{ url: "/hero/sarees-desktop.webp", mobileUrl: "/hero/sarees-mobile.webp" }],
@@ -41,7 +41,7 @@ export const HERO_SLIDES = [
   {
     id: "lehengas",
     headline: "Lehengas & gowns",
-    subline: "Statement silhouettes, handpicked with love.",
+    subline: "Bridal, festive and lighter lehengas for smaller functions.",
     cta: "Shop lehengas",
     href: "/collections/lehengas",
     images: [{ url: "/hero/lehengas-desktop.webp", mobileUrl: "/hero/lehengas-mobile.webp" }],

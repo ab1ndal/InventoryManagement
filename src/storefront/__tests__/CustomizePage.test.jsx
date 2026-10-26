@@ -19,7 +19,9 @@ describe("CustomizePage", () => {
     const url = new URL(whatsapp.getAttribute("href"));
     expect(url.origin + url.pathname).toBe("https://wa.me/919810873280");
     const text = url.searchParams.get("text");
-    ["Garment:", "Budget:", "Quantity:", "Size:"].forEach((field) => expect(text).toContain(field));
+    // One short opener; size and fabric are asked later.
+    expect(text).toMatch(/outfit made from this photo/i);
+    expect(text.length).toBeLessThan(200);
   });
 
   it("offers email as the alternative", () => {
@@ -42,7 +44,7 @@ describe("CustomizePage", () => {
 
   it("keeps the full rules in a fold so the page stays short", () => {
     renderPage();
-    const fold = screen.getByText(/before you order/i).closest("details");
+    const fold = screen.getByText(/a few things to know/i).closest("details");
     expect(fold).not.toHaveAttribute("open");
     expect(fold).toHaveTextContent(/within 1 day/i);
   });

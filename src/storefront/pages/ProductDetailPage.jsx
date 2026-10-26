@@ -426,6 +426,12 @@ function ProductDetail({ productid }) {
               <Truck size={15} className="text-storefront-gold flex-shrink-0" aria-hidden="true" />
               {DELIVERY_ESTIMATE}
             </p>
+            <p className="text-xs text-storefront-muted font-sans mt-2">
+              Want it in another colour or size?{" "}
+              <Link to="/customize" className="text-storefront-charcoal underline underline-offset-2 hover:text-storefront-gold">
+                Our tailors can make it for you
+              </Link>
+            </p>
 
             <ul className="grid grid-cols-3 gap-2 border-y border-storefront-border/70 py-4 mt-5 mb-8">
               {TRUST_POINTS.map(({ icon: Icon, label }) => (

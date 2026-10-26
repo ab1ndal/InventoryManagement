@@ -115,6 +115,35 @@ measuring tape, brass scissors and spools of gold zari thread; an unfinished mar
 dress form behind.`,
 };
 
+// Portrait for the /customize page itself: no overlay, so no empty band.
+SLIDES["customize-page"] = {
+  stillLife: true,
+  layouts: {
+    mobile: `
+COMPOSITION (portrait 4:5): a balanced, filled editorial composition. Upper half: the unfinished
+maroon silk blouse on a dress form, with tailor's pins and chalk lines, slightly off-centre. Lower half:
+the worktable close up with the lehenga design sketch, the fan of swatches, measuring tape, brass scissors
+and zari spools, all in focus. No empty areas.`,
+  },
+  mobileScene: SLIDES.customize.mobileScene,
+};
+
+// Home band image: must differ from the /customize page photo (owner: the
+// same photo on both looked odd). Tells "send us the photo" instead.
+SLIDES["customize-band"] = {
+  stillLife: true,
+  layouts: {
+    mobile: `
+COMPOSITION (portrait 4:5): top-down three-quarter view of a tailor's cutting table, filled edge to edge.
+A smartphone lies on the table, its screen showing a photograph of an elegant embroidered pastel lehenga
+outfit. Beside the phone, a pencil sketch on cream paper that copies the same lehenga from the photo,
+then a few matching fabric swatches and a spool of gold zari thread, a yellow measuring tape and tailor's
+chalk. No empty areas.`,
+  },
+  mobileScene: `SETTING: a wooden tailor's cutting table in a warm Indian boutique workroom, soft window light,
+the story of turning a customer's reference photo into a design: phone with the photo, sketch, swatches.`,
+};
+
 const STILL_STYLE = `
 Photorealistic editorial still-life photograph for a luxury Indian ethnicwear e-commerce homepage banner.
 Real objects, real textures, natural imperfections, shot on a full-frame camera with a 50mm lens at f/4,
@@ -144,7 +173,8 @@ will be overlaid there.`,
 
 function buildPrompt(slide, v) {
   const style = slide.stillLife ? STILL_STYLE : STYLE;
-  const layout = slide.stillLife ? STILL_LAYOUTS[v === VARIANTS.mobile ? "mobile" : "desktop"] : v.layout;
+  const variantName = v === VARIANTS.mobile ? "mobile" : "desktop";
+  const layout = slide.layouts?.[variantName] ?? (slide.stillLife ? STILL_LAYOUTS[variantName] : v.layout);
   return [style, v.scene(slide), layout, NEGATIVE].map((s) => s.trim()).join("\n\n");
 }
 

@@ -9,6 +9,7 @@ const ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Utta
 const STORE_LAT_LNG = "28.6658525,77.4270128";
 const MAP_SRC = `https://www.google.com/maps?q=${STORE_LAT_LNG}&z=17&output=embed`;
 const DIRECTIONS_URL = "https://maps.google.com/?cid=3990311017020362668";
+const STORE_PHOTOS = [];
 
 export default function ContactPage() {
   return (
@@ -66,17 +67,16 @@ export default function ContactPage() {
             </a>
           </div>
 
-          {/* Store photo placeholders */}
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            {["Storefront photo", "Interior photo"].map((label) => (
-              <div
-                key={label}
-                className="aspect-[4/3] bg-storefront-border/30 rounded-sm flex items-center justify-center text-storefront-muted text-[11px] tracking-wide text-center px-2"
-              >
-                [{label}]
-              </div>
-            ))}
-          </div>
+          {/* Real shop photos only: grey placeholder boxes read as an
+              unfinished site (owner 2026-10-25). Add { src, alt } entries
+              once the owner sends them. */}
+          {STORE_PHOTOS.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              {STORE_PHOTOS.map(({ src, alt }) => (
+                <img key={src} src={src} alt={alt} loading="lazy" className="aspect-[4/3] w-full object-cover rounded-sm" />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Right: map */}

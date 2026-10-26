@@ -10,16 +10,10 @@
 const SHOP_WHATSAPP = "919810873280";
 const SHOP_EMAIL = "bindalscreations@gmail.com";
 
-const REQUEST_TEMPLATE = [
-  "Hi Bindal's Creation, I saw a design I love and would like it made.",
-  "Garment: ",
-  "Budget: ",
-  "Quantity: ",
-  "Size: ",
-  "Fabric (optional): ",
-  "Needed by (optional): ",
-  "I'm attaching the photo.",
-].join("\n");
+// One easy opener (Codex review 2026-10-25): size, fabric and dates are
+// asked after the shop replies, so first contact stays effortless.
+const REQUEST_TEMPLATE =
+  "Hi Bindal's Creation, I'd like an outfit made from this photo. I'm attaching it. Please tell me what's possible and roughly what it would cost.";
 
 export const WHATSAPP_REQUEST_URL = `https://wa.me/${SHOP_WHATSAPP}?text=${encodeURIComponent(REQUEST_TEMPLATE)}`;
 export const EMAIL_REQUEST_URL = `mailto:${SHOP_EMAIL}?subject=${encodeURIComponent(
@@ -31,30 +25,24 @@ export const CUSTOMIZE = {
   lede: "A film star's lehenga, a look from Instagram, a photo from a friend's wedding. Send it to us and our in-house tailors will make it for you, in your size.",
   pitch: "Most shops sell you something like it. We make the one in your photo, as close as we possibly can.",
   makes: [
-    "Lehengas",
-    "Sarees & blouses",
-    "Dresses & gowns",
-    "Kurtis",
-    "Suits",
-    "Sherwanis",
-    "Jodhpuri suits",
-    "Formal suits",
-    "Blazers",
-    "Coat-pants",
+    { group: "For her", items: ["Lehengas", "Sarees & blouses", "Dresses & gowns", "Kurtis", "Suits"] },
+    { group: "For him", items: ["Sherwanis", "Jodhpuri suits", "Formal suits", "Blazers", "Coat-pants"] },
   ],
   steps: [
-    { title: "Send the photo", desc: "A screenshot or photo, your budget and size, on WhatsApp." },
-    { title: "Get a quote", desc: "We reply with a price and a ready-by date." },
+    { title: "Send the photo", desc: "A screenshot or photo on WhatsApp. That's all we need to start." },
+    { title: "Get a quote", desc: "We ask about size and fabric, then send a price and a ready-by date." },
     { title: "Pay 50% to start", desc: "We measure you at the shop or on a video call." },
     { title: "Collect or get it delivered", desc: "Pay the rest when it's ready." },
   ],
   facts: [
     { value: "2–4 weeks", label: "Rush orders possible" },
-    { value: "From ₹3,000", label: "Minimum order" },
+    { value: "₹3,000+", label: "Price depends on fabric and work" },
     { value: "50%", label: "Advance to start" },
-    { value: "Free", label: "Alterations at the shop" },
+    { value: "Free", label: "Fitting fixes at our Ghaziabad shop" },
   ],
+  reassurance: "We confirm the price, fabric and ready date with you before you pay anything.",
   goodToKnow: [
+    "Minimum order is ₹3,000.",
     "We match your photo as closely as we can. Fabric, handwork and colour can differ a little from the picture, and we'll tell you about any change when we quote.",
     "Rush orders (under 2 weeks) cost extra. The quote shows how much.",
     "Your budget helps us plan. The price in our quote is the final price.",
