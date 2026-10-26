@@ -1,3 +1,8 @@
+import React from "react";
+import { render, screen, act } from "@testing-library/react";
+import { WishlistProvider, useWishlist } from "../context/WishlistContext";
+import { fetchServerWishlist, addServerItems, removeServerItem } from "../lib/wishlistApi";
+
 jest.mock("../lib/wishlistApi", () => {
   const actual = jest.requireActual("../lib/wishlistApi");
   return {
@@ -19,10 +24,6 @@ jest.mock("lib/supabaseClient", () => ({
   },
 }));
 
-import React from "react";
-import { render, screen, act } from "@testing-library/react";
-import { WishlistProvider, useWishlist } from "../context/WishlistContext";
-import { fetchServerWishlist, addServerItems, removeServerItem } from "../lib/wishlistApi";
 
 const SAREE = { productid: "BC1", name: "Saree", retailprice: 1000 };
 const KURTA = { productid: "BC2", name: "Kurta", retailprice: 800 };
@@ -128,7 +129,9 @@ describe("sign-in sync", () => {
 
   it("drops a pending sync when the provider unmounts", async () => {
     const { unmount } = renderProbe();
-    await act(async () => { authCb("SIGNED_IN", SESSION); });
+    // Synchronous act: an async act can yield long enough under load for the
+    // deferred sync timer to fire before unmount, making this test flaky.
+    act(() => { authCb("SIGNED_IN", SESSION); });
     unmount();
     await flush();
     expect(fetchServerWishlist).not.toHaveBeenCalled();

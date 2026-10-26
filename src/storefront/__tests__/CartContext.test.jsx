@@ -1,3 +1,10 @@
+import React from "react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { CartProvider, useCart } from "../context/CartContext";
+import {
+  fetchServerCart, removeServerItem, clearServerCart, fetchLiveVariantData,
+} from "../lib/cartApi";
+
 const mockUpsert = jest.fn(async () => {});
 jest.mock("../lib/cartApi", () => ({
   fetchServerCart: jest.fn(async () => []),
@@ -18,12 +25,6 @@ jest.mock("lib/supabaseClient", () => ({
   },
 }));
 
-import React from "react";
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { CartProvider, useCart } from "../context/CartContext";
-import {
-  fetchServerCart, removeServerItem, clearServerCart, fetchLiveVariantData,
-} from "../lib/cartApi";
 
 const ITEM_V1 = {
   variant_id: "v1",
@@ -273,5 +274,17 @@ describe("CartContext — auth callback must not block the auth lock", () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     expect(fetchServerCart).toHaveBeenCalled();
     expect(screen.getByTestId("count").textContent).toBe("2");
+  });
+});
+
+describe("CartContext — pending sync on unmount", () => {
+  it("cancels a deferred sign-in sync when the provider unmounts", async () => {
+    fetchServerCart.mockReset();
+    fetchServerCart.mockResolvedValue([]);
+    const { unmount } = render(<CartProvider><Harness /></CartProvider>);
+    act(() => { authCb("SIGNED_IN", { user: { id: "u1" } }); });
+    unmount();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(fetchServerCart).not.toHaveBeenCalled();
   });
 });

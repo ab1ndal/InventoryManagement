@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+import CustomerTable from "../CustomerTable";
 
 const mockCustomers = [
   { customerid: 1, customer_ulid: "u1", first_name: "Asha", phone: "+911111111111", community_status: "not_added", created_at: "2026-01-02" },
@@ -37,7 +38,6 @@ jest.mock("../../../lib/supabaseClient", () => ({
 }));
 jest.mock("sonner", () => ({ toast: { success: () => {}, error: () => {}, warning: () => {} } }));
 
-import CustomerTable from "../CustomerTable";
 
 beforeEach(() => {
   mockUpdates = [];
@@ -45,16 +45,16 @@ beforeEach(() => {
 
 test("shows community status with human labels", async () => {
   render(<CustomerTable />);
-  await waitFor(() => expect(screen.getByText("Asha")).toBeInTheDocument());
-  const rowA = screen.getByText("Asha").closest("tr");
-  const rowB = screen.getByText("Bina").closest("tr");
+  expect(await screen.findByText("Asha")).toBeInTheDocument();
+  const rowA = screen.getByRole("row", { name: /Asha/ });
+  const rowB = screen.getByRole("row", { name: /Bina/ });
   expect(within(rowA).getByText("Not added")).toBeInTheDocument();
   expect(within(rowB).getByText("Member")).toBeInTheDocument();
 });
 
 test("filters to customers not yet added to the community", async () => {
   render(<CustomerTable />);
-  await waitFor(() => expect(screen.getByText("Bina")).toBeInTheDocument());
+  expect(await screen.findByText("Bina")).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Filter by community status"), {
     target: { value: "not_added" },
   });
@@ -64,7 +64,7 @@ test("filters to customers not yet added to the community", async () => {
 
 test("select all on page then bulk-mark as member in one update", async () => {
   render(<CustomerTable />);
-  await waitFor(() => expect(screen.getByText("Asha")).toBeInTheDocument());
+  expect(await screen.findByText("Asha")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("checkbox", { name: "Select all on page" }));
   expect(screen.getByText(/2 selected/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Member" }));

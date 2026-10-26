@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { MessageCircle, ChevronDown, MapPin } from "lucide-react";
+import { MessageCircle, ChevronDown, MapPin, Phone } from "lucide-react";
 import Seo from "../components/Seo";
 import { CUSTOMIZE, WHATSAPP_REQUEST_URL, EMAIL_REQUEST_URL } from "./customizeContent";
 
@@ -8,7 +8,7 @@ const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:rin
 
 function RequestCta() {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-x-5 [&>a]:whitespace-nowrap">
       <a
         href={WHATSAPP_REQUEST_URL}
         target="_blank"
@@ -19,10 +19,17 @@ function RequestCta() {
         Send your photo on WhatsApp
       </a>
       <a
+        href="tel:+919810873280"
+        className={`inline-flex items-center justify-center gap-2 border border-storefront-charcoal text-storefront-charcoal hover:bg-storefront-charcoal hover:text-storefront-cream font-sans text-sm font-medium tracking-widest uppercase px-6 py-4 active:scale-[0.98] transition duration-200 ${FOCUS}`}
+      >
+        <Phone size={16} />
+        Call us
+      </a>
+      <a
         href={EMAIL_REQUEST_URL}
         className={`text-center font-sans text-sm text-storefront-muted underline underline-offset-4 decoration-storefront-border hover:text-storefront-charcoal hover:decoration-storefront-charcoal transition-colors ${FOCUS}`}
       >
-        or email us
+        or email
       </a>
     </div>
   );
@@ -39,13 +46,20 @@ export default function CustomizePage() {
       {/* Hero: copy left, still life right (stacked on phones, copy first) */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-16 sm:pt-16 sm:pb-24 grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-16 items-center">
         <div>
-          <h1 className="font-display font-semibold text-storefront-charcoal text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] tracking-[-0.02em] [text-wrap:balance] mb-6">
+          <h1 className="font-display font-semibold text-storefront-charcoal text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] tracking-[-0.02em] [text-wrap:balance] mb-3">
             {CUSTOMIZE.title}
           </h1>
+          <p className="font-display italic text-2xl text-storefront-gold mb-6" lang="hi-Latn">
+            {CUSTOMIZE.hinglish}
+          </p>
           <p className="font-sans text-lg text-storefront-warm leading-relaxed max-w-[34rem] [text-wrap:pretty] mb-9">
             {CUSTOMIZE.lede}
           </p>
           <RequestCta />
+          <p className="font-sans text-xs tracking-wide text-storefront-muted mt-7">
+            Made for every function:{" "}
+            <span className="text-storefront-charcoal">{CUSTOMIZE.occasions.join(" · ")}</span>
+          </p>
         </div>
         <div className="relative mr-3 sm:mr-5">
           {/* Offset gold hairline frame for depth */}

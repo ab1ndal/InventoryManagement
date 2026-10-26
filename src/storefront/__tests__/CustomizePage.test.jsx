@@ -26,7 +26,7 @@ describe("CustomizePage", () => {
 
   it("offers email as the alternative", () => {
     renderPage();
-    const [email] = screen.getAllByRole("link", { name: /or email us/i });
+    const [email] = screen.getAllByRole("link", { name: /^or email$/i });
     expect(email.getAttribute("href")).toMatch(/^mailto:bindalscreations@gmail\.com\?subject=/);
   });
 
@@ -44,9 +44,20 @@ describe("CustomizePage", () => {
 
   it("keeps the full rules in a fold so the page stays short", () => {
     renderPage();
-    const fold = screen.getByText(/a few things to know/i).closest("details");
+    const fold = screen.getByRole("group");
+    expect(fold).toHaveTextContent(/a few things to know/i);
     expect(fold).not.toHaveAttribute("open");
     expect(fold).toHaveTextContent(/within 1 day/i);
+  });
+
+  it("speaks to Indian shoppers: call option, UPI, the functions they dress for", () => {
+    renderPage();
+    const [call] = screen.getAllByRole("link", { name: /call us/i });
+    expect(call).toHaveAttribute("href", "tel:+919810873280");
+    const text = document.body.textContent;
+    expect(text).toMatch(/UPI/);
+    expect(text).toMatch(/Shaadi/);
+    expect(text).toMatch(/Bollywood/);
   });
 
   it("is linked from the header nav", () => {

@@ -22,16 +22,20 @@ export const EMAIL_REQUEST_URL = `mailto:${SHOP_EMAIL}?subject=${encodeURICompon
 
 export const CUSTOMIZE = {
   title: "Seen a look you love?",
-  lede: "A film star's lehenga, a look from Instagram, a photo from a friend's wedding. Send it to us and our in-house tailors will make it for you, in your size.",
+  // Indian-audience pass (2026-10-25): "Bollywood" over "film star", a
+  // Hinglish line, the functions people dress for, calling over email.
+  lede: "A Bollywood star's lehenga, a look from Instagram, a photo from a cousin's wedding. Send it to us and our in-house tailors will make it for you, in your size.",
+  hinglish: "Photo bhejiye, hum bana denge.",
+  occasions: ["Shaadi", "Sangeet", "Mehendi", "Haldi", "Reception", "Festivals"],
   pitch: "Most shops sell you something like it. We make the one in your photo, as close as we possibly can.",
   makes: [
-    { group: "For her", items: ["Lehengas", "Sarees & blouses", "Dresses & gowns", "Kurtis", "Suits"] },
-    { group: "For him", items: ["Sherwanis", "Jodhpuri suits", "Formal suits", "Blazers", "Coat-pants"] },
+    { group: "For her", items: ["Bridal lehengas", "Lehengas", "Saree blouses", "Dresses & gowns", "Kurtis & suits"] },
+    { group: "For him", items: ["Sherwanis", "Jodhpuri suits", "Suits & formal suits", "Blazers", "Coat-pants"] },
   ],
   steps: [
     { title: "Send the photo", desc: "A screenshot or photo on WhatsApp. That's all we need to start." },
     { title: "Get a quote", desc: "We ask about size and fabric, then send a price and a ready-by date." },
-    { title: "Pay 50% to start", desc: "We measure you at the shop or on a video call." },
+    { title: "Pay 50% to start", desc: "By UPI or card. We measure you at the shop or on a video call, or copy a blouse that fits you well." },
     { title: "Collect or get it delivered", desc: "Pay the rest when it's ready." },
   ],
   facts: [

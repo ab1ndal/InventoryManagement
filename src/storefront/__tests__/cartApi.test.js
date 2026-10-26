@@ -1,3 +1,6 @@
+import { supabase } from "lib/supabaseClient";
+import { upsertItem, fetchLiveVariantData } from "../lib/cartApi";
+
 jest.mock("lib/supabaseClient", () => {
   const getUser = jest.fn();
   getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
@@ -9,8 +12,6 @@ jest.mock("../lib/productImage", () => ({
   getProductImageUrl: jest.fn(async () => "img://x"),
 }));
 
-import { supabase } from "lib/supabaseClient";
-import { upsertItem, fetchLiveVariantData } from "../lib/cartApi";
 
 describe("cartApi.upsertItem", () => {
   beforeEach(() => {

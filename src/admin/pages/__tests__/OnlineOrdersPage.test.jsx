@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import OnlineOrdersPage from "../OnlineOrdersPage";
 
 let mockRole = "admin";
 let mockLive = false;
@@ -16,7 +17,6 @@ jest.mock("../../components/onlineOrders/onlineOrdersApi", () => ({
 }));
 jest.mock("sonner", () => ({ toast: { error: () => {}, success: () => {} } }));
 
-import OnlineOrdersPage from "../OnlineOrdersPage";
 
 beforeEach(() => {
   mockRole = "admin";

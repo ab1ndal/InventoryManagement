@@ -1,3 +1,10 @@
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
+import CheckoutPage from "../pages/CheckoutPage";
+import { OrdersApiError } from "../lib/ordersApi";
+
 jest.mock("../components/FreeShippingNudge", () => ({ amount }) =>
   require("react").createElement("div", { "data-testid": "free-shipping-nudge", "data-amount": amount })
 );
@@ -24,12 +31,6 @@ jest.mock("../lib/ordersApi", () => ({
   newAttemptKey: (...a) => mockApi.newAttemptKey(...a),
 }));
 
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
-import CheckoutPage from "../pages/CheckoutPage";
-import { OrdersApiError } from "../lib/ordersApi";
 
 const ITEM = { variant_id: "v1", product_id: "BC1", quantity: 2, name: "Silk Saree", size: "FREE", color: "Red", price: 1500, image_url: null };
 const ATTEMPT_KEY = "11111111-2222-4333-8444-555555555555";

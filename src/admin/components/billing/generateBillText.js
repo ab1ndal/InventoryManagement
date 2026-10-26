@@ -1,3 +1,6 @@
+import { formatDate } from "../../../utility/dateFormat";
+import { formatINR } from "../../../utility/formatCurrency";
+
 const STORE = {
   name: "BINDALS CREATION",
   tagline: "A Complete Range of Family Wear",
@@ -5,9 +8,6 @@ const STORE = {
   phone: "+91 9810873280 | +91 9810121438",
   gstin: "09ABVPB4203A1Z4",
 };
-
-import { formatDate } from "../../../utility/dateFormat";
-import { formatINR } from "../../../utility/formatCurrency";
 
 const fmt = (n) => formatINR(n || 0, 2);
 const fmtDate = (d) => formatDate(d);

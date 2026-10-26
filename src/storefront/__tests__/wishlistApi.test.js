@@ -1,9 +1,10 @@
-jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
-
 import { supabase } from "lib/supabaseClient";
 import {
   fetchServerWishlist, addServerItems, removeServerItem, isMissingTableError,
 } from "../lib/wishlistApi";
+
+jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
+
 
 describe("wishlistApi.fetchServerWishlist", () => {
   it("reads rows joined to products in one query and returns the snapshot shape", async () => {

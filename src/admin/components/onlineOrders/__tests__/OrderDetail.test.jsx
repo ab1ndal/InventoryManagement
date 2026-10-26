@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
+import OrderDetail from "../OrderDetail";
 
 // Plain functions + mutable state: CRA resetMocks wipes jest.fn implementations.
 let mockDetail = null;
@@ -27,7 +28,6 @@ jest.mock("sonner", () => ({
   },
 }));
 
-import OrderDetail from "../OrderDetail";
 
 const baseOrder = {
   id: "o1",
@@ -94,6 +94,8 @@ test("shows the money breakdown", async () => {
   expect(await screen.findByText("Promo (DIWALI)")).toBeInTheDocument();
   expect(screen.getByText("Voucher (V1)")).toBeInTheDocument();
   expect(screen.getByText("Store credit")).toBeInTheDocument();
+  // The amount sits in the cell beside its label; no role ties the two.
+  // eslint-disable-next-line testing-library/no-node-access
   expect(screen.getByText("Paid online").nextSibling).toHaveTextContent("₹1,749.00");
 });
 

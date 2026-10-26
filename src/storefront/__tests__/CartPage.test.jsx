@@ -1,3 +1,8 @@
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import CartPage from "../pages/CartPage";
+
 // The nudge queries Supabase for suggestions (FreeShippingNudge.test.jsx
 // covers that); here we only check it receives the subtotal.
 jest.mock("../components/FreeShippingNudge", () => ({ amount }) =>
@@ -15,10 +20,6 @@ jest.mock("../context/CartContext", () => ({
   }),
 }));
 
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import CartPage from "../pages/CartPage";
 
 // CRA sets Jest's `resetMocks: true`, which wipes the factory-supplied
 // implementation above before every test — re-arm it here.

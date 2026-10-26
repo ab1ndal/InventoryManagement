@@ -1,12 +1,13 @@
+import React from "react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import HeroSlider from "../components/home/HeroSlider";
+
 // Plain function, not jest.fn: CRA's resetMocks would wipe a mock implementation.
 jest.mock("../lib/productImage", () => ({
   getProductImageUrl: (id) => Promise.resolve(`https://img.test/${id}.webp`),
 }));
 
-import React from "react";
-import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import HeroSlider from "../components/home/HeroSlider";
 
 const SLIDES = [
   { id: "a", headline: "Slide A", subline: "Sub A", cta: "Shop A", href: "/a", images: [{ productid: "BC1" }] },
@@ -51,6 +52,9 @@ describe("HeroSlider", () => {
   beforeEach(() => mockReducedMotion(false));
   afterEach(() => jest.useRealTimers());
 
+  // Slide images are decorative (alt="") and <picture>/<source> have no role,
+  // so the next two tests select them directly.
+  /* eslint-disable testing-library/no-container, testing-library/no-node-access */
   it("renders every slide from the config with its CTA link", async () => {
     const { container } = renderSlider();
     SLIDES.forEach((s) => {
@@ -75,6 +79,7 @@ describe("HeroSlider", () => {
     // Slides without a mobileUrl render a bare <img>.
     expect(container.querySelector('img[src="/hero/c.jpg"]').closest("picture")).toBeNull();
   });
+  /* eslint-enable testing-library/no-container, testing-library/no-node-access */
 
   it("moves forward and backward with the arrows, wrapping at the ends", () => {
     renderSlider();
@@ -101,8 +106,8 @@ describe("HeroSlider", () => {
 
   it("pauses autoplay on hover", () => {
     jest.useFakeTimers();
-    const { container } = renderSlider();
-    fireEvent.mouseEnter(container.querySelector("section"));
+    renderSlider();
+    fireEvent.mouseEnter(screen.getByRole("region", { name: "Featured collections" }));
     act(() => jest.advanceTimersByTime(15000));
     expect(activeHeadline()).toBe("Slide A");
   });
@@ -116,8 +121,8 @@ describe("HeroSlider", () => {
   });
 
   it("changes slide on a horizontal swipe", () => {
-    const { container } = renderSlider();
-    const section = container.querySelector("section");
+    renderSlider();
+    const section = screen.getByRole("region", { name: "Featured collections" });
     fireEvent.touchStart(section, { touches: [{ clientX: 300, clientY: 10 }] });
     fireEvent.touchEnd(section, { changedTouches: [{ clientX: 100, clientY: 12 }] });
     expect(activeHeadline()).toBe("Slide B");

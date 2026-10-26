@@ -1,3 +1,12 @@
+import React from "react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { supabase } from "lib/supabaseClient";
+import { useProduct } from "../hooks/useProduct";
+import { getProductImagePaths } from "../lib/productImage";
+import ProductDetailPage from "../pages/ProductDetailPage";
+import { MEASURE_INTRO } from "../pages/sizeGuideContent";
+
 jest.mock("lib/supabaseClient", () => ({
   supabase: { from: jest.fn() },
 }));
@@ -14,14 +23,6 @@ jest.mock("../components/ProductCard", () => (props) => (
   <div data-testid="product-card">{props.product.name}</div>
 ));
 
-import React from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { supabase } from "lib/supabaseClient";
-import { useProduct } from "../hooks/useProduct";
-import { getProductImagePaths } from "../lib/productImage";
-import ProductDetailPage from "../pages/ProductDetailPage";
-import { MEASURE_INTRO } from "../pages/sizeGuideContent";
 
 const PRODUCT = {
   productid: "BC252742",
@@ -140,6 +141,8 @@ describe("ProductDetailPage", () => {
   it("has no category eyebrow above the product title", () => {
     renderPage();
     const h1 = screen.getByRole("heading", { level: 1, name: "Silk-Lehenga", hidden: true });
+    // Checks DOM order: what sits directly above the title.
+    // eslint-disable-next-line testing-library/no-node-access
     const prev = h1.previousElementSibling;
     expect(prev?.textContent ?? "").not.toBe("Lehenga");
   });
@@ -210,7 +213,9 @@ describe("ProductDetailPage", () => {
 
 describe("ProductDetailPage — colour photos", () => {
   // The main image is the one inside the "Enlarge image" button.
+  // The main image is alt-less inside the button, so select it directly.
   const mainImageSrc = () =>
+    // eslint-disable-next-line testing-library/no-node-access
     screen.getByRole("button", { name: /enlarge image/i }).querySelector("img").getAttribute("src");
 
   it("shows the photo of the colour the shopper picks", async () => {

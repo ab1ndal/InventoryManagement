@@ -48,11 +48,15 @@ describe("StorefrontFooter — shop links", () => {
     renderFooter();
     const shopAll = screen.getAllByRole("link", { name: "Shop All" });
     expect(shopAll).toHaveLength(1);
+    // Footer columns are plain divs (heading + list); the column is the link's
+    // nearest div.
+    // eslint-disable-next-line testing-library/no-node-access
     expect(shopAll[0].closest("div")).toHaveTextContent(/^Explore/);
   });
 
   it("splits categories (Shop) from seasonal and service pages (Explore)", () => {
     renderFooter();
+    // eslint-disable-next-line testing-library/no-node-access -- column = heading's div, see above
     const column = (name) => screen.getByRole("heading", { name }).closest("div");
     expect(column("Shop")).toHaveTextContent("Sarees");
     expect(column("Shop")).not.toHaveTextContent("Custom Tailoring");

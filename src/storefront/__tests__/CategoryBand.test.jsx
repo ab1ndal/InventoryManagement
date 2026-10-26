@@ -1,13 +1,14 @@
-jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
-jest.mock("../lib/productImage", () => ({
-  getProductImageUrl: (id) => Promise.resolve(`https://img.test/${id}.webp`),
-}));
-
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import CategoryBand, { pickBandEntries } from "../components/home/CategoryBand";
+
+jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
+jest.mock("../lib/productImage", () => ({
+  getProductImageUrl: (id) => Promise.resolve(`https://img.test/${id}.webp`),
+}));
+
 
 const LINKS = [
   { label: "Sarees", to: "/collections/sarees" },

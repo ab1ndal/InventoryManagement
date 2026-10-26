@@ -1,10 +1,11 @@
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import ProductGrid from "../components/shop/ProductGrid";
+
 jest.mock("../components/ProductCard", () => (props) => (
   <div data-testid="product-card">{props.product.name}</div>
 ));
 
-import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
-import ProductGrid from "../components/shop/ProductGrid";
 
 let intersect;
 beforeAll(() => {
@@ -31,6 +32,8 @@ describe("ProductGrid", () => {
         fetchNextPage={() => {}}
       />
     );
+    // The column classes live on the cards' wrapper, which has no role.
+    // eslint-disable-next-line testing-library/no-node-access
     const grid = screen.getAllByTestId("product-card")[0].parentElement;
     expect(grid).toHaveClass("grid-cols-2", "lg:grid-cols-3", "xl:grid-cols-4");
     expect(grid).not.toHaveClass("grid-cols-1");

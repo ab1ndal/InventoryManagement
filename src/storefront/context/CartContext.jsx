@@ -61,6 +61,9 @@ export function CartProvider({ children }) {
     // every Supabase query first awaits getSession() on that same lock.
     // Awaiting a query here deadlocks the whole client — the storefront hangs
     // on skeletons for any returning signed-in visitor. Defer the work instead.
+    // Pending syncs are cancelled on unmount, as in WishlistContext: a sync
+    // that outlives its provider would still write to the server.
+    const timers = new Set();
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       const uid = session?.user?.id ?? null;
       userIdRef.current = uid;
@@ -69,9 +72,16 @@ export function CartProvider({ children }) {
         if (event === "SIGNED_OUT") setItems([]);
         return;
       }
-      setTimeout(() => syncWithServer(event), 0);
+      const t = setTimeout(() => {
+        timers.delete(t);
+        syncWithServer(event);
+      }, 0);
+      timers.add(t);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      timers.forEach(clearTimeout);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const persist = useCallback((variant_id, next) => {

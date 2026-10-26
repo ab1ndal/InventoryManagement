@@ -1,3 +1,9 @@
+import React from "react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
+import CheckoutPage from "../pages/CheckoutPage";
+
 // The nudge queries Supabase for suggestions (FreeShippingNudge.test.jsx
 // covers that); here we only check it receives the item subtotal.
 jest.mock("../components/FreeShippingNudge", () => ({ amount }) =>
@@ -16,11 +22,6 @@ jest.mock("../context/CartContext", () => ({
   useCart: () => mockUseCart(),
 }));
 
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
-import CheckoutPage from "../pages/CheckoutPage";
 
 const ITEM = { variant_id: "v1", product_id: "BC1", quantity: 2, name: "Silk Saree", size: "FREE", color: "Red", price: 1500, image_url: null };
 

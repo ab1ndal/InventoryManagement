@@ -1,3 +1,9 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import CollectionPage from "../pages/CollectionPage";
+import { getCollection } from "../lib/collections";
+
 jest.mock("../pages/ShopPage", () => (props) => (
   <div data-testid="shop-page">
     {props.title}|{(props.scopeCategoryIds || []).join(",")}|{(props.scopeProductIds || []).join(",")}|
@@ -15,11 +21,6 @@ jest.mock("../lib/collections", () => {
   };
 });
 
-import React from "react";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import CollectionPage from "../pages/CollectionPage";
-import { getCollection } from "../lib/collections";
 
 function renderAt(slug) {
   return render(

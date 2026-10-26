@@ -56,10 +56,10 @@ describe("Policy pages", () => {
     expect(screen.getByText(/do not see or store your card/i)).toBeInTheDocument();
     expect(container).not.toHaveTextContent(/placeholder|TODO/i);
     unmount();
-    const terms = render(<TermsPage />);
+    const view = render(<TermsPage />);
     expect(screen.getByRole("heading", { name: /terms/i })).toBeInTheDocument();
     expect(screen.getByText(/no GST is charged separately/i)).toBeInTheDocument();
     expect(screen.getByText(/laws of India/i)).toBeInTheDocument();
-    expect(terms.container).not.toHaveTextContent(/placeholder|TODO/i);
+    expect(view.container).not.toHaveTextContent(/placeholder|TODO/i);
   });
 });

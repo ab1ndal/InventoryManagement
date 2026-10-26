@@ -11,7 +11,7 @@ export default function TailoringBand() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 grid grid-cols-1 md:grid-cols-[0.85fr_1.15fr] gap-8 md:gap-14 items-center">
         <img
           src="/customize/photo-to-sketch.webp"
-          alt="A phone showing a photo of a lehenga, next to a pencil sketch of the same design and matching fabric swatches"
+          alt="A lehenga on a phone screen, next to a pencil sketch of the same design and matching fabric swatches"
           width={900}
           height={1125}
           loading="lazy"

@@ -1,14 +1,15 @@
+import React from "react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { supabase } from "lib/supabaseClient";
+import TrackOrderPage from "../pages/TrackOrderPage";
+
 jest.mock("lib/supabaseClient", () => ({
   supabase: {
     rpc: jest.fn(),
   },
 }));
 
-import React from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
-import { supabase } from "lib/supabaseClient";
-import TrackOrderPage from "../pages/TrackOrderPage";
 
 const DELIVERED = {
   order_ref: "WEB-000007", status: "delivered", created_at: "2026-10-20T10:00:00Z",

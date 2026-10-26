@@ -35,7 +35,10 @@ describe("WhatsApp Community QR footer", () => {
     const { container } = render(
       <QRCodeSVG value={WHATSAPP_COMMUNITY_INVITE_URL} level="M" marginSize={4} />,
     );
+    // QR modules are SVG path data; no accessible query exposes them.
+    // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
     const d = container.querySelectorAll("path")[1].getAttribute("d");
+    // eslint-disable-next-line testing-library/no-container
     container.remove();
     return d;
   };
@@ -45,6 +48,7 @@ describe("WhatsApp Community QR footer", () => {
     render(<InvoiceView {...base} docType={docType} />);
     const block = screen.getByTestId("community-qr");
     expect(within(block).getByText(/Scan to join our WhatsApp Community/, { selector: "div" })).toBeInTheDocument();
+    // eslint-disable-next-line testing-library/no-node-access -- SVG path data, see expectedModulePath
     const paths = block.querySelectorAll("svg path");
     expect(paths).toHaveLength(2);
     expect(paths[1].getAttribute("d")).toBe(expected);

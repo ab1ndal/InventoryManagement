@@ -1,11 +1,12 @@
-jest.mock("../components/ProductCard", () => (props) => (
-  <div data-testid="product-card">{props.product.name}</div>
-));
-
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ProductRail from "../components/home/ProductRail";
+
+jest.mock("../components/ProductCard", () => (props) => (
+  <div data-testid="product-card">{props.product.name}</div>
+));
+
 
 function renderRail(props) {
   return render(

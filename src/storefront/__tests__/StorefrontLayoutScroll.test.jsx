@@ -1,3 +1,8 @@
+import React from "react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
+import StorefrontLayout from "../components/StorefrontLayout";
+
 jest.mock("../components/StorefrontHeader", () => () => null);
 jest.mock("../components/StorefrontFooter", () => () => null);
 jest.mock("../components/cart/CartDrawer", () => () => null);
@@ -8,10 +13,6 @@ jest.mock("../context/CartContext", () => ({ CartProvider: ({ children }) => chi
 jest.mock("../context/WishlistContext", () => ({ WishlistProvider: ({ children }) => children }));
 jest.mock("../lib/analytics", () => ({ initAnalytics: jest.fn(), trackPageView: jest.fn() }));
 
-import React from "react";
-import { render, screen, fireEvent, act } from "@testing-library/react";
-import { MemoryRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
-import StorefrontLayout from "../components/StorefrontLayout";
 
 function Page({ to }) {
   const navigate = useNavigate();
@@ -51,8 +52,6 @@ test("going back leaves scroll to the browser", () => {
   renderApp();
   fireEvent.click(screen.getByRole("link", { name: "go" }));
   window.scrollTo.mockClear();
-  act(() => {
-    fireEvent.click(screen.getByRole("button", { name: "back" }));
-  });
+  fireEvent.click(screen.getByRole("button", { name: "back" }));
   expect(window.scrollTo).not.toHaveBeenCalled();
 });

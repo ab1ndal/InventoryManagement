@@ -1,3 +1,10 @@
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import RefundChoicePage from "../pages/RefundChoicePage";
+import { OrdersApiError } from "../lib/ordersApi";
+
 const mockPreview = jest.fn();
 const mockChoose = jest.fn();
 jest.mock("../lib/ordersApi", () => ({
@@ -6,12 +13,6 @@ jest.mock("../lib/ordersApi", () => ({
   refundChoose: (...a) => mockChoose(...a),
 }));
 
-import React from "react";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
-import RefundChoicePage from "../pages/RefundChoicePage";
-import { OrdersApiError } from "../lib/ordersApi";
 
 const PREVIEW = {
   orderRef: "WEB-000001",

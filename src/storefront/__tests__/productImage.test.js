@@ -1,7 +1,3 @@
-jest.mock("lib/supabaseClient", () => ({
-  supabase: { from: jest.fn() },
-}));
-
 import { supabase } from "lib/supabaseClient";
 import {
   imageUrl,
@@ -10,6 +6,11 @@ import {
   getProductImageUrl,
   imageColor,
 } from "../lib/productImage";
+
+jest.mock("lib/supabaseClient", () => ({
+  supabase: { from: jest.fn() },
+}));
+
 
 // Build a chainable mock for the batched query:
 //   supabase.from(...).select(...).in(...).order(...).order(...)

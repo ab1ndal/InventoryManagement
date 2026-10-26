@@ -1,7 +1,3 @@
-jest.mock("lib/supabaseClient", () => ({
-  supabase: { functions: { invoke: jest.fn() }, rpc: jest.fn(), from: jest.fn() },
-}));
-
 import { supabase } from "lib/supabaseClient";
 import {
   OrdersApiError,
@@ -16,6 +12,11 @@ import {
   refundChoose,
   resetCashfreeLoaderForTests,
 } from "../lib/ordersApi";
+
+jest.mock("lib/supabaseClient", () => ({
+  supabase: { functions: { invoke: jest.fn() }, rpc: jest.fn(), from: jest.fn() },
+}));
+
 
 function httpError(status, body) {
   return { context: { status, json: async () => body }, message: "Edge Function returned a non-2xx status code" };

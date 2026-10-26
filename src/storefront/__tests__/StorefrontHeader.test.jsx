@@ -99,6 +99,8 @@ describe("StorefrontHeader promo line", () => {
   it("starts on the first message in a polite live region", () => {
     renderHeader();
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[0].text);
+    // aria-live is an attribute on an inner node with no role of its own.
+    // eslint-disable-next-line testing-library/no-node-access
     expect(promo().querySelector("[aria-live='polite']")).not.toBeNull();
   });
 
