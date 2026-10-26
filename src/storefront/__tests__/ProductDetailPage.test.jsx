@@ -143,21 +143,23 @@ describe("ProductDetailPage", () => {
     expect(prev?.textContent ?? "").not.toBe("Lehenga");
   });
 
-  it("shows the tax and shipping line and the trust row", () => {
+  it("shows the price and shipping line and the trust row", () => {
     renderPage();
     expect(
-      screen.getByText("Inclusive of all taxes · Free shipping above ₹5,000")
+      screen.getByText("Final price · Free shipping above ₹5,000")
     ).toBeInTheDocument();
     expect(screen.getByText(/handpicked with love/i)).toBeInTheDocument();
     expect(screen.getByText(/exchange in store within 7 days/i)).toBeInTheDocument();
+    // Composition dealer: no tax claim anywhere on the page.
+    expect(document.body.textContent).not.toMatch(/inclusive of all taxes/i);
   });
 
-  it("shows Sold out instead of the price and tax line when every variant is sold out", () => {
+  it("shows Sold out instead of the price and its note when every variant is sold out", () => {
     renderPage(PRODUCT, VARIANTS.map((v) => ({ ...v, stock: 0 })));
     expect(screen.getByText("Sold out")).toBeInTheDocument();
     expect(screen.queryByText("₹12,500")).not.toBeInTheDocument();
     expect(
-      screen.queryByText("Inclusive of all taxes · Free shipping above ₹5,000")
+      screen.queryByText("Final price · Free shipping above ₹5,000")
     ).not.toBeInTheDocument();
   });
 
