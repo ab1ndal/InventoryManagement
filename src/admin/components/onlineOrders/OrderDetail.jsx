@@ -86,6 +86,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   // Courier cancel failure inside a send-back/rebook dialog; the dialog stays open so the
   // same op key can be resumed (retry, or superadmin manual-cancel confirmation).
   const [dialogProblem, setDialogProblem] = useState(null);
+  const [deliveredError, setDeliveredError] = useState(null);
   // release_op target {key, label}: key is the open send-back/rebook dialog's key, or a new one.
   const [release, setRelease] = useState(null);
   // One op key per Process/Cancel click; reused if that click's request is retried.
@@ -134,6 +135,7 @@ export default function OrderDetail({ orderId, onChanged }) {
     setRebookNote("");
     setDeliveredReason("");
     setDialogProblem(null);
+    setDeliveredError(null);
     opRef.current = null;
   };
 
@@ -180,6 +182,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   // Runs one admin-order-action call. Returns true on success.
   const run = async (payload, successMessage) => {
     setPending(true);
+    setDeliveredError(null);
     try {
       await action(payload);
       toast.success(successMessage);
@@ -195,6 +198,11 @@ export default function OrderDetail({ orderId, onChanged }) {
         setCourierError(err.message);
         toast.error("Courier error", { description: err.message });
         closeDialog();
+        await load();
+        onChanged?.();
+      } else if (err.code === "bad_state" && payload.action === "mark_delivered") {
+        // Refusals of the date/reason come back as bad_state too; keep the typed values.
+        setDeliveredError(err.message);
         await load();
         onChanged?.();
       } else if (err.code === "bad_state") {
@@ -253,6 +261,10 @@ export default function OrderDetail({ orderId, onChanged }) {
   const canMarkDelivered =
     role === "superadmin" && ["shipped", "out_for_delivery"].includes(order.status) && !order.delivered_at;
   const deliveredIso = localInputToIso(deliveredAt);
+  // The server allows at most 30 days back and nothing before payment.
+  const deliveredMin = toLocalInputValue(
+    new Date(Math.max(Date.now() - 30 * 24 * 3600 * 1000, order.paid_at ? new Date(order.paid_at) : 0))
+  );
   const canRelease = ["send_back", "rebook"].includes(order.op_action) && leaseExpired;
   const backPayload = (extra) =>
     dialog === "sendback"
@@ -517,7 +529,15 @@ export default function OrderDetail({ orderId, onChanged }) {
         </p>
       )}
 
-      <ReturnsSection order={order} items={items} role={role} onChanged={load} />
+      <ReturnsSection
+        order={order}
+        items={items}
+        role={role}
+        onChanged={async () => {
+          await load();
+          onChanged?.();
+        }}
+      />
 
       {/* Refunds */}
       {refunds.length > 0 && (
@@ -742,6 +762,8 @@ export default function OrderDetail({ orderId, onChanged }) {
               type="datetime-local"
               className="h-9 w-full rounded-md border border-input bg-white px-2"
               value={deliveredAt}
+              min={deliveredMin}
+              max={toLocalInputValue(new Date())}
               onChange={(e) => setDeliveredAt(e.target.value)}
             />
           </label>
@@ -754,6 +776,9 @@ export default function OrderDetail({ orderId, onChanged }) {
               placeholder="e.g. Customer confirmed receipt on WhatsApp"
             />
           </label>
+          {deliveredError && (
+            <p className="rounded-md border border-red-200 bg-red-50 p-2 text-red-800">{deliveredError}</p>
+          )}
         </div>
       </ConfirmDialog>
 

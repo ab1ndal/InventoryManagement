@@ -490,10 +490,49 @@ describe("Mark delivered", () => {
       reason: "Customer confirmed on call",
     });
   });
+
+  test("a server refusal keeps the dialog open with the message and the typed reason", async () => {
+    mockRole = "superadmin";
+    mockDetail = detail({ order: { status: "shipped", delivered_at: null } });
+    mockActionImpl = () => {
+      throw Object.assign(new Error("delivered date cannot be more than 30 days ago"), { code: "bad_state" });
+    };
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    fireEvent.click(await screen.findByRole("button", { name: "Mark delivered…" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Delivery reason"), { target: { value: "Called customer" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Mark delivered" }));
+    await waitFor(() => expect(dialog).toHaveTextContent("delivered date cannot be more than 30 days ago"));
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(within(dialog).getByLabelText("Delivery reason")).toHaveValue("Called customer");
+  });
 });
 
 test("a delivered order shows the Returns section", async () => {
   mockDetail = detail({ order: { status: "delivered", delivered_at: "2026-10-20T10:00:00Z", returns: [] } });
   render(<OrderDetail orderId="o1" />);
   expect(await screen.findByRole("heading", { name: "Returns" })).toBeInTheDocument();
+});
+
+test("a return action refreshes the list through onChanged", async () => {
+  mockDetail = detail({
+    order: {
+      status: "delivered",
+      delivered_at: new Date().toISOString(),
+      returns: [
+        {
+          id: "r1", order_id: "o1", reason: "change_of_mind", status: "open", contacted_at: new Date().toISOString(),
+          note: "n", items: [{ return_id: "r1", item_id: "i1", units: 1 }], photos: [],
+        },
+      ],
+    },
+  });
+  const onChanged = jest.fn();
+  render(<OrderDetail orderId="o1" onChanged={onChanged} />);
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel return…" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Cancel note"), { target: { value: "no" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel return" }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalled());
 });

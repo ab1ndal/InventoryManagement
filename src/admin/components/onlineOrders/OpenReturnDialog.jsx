@@ -20,7 +20,7 @@ import {
 
 const variantText = (it) => [it.size, it.color].filter(Boolean).join(" / ");
 
-export default function OpenReturnDialog({ open, order, items, role, pending, onClose, onSubmit }) {
+export default function OpenReturnDialog({ open, order, items, role, pending, error, onClose, onSubmit }) {
   const [reason, setReason] = useState("change_of_mind");
   const [contactedAt, setContactedAt] = useState(() => toLocalInputValue(new Date()));
   const [units, setUnits] = useState({});
@@ -94,6 +94,8 @@ export default function OpenReturnDialog({ open, order, items, role, pending, on
               aria-label="Contacted at"
               className="h-9 w-full rounded-md border border-input bg-white px-2"
               value={contactedAt}
+              min={order.delivered_at ? toLocalInputValue(new Date(order.delivered_at)) : undefined}
+              max={toLocalInputValue(new Date())}
               onChange={(e) => setContactedAt(e.target.value)}
             />
             <span className="text-xs text-muted-foreground">
@@ -150,6 +152,7 @@ export default function OpenReturnDialog({ open, order, items, role, pending, on
               />
             </label>
           )}
+          {error && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-red-800">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>

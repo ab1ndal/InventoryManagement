@@ -14,13 +14,15 @@ import { formatRupees } from "./orderHelpers";
 
 const variantText = (it) => [it.size, it.color].filter(Boolean).join(" / ");
 
-export default function ReceiveReturnDialog({ open, ret, items, pending, onClose, onSubmit }) {
+const PREVIEW_DEBOUNCE_MS = 250;
+
+export default function ReceiveReturnDialog({ open, ret, items, pending, error, onClose, onSubmit }) {
   const [lines, setLines] = useState(() =>
     Object.fromEntries(ret.items.map((ri) => [ri.item_id, { received: ri.units, restock: ri.units }]))
   );
   const [note, setNote] = useState("");
-  const [preview, setPreview] = useState(null);
-  const [previewError, setPreviewError] = useState(null);
+  // Tagged with the counts it was computed for, so a result for older counts reads as stale.
+  const [result, setResult] = useState(null);
 
   const payloadItems = ret.items.map((ri) => ({
     itemId: ri.item_id,
@@ -33,25 +35,20 @@ export default function ReceiveReturnDialog({ open, ret, items, pending, onClose
   const key = JSON.stringify(payloadItems);
 
   useEffect(() => {
-    if (!open || rejecting) {
-      setPreview(null);
-      setPreviewError(null);
-      return undefined;
-    }
+    if (!open || rejecting) return undefined;
     let cancelled = false;
-    action({ action: "return_preview", returnId: ret.id, items: JSON.parse(key) })
-      .then((res) => {
-        if (cancelled) return;
-        setPreview(res.preview);
-        setPreviewError(null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setPreview(null);
-        setPreviewError(err.message);
-      });
+    const timer = setTimeout(() => {
+      action({ action: "return_preview", returnId: ret.id, items: JSON.parse(key) })
+        .then((res) => {
+          if (!cancelled) setResult({ key, preview: res.preview });
+        })
+        .catch((err) => {
+          if (!cancelled) setResult({ key, error: err.message });
+        });
+    }, PREVIEW_DEBOUNCE_MS);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [open, rejecting, ret.id, key]);
 
@@ -65,6 +62,9 @@ export default function ReceiveReturnDialog({ open, ret, items, pending, onClose
 
   const needsNote = received < expected;
   const confirmLabel = rejecting ? "Reject return" : "Receive and refund";
+  const fresh = result?.key === key ? result : null;
+  const preview = fresh?.preview;
+  const previewError = fresh?.error;
   const ready = rejecting || preview;
 
   return (
@@ -152,6 +152,7 @@ export default function ReceiveReturnDialog({ open, ret, items, pending, onClose
             </span>
             <Textarea aria-label="Receive note" value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
+          {error && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-red-800">{error}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>

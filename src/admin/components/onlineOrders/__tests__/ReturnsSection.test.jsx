@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import ReturnsSection from "../ReturnsSection";
+import { toLocalInputValue } from "../orderHelpers";
 
 // Plain functions + mutable state: CRA resetMocks wipes jest.fn implementations.
 let mockActions = [];
@@ -240,7 +241,7 @@ describe("Receive dialog", () => {
     fireEvent.change(within(dialog).getByLabelText("Received units of Kurta"), { target: { value: "1" } });
     expect(confirm).toBeDisabled();
     fireEvent.change(within(dialog).getByLabelText("Receive note"), { target: { value: "One piece missing" } });
-    expect(confirm).toBeEnabled();
+    await waitFor(() => expect(confirm).toBeEnabled());
   });
 
   test("restock is capped by received; receiving sends the arrays and note", async () => {
@@ -249,7 +250,9 @@ describe("Receive dialog", () => {
     expect(within(dialog).getByLabelText("Restock units of Kurta")).toHaveValue(1);
     fireEvent.change(within(dialog).getByLabelText("Restock units of Dupatta"), { target: { value: "0" } });
     fireEvent.change(within(dialog).getByLabelText("Receive note"), { target: { value: "short" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Receive and refund" }));
+    const confirm = within(dialog).getByRole("button", { name: "Receive and refund" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    fireEvent.click(confirm);
     await waitFor(() => expect(mockActions.some((a) => a.action === "return_receive")).toBe(true));
     expect(mockActions.find((a) => a.action === "return_receive")).toEqual({
       action: "return_receive",
@@ -285,7 +288,16 @@ test("Cancel return sends the note", async () => {
 
 test("View photo opens the signed url", async () => {
   const opened = [];
-  window.open = (u) => opened.push(u);
+  let syncOpens = 0;
+  window.open = () => {
+    syncOpens += 1;
+    return {
+      close: () => {},
+      set location(u) {
+        opened.push(u);
+      },
+    };
+  };
   mockActionImpl = () => ({ ok: true, url: "https://signed/p1" });
   renderSection({
     order: order({ returns: [openReturn({ photos: [{ id: "p1", uploaded_at: "2026-10-21T10:00:00Z" }] })] }),
@@ -293,4 +305,114 @@ test("View photo opens the signed url", async () => {
   fireEvent.click(screen.getByRole("button", { name: "View photo 1" }));
   await waitFor(() => expect(opened).toEqual(["https://signed/p1"]));
   expect(mockActions[0]).toEqual({ action: "return_photo_view", photoId: "p1" });
+  expect(syncOpens).toBe(1);
+});
+
+test("View photo opens the window before the request and closes it on error", async () => {
+  let closed = 0;
+  let openedBeforeAction = null;
+  window.open = () => {
+    openedBeforeAction = mockActions.length === 0;
+    return { close: () => (closed += 1) };
+  };
+  mockActionImpl = () => {
+    throw Object.assign(new Error("nope"), { code: "server" });
+  };
+  renderSection({
+    order: order({ returns: [openReturn({ photos: [{ id: "p1", uploaded_at: "2026-10-21T10:00:00Z" }] })] }),
+  });
+  fireEvent.click(screen.getByRole("button", { name: "View photo 1" }));
+  await waitFor(() => expect(closed).toBe(1));
+  expect(openedBeforeAction).toBe(true);
+});
+
+test("a photo with an empty type is sent as heic when the name ends in .heic", async () => {
+  global.fetch = async () => ({ ok: true });
+  mockActionImpl = (p) =>
+    p.action === "return_photo_url" ? { ok: true, uploadUrl: "https://up/x", path: "o1/r1/u.heic" } : { ok: true };
+  renderSection({ order: order({ returns: [openReturn({ reason: "damaged_wrong" })] }) });
+  const file = new File(["x"], "IMG_1.HEIC", { type: "" });
+  fireEvent.change(screen.getByLabelText("Add photos"), { target: { files: [file] } });
+  await waitFor(() => expect(mockActions).toHaveLength(2));
+  expect(mockActions[0].contentType).toBe("image/heic");
+});
+
+describe("a server refusal (bad_state) keeps the dialog open with the message", () => {
+  const refuse = (p) => {
+    if (p.action === "return_preview") return { ok: true, preview: { credit_part: 0, gateway_part: 10, shipping: 0, total: 10 } };
+    throw Object.assign(new Error("contact time cannot be before delivery"), { code: "bad_state" });
+  };
+
+  test("Open return keeps entered values", async () => {
+    mockActionImpl = refuse;
+    const onChanged = renderSection();
+    fireEvent.click(screen.getByRole("button", { name: "Open return…" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Units of Kurta"), { target: { value: "2" } });
+    fireEvent.change(within(dialog).getByLabelText("Note"), { target: { value: "Too small" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Open return" }));
+    await waitFor(() => expect(dialog).toHaveTextContent("contact time cannot be before delivery"));
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(within(dialog).getByLabelText("Note")).toHaveValue("Too small");
+    expect(within(dialog).getByLabelText("Units of Kurta")).toHaveValue(2);
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  test("Receive and Cancel stay open too", async () => {
+    mockActionImpl = refuse;
+    renderSection({ order: order({ returns: [openReturn()] }) });
+    fireEvent.click(screen.getByRole("button", { name: "Receive…" }));
+    let dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByRole("button", { name: "Receive and refund" });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    fireEvent.click(confirm);
+    await waitFor(() => expect(dialog).toHaveTextContent("contact time cannot be before delivery"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel return…" }));
+    dialog = await screen.findByRole("dialog");
+    expect(dialog).not.toHaveTextContent("contact time"); // error cleared between dialogs
+    fireEvent.change(within(dialog).getByLabelText("Cancel note"), { target: { value: "why" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel return" }));
+    await waitFor(() => expect(dialog).toHaveTextContent("contact time cannot be before delivery"));
+    expect(within(dialog).getByLabelText("Cancel note")).toHaveValue("why");
+  });
+});
+
+test("Open return limits Contacted at to between delivery and now", async () => {
+  renderSection();
+  fireEvent.click(screen.getByRole("button", { name: "Open return…" }));
+  const input = within(await screen.findByRole("dialog")).getByLabelText("Contacted at");
+  expect(input).toHaveAttribute("min", toLocalInputValue(new Date(DELIVERED)));
+  expect(input.getAttribute("max")).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d$/);
+});
+
+test("Receive disables submit while the preview is stale", async () => {
+  mockActionImpl = (p) =>
+    p.action === "return_preview"
+      ? { ok: true, preview: { credit_part: 0, gateway_part: 10, shipping: 0, total: 10 } }
+      : { ok: true };
+  renderSection({ order: order({ returns: [openReturn()] }) });
+  fireEvent.click(screen.getByRole("button", { name: "Receive…" }));
+  const dialog = await screen.findByRole("dialog");
+  const confirm = within(dialog).getByRole("button", { name: "Receive and refund" });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.change(within(dialog).getByLabelText("Received units of Kurta"), { target: { value: "1" } });
+  fireEvent.change(within(dialog).getByLabelText("Receive note"), { target: { value: "short" } });
+  expect(confirm).toBeDisabled();
+  expect(dialog).toHaveTextContent("Calculating refund");
+  await waitFor(() => expect(confirm).toBeEnabled());
+});
+
+test("Receive sends one preview for a burst of edits", async () => {
+  mockActionImpl = () => ({ ok: true, preview: { credit_part: 0, gateway_part: 10, shipping: 0, total: 10 } });
+  renderSection({ order: order({ returns: [openReturn({ items: [{ item_id: "i1", units: 3 }] })] }) });
+  fireEvent.click(screen.getByRole("button", { name: "Receive…" }));
+  const dialog = await screen.findByRole("dialog");
+  const input = within(dialog).getByLabelText("Received units of Kurta");
+  fireEvent.change(input, { target: { value: "2" } });
+  fireEvent.change(input, { target: { value: "1" } });
+  await waitFor(() => expect(dialog).toHaveTextContent("₹10.00"));
+  expect(mockActions.filter((a) => a.action === "return_preview")).toHaveLength(1);
 });

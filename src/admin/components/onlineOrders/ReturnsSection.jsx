@@ -18,6 +18,11 @@ const BUSY_MESSAGE = "Another staff member is working on this order";
 const PHOTO_TYPES = "image/jpeg,image/png,image/webp,image/heic,image/heif";
 const STATUS_TEXT = { open: "Open", refunded: "Refunded", rejected: "Rejected", cancelled: "Cancelled" };
 
+const HEIC_TYPES = { heic: "image/heic", heif: "image/heif" };
+// Some browsers leave file.type empty for HEIC; the server needs a content type.
+const photoContentType = (file) =>
+  file.type || HEIC_TYPES[file.name.split(".").pop().toLowerCase()] || file.type;
+
 const variantText = (it) => [it.size, it.color].filter(Boolean).join(" / ");
 
 export default function ReturnsSection({ order, items, role, onChanged }) {
@@ -25,6 +30,7 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
   const [dialog, setDialog] = useState(null); // { kind: 'open' } | { kind: 'receive'|'cancel', ret }
   const [pending, setPending] = useState(false);
   const [cancelNote, setCancelNote] = useState("");
+  const [dialogError, setDialogError] = useState(null);
   const fileRef = useRef({});
 
   const delivered = order.status === "delivered";
@@ -34,11 +40,14 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
   const close = () => {
     setDialog(null);
     setCancelNote("");
+    setDialogError(null);
   };
 
-  // Runs one admin-order-action call; refreshes the order on success and on a stale view.
+  // Runs one admin-order-action call; refreshes the order on success and after a refusal. The server
+  // reports every refusal as bad_state, so the dialog stays open with the message and the typed input.
   const run = async (payload, successMessage) => {
     setPending(true);
+    setDialogError(null);
     try {
       const res = await action(payload);
       toast.success(successMessage);
@@ -49,8 +58,7 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
       if (err.code === "busy") {
         toast.error(BUSY_MESSAGE);
       } else if (err.code === "bad_state") {
-        toast.error("This return has changed", { description: err.message });
-        close();
+        setDialogError(err.message);
         await onChanged?.();
       } else {
         toast.error("Action failed", { description: err.message });
@@ -69,7 +77,7 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
         const { uploadUrl, path } = await action({
           action: "return_photo_url",
           returnId: ret.id,
-          contentType: file.type,
+          contentType: photoContentType(file),
         });
         const put = await fetch(uploadUrl, { method: "PUT", body: file });
         if (!put.ok) throw new Error(`Upload of ${file.name} failed (${put.status})`);
@@ -88,10 +96,16 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
   };
 
   const viewPhoto = async (photo) => {
+    // Opened before the await so Safari treats it as a click-initiated popup.
+    const win = window.open("", "_blank");
     try {
       const { url } = await action({ action: "return_photo_view", photoId: photo.id });
-      window.open(url, "_blank", "noopener");
+      if (win) {
+        win.opener = null;
+        win.location = url;
+      }
     } catch (err) {
+      win?.close();
       toast.error("Could not open photo", { description: err.message });
     }
   };
@@ -205,6 +219,7 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
           items={items}
           role={role}
           pending={pending}
+          error={dialogError}
           onClose={close}
           onSubmit={(payload) => run(payload, "Return opened")}
         />
@@ -215,10 +230,9 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
           ret={dialog.ret}
           items={items}
           pending={pending}
+          error={dialogError}
           onClose={close}
-          onSubmit={(payload) =>
-            run(payload, "Return processed")
-          }
+          onSubmit={(payload) => run(payload, "Return processed")}
         />
       )}
       <Dialog open={dialog?.kind === "cancel"} onOpenChange={(o) => !o && close()}>
@@ -234,6 +248,9 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
               onChange={(e) => setCancelNote(e.target.value)}
             />
           </label>
+          {dialogError && (
+            <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-800">{dialogError}</p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={close} disabled={pending}>
               Back
