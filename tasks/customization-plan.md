@@ -1,6 +1,6 @@
 # Customization service plan
 
-Written 2026-10-25. Status: **plan, awaiting owner answers (bottom)**. Next focus after Diwali (8 Nov 2026).
+Written 2026-10-25. Status: **plan; owner answered open questions 2026-10-25 (see Owner decisions); CA questions still open**. Next focus after Diwali (8 Nov 2026).
 Builds on the online-orders system (`docs/superpowers/specs/2026-10-23-online-orders-design.md`,
 `schema/migration_online_orders*.sql`, `supabase/functions/*`) and reuses its Cashfree client,
 webhook, Gmail mailer, rate-limit table and token-link pattern.
@@ -11,32 +11,67 @@ quote a price and a timeline; the customer pays 50% to start and the rest when t
 Garments: lehengas, sarees (fall/pico/blouse work), dresses, kurtis, suits; men's sherwanis,
 jodhpuri suits, suits, blazers, coat-pants, formal suits.
 
+## Owner decisions (2026-10-25)
+1. **Measurements:** store visit preferred; otherwise a guided video call. The form only asks for an
+   overall size (e.g. M / 38); exact measurements are taken in store or on the call and staff enter
+   them in admin. No self-measure form online.
+2. **Quotes go out on WhatsApp** (preferred). Email is secondary: the shop rarely checks it, so email
+   is never the only alert for new requests.
+3. **Pickup or delivery within UP**, delivery for a fee (quoted per order).
+4. **Minimum order ₹3,000** (quote total).
+5. **Turnaround 2–4 weeks.** **Rush orders allowed for a rush fee.**
+6. **Cancellation:** after the advance, a short grace window (a few days, and only while fabric is not
+   bought and cutting has not started) gives a refund. After that the advance is forfeited. The shop
+   can cancel at any point, and then refunds the whole amount paid.
+7. **Budget is not binding; the quote is.** The quote reflects design complexity, tailor availability
+   and rush.
+8. **One fitting + free alteration, in store only.** Shipped orders are not taken back for
+   alterations; the customer can bring the piece to the store.
+9. **Own fabric accepted**; the quote then covers stitching only.
+10. **Contact details encouraged, not required.** First contact must be as easy as possible: submit
+    and get a reference. Name and WhatsApp number are asked for (so the shop can reply on time) but
+    optional. The service doubles as a way to bring customers into the store: the customer can choose
+    "I'll visit the store" and the rest is handled in person; online stays available for those who
+    prefer it.
+
 ## User flow
 **Customer**
 1. `/customize` landing: what we make, how it works (4 steps), example pieces, FAQ, CTA.
-2. Request form: garment type, design photos (1–4), budget (₹), quantity, fabric (optional: "you
-   choose" / "I'll bring my own" / free text), needed-by date (optional), notes, name, phone, email.
-3. Confirmation screen + email with a private link `/custom/:ref?t=<token>` (same pattern as
-   `/order/:ref`). Ref format `CUS-000123`.
-4. Shop replies with a quote (price, ready-by date, notes, valid for 7 days). Email + WhatsApp
-   carry the link. Customer accepts → pays 50% advance on Cashfree's hosted page, or declines.
-5. Status updates by email: in production → ready (with balance link) → delivered/collected.
-6. Measurements: taken in store, or sent via the size-guide measurement list (see open questions).
+2. Request form, short on purpose. Required: garment type, at least 1 design photo (up to 4).
+   Optional: budget (₹), quantity (default 1), overall size, fabric ("you choose" / "I'll bring my
+   own" / free text), needed-by date, "rush" tick, notes, how to continue ("visit the store" /
+   "online"), name, WhatsApp number, email.
+3. Confirmation screen with the reference `CUS-000123` and a private link `/custom/:ref?t=<token>`
+   (same pattern as `/order/:ref`), plus "Save this link" and a WhatsApp button that opens a chat with
+   the shop pre-filled with the reference. Email copy only if an email was given. Without any contact
+   detail, the link is the only way back, and the screen says so.
+4. Shop replies on WhatsApp with the quote (price, rush fee if any, delivery fee if shipping, ready-by
+   date, valid 7 days), linking to the status page. Customer accepts → pays 50% on Cashfree's hosted
+   page, or declines. "Visit the store" requests can be quoted and paid in person instead.
+5. Measurements: in store, or on a video call the shop books over WhatsApp.
+6. Status updates on WhatsApp (manual, from the admin screen) and email if given: in production →
+   ready (with balance link) → delivered/collected.
 
 **Admin** (`/admin/custom-orders`)
-1. Inbox of new requests (photos via signed URLs, budget, contact, WhatsApp button).
-2. Quote form: price, ready-by date, delivery mode + fee, notes → sends quote. Can decline with reason.
+1. Inbox of new requests (photos via signed URLs, budget, size, contact, WhatsApp button). New
+   requests also alert the shop outside email (see open questions).
+2. Measurements form (entered by staff after the visit or video call).
+3. Quote form: price, rush fee, ready-by date, delivery mode + fee, notes → generates the WhatsApp
+   message with the link. Can decline with reason. "Handled in store" marks a request paid offline.
 3. After advance: mark in production → mark ready (creates balance link) → mark delivered/collected.
 4. Cancel/refund action with the refund rule applied (see lifecycle).
 
 ## Spec (v1)
-- Anyone can submit (no login), rate-limited. If logged in, the request links to the customer and
-  shows under Account → My custom orders.
+- Anyone can submit (no login), rate-limited. Contact fields optional. If logged in, the request
+  links to the customer and shows under Account → My custom orders.
+- Quote total (price + rush fee) must be ≥ ₹3,000; the admin form enforces it.
+- Fitting and free alteration only for in-store collection. The quote and Terms say shipped pieces
+  are not taken back for alterations.
 - Budget is the customer's target, not a price. The quote is the only binding price.
 - Quantity 1–20 per request. Several different garments = several requests (keeps one price/state each).
 - Quote valid 7 days; expired quotes can be re-issued by admin (same request, new quote row).
 - Advance = `ceil(quote × 0.5)` to the rupee; balance = quote + delivery fee − advance.
-- Delivery: in-store collection (default) or shipping **within UP only** (same composition rule as
+- Delivery: in-store collection or shipping **within UP only** for a fee (same composition rule as
   online orders, `tasks/checkout-shipping-plan.md`). Shipping booked manually in Shiprocket in v1.
 - Edge cases: duplicate submit (idempotency key from the form), photo upload fails midway (request
   stays `draft` and is swept after 24 h), customer pays an expired/cancelled link (webhook arrives on
@@ -59,9 +94,12 @@ advance_paid | in_production ──admin cancel──▶ cancelled (refund per r
 Transitions happen only in SECURITY DEFINER SQL functions (like `online_order_*`), each writing an
 event row. Payment-driven transitions only after re-reading Cashfree (never trust the webhook body).
 
-**Advance refund rule (recommended default, owner to confirm):** full refund if cancelled before
-`in_production`; after cutting starts, no refund (fabric is bought and cut for this order) unless
-the shop cancels, then full refund. Shop can't make it → full refund to source.
+**Advance refund rule (owner 2026-10-25):** the customer may cancel with a full refund only within
+the grace window: `advance_paid` for at most N days (N open, default 3) and still not
+`in_production`. Admin moves the request to `in_production` the moment fabric is bought or cutting
+starts, which closes the window early. After the window the advance is forfeited. A shop cancel at
+any state refunds everything paid. v1: customers ask to cancel on WhatsApp and the admin applies the
+rule (the admin action shows whether the window is still open); no self-serve cancel button.
 
 ## Data model (migration sketch, `schema/migration_custom_orders.sql`)
 ```sql
@@ -74,11 +112,15 @@ create table public.custom_requests (
     'declined','cancelled','advance_paid','in_production','ready','balance_paid','delivered','collected')),
   garment_type text not null check (garment_type in ('lehenga','saree','dress','kurti','suit',
     'sherwani','jodhpuri','mens_suit','blazer','coat_pant','other')),
-  quantity int not null check (quantity between 1 and 20),
+  quantity int not null default 1 check (quantity between 1 and 20),
+  approx_size text, rush_requested boolean not null default false,
+  prefers text not null default 'online' check (prefers in ('online','store')),
+  measurements jsonb,  -- staff-entered after store visit / video call
   budget numeric(12,2) check (budget > 0),
   fabric_choice text check (fabric_choice in ('shop','own','described')),
   fabric_notes text, needed_by date, notes text check (length(notes) <= 2000),
-  contact_name text not null, contact_phone text not null, contact_email text not null,
+  contact_name text, contact_phone text, contact_email text,  -- all optional (owner 2026-10-25)
+  advance_paid_at timestamptz,  -- starts the cancellation grace window
   customerid int references public.customers(customerid), auth_user_id uuid,
   access_token_hash text not null,
   delivery_mode text check (delivery_mode in ('collect','ship')), address jsonb,
@@ -88,6 +130,7 @@ create table public.custom_requests (
 create table public.custom_request_photos (id uuid pk, request_id uuid fk, storage_path text unique,
   mime text, bytes int, created_at timestamptz);
 create table public.custom_quotes (id uuid pk, request_id uuid fk, price numeric(12,2) not null check (price > 0),
+  rush_fee numeric(12,2) not null default 0, check (price + rush_fee >= 3000),
   delivery_fee numeric(12,2) not null default 0, ready_by date not null, notes text,
   valid_until timestamptz not null, status text check (status in ('open','accepted','expired','superseded','declined')),
   created_by uuid, created_at timestamptz);
@@ -153,10 +196,11 @@ Build default until answered: one Bill of Supply (`bills.document_type = 'bos'`)
 full amount, advance shown as received; a simple numbered advance receipt (PDF/email) at payment.
 
 ## Notifications
-Gmail mailer (`_shared/mailer.ts`, already verified live): request received (customer + shop inbox),
+WhatsApp is the main channel (owner): the admin screen has a `wa.me` button per state with the
+message pre-filled (quote, payment link, ready, etc.). Email is secondary and only sent when the
+customer gave one. Gmail mailer (`_shared/mailer.ts`, already verified live): request received (customer + shop inbox),
 quote sent, advance received, in production, ready + balance link, balance received, delivered,
-cancelled/refund. All with the `/custom/:ref` link. WhatsApp stays manual: admin screen shows a
-`wa.me` button with a pre-filled message per state. Email failures queue in `order_jobs`-style retry
+cancelled/refund. All with the `/custom/:ref` link. Email failures queue in `order_jobs`-style retry
 (new kind) via `run-jobs`.
 
 ## Admin screen (`src/admin/pages/CustomOrdersPage.jsx`)
@@ -171,7 +215,9 @@ events, actions valid for the current state only. Mutations via `admin-custom-ac
   pay buttons, timeline.
 - Account → "My custom orders" list (logged-in customers, via `my_custom_requests()`).
 - Nav: header link "Customize" + footer Help entry; home band after Diwali.
-- Size guide's measurement list (`MeasurementDiagram.jsx`) reused on the form as "how to measure".
+- Landing page sells the store visit too ("Come to the shop, or do it all online"), with the address
+  and a WhatsApp CTA; good for bringing customers in.
+- The form only asks for an overall size; the size guide diagram is linked for reference, not filled in.
 
 ## Phased steps (each verifiable; local DB harness `scripts/test-db.sh` for all SQL)
 1. **CA questions** sent (no code). Owner answers open questions below.
@@ -194,18 +240,21 @@ events, actions valid for the current state only. Mutations via `admin-custom-ac
 9. **Launch**: policy text (custom-order terms, refund rule, photo retention) on Terms/Returns pages,
    nav links, feature flag `storefront_settings.custom_live` (off until owner flips it, like checkout).
 
-Phase A bridge (zero code, usable right after Diwali): a "Customize" page with a WhatsApp CTA and
-the quote/advance done by manually created Cashfree Payment Links from the dashboard.
+Phase A bridge (small, usable right after Diwali): a `/customize` landing page with "Send your design
+on WhatsApp" (pre-filled message asking for photo, garment, budget, size) and the store address. Quote
+on WhatsApp, advance and balance by Cashfree Payment Links made by hand in the dashboard. Fits the
+owner's "easy first contact, bring people to the store" goal and tests demand before phases 2–9.
 
-## Open questions for the owner (recommended default in bold)
-1. Measurements: **in store or by video call for v1; customers who can't come fill the 7-point
-   measurement list on the status page after paying the advance.** Alternative: ask on the form.
-2. Quote channel: **email + WhatsApp, both linking to the status page where they accept and pay.**
-3. Delivery vs pickup: **collect in store by default; shipping within UP at a quoted fee.**
-4. Minimum order: **₹3,000 quote minimum (below that, regular alteration in store).**
-5. Turnaround: **shop sets per quote; show "usually 2–4 weeks" on the landing page; no rush orders v1.**
-6. Cancellation after advance: **full refund before cutting starts; none after, unless the shop cancels.**
-7. Price field: **a budget ("your budget"), not a fixed price; the quote is binding.**
-8. Fittings/trials: **one trial included for stitched pieces; extra alterations after delivery free for 7 days.**
-9. Own fabric: **accepted (customer drops it at the shop); quote covers stitching only.**
-10. Login: **not required to submit; optional login shows requests in Account.**
+## Still open (owner)
+1. Grace window length for a refundable cancel after the advance: **3 days** (and only before fabric
+   is bought or cutting starts).
+2. How the shop hears about new requests, since email is rarely checked: **Gmail app notifications on
+   the shop phone for a dedicated "New custom request" email, plus a count badge in admin.** A
+   WhatsApp Business API alert is possible later but costs money and setup.
+3. Rush fee: **set per quote** (no fixed rate), and what "rush" means on the landing page (e.g.
+   **"under 2 weeks, extra charge"**).
+4. Delivery fee within UP: **quoted per order**, or a flat fee?
+5. Start with the Phase A bridge right after Diwali? **Yes.**
+
+Answered 2026-10-25: measurements, quote channel, delivery/pickup, minimum, turnaround, cancellation,
+budget vs quote, fittings, own fabric, contact details (see Owner decisions).
