@@ -56,6 +56,7 @@ export function fakeOrder(over: Partial<OrderRow> = {}): OrderRow {
     problem: null,
     sr_sync_status: null,
     sr_last_error: null,
+    sr_attempt: 1,
     ...over,
   };
 }
@@ -333,6 +334,9 @@ export class FakeShiprocket implements ShiprocketClient {
   }
   async cancel(srOrderIds: number[]): Promise<void> {
     await this.hit("cancel", [srOrderIds]);
+  }
+  async cancelAwbs(awbs: string[]): Promise<void> {
+    await this.hit("cancelAwbs", [awbs]);
   }
   async track(awb: string): Promise<TrackResult> {
     await this.hit("track", [awb]);

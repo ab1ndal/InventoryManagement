@@ -254,6 +254,7 @@ export function fakeShiprocket(opts: { state?: string | null; rate?: RateQuote |
     manifest: notUsed,
     label: notUsed,
     cancel: notUsed,
+    cancelAwbs: notUsed,
     track: notUsed,
   };
   return { client, calls };

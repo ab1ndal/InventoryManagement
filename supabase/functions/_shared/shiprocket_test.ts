@@ -445,6 +445,19 @@ Deno.test("cancel: 204 ok; 500 throws; empty list makes no call", async () => {
   );
 });
 
+Deno.test("cancelAwbs posts awbs; empty list makes no call; non-2xx throws", async () => {
+  const t = setup(() => new Response(null, { status: 204 }));
+  await t.sr.cancelAwbs(["AWB1", "AWB2"]);
+  assert(t.apiCalls()[0].url.endsWith("/orders/cancel/shipment/awbs"));
+  assertEquals(t.apiCalls()[0].body, { awbs: ["AWB1", "AWB2"] });
+  await t.sr.cancelAwbs([]);
+  assertEquals(t.apiCalls().length, 1);
+  await assertRejects(
+    () => setup(() => jsonResponse(422, { message: "bad awb" })).sr.cancelAwbs(["X"]),
+    ShiprocketError,
+  );
+});
+
 Deno.test("track: shipment-scheme status, current status, url", async () => {
   const t = setup(() =>
     jsonResponse(200, {

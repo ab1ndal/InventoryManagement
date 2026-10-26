@@ -80,6 +80,7 @@ export type OrderRow = {
   op_action: string | null;
   op_lease_until: string | null;
   process_error: string | null;
+  sr_attempt: number;
   [column: string]: unknown;
 };
 
@@ -222,6 +223,12 @@ export function shippableDiffers(items: OrderItemRow[], plan: ProcessPlan): bool
   return false;
 }
 
+/** Shiprocket order id: Shiprocket never reuses cancelled ids, so attempt n >= 2 gets `-n`. */
+export function srOrderRef(o: OrderRow): string {
+  const attempt = o.sr_attempt ?? 1;
+  return attempt > 1 ? `${o.order_ref}-${attempt}` : o.order_ref;
+}
+
 export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   const a = (o.address ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
@@ -236,7 +243,7 @@ export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   );
   const address2 = str(a.line2);
   return {
-    orderRef: o.order_ref,
+    orderRef: srOrderRef(o),
     orderDate: new Date(o.paid_at ?? o.created_at),
     billing: {
       name: o.contact_name,

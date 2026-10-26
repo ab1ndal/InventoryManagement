@@ -18,6 +18,13 @@ import type { SrOrderInput } from "./shiprocket.ts";
 
 const SHOP = "shop@example.com";
 
+Deno.test("buildSrInput: bare ref on first attempt, -n suffix from attempt 2", () => {
+  const lines = createLines(fakeItems());
+  assertEquals(buildSrInput(fakeOrder(), lines).orderRef, "WEB-000123");
+  assertEquals(buildSrInput(fakeOrder({ sr_attempt: 1 }), lines).orderRef, "WEB-000123");
+  assertEquals(buildSrInput(fakeOrder({ sr_attempt: 2 }), lines).orderRef, "WEB-000123-2");
+});
+
 Deno.test("buildSrInput: paid values, sub_total, box dims, weight by category per unit", () => {
   const input = buildSrInput(fakeOrder(), createLines(fakeItems()));
   assertEquals(input.orderRef, "WEB-000123");
