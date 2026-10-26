@@ -20,6 +20,16 @@ export const HERO_SLIDES = [
     href: "/collections/diwali",
     images: [{ url: "/hero/diwali-desktop.webp", mobileUrl: "/hero/diwali-mobile.webp" }],
   },
+  // Second on purpose (owner 2026-10-25): made-to-order tailoring is a key
+  // differentiator.
+  {
+    id: "customize",
+    headline: "Made to order, made for you",
+    subline: "Send us your design. Our in-house tailors will stitch it to your size.",
+    cta: "Start your design",
+    href: "/customize",
+    images: [{ url: "/hero/customize-desktop.webp", mobileUrl: "/hero/customize-mobile.webp" }],
+  },
   {
     id: "sarees",
     headline: "Sarees for every celebration",

@@ -1,11 +1,16 @@
 import { HERO_SLIDES } from "../lib/heroSlides";
 
 describe("hero slides config", () => {
-  it("has 3 to 5 slides with unique ids", () => {
+  it("has 3 to 6 slides with unique ids", () => {
     expect(HERO_SLIDES.length).toBeGreaterThanOrEqual(3);
-    expect(HERO_SLIDES.length).toBeLessThanOrEqual(5);
+    expect(HERO_SLIDES.length).toBeLessThanOrEqual(6);
     const ids = HERO_SLIDES.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("puts custom tailoring second, right after Diwali", () => {
+    expect(HERO_SLIDES.slice(0, 2).map((s) => s.id)).toEqual(["diwali", "customize"]);
+    expect(HERO_SLIDES[1].href).toBe("/customize");
   });
 
   it("gives every slide copy, a CTA and an in-site link", () => {

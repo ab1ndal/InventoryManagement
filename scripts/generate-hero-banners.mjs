@@ -97,6 +97,23 @@ radiant, confident, smiling, wearing the magenta suit with dupatta from referenc
   },
 };
 
+// Owner 2026-10-25: customization (made-to-order tailoring) is a key
+// differentiator, so it gets the second slide. The reference lehenga is shown
+// on a dress form, being finished in the shop's workroom.
+SLIDES.customize = {
+  refs: ["BC252745"],
+  scene: `SETTING: a warm, bright tailoring workroom inside an Indian ethnicwear boutique. Wooden shelves
+of folded silk and brocade fabrics in jewel tones, design sketches and fabric swatches pinned on a board,
+a classic sewing machine, scissors, chalk and a measuring tape on a wooden worktable, soft afternoon window
+light. The red lehenga from reference 1 stands on a dress form, nearly finished. An Indian master tailor
+(middle-aged man, neat kurta, measuring tape around his neck) kneels to pin the hem, while a young Indian
+woman customer stands beside it, smiling, holding a printed photo of her design. The garment on the dress
+form is the hero: fully visible, sharp, exactly as in reference 1.`,
+  mobileScene: `SETTING: warm tailoring workroom of an Indian boutique, shelves of silk fabrics, sketches on a
+board, soft window light. The red lehenga from reference 1 on a dress form, fully visible, with an Indian
+master tailor's hands pinning the hem, a measuring tape draped over the dress form's shoulder.`,
+};
+
 const VARIANTS = {
   desktop: { size: "2560x976", layout: DESKTOP_LAYOUT, scene: (s) => s.scene, refs: (s) => s.refs },
   mobile: {
