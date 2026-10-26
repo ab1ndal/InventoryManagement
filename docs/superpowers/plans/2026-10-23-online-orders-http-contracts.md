@@ -62,6 +62,8 @@ Req: `{ action: "set_availability", orderId, itemId, availableQty }`
      // stalled Process (processing, op 'process', lease expired) → paid; opKey must differ from the Process key
    | `{ action: "rebook", orderId, opKey, parcelLost: boolean, note: string, manualCancelConfirmed?: boolean }`
      // packed / shipped / out_for_delivery → paid (re-send) or cancelled (nothing left; refundId returned)
+   | `{ action: "release_op", orderId, opKey }`
+     // any admin: abandon a send_back / rebook claim whose courier booking was NOT cancelled
 Res 200: `{ ok: true, order: <orders row>, refundId?: string, billId?: number }`
 Errors: 400 `invalid_request` (bad/missing field; `note` blank, `parcelLost` / `manualCancelConfirmed` not boolean), 403 `forbidden` (`manualCancelConfirmed: true` from a non-superadmin, `set_live` from an admin), 409 `busy` (another staff action holds the order), 409 `bad_state`, 502 `courier_error` (order left in `processing` with `process_error`; Retry resumes).
 
@@ -73,6 +75,8 @@ Errors: 400 `invalid_request` (bad/missing field; `note` blank, `parcelLost` / `
 - API cancel fails → 502 `courier_error` "Cancel AWB <awb> / Shiprocket order <id> in Shiprocket dashboard" (null parts omitted), also stored as the order's `problem`.
 - `manualCancelConfirmed: true` (superadmin) → records the manual dashboard cancel instead of calling the API.
 After a 502 the order stays claimed (`op_action` send_back / rebook, 5-minute lease): resend with the **same opKey** (e.g. a superadmin with `manualCancelConfirmed: true`); a different opKey gets 409 `busy` until the lease expires. Repeating a finished send_back / rebook with its opKey returns 200 again (lost-response retry).
+
+`release_op` (SQL `online_order_release_op`): allowed with the claim's own opKey, or any opKey once its lease expired. send_back → order stays `processing` as a stalled Process (`op_action` 'process', lease expired, key kept) so Retry / Send back take over; rebook → claim cleared, status unchanged (courier tracking was only held while the rebook lease was live). 200 `{ ok: true, order }`. Refused → 409 `bad_state`: courier booking already cancelled for the order (`sr_cancelled` recorded or manual cancel confirmed — finish the action instead), another key's lease still live, or no send_back / rebook in progress. Event `op_released {action, op_key, actor}`.
 
 ## Webhooks (no CORS, `--no-verify-jwt`)
 - POST `cashfree-webhook` — Cashfree payment + refund events (signature checked).

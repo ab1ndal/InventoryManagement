@@ -64,3 +64,11 @@ Deno.test("email jobs: mailer not configured resolves (no retry storm); send err
   await assertRejects(() => sendOrderEmail(b.ctx, b.store, b.job("email_other")), Error, "unknown job kind");
   await assertRejects(() => sendOrderEmail(b.ctx, b.store, { ...b.job("email_shop"), order_id: "nope" }), Error, "not found");
 });
+
+Deno.test("email jobs: a rebooked order's second shipment (kind:attempt) still sends shipped / delivered", async () => {
+  const { store, ctx, sent, job } = setup({ awb: "AWB2" });
+  await sendOrderEmail(ctx, store, job("email_shipped:2"));
+  await sendOrderEmail(ctx, store, job("email_delivered:2"));
+  assertEquals(sent.length, 2);
+  assertStringIncludes(sent[0].text, "https://shiprocket.co/tracking/AWB2");
+});

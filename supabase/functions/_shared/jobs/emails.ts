@@ -41,7 +41,8 @@ export async function sendOrderEmail(ctx: JobContext, store: Store, job: OrderJo
   const site = ctx.env.siteUrl;
   let to: string | null;
   let mail: Email;
-  switch (job.kind) {
+  // A rebooked order's later shipment queues "email_shipped:<attempt>" (see apply_tracking).
+  switch (job.kind.split(":")[0]) {
     case "email_confirmed":
       to = order.contactEmail;
       mail = orderConfirmed(order, site);

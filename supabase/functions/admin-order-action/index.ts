@@ -8,6 +8,7 @@
  *   retry            {orderId}                   re-run failed jobs / resume Process
  *   send_back        {orderId, opKey, manualCancelConfirmed?}                  stalled Process → paid
  *   rebook           {orderId, opKey, parcelLost, note, manualCancelConfirmed?} packed/shipped → paid | cancelled
+ *   release_op       {orderId, opKey}            abandon a send_back / rebook whose booking was not cancelled
  *   rto_received     {orderId}
  *   set_live         {live}                      superadmin only
  *
@@ -167,6 +168,17 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         if (r.kind === "bad_state") return fail(409, "bad_state", `order is ${r.status}`);
         if (r.kind === "cancel_failed") return fail(502, "courier_error", r.problem);
         return await orderBody(orderId, r.refundId ? { refundId: r.refundId } : {});
+      }
+
+      case "release_op": {
+        // Refusals (booking already cancelled, live lease held by another key) raise → 409 bad_state.
+        const orderId = uuidField(body, "orderId");
+        await deps.db.rpc("online_order_release_op", {
+          p_order_id: orderId,
+          p_actor: user.id,
+          p_op_key: textField(body, "opKey"),
+        });
+        return await orderBody(orderId);
       }
 
       case "retry": {

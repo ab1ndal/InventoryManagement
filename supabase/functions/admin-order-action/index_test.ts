@@ -395,3 +395,41 @@ Deno.test("rebook parcelLost must be boolean (400); manualCancelConfirmed must b
   assertEquals((await call({ ...REBOOK, manualCancelConfirmed: "true" })).status, 400);
   assertEquals(db.calls.length, 0);
 });
+
+const RELEASE = { action: "release_op", orderId: ORDER_ID, opKey: "rb-1" };
+
+Deno.test("release_op: abandons a rebook claim (any admin) → 200 with the order, op cleared", async () => {
+  const { db, sr, call } = setup({ ...PACKED, op_key: "rb-1", op_action: "rebook", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  const r = await call(RELEASE);
+  assertEquals(r.status, 200);
+  assertEquals(r.body.ok, true);
+  assertEquals(r.body.order.status, "packed");
+  assertEquals(r.body.order.op_action, null);
+  assertEquals(db.calls, [{ fn: "online_order_release_op", args: { p_order_id: ORDER_ID, p_actor: ADMIN, p_op_key: "rb-1" } }]);
+  assertEquals(sr.calls.length, 0);
+});
+
+Deno.test("release_op: send_back released → stalled Process again (lease expired, Retry can resume)", async () => {
+  const { db, call } = setup({ ...STUCK, op_key: "sb-1", op_action: "send_back", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  const r = await call({ ...RELEASE, opKey: "sb-1" });
+  assertEquals(r.status, 200);
+  assertEquals([r.body.order.status, r.body.order.op_action, r.body.order.op_key], ["processing", "process", "sb-1"]);
+  assert(Date.parse(db.order.op_lease_until!) < Date.now());
+});
+
+Deno.test("release_op refused by the DB (booking already cancelled / other key, live lease) → 409 bad_state", async () => {
+  const cancelled = setup({ ...PACKED, op_key: "rb-1", op_action: "rebook", sr_cancelled_op_key: "rb-1", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  const r = await cancelled.call(RELEASE);
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+  assert(r.body.error.includes("release: courier booking already cancelled — finish the action"), r.body.error);
+  assertEquals(cancelled.db.order.op_action, "rebook");
+  const live = setup({ ...PACKED, op_key: "rb-other", op_action: "rebook", op_lease_until: new Date(Date.now() + 60_000).toISOString() });
+  assertEquals((await live.call(RELEASE)).body.code, "bad_state");
+});
+
+Deno.test("release_op: opKey and orderId required (400), no DB call", async () => {
+  const { db, call } = setup(PACKED);
+  assertEquals((await call({ action: "release_op", orderId: ORDER_ID })).status, 400);
+  assertEquals((await call({ action: "release_op", orderId: "x", opKey: "k" })).status, 400);
+  assertEquals(db.calls.length, 0);
+});

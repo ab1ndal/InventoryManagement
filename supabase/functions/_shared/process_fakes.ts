@@ -329,6 +329,21 @@ export class FakeDb implements OrdersDb {
         this.events.push({ kind, opKey: key, result });
         return structuredClone(result) as T;
       }
+      case "online_order_release_op": {
+        if (o.op_action !== "send_back" && o.op_action !== "rebook") {
+          throw raised(fn, `release: no send back / rebook in progress (status ${o.status}, op ${o.op_action})`);
+        }
+        if (!args.p_op_key || (args.p_op_key !== o.op_key && this.leaseLive())) {
+          throw raised(fn, "release: stale operation");
+        }
+        if (o.sr_cancelled_op_key !== null || o.manual_cancel_confirmed_by !== null) {
+          throw raised(fn, "release: courier booking already cancelled — finish the action");
+        }
+        if (o.op_action === "send_back") {
+          Object.assign(o, { op_action: "process", op_lease_until: new Date(Date.now() - 1000).toISOString() });
+        } else this.clearOp();
+        return structuredClone(o) as T;
+      }
       case "online_order_cancel": {
         if (!(o.status === "paid" || (o.status === "cancelling" && o.op_action === "cancel"))) {
           throw raised(fn, `cancel is only allowed for paid orders (now ${o.status})`);
