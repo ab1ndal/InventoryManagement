@@ -566,7 +566,20 @@ begin
   assert ev ->> 'old_awb' = 'AWBOLD' and ev ->> 'old_sr_order_id' = '111' and ev ->> 'old_sr_shipment_id' = '222', 'event: ' || coalesce(ev::text, 'none');
   -- idempotent once paid with no op
   r := public.online_order_send_back(o, null, 'op-sb');
-  assert r ->> 'status' = 'paid' and (select sr_attempt from public.orders where id = o) = 2, 'idempotent';
+  assert r ->> 'status' = 'paid' and r ->> 'old_sr_order_id' = '111' and r ->> 'old_awb' = 'AWBOLD'
+     and (select sr_attempt from public.orders where id = o) = 2, 'idempotent repeat returns original ids: ' || r::text;
+  begin
+    perform public.online_order_send_back(o, null, 'op-unknown');
+    assert false, 'unknown key on a paid order refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
+  begin
+    perform public.online_order_send_back(o, null, null);
+    assert false, 'null key refused';
+  exception when raise_exception then
+    assert sqlerrm like '%stale operation%', sqlerrm;
+  end;
 end $$;
 rollback;
 

@@ -49,7 +49,7 @@
 --   Clears shipment fields, problem, op_*, sr_cancelled_op_key, manual_cancel_confirmed_by;
 --   sr_attempt += 1; per item stock_taken := coalesce(available_qty, stock_taken),
 --   available_qty := null, shipped_qty := 0; status paid; event sent_back. Already paid with
---   no op -> returns current (idempotent).
+--   no op -> success only for the key whose sent_back event exists (returns its old ids).
 -- online_order_confirm_manual_cancel(p_order_id uuid, p_actor uuid, p_op_key text) returns void
 --   Fenced; only while op_action is send_back/rebook (superadmin check is in the edge
 --   function). Sets orders.manual_cancel_confirmed_by, event manual_cancel_confirmed.
@@ -579,12 +579,20 @@ set search_path = public
 as $$
 declare
   o public.orders;
+  v_done jsonb;
 begin
   select * into o from public.orders where id = p_order_id for update;
   if not found then raise exception 'order % not found', p_order_id; end if;
-  -- Finished already (retry after a lost response): nothing left to do.
-  if o.status = 'paid' and o.op_action is null then
-    return jsonb_build_object('status', o.status, 'old_sr_order_id', null, 'old_awb', null);
+  -- Retry after a lost response: only the op that finalized may see success (its event carries
+  -- the old ids); any other key falls through to the fence below.
+  if o.status = 'paid' and o.op_action is null and p_op_key is not null then
+    select data into v_done from public.order_events
+     where order_id = o.id and kind = 'sent_back' and data ->> 'op_key' = p_op_key
+     order by created_at desc limit 1;
+    if found then
+      return jsonb_build_object('status', o.status, 'old_sr_order_id', v_done ->> 'old_sr_order_id',
+                                'old_awb', v_done ->> 'old_awb');
+    end if;
   end if;
   if p_op_key is null or o.op_key is distinct from p_op_key then
     raise exception 'send_back: stale operation';
@@ -612,7 +620,7 @@ begin
   update public.order_items i set status = public._item_status(i) where i.order_id = o.id;
   perform public._online_event(o.id, 'sent_back', 'processing', 'paid', p_actor,
     jsonb_build_object('old_sr_order_id', o.sr_order_id, 'old_sr_shipment_id', o.sr_shipment_id,
-                       'old_awb', o.awb, 'sr_attempt', o.sr_attempt + 1));
+                       'old_awb', o.awb, 'sr_attempt', o.sr_attempt + 1, 'op_key', p_op_key));
   return jsonb_build_object('status', 'paid', 'old_sr_order_id', o.sr_order_id, 'old_awb', o.awb);
 end;
 $$;
