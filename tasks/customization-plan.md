@@ -28,9 +28,9 @@ jodhpuri suits, suits, blazers, coat-pants, formal suits.
 8. **One fitting + free alteration, in store only.** Shipped orders are not taken back for
    alterations; the customer can bring the piece to the store.
 9. **Own fabric accepted**; the quote then covers stitching only.
-10. **Contact details encouraged, not required.** First contact must be as easy as possible: submit
-    and get a reference. Name and WhatsApp number are asked for (so the shop can reply on time) but
-    optional. The service doubles as a way to bring customers into the store: the customer can choose
+10. **A way to reach the customer is required** (owner correction 2026-10-25): WhatsApp number
+    preferred, email accepted instead; at least one. Name optional. Everything else stays minimal so
+    first contact is easy: submit and get a reference. The service doubles as a way to bring customers into the store: the customer can choose
     "I'll visit the store" and the rest is handled in person; online stays available for those who
     prefer it.
 
@@ -38,13 +38,13 @@ jodhpuri suits, suits, blazers, coat-pants, formal suits.
 **Customer**
 1. `/customize` landing: what we make, how it works (4 steps), example pieces, FAQ, CTA.
 2. Request form, short on purpose. Required: garment type, at least 1 design photo (up to 4).
-   Optional: budget (₹), quantity (default 1), overall size, fabric ("you choose" / "I'll bring my
-   own" / free text), needed-by date, "rush" tick, notes, how to continue ("visit the store" /
-   "online"), name, WhatsApp number, email.
+   Plus a way to reach them: WhatsApp number (preferred, shown first) or email; at least one.
+   Optional: name, budget (₹), quantity (default 1), overall size, fabric ("you choose" / "I'll bring
+   my own" / free text), needed-by date, "rush" tick, notes, how to continue ("visit the store" /
+   "online").
 3. Confirmation screen with the reference `CUS-000123` and a private link `/custom/:ref?t=<token>`
    (same pattern as `/order/:ref`), plus "Save this link" and a WhatsApp button that opens a chat with
-   the shop pre-filled with the reference. Email copy only if an email was given. Without any contact
-   detail, the link is the only way back, and the screen says so.
+   the shop pre-filled with the reference. Email copy only if an email was given.
 4. Shop replies on WhatsApp with the quote (price, rush fee if any, delivery fee if shipping, ready-by
    date, valid 7 days), linking to the status page. Customer accepts → pays 50% on Cashfree's hosted
    page, or declines. "Visit the store" requests can be quoted and paid in person instead.
@@ -62,7 +62,8 @@ jodhpuri suits, suits, blazers, coat-pants, formal suits.
 4. Cancel/refund action with the refund rule applied (see lifecycle).
 
 ## Spec (v1)
-- Anyone can submit (no login), rate-limited. Contact fields optional. If logged in, the request
+- Anyone can submit (no login), rate-limited. WhatsApp number or email required (either; WhatsApp
+  validated as a 10-digit Indian mobile, stored as +91), name optional. If logged in, the request
   links to the customer and shows under Account → My custom orders.
 - Quote total (price + rush fee) must be ≥ ₹3,000; the admin form enforces it.
 - Fitting and free alteration only for in-store collection. The quote and Terms say shipped pieces
@@ -119,7 +120,8 @@ create table public.custom_requests (
   budget numeric(12,2) check (budget > 0),
   fabric_choice text check (fabric_choice in ('shop','own','described')),
   fabric_notes text, needed_by date, notes text check (length(notes) <= 2000),
-  contact_name text, contact_phone text, contact_email text,  -- all optional (owner 2026-10-25)
+  contact_name text, contact_phone text, contact_email text,
+  check (contact_phone is not null or contact_email is not null),  -- owner 2026-10-25
   advance_paid_at timestamptz,  -- starts the cancellation grace window
   customerid int references public.customers(customerid), auth_user_id uuid,
   access_token_hash text not null,
@@ -257,4 +259,4 @@ owner's "easy first contact, bring people to the store" goal and tests demand be
 5. Start with the Phase A bridge right after Diwali? **Yes.**
 
 Answered 2026-10-25: measurements, quote channel, delivery/pickup, minimum, turnaround, cancellation,
-budget vs quote, fittings, own fabric, contact details (see Owner decisions).
+budget vs quote, fittings, own fabric, contact (WhatsApp or email required; see Owner decisions).
