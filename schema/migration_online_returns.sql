@@ -198,6 +198,26 @@ alter table public.order_returns enable row level security;
 alter table public.order_return_items enable row level security;
 alter table public.order_return_photos enable row level security;
 
+-- Access: service role writes everything (via functions); admins read for the Online Orders
+-- screen, same pattern as migration_online_orders.sql. Photo storage paths stay server-side:
+-- authenticated gets no column grant on order_return_photos.path.
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['order_returns', 'order_return_items', 'order_return_photos'] loop
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
+    execute format('grant all on table public.%I to service_role', t);
+    execute format('drop policy if exists %I on public.%I', t || '_admin_select', t);
+    execute format($p$create policy %I on public.%I for select to authenticated
+      using (exists (select 1 from public.profiles p
+                     where p.id = auth.uid() and p.role in ('admin', 'superadmin')))$p$,
+      t || '_admin_select', t);
+  end loop;
+end $$;
+grant select on table public.order_returns, public.order_return_items to authenticated;
+grant select (id, return_id, uploaded_at, uploaded_by) on public.order_return_photos to authenticated;
+
 -- Units of each item still free to return, not floored at 0, leaving out open return
 -- p_exclude_return (receive re-checks its own return's units against this).
 create or replace function public._online_return_free_units(p_order_id uuid, p_exclude_return uuid)

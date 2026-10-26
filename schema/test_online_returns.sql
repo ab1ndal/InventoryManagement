@@ -589,7 +589,10 @@ begin
   assert (select relrowsecurity from pg_class where oid = 'public.order_returns'::regclass), 'rls returns';
   assert (select relrowsecurity from pg_class where oid = 'public.order_return_items'::regclass), 'rls items';
   assert (select relrowsecurity from pg_class where oid = 'public.order_return_photos'::regclass), 'rls photos';
-  assert not exists (select 1 from pg_policies where tablename in ('order_returns', 'order_return_items', 'order_return_photos')), 'no policies';
+  assert not exists (select 1 from pg_policies where tablename in ('order_returns', 'order_return_items', 'order_return_photos')
+                       and (cmd <> 'SELECT' or policyname not like '%_admin_select')), 'only admin select policies';
+  assert not has_table_privilege('anon', 'public.order_returns', 'select'), 'anon no select';
+  assert not has_table_privilege('authenticated', 'public.order_returns', 'insert'), 'authenticated no insert';
   assert not has_function_privilege('anon', 'public.online_return_open(uuid,uuid,boolean,text,timestamptz,jsonb,text,text,text)', 'execute'), 'anon open';
   assert not has_function_privilege('authenticated', 'public.online_return_cancel(uuid,uuid,text)', 'execute'), 'authenticated cancel';
   assert not has_function_privilege('anon', 'public.online_return_returnable(uuid)', 'execute'), 'anon returnable';
@@ -1320,6 +1323,38 @@ begin
   perform public.online_order_apply_tracking(s.o_awb, 'shipped', '{"shipment_status_id":6}');
   assert (select count(*) from public.order_jobs where order_id = s.o_id and kind = 'email_shipped') = 2, 'second shipped email';
   assert exists (select 1 from public.order_jobs where order_id = s.o_id and kind = 'email_shipped' and ref_id = '2'), 'ref = attempt';
+end $$;
+rollback;
+
+begin;
+do $$
+declare
+  s record := pg_temp.delivered_order(3);
+  rid uuid := pg_temp.open_ret(s.o_id, s.i_id, 1);
+  pid uuid := gen_random_uuid();
+  u_admin uuid := gen_random_uuid();
+  u_user uuid := gen_random_uuid();
+  n int;
+begin
+  insert into public.order_return_photos (id, return_id, path) values (pid, rid, s.o_id || '/' || rid || '/x.jpg');
+  insert into auth.users (id) values (u_admin), (u_user);
+  insert into public.profiles (id, email, role) values (u_admin, 'ra@t.in', 'admin'), (u_user, 'ru@t.in', 'user');
+  grant select on public.profiles to authenticated;  -- live Supabase has this; the local harness does not
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', u_admin, 'role', 'authenticated')::text, true);
+  assert (select count(*) from public.order_returns where id = rid) = 1, 'admin reads returns';
+  assert (select count(*) from public.order_return_items where return_id = rid) = 1, 'admin reads return items';
+  assert (select count(id) from public.order_return_photos where id = pid) = 1, 'admin reads photo ids';
+  begin
+    perform path from public.order_return_photos;
+    assert false, 'path must not be readable';
+  exception when insufficient_privilege then null;
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', u_user, 'role', 'authenticated')::text, true);
+  assert (select count(*) from public.order_returns) = 0, 'non-admin sees no returns';
+  assert (select count(*) from public.order_return_items) = 0, 'non-admin sees no items';
+  assert (select count(id) from public.order_return_photos) = 0, 'non-admin sees no photos';
+  reset role;
 end $$;
 rollback;
 
