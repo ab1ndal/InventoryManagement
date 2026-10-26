@@ -140,5 +140,66 @@ SQL
 echo "offset rows=$OFFSET_ROWS"
 [ "$OFFSET_ROWS" = "2" ] || { echo "FAIL: two sessions should leave exactly items+1 = 2 offset rows"; fail=1; }
 
+# ---- online_return_open: two sessions, same last returnable unit -> exactly one return ----
+V4=44444444-4444-4444-8444-444444444444
+cleanup_return() {
+  "${PSQL[@]}" > /dev/null <<SQL
+update public.storefront_settings set checkout_live = false where id = 1;
+create temp table ret_bills as select bill_id from public.orders where contact_name = 'Concurrency Return' and bill_id is not null;
+delete from public.orders where contact_name = 'Concurrency Return';
+delete from public.bills where billid in (select bill_id from ret_bills);
+delete from public.productsizecolors where variantid = '$V4';
+delete from public.products where productid = 'CONC4';
+SQL
+}
+cleanup_return
+"${PSQL[@]}" > "$OUT/return_ids" <<SQL
+insert into public.products (productid, name, purchaseprice, retailprice) values ('CONC4', 'Conc four', 500, 1000);
+insert into public.productsizecolors (productid, size, color, stock, variantid) values ('CONC4', 'M', 'Red', 5, '$V4');
+update public.storefront_settings set checkout_live = true where id = 1;
+create temp table ret_ids (order_id uuid, item_id uuid);
+do \$\$
+declare
+  v_ref text; v_order uuid; v_item uuid;
+begin
+  v_ref := (public.online_order_create(
+    jsonb_build_object('contact', jsonb_build_object('name', 'Concurrency Return', 'phone', '+919800000098'),
+      'address', jsonb_build_object('pincode', '201001'), 'subtotal', 1000, 'shipping', 99, 'gateway_amount', 1099),
+    jsonb_build_array(jsonb_build_object('variant_id', '$V4', 'qty', 1, 'unit_price', 1000)), null)).order_ref;
+  select id into v_order from public.orders where order_ref = v_ref;
+  perform public.online_order_confirm_payment(v_ref, 'cf_' || v_ref, 1099, 'INR');
+  select id into v_item from public.order_items where order_id = v_order;
+  perform public.online_order_set_availability(v_order, v_item, 1, null);
+  perform public.online_order_claim(v_order, 'process', null, 'op-ret');
+  perform public.online_order_prepare_process(v_order, null);
+  perform public.online_order_checkpoint(v_order, 'awb', '{"awb":"AWBRET","courier_id":7,"courier_name":"T"}', 'op-ret');
+  perform public.online_order_checkpoint(v_order, 'label', '{"label_url":"https://x/l.pdf"}', 'op-ret');
+  perform public.online_order_mark_packed(v_order, '{}'::jsonb, null, 'op-ret');
+  perform public.online_order_apply_tracking('AWBRET', 'shipped', '{"shipment_status_id":6}');
+  perform public.online_order_apply_tracking('AWBRET', 'delivered', '{"shipment_status_id":7}');
+  insert into ret_ids values (v_order, v_item);
+end \$\$;
+select order_id || ' ' || item_id from ret_ids;
+SQL
+read -r RET_ORDER RET_ITEM < "$OUT/return_ids"
+OPEN_SQL="select public.online_return_open('$RET_ORDER', null, false, 'change_of_mind', now(), jsonb_build_array(jsonb_build_object('item_id', '$RET_ITEM', 'units', 1)), 'conc', null, null)"
+"${PSQL[@]}" -c "begin" -c "$OPEN_SQL" -c "select pg_sleep(1.5)" -c "commit" > "$OUT/ret_a" 2> "$OUT/ret_a_err" &
+PID_RA=$!
+sleep 0.5
+set +e
+START=$(date +%s)
+"${PSQL[@]}" -c "$OPEN_SQL" > "$OUT/ret_b" 2> "$OUT/ret_b_err"
+RET_B_RC=$?
+RET_WAITED=$(( $(date +%s) - START ))
+set -e
+wait "$PID_RA" || true
+RET_ROWS="$("${PSQL[@]}" -c "select count(*) from public.order_returns where order_id = '$RET_ORDER'")"
+cleanup_return
+echo "return open: rows=$RET_ROWS B_rc=$RET_B_RC waitedB=${RET_WAITED}s B_err=$(tr '\n' ' ' < "$OUT/ret_b_err")"
+[ "$RET_ROWS" = "1" ] || { echo "FAIL: exactly one return should exist for the last returnable unit"; fail=1; }
+[ "$RET_B_RC" != "0" ] || { echo "FAIL: second open should be refused"; fail=1; }
+grep -q 'returnable' "$OUT/ret_b_err" || { echo "FAIL: B should fail on returnable units"; fail=1; }
+[ "$RET_WAITED" -ge 1 ] || { echo "FAIL: B did not wait for A's order lock"; fail=1; }
+
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"

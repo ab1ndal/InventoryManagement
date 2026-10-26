@@ -1,4 +1,4 @@
--- Tests for schema/migration_online_returns.sql (delivered_at + manual mark delivered).
+-- Tests for schema/migration_online_returns.sql (delivered_at, mark delivered, return open/cancel).
 -- Each test is `begin; do $$ ... assert ... $$; rollback;` seeded via the pg_temp helpers below.
 -- Run locally:
 --   scripts/test-db.sh up
@@ -340,5 +340,260 @@ begin
   assert not has_function_privilege('anon', 'public.online_order_mark_delivered(uuid,uuid,timestamptz,text)', 'execute'), 'anon';
   assert not has_function_privilege('authenticated', 'public.online_order_mark_delivered(uuid,uuid,timestamptz,text)', 'execute'), 'authenticated';
   assert has_function_privilege('service_role', 'public.online_order_mark_delivered(uuid,uuid,timestamptz,text)', 'execute'), 'service_role';
+end $$;
+rollback;
+
+-- ===================================================================
+-- Task 2: returnable units, open / cancel
+-- ===================================================================
+-- Delivered order with one line of p_qty units, delivered p_ago in the past.
+create function pg_temp.delivered_order(p_qty int default 3, p_ago interval default interval '3 days',
+                                        out o_id uuid, out i_id uuid) language plpgsql as $$
+declare
+  v uuid := pg_temp.mk_variant(1000, 10);
+  r record;
+begin
+  perform pg_temp.go_live();
+  select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', p_qty)));
+  perform pg_temp.pay(r.order_ref);
+  perform public.online_order_set_availability(r.order_id, i.id, i.qty, null) from public.order_items i where i.order_id = r.order_id;
+  perform pg_temp.pack(r.order_id);
+  o_id := r.order_id;
+  update public.orders set paid_at = now() - interval '20 days' where id = o_id;
+  perform public.online_order_apply_tracking((select awb from public.orders where id = o_id), 'shipped', '{"shipment_status_id":6}');
+  perform public.online_order_mark_delivered(o_id, null, now() - p_ago, 'test');
+  select id into i_id from public.order_items where order_id = o_id;
+end $$;
+
+create function pg_temp.returnable(p_order uuid) returns int language sql as $$
+  select coalesce(sum(units), 0)::int from public.online_return_returnable(p_order)
+$$;
+
+create function pg_temp.open_ret(p_order uuid, p_item uuid, p_units int, p_reason text default 'change_of_mind',
+                                 p_contacted timestamptz default now()) returns uuid language sql as $$
+  select public.online_return_open(p_order, null, false, p_reason, p_contacted,
+    jsonb_build_array(jsonb_build_object('item_id', p_item, 'units', p_units)), 'customer called', null, null)
+$$;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3);
+begin
+  assert pg_temp.returnable(s.o_id) = 3, 'returnable = shipped: ' || pg_temp.returnable(s.o_id);
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3); rid uuid;
+begin
+  rid := pg_temp.open_ret(s.o_id, s.i_id, 2);
+  assert pg_temp.returnable(s.o_id) = 1, 'minus open return';
+  assert (select status from public.order_returns where id = rid) = 'open';
+  assert exists (select 1 from public.order_events where order_id = s.o_id and kind = 'return_opened'
+                   and data ->> 'return_id' = rid::text), 'return_opened event';
+  assert (select status from public.orders where id = s.o_id) = 'delivered', 'order stays delivered';
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3); rid uuid;
+begin
+  -- refunded return: received units are gone, rejected-by-warehouse units are not
+  rid := pg_temp.open_ret(s.o_id, s.i_id, 2);
+  update public.order_returns set status = 'refunded' where id = rid;
+  update public.order_return_items set received_units = 1, restock_units = 1 where return_id = rid;
+  assert pg_temp.returnable(s.o_id) = 2, 'refunded return subtracts received units only: ' || pg_temp.returnable(s.o_id);
+  -- rejected / cancelled returns free their units
+  update public.order_returns set status = 'rejected' where id = rid;
+  assert pg_temp.returnable(s.o_id) = 3, 'rejected frees units';
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3); b int;
+begin
+  select bill_item_id into b from public.order_items where id = s.i_id;
+  assert b is not null, 'bill item linked';
+  insert into public.exchanges (original_bill_item_id, quantity, reason) values (b, 1, 'In-store exchange');
+  assert pg_temp.returnable(s.o_id) = 2, 'minus in-store exchange: ' || pg_temp.returnable(s.o_id);
+  -- exchange written by an online refund does not count
+  insert into public.order_refunds (order_id, reason) values (s.o_id, 'cancel');
+  insert into public.exchanges (original_bill_item_id, quantity, reason, order_refund_id)
+    values (b, 1, 'Online', (select id from public.order_refunds where order_id = s.o_id));
+  assert pg_temp.returnable(s.o_id) = 2, 'online refund exchange excluded';
+  -- never below zero
+  insert into public.exchanges (original_bill_item_id, quantity, reason) values (b, 5, 'In-store exchange');
+  assert pg_temp.returnable(s.o_id) = 0, 'floored at 0';
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3, interval '3 days'); rid uuid;
+begin
+  -- opened late, but contacted 40h after delivery: inside the 48h window
+  rid := pg_temp.open_ret(s.o_id, s.i_id, 1, 'damaged_wrong',
+    (select delivered_at + interval '40 hours' from public.orders where id = s.o_id));
+  assert (select override_reason from public.order_returns where id = rid) is null, 'no override recorded';
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3, interval '6 days');
+begin
+  begin
+    perform pg_temp.open_ret(s.o_id, s.i_id, 1, 'damaged_wrong',
+      (select delivered_at + interval '49 hours' from public.orders where id = s.o_id));
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm like 'return window closed%', 'admin outside window: ' || sqlerrm;
+  end;
+  -- admin with an override reason is still refused
+  begin
+    perform public.online_return_open(s.o_id, null, false, 'damaged_wrong', now(),
+      jsonb_build_array(jsonb_build_object('item_id', s.i_id, 'units', 1)), 'n', null, 'owner approved');
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm like 'return window closed%', 'non-superadmin override refused: ' || sqlerrm;
+  end;
+  -- change_of_mind: 7 days; 6 days after delivery is fine
+  perform pg_temp.open_ret(s.o_id, s.i_id, 1, 'change_of_mind', now());
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3, interval '10 days'); rid uuid;
+begin
+  begin
+    perform public.online_return_open(s.o_id, null, true, 'change_of_mind', now(),
+      jsonb_build_array(jsonb_build_object('item_id', s.i_id, 'units', 1)), 'n', null, '  ');
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm like 'return window closed%', 'blank override refused: ' || sqlerrm;
+  end;
+  rid := public.online_return_open(s.o_id, null, true, 'change_of_mind', now(),
+    jsonb_build_array(jsonb_build_object('item_id', s.i_id, 'units', 1)), 'n', null, 'owner approved');
+  assert (select override_reason from public.order_returns where id = rid) = 'owner approved', 'override recorded';
+  assert (select data ->> 'override_reason' from public.order_events where kind = 'return_opened' and order_id = s.o_id) = 'owner approved';
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3);
+begin
+  begin
+    perform pg_temp.open_ret(s.o_id, s.i_id, 4);
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm like '%returnable%', 'above returnable: ' || sqlerrm;
+  end;
+  assert not exists (select 1 from public.order_returns where order_id = s.o_id), 'nothing persisted by the failed open? (subtransaction rolled back)';
+  perform pg_temp.open_ret(s.o_id, s.i_id, 2);
+  begin
+    perform pg_temp.open_ret(s.o_id, s.i_id, 2);
+    assert false, 'should have raised';
+  exception when others then
+    assert sqlerrm like '%returnable%', 'second return above remaining: ' || sqlerrm;
+  end;
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3);
+begin
+  begin
+    perform public.online_return_open(s.o_id, null, false, 'change_of_mind', now() + interval '1 hour',
+      jsonb_build_array(jsonb_build_object('item_id', s.i_id, 'units', 1)), 'n', null, null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%future%', 'future contact: ' || sqlerrm; end;
+  begin
+    perform pg_temp.open_ret(s.o_id, s.i_id, 1, 'change_of_mind', now() - interval '10 days');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%before delivery%', 'contact before delivery: ' || sqlerrm; end;
+  begin
+    perform public.online_return_open(s.o_id, null, false, 'change_of_mind', now(),
+      jsonb_build_array(jsonb_build_object('item_id', s.i_id, 'units', 1)), '  ', null, null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%note%', 'note required: ' || sqlerrm; end;
+  begin
+    perform public.online_return_open(s.o_id, null, false, 'bogus', now(),
+      jsonb_build_array(jsonb_build_object('item_id', s.i_id, 'units', 1)), 'n', null, null);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%reason%', 'bad reason: ' || sqlerrm; end;
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.shipped_order();
+begin
+  begin
+    perform pg_temp.open_ret(s.o_id, (select id from public.order_items where order_id = s.o_id), 1);
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%not delivered%', 'undelivered order: ' || sqlerrm; end;
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3); rid uuid;
+begin
+  rid := pg_temp.open_ret(s.o_id, s.i_id, 3);
+  assert pg_temp.returnable(s.o_id) = 0, 'all units tied up';
+  begin
+    perform public.online_return_cancel(rid, null, ' ');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%note%', 'cancel note required: ' || sqlerrm; end;
+  perform public.online_return_cancel(rid, null, 'customer changed mind');
+  assert (select status from public.order_returns where id = rid) = 'cancelled', 'cancelled';
+  assert pg_temp.returnable(s.o_id) = 3, 'units returnable again';
+  assert exists (select 1 from public.order_events where order_id = s.o_id and kind = 'return_cancelled'), 'event';
+  begin
+    perform public.online_return_cancel(rid, null, 'again');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%cannot be cancelled%', 'cancel twice: ' || sqlerrm; end;
+end $$;
+rollback;
+
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3); rid uuid;
+begin
+  rid := pg_temp.open_ret(s.o_id, s.i_id, 1);
+  update public.order_returns set status = 'refunded' where id = rid;
+  begin
+    perform public.online_return_cancel(rid, null, 'n');
+    assert false, 'should have raised';
+  exception when others then assert sqlerrm like '%cannot be cancelled%', 'cancel refunded: ' || sqlerrm; end;
+end $$;
+rollback;
+
+-- constraints, RLS, privileges
+begin;
+do $$
+declare s record := pg_temp.delivered_order(3); rid uuid;
+begin
+  insert into public.order_refunds (order_id, reason) values (s.o_id, 'return');  -- accepted now
+  rid := pg_temp.open_ret(s.o_id, s.i_id, 2);
+  begin
+    update public.order_return_items set received_units = 3 where return_id = rid;
+    assert false, 'should have raised';
+  exception when check_violation then null; end;
+  assert (select relrowsecurity from pg_class where oid = 'public.order_returns'::regclass), 'rls returns';
+  assert (select relrowsecurity from pg_class where oid = 'public.order_return_items'::regclass), 'rls items';
+  assert (select relrowsecurity from pg_class where oid = 'public.order_return_photos'::regclass), 'rls photos';
+  assert not exists (select 1 from pg_policies where tablename in ('order_returns', 'order_return_items', 'order_return_photos')), 'no policies';
+  assert not has_function_privilege('anon', 'public.online_return_open(uuid,uuid,boolean,text,timestamptz,jsonb,text,text,text)', 'execute'), 'anon open';
+  assert not has_function_privilege('authenticated', 'public.online_return_cancel(uuid,uuid,text)', 'execute'), 'authenticated cancel';
+  assert not has_function_privilege('anon', 'public.online_return_returnable(uuid)', 'execute'), 'anon returnable';
+  assert has_function_privilege('service_role', 'public.online_return_open(uuid,uuid,boolean,text,timestamptz,jsonb,text,text,text)', 'execute'), 'service open';
+  assert has_function_privilege('service_role', 'public.online_return_cancel(uuid,uuid,text)', 'execute'), 'service cancel';
 end $$;
 rollback;
