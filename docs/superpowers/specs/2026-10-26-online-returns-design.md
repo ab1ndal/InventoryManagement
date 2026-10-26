@@ -231,3 +231,28 @@ Discussed and parked to get live sooner:
 ## Open (owner)
 
 - None.
+
+## Changes from the adversarial review (Codex, 2026-10-26)
+
+These override anything above that conflicts.
+
+1. **In-store exchange becomes one locked DB function.** `ExchangePage` today restocks, updates manual
+   item stock and inserts `exchanges` rows as separate browser calls. A new `exchange_record` RPC does all
+   three in one transaction, after locking the bill's online order row (if the bill is an online Bill of
+   Supply) and the `bill_items` rows, and re-checking the cumulative returned quantity, online refund
+   offsets included. `online_return_receive` takes the same locks in the same order (order, then bill
+   items by id). This also makes today's in-store exchange atomic.
+2. **Open locks the order** before computing returnable units, so two admins can't reserve the same unit.
+3. **Photos are tied to a return by the server.** Upload URLs are issued for a `returnId` only: the
+   server checks the return exists and is `open`, derives the order and builds the path. Viewing takes a
+   `photoId` and signs only that stored path. No client-supplied paths.
+4. **Mark delivered is superadmin only**, with a required reason; it can't move `delivered_at` once set,
+   and the date can't be more than 30 days back. Stored in the event for audit.
+5. **Refund preview comes from the database**: a read-only `online_return_preview(return, items)` using
+   the same allocation and shipping rule as receive. Receive recomputes under the lock and the dialog
+   shows the confirmed amounts returned by receive.
+6. **Photos:** a damaged/wrong return can be opened first and photos added any time while it is `open`;
+   at least one photo is required before it can be received. The UI keeps "Add photos" available until
+   receipt.
+7. **Exchange window code:** `ExchangePage.handleLoadBill` must look up the linked online order's
+   `delivered_at` before the window check (today the check runs first, `src/admin/pages/ExchangePage.js:173-189`).

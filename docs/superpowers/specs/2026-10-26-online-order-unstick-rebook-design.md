@@ -192,3 +192,30 @@ shipment sends the existing "shipped" email with the new AWB.
 ## Open (owner)
 
 - None.
+
+## Changes from the adversarial review (Codex, 2026-10-26)
+
+These override anything above that conflicts.
+
+1. **Fencing, not leases.** An expired lease doesn't prove a Process worker has stopped (it may be stuck in
+   a slow Shiprocket call). `online_order_checkpoint` and `online_order_mark_packed` gain `p_op_key` and
+   refuse when the order's `op_key` differs. Process renews its lease (same-key `online_order_claim`)
+   before each Shiprocket call. Send back takes over the op with a **new** key, so a late write from the
+   old worker is rejected.
+2. **Claim before touching the courier.** Send back and Rebook are two-phase:
+   - claim: `online_order_claim` accepts actions `send_back` (from `processing` with an expired lease) and
+     `rebook` (from `packed` / `shipped` / `out_for_delivery`; status unchanged, `op_action = 'rebook'`);
+   - cancel the old shipment in Shiprocket, then record checkpoint `sr_cancelled` (so a retry with the same
+     op key doesn't cancel twice);
+   - finalize with `online_order_send_back` / `online_order_rebook`, which verify the op key.
+   While `op_action = 'rebook'`, the tracking webhook stores the raw status but doesn't change the order
+   status. Two admins: the second claim gets `busy`.
+3. **No blind continue on a failed cancel.** If the Shiprocket cancel fails or is ambiguous, the action
+   stops with the order still claimed and a problem note. Staff can press it again (same op key resumes),
+   or a **superadmin** confirms "I cancelled it in the Shiprocket dashboard", which finalizes without
+   the API. Rebook stays switched off until the cancel-by-AWB call is verified against real Shiprocket.
+4. **Bill offset helper:** `_online_bill_offset(refund, reason, include_shipping_offset boolean)`; RTO
+   passes `false` (RTO never offsets shipping). Duplicates are prevented by the database:
+   `exchanges.order_refund_id` + `exchanges.order_item_id`, a unique index on
+   `(order_refund_id, order_item_id)` for item rows and a unique partial index for one shipping row per
+   refund, inserts with `on conflict do nothing`.
