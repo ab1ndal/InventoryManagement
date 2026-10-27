@@ -12,8 +12,16 @@ import {
   DialogTitle,
 } from "../../../components/ui/dialog";
 import { action, getMyRole, getOrder, newOpKey } from "./onlineOrdersApi";
-import { StatusBadge } from "./OrderList";
-import { formatDateTime, formatRupees, processRefundPreview } from "./orderHelpers";
+import { ReturnBadge, StatusBadge } from "./OrderList";
+import ReturnsSection from "./ReturnsSection";
+import {
+  formatDateTime,
+  formatRupees,
+  localInputToIso,
+  processRefundPreview,
+  ceilToMinute,
+  toLocalInputValue,
+} from "./orderHelpers";
 
 const BUSY_MESSAGE = "Another staff member is working on this order";
 const RELEASE_MESSAGE =
@@ -67,16 +75,19 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [avail, setAvail] = useState({});
   const [checked, setChecked] = useState(() => new Set());
   const [savingLine, setSavingLine] = useState(null);
-  const [dialog, setDialog] = useState(null); // 'process' | 'cancel' | 'rto' | 'sendback' | 'rebook' | 'release'
+  const [dialog, setDialog] = useState(null); // 'process' | 'cancel' | 'rto' | 'sendback' | 'rebook' | 'release' | 'delivered'
   const [pending, setPending] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [courierError, setCourierError] = useState(null);
   const [role, setRole] = useState(null);
   const [parcelLost, setParcelLost] = useState(false);
   const [rebookNote, setRebookNote] = useState("");
+  const [deliveredAt, setDeliveredAt] = useState("");
+  const [deliveredReason, setDeliveredReason] = useState("");
   // Courier cancel failure inside a send-back/rebook dialog; the dialog stays open so the
   // same op key can be resumed (retry, or superadmin manual-cancel confirmation).
   const [dialogProblem, setDialogProblem] = useState(null);
+  const [deliveredError, setDeliveredError] = useState(null);
   // release_op target {key, label}: key is the open send-back/rebook dialog's key, or a new one.
   const [release, setRelease] = useState(null);
   // One op key per Process/Cancel click; reused if that click's request is retried.
@@ -123,7 +134,9 @@ export default function OrderDetail({ orderId, onChanged }) {
     setCancelReason("");
     setParcelLost(false);
     setRebookNote("");
+    setDeliveredReason("");
     setDialogProblem(null);
+    setDeliveredError(null);
     opRef.current = null;
   };
 
@@ -170,6 +183,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   // Runs one admin-order-action call. Returns true on success.
   const run = async (payload, successMessage) => {
     setPending(true);
+    setDeliveredError(null);
     try {
       await action(payload);
       toast.success(successMessage);
@@ -185,6 +199,11 @@ export default function OrderDetail({ orderId, onChanged }) {
         setCourierError(err.message);
         toast.error("Courier error", { description: err.message });
         closeDialog();
+        await load();
+        onChanged?.();
+      } else if (err.code === "bad_state" && payload.action === "mark_delivered") {
+        // Refusals of the date/reason come back as bad_state too; keep the typed values.
+        setDeliveredError(err.message);
         await load();
         onChanged?.();
       } else if (err.code === "bad_state") {
@@ -239,6 +258,17 @@ export default function OrderDetail({ orderId, onChanged }) {
   const canRebook =
     ["packed", "shipped", "out_for_delivery"].includes(order.status) &&
     (!order.op_action || (order.op_action === "rebook" && leaseExpired));
+  // Superadmin-only manual fallback when the courier never reported delivery; the server enforces both.
+  const canMarkDelivered =
+    role === "superadmin" && ["shipped", "out_for_delivery"].includes(order.status) && !order.delivered_at;
+  const deliveredIso = localInputToIso(deliveredAt);
+  // The server allows at most 30 days back and nothing before payment; a minute of slack covers the
+  // time between rendering and submitting.
+  const deliveredMin = toLocalInputValue(
+    ceilToMinute(
+      new Date(Math.max(Date.now() - 30 * 24 * 3600 * 1000, order.paid_at ? new Date(order.paid_at) : 0) + 60000)
+    )
+  );
   const canRelease = ["send_back", "rebook"].includes(order.op_action) && leaseExpired;
   const backPayload = (extra) =>
     dialog === "sendback"
@@ -264,7 +294,10 @@ export default function OrderDetail({ orderId, onChanged }) {
           </div>
           <div className="text-sm text-muted-foreground">{addressText(order.address)}</div>
         </div>
-        <StatusBadge status={order.status} />
+        <div>
+          <StatusBadge status={order.status} />
+          <ReturnBadge order={{ ...order, order_items: items }} />
+        </div>
       </div>
 
       {(order.problem || order.process_error || courierError || failedJobs.length > 0) && (
@@ -476,6 +509,18 @@ export default function OrderDetail({ orderId, onChanged }) {
             Abandon
           </Button>
         )}
+        {canMarkDelivered && (
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => {
+              setDeliveredAt(toLocalInputValue(new Date()));
+              setDialog("delivered");
+            }}
+          >
+            Mark delivered…
+          </Button>
+        )}
         {order.status === "rto" && (
           <Button variant="outline" disabled={pending} onClick={() => setDialog("rto")}>
             Parcel received back
@@ -487,6 +532,16 @@ export default function OrderDetail({ orderId, onChanged }) {
           Check every item on the shelf before processing.
         </p>
       )}
+
+      <ReturnsSection
+        order={order}
+        items={items}
+        role={role}
+        onChanged={async () => {
+          await load();
+          onChanged?.();
+        }}
+      />
 
       {/* Refunds */}
       {refunds.length > 0 && (
@@ -688,6 +743,48 @@ export default function OrderDetail({ orderId, onChanged }) {
         onClose={closeDialog}
         onConfirm={() => run({ action: "release_op", orderId, opKey: release?.key }, "Order released")}
       />
+
+      <ConfirmDialog
+        open={dialog === "delivered"}
+        title={`Mark ${order.order_ref} delivered?`}
+        description="Use only when the courier never reported delivery. The delivery date starts the return window and cannot be changed afterwards."
+        confirmLabel="Mark delivered"
+        confirmDisabled={!deliveredIso || !deliveredReason.trim()}
+        pending={pending}
+        onClose={closeDialog}
+        onConfirm={() =>
+          run(
+            { action: "mark_delivered", orderId, deliveredAt: deliveredIso, reason: deliveredReason.trim() },
+            "Order marked delivered"
+          )
+        }
+      >
+        <div className="space-y-3 text-sm">
+          <label className="block">
+            <span className="mb-1 block font-medium">Delivered at</span>
+            <input
+              type="datetime-local"
+              className="h-9 w-full rounded-md border border-input bg-white px-2"
+              value={deliveredAt}
+              min={deliveredMin}
+              max={toLocalInputValue(new Date())}
+              onChange={(e) => setDeliveredAt(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block font-medium">Reason (required)</span>
+            <Textarea
+              aria-label="Delivery reason"
+              value={deliveredReason}
+              onChange={(e) => setDeliveredReason(e.target.value)}
+              placeholder="e.g. Customer confirmed receipt on WhatsApp"
+            />
+          </label>
+          {deliveredError && (
+            <p className="rounded-md border border-red-200 bg-red-50 p-2 text-red-800">{deliveredError}</p>
+          )}
+        </div>
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={dialog === "rto"}

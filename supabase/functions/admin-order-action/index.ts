@@ -10,6 +10,14 @@
  *   rebook           {orderId, opKey, parcelLost, note, manualCancelConfirmed?} packed/shipped → paid | cancelled
  *   release_op       {orderId, opKey}            abandon a send_back / rebook whose booking was not cancelled
  *   rto_received     {orderId}
+ *   mark_delivered   {orderId, deliveredAt, reason}                            superadmin only
+ *   return_open      {orderId, reason, contactedAt, items, note, returnAwb?, overrideReason?}
+ *   return_photo_url {returnId, contentType}  →  {uploadUrl, path, token}
+ *   return_photo_add {returnId, path}
+ *   return_photo_view {photoId}               →  {url} (10 min)
+ *   return_preview   {returnId, items}        →  {preview}
+ *   return_receive   {returnId, items, note?}
+ *   return_cancel    {returnId, note}
  *   set_live         {live}                      superadmin only
  *
  * 200 {ok: true, order, refundId?, billId?}; errors {error, code}: 409 busy | bad_state,
@@ -43,6 +51,18 @@ import {
   shiprocketFromEnv,
   supabaseOrdersDb,
 } from "../_shared/process.ts";
+import {
+  isoTimestamp,
+  mapOpenReturn,
+  mapReceiveItems,
+  optionalText,
+  PHOTO_VIEW_TTL_SECONDS,
+  photoExtFor,
+  requiredText,
+  type ReturnsStorage,
+  supabaseReturnsStorage,
+  UUID_RE,
+} from "../_shared/returns.ts";
 import type { ShiprocketClient } from "../_shared/shiprocket.ts";
 
 export type Deps = {
@@ -52,6 +72,7 @@ export type Deps = {
   verifyJwt: VerifyJwt;
   isAdmin: (userId: string) => Promise<boolean>;
   isSuperadmin: (userId: string) => Promise<boolean>;
+  storage: ReturnsStorage;
   /** anon/publishable keys: a bearer equal to one of these is "not signed in". */
   publicKeys: string[];
   allowedOrigins: string[];
@@ -60,13 +81,13 @@ export type Deps = {
   rebookApiCancel?: boolean;
 };
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 class BadRequest extends HttpError {
   constructor(message: string) {
     super(400, message);
   }
 }
+
+class NotFound extends Error {}
 
 function uuidField(body: Record<string, unknown>, key: string): string {
   const v = body[key];
@@ -108,7 +129,13 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
     const ship: ShipDeps = { db: deps.db, shiprocket: deps.shiprocket, shopEmail: deps.shopEmail };
     const action = body.action;
     const orderBody = async (orderId: string, extra: Record<string, unknown> = {}) =>
-      json(200, { ok: true, order: await deps.db.getOrder(orderId), ...extra }, cors);
+      json(200, { ok: true, order: await deps.db.getOrderWithReturns(orderId), ...extra }, cors);
+
+    const orderIdOfReturn = async (returnId: string) => {
+      const id = await deps.db.getReturnOrderId(returnId);
+      if (!id) throw new NotFound("return not found");
+      return id;
+    };
 
     switch (action) {
       case "set_availability": {
@@ -204,6 +231,111 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         return await orderBody(orderId, { refundId });
       }
 
+      case "mark_delivered": {
+        const orderId = uuidField(body, "orderId");
+        if (!(await deps.isSuperadmin(user.id))) {
+          throw new HttpError(403, "superadmin access required");
+        }
+        await deps.db.rpc("online_order_mark_delivered", {
+          p_order_id: orderId,
+          p_actor: user.id,
+          p_delivered_at: isoTimestamp(body.deliveredAt, "deliveredAt"),
+          p_reason: textField(body, "reason"),
+        });
+        return await orderBody(orderId);
+      }
+
+      case "return_open": {
+        const orderId = uuidField(body, "orderId");
+        const args = mapOpenReturn(
+          body,
+          orderId,
+          user.id,
+          await deps.isSuperadmin(user.id),
+        );
+        const returnId = await deps.db.rpc<string>("online_return_open", args);
+        return await orderBody(orderId, { returnId });
+      }
+
+      case "return_photo_url": {
+        // Only returnId and contentType are read: the path is always built by the DB.
+        const returnId = uuidField(body, "returnId");
+        const ext = photoExtFor(body.contentType);
+        const path = await deps.db.rpc<string>("online_return_photo_path", {
+          p_return_id: returnId,
+          p_ext: ext,
+        });
+        const { uploadUrl, token } = await deps.storage.createUploadUrl(path);
+        return json(200, { ok: true, uploadUrl, path, token }, cors);
+      }
+
+      case "return_photo_add": {
+        const returnId = uuidField(body, "returnId");
+        const path = textField(body, "path");
+        const orderId = await orderIdOfReturn(returnId);
+        const photoId = await deps.db.rpc<string>("online_return_add_photo", {
+          p_return_id: returnId,
+          p_path: path,
+          p_actor: user.id,
+        });
+        return await orderBody(orderId, { photoId });
+      }
+
+      case "return_photo_view": {
+        const path = await deps.db.getReturnPhotoPath(
+          uuidField(body, "photoId"),
+        );
+        if (!path) return fail(404, "not_found", "photo not found");
+        const url = await deps.storage.createViewUrl(path, PHOTO_VIEW_TTL_SECONDS);
+        if (!url) return fail(404, "not_found", "photo file not found");
+        return json(200, { ok: true, url }, cors);
+      }
+
+      case "return_preview": {
+        const preview = await deps.db.rpc<Record<string, unknown>>(
+          "online_return_preview",
+          {
+            p_return_id: uuidField(body, "returnId"),
+            p_items: mapReceiveItems(body.items),
+          },
+        );
+        return json(200, { ok: true, preview }, cors);
+      }
+
+      case "return_receive": {
+        const returnId = uuidField(body, "returnId");
+        const items = mapReceiveItems(body.items);
+        const orderId = await orderIdOfReturn(returnId);
+        const r = await deps.db.rpc<
+          { status: string; refund_id: string | null; refund: unknown }
+        >(
+          "online_return_receive",
+          {
+            p_return_id: returnId,
+            p_actor: user.id,
+            p_items: items,
+            p_note: optionalText(body.note, "note"),
+          },
+        );
+        return await orderBody(orderId, {
+          status: r.status,
+          refund: r.refund,
+          ...(r.refund_id ? { refundId: r.refund_id } : {}),
+        });
+      }
+
+      case "return_cancel": {
+        const returnId = uuidField(body, "returnId");
+        const note = requiredText(body.note, "note");
+        const orderId = await orderIdOfReturn(returnId);
+        await deps.db.rpc("online_return_cancel", {
+          p_return_id: returnId,
+          p_actor: user.id,
+          p_note: note,
+        });
+        return await orderBody(orderId);
+      }
+
       case "set_live": {
         if (typeof body.live !== "boolean") throw new BadRequest("live must be true or false");
         if (!(await deps.isSuperadmin(user.id))) throw new HttpError(403, "superadmin access required");
@@ -219,11 +351,16 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         throw new BadRequest("unknown action");
     }
   } catch (err) {
+    if (err instanceof NotFound) return fail(404, "not_found", err.message);
     if (err instanceof HttpError) {
       const code = err.status === 400 ? "invalid_request" : err.status === 401 ? "unauthorized" : "forbidden";
       return fail(err.status, code, err.message);
     }
     if (err instanceof DbError && err.isRaised) return fail(409, "bad_state", err.message);
+    // Only return_photo_add inserts a client-supplied unique value: a replayed path.
+    if (err instanceof DbError && err.isUniqueViolation && err.fn === "online_return_add_photo") {
+      return fail(409, "bad_state", "photo already recorded");
+    }
     logEvent("error", "admin_order_action_failed", { error: err instanceof Error ? err.message : String(err) });
     return fail(500, "internal", "internal error");
   }
@@ -243,6 +380,7 @@ if (import.meta.main) {
     verifyJwt: supabaseVerifier(client),
     isAdmin: profileAdminCheck(client),
     isSuperadmin,
+    storage: supabaseReturnsStorage(client),
     publicKeys: [Deno.env.get("SUPABASE_ANON_KEY"), Deno.env.get("SUPABASE_PUBLISHABLE_KEY")]
       .filter((k): k is string => !!k),
     allowedOrigins: parseAllowedOrigins(Deno.env.get("ALLOWED_ORIGIN")),

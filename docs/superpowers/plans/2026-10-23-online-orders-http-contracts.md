@@ -64,8 +64,25 @@ Req: `{ action: "set_availability", orderId, itemId, availableQty }`
      // packed / shipped / out_for_delivery → paid (re-send) or cancelled (nothing left; refundId returned)
    | `{ action: "release_op", orderId, opKey }`
      // any admin: abandon a send_back / rebook claim whose courier booking was NOT cancelled
+   | `{ action: "mark_delivered", orderId, deliveredAt: <ISO-8601 with zone>, reason }`   // superadmin only; delivered_at is never changed once set, at most 30 days back
+   | `{ action: "return_open", orderId, reason: "damaged_wrong"|"change_of_mind", contactedAt: <ISO-8601 with zone>, items: [{ itemId, units }], note, returnAwb?, overrideReason? }`
+     // outside the return window only a superadmin may open it, with a non-blank overrideReason
+   | `{ action: "return_photo_url", returnId, contentType }`  // image/jpeg|png|webp|heic|heif; any orderId / path in the body is ignored
+   | `{ action: "return_photo_add", returnId, path }`        // path as returned by return_photo_url; the DB re-validates its shape
+   | `{ action: "return_photo_view", photoId }`
+   | `{ action: "return_preview", returnId, items: [{ itemId, receivedUnits, restockUnits }] }`   // every item of the return listed once, same rules as receive
+   | `{ action: "return_receive", returnId, items: [{ itemId, receivedUnits, restockUnits }], note? }`
+   | `{ action: "return_cancel", returnId, note }`
 Res 200: `{ ok: true, order: <orders row>, refundId?: string, billId?: number }`
-Errors: 400 `invalid_request` (bad/missing field; `note` blank, `parcelLost` / `manualCancelConfirmed` not boolean), 403 `forbidden` (`manualCancelConfirmed: true` from a non-superadmin, `set_live` from an admin), 409 `busy` (another staff action holds the order), 409 `bad_state`, 502 `courier_error` (order left in `processing` with `process_error`; Retry resumes).
+- `order.returns`: every order response carries the order's returns, each `{ ...order_returns columns, items: [order_return_items rows], photos: [{ id, uploaded_at }] }`. Photo paths are never sent; staff view a photo through `return_photo_view`.
+- `return_open` → also `returnId`.
+- `return_photo_url` → `{ ok, uploadUrl, path, token }` (no `order`): the browser PUTs the file to `uploadUrl` (signed upload URL on the private `order-returns` bucket), then calls `return_photo_add` with `path`. The path is built by the server (`<order_id>/<return_id>/<uuid>.<ext>`).
+- `return_photo_add` → also `photoId`.
+- `return_photo_view` → `{ ok, url }` (signed URL, valid 10 minutes; no `order`).
+- `return_preview` → `{ ok, preview: { credit_part, gateway_part, shipping, total } }` (no `order`).
+- `return_receive` → also `status` (`refunded` | `rejected`), `refund`, and `refundId` when a refund was created.
+- `return_cancel`, `mark_delivered` → just the order.
+Errors: 400 `invalid_request` (bad/missing field; `note` blank, `parcelLost` / `manualCancelConfirmed` not boolean; return actions: bad `reason`, `contactedAt` / `deliveredAt` not an ISO timestamp with zone, `items` empty or listing an item twice, `units` not a positive integer, `receivedUnits` / `restockUnits` not non-negative integers or restock above received, `contentType` not an allowed image type), 403 `forbidden` (`manualCancelConfirmed: true` from a non-superadmin, `set_live` or `mark_delivered` from an admin), 404 `not_found` (unknown `returnId` on add-photo / receive / cancel, unknown `photoId`), 409 `busy` (another staff action holds the order), 409 `bad_state`, 502 `courier_error` (order left in `processing` with `process_error`; Retry resumes).
 
 `cancel` on an order that is already `cancelled` (e.g. by a rebook that refunded everything) → 200 with the order and no `refundId`.
 

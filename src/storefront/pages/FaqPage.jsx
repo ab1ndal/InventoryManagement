@@ -1,8 +1,9 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import StaticPage from "../components/StaticPage";
 import { FAQ_ITEMS } from "./faqContent";
 
-function FaqItem({ q, a }) {
+function FaqItem({ q, a, link }) {
   return (
     <details className="group border-b border-storefront-border py-5">
       <summary className="flex items-start justify-between gap-4 cursor-pointer list-none font-display text-lg text-storefront-charcoal">
@@ -13,6 +14,15 @@ function FaqItem({ q, a }) {
       </summary>
       <p className="mt-3 text-sm text-storefront-muted font-sans leading-relaxed">
         {a}
+        {link && (
+          <>
+            {" "}
+            <Link to={link.to} className="underline">
+              {link.label}
+            </Link>
+            .
+          </>
+        )}
       </p>
     </details>
   );
@@ -27,7 +37,7 @@ export default function FaqPage() {
     >
       <div>
         {FAQ_ITEMS.map((item) => (
-          <FaqItem key={item.q} q={item.q} a={item.a} />
+          <FaqItem key={item.q} q={item.q} a={item.a} link={item.link} />
         ))}
       </div>
     </StaticPage>

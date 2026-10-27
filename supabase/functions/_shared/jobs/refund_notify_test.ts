@@ -107,3 +107,35 @@ Deno.test("parseKind accepts only refund_notify:<uuid>[:completed]", () => {
     assert(threw, bad);
   }
 });
+
+Deno.test("return refund: choice email uses return wording and no similar-pieces nudge", async () => {
+  const { db, sent, deps } = setup();
+  const r = db.add({ gateway: 1000, reason: "return" });
+  await notify(deps, job(`refund_notify:${r.id}`));
+  assertStringIncludes(sent[0].text, `returned item(s) from order ${r.orderRef}`);
+  assertStringIncludes(sent[0].text, "passed our check");
+  assert(!sent[0].text.includes("no longer available"));
+  assert(!sent[0].text.includes("Looking for something similar"));
+});
+
+Deno.test("return refund: completed email uses return wording and no similar-pieces nudge", async () => {
+  const { db, sent, deps } = setup();
+  const r = db.add({ gateway: 0, credit: 500, isGuest: false, reason: "return" });
+  await notify(deps, job(`refund_notify:${r.id}`));
+  assertStringIncludes(sent[0].text, "passed our check");
+  assertStringIncludes(sent[0].text, "refund of ₹500");
+  assert(!sent[0].text.includes("Looking for something similar"));
+});
+
+Deno.test("non-return refund keeps the unavailable wording and similar-pieces nudge in both emails", async () => {
+  const a = setup();
+  const r1 = a.db.add({ gateway: 1000, reason: "cancel" });
+  await notify(a.deps, job(`refund_notify:${r1.id}`));
+  assertStringIncludes(a.sent[0].text, "no longer available");
+  assertStringIncludes(a.sent[0].text, "Looking for something similar");
+  const b = setup();
+  const r2 = b.db.add({ gateway: 0, credit: 500, isGuest: false, reason: "rto" });
+  await notify(b.deps, job(`refund_notify:${r2.id}`));
+  assert(!b.sent[0].text.includes("passed our check"));
+  assertStringIncludes(b.sent[0].text, "Looking for something similar");
+});

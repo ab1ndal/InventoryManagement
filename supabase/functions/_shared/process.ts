@@ -82,6 +82,8 @@ export type OrderRow = {
   op_lease_until: string | null;
   process_error: string | null;
   sr_attempt: number;
+  /** Only present on getOrderWithReturns. */
+  returns?: Record<string, unknown>[];
   [column: string]: unknown;
 };
 
@@ -109,11 +111,36 @@ export class DbError extends Error {
   get isRaised(): boolean {
     return this.code === "P0001";
   }
+  get isUniqueViolation(): boolean {
+    return this.code === "23505";
+  }
+}
+
+const byKey = (key: string) => (a: Record<string, unknown>, b: Record<string, unknown>) =>
+  String(a[key] ?? "").localeCompare(String(b[key] ?? ""));
+
+/** Deterministic order for the embedded returns (PostgREST orders embeds by alias, so sort here). */
+export function sortReturns(order: OrderRow): OrderRow {
+  if (!order.returns) return order;
+  const list = (v: unknown) => (Array.isArray(v) ? v as Record<string, unknown>[] : []);
+  return {
+    ...order,
+    returns: [...order.returns].sort(byKey("opened_at")).map((r) => ({
+      ...r,
+      items: [...list(r.items)].sort(byKey("item_id")),
+      photos: [...list(r.photos)].sort(byKey("uploaded_at")),
+    })),
+  };
 }
 
 export type OrdersDb = {
   rpc<T>(fn: string, args: Record<string, unknown>): Promise<T>;
   getOrder(id: string): Promise<OrderRow | null>;
+  /** getOrder plus the order's returns (items, photo ids): only for staff responses, never internal reads. */
+  getOrderWithReturns(id: string): Promise<OrderRow | null>;
+  /** Stored storage path of a return photo; staff view it through a signed URL only. */
+  getReturnPhotoPath(photoId: string): Promise<string | null>;
+  getReturnOrderId(returnId: string): Promise<string | null>;
   getItems(orderId: string): Promise<OrderItemRow[]>;
 };
 
@@ -128,6 +155,23 @@ export function supabaseOrdersDb(client: SupabaseClient): OrdersDb {
       const { data, error } = await client.from("orders").select("*").eq("id", id).maybeSingle();
       if (error) throw new DbError("orders", error.code ?? null, error.message);
       return (data ?? null) as OrderRow | null;
+    },
+    async getOrderWithReturns(id) {
+      const { data, error } = await client.from("orders")
+        .select("*, returns:order_returns(*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at))")
+        .eq("id", id).maybeSingle();
+      if (error) throw new DbError("orders", error.code ?? null, error.message);
+      return data ? sortReturns(data as OrderRow) : null;
+    },
+    async getReturnPhotoPath(photoId) {
+      const { data, error } = await client.from("order_return_photos").select("path").eq("id", photoId).maybeSingle();
+      if (error) throw new DbError("order_return_photos", error.code ?? null, error.message);
+      return (data?.path as string | undefined) ?? null;
+    },
+    async getReturnOrderId(returnId) {
+      const { data, error } = await client.from("order_returns").select("order_id").eq("id", returnId).maybeSingle();
+      if (error) throw new DbError("order_returns", error.code ?? null, error.message);
+      return (data?.order_id as string | undefined) ?? null;
     },
     async getItems(orderId) {
       const { data, error } = await client.from("order_items").select("*").eq("order_id", orderId).order("line_no");

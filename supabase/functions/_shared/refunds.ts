@@ -58,6 +58,8 @@ export type RefundNotice = {
   email: string | null;
   name: string;
   isGuest: boolean;
+  /** order_refunds.reason: 'cancel' | 'rto' | 'return' | ... */
+  reason: string;
   items: { name: string; size: string | null; color: string | null; units: number; categoryId: string | null }[];
   legs: {
     source: "credit" | "gateway" | "shipping_credit" | "shipping_gateway";

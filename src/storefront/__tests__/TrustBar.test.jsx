@@ -6,7 +6,7 @@ describe("TrustBar", () => {
   it("shows the four factual promises", () => {
     render(<TrustBar />);
     expect(screen.getByText(/handpicked with love/i)).toBeInTheDocument();
-    expect(screen.getByText(/easy exchanges in store/i)).toBeInTheDocument();
+    expect(screen.getByText(/7-day returns & exchange/i)).toBeInTheDocument();
     expect(screen.getByText(/whatsapp help/i)).toBeInTheDocument();
     expect(screen.getByText(/free shipping over ₹5,000/i)).toBeInTheDocument();
   });
@@ -16,10 +16,10 @@ describe("TrustBar", () => {
     expect(screen.getByText(/plus sizes up to 6xl/i)).toBeInTheDocument();
   });
 
-  it("advertises in-store exchange within 7 days, not returns", () => {
+  it("advertises 7-day returns and exchange", () => {
     render(<TrustBar />);
-    expect(screen.getByText(/exchange within 7 days/i)).toBeInTheDocument();
-    expect(screen.queryByText(/returns/i)).toBeNull();
+    expect(screen.getByText("7-day returns & exchange")).toBeInTheDocument();
+    expect(screen.getByText(/within 7 days of delivery or purchase/i)).toBeInTheDocument();
   });
 
   it("links WhatsApp help to a chat", () => {

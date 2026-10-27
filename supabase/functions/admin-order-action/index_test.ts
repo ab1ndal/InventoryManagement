@@ -17,6 +17,7 @@ function setup(
 ) {
   const db = new FakeDb(order, plan);
   const sr = new FakeShiprocket();
+  const storageCalls: Record<string, unknown>[] = [];
   const deps: Deps = {
     db,
     shiprocket: sr,
@@ -24,6 +25,19 @@ function setup(
     verifyJwt: (jwt) => Promise.resolve(TOKENS[jwt] ? { id: TOKENS[jwt] } : null),
     isAdmin: (id) => Promise.resolve(id === ADMIN || id === SUPER),
     isSuperadmin: (id) => Promise.resolve(id === SUPER),
+    storage: {
+      createUploadUrl: (path) => {
+        storageCalls.push({ fn: "upload", path });
+        return Promise.resolve({
+          uploadUrl: `https://storage.test/upload/${path}?token=t`,
+          token: "t",
+        });
+      },
+      createViewUrl: (path, seconds) => {
+        storageCalls.push({ fn: "view", path, seconds });
+        return Promise.resolve(path.startsWith("gone/") ? null : `https://storage.test/view/${path}`);
+      },
+    },
     publicKeys: ["anon-key"],
     allowedOrigins: [ORIGIN],
     rebookApiCancel,
@@ -39,7 +53,7 @@ function setup(
     );
     return { status: res.status, body: await res.json(), headers: res.headers };
   };
-  return { db, sr, deps, call };
+  return { db, sr, deps, call, storageCalls };
 }
 
 const PROCESS = { action: "process", orderId: ORDER_ID, opKey: "op-1" };
@@ -433,3 +447,273 @@ Deno.test("release_op: opKey and orderId required (400), no DB call", async () =
   assertEquals((await call({ action: "release_op", orderId: "x", opKey: "k" })).status, 400);
   assertEquals(db.calls.length, 0);
 });
+const RETURN_ID = "99999999-9999-4999-8999-999999999999";
+const PHOTO_ID = "88888888-8888-4888-8888-888888888888";
+const OPEN_RETURN = {
+  action: "return_open",
+  orderId: ORDER_ID,
+  reason: "damaged_wrong",
+  contactedAt: "2026-10-20T10:00:00Z",
+  items: [{ itemId: ITEM_A, units: 1 }],
+  note: "torn seam",
+};
+
+Deno.test("mark_delivered: admin → 403, no DB call; superadmin → RPC with actor", async () => {
+  const body = {
+    action: "mark_delivered",
+    orderId: ORDER_ID,
+    deliveredAt: "2026-10-20T10:00:00Z",
+    reason: "courier confirmed",
+  };
+  const { db, call } = setup();
+  const denied = await call(body);
+  assertEquals([denied.status, denied.body.code], [403, "forbidden"]);
+  assertEquals(db.calls.length, 0);
+  const ok = await call(body, "super-jwt");
+  assertEquals(ok.status, 200);
+  assertEquals(db.calls, [{
+    fn: "online_order_mark_delivered",
+    args: {
+      p_order_id: ORDER_ID,
+      p_actor: SUPER,
+      p_delivered_at: "2026-10-20T10:00:00Z",
+      p_reason: "courier confirmed",
+    },
+  }]);
+  assertEquals((await call({ ...body, reason: " " }, "super-jwt")).status, 400);
+  assertEquals(
+    (await call({ ...body, deliveredAt: "yesterday" }, "super-jwt")).status,
+    400,
+  );
+});
+
+Deno.test("return_open passes the superadmin flag (false for admin, true for superadmin) and returns returnId", async () => {
+  const { db, call } = setup();
+  const a = await call(OPEN_RETURN);
+  assertEquals(a.status, 200);
+  assertEquals(a.body.returnId, "dddddddd-dddd-4ddd-8ddd-dddddddddddd");
+  assertEquals(db.calls[0].args.p_is_superadmin, false);
+  await call({ ...OPEN_RETURN, overrideReason: "VIP" }, "super-jwt");
+  assertEquals(db.calls[1].args.p_is_superadmin, true);
+  assertEquals(db.calls[1].args.p_override_reason, "VIP");
+  assertEquals(db.calls[0].args.p_items, [{ item_id: ITEM_A, units: 1 }]);
+});
+
+Deno.test("return_open input validation → 400, no DB call", async () => {
+  const { db, call } = setup();
+  for (
+    const bad of [
+      { ...OPEN_RETURN, note: undefined },
+      { ...OPEN_RETURN, reason: "regret" },
+      { ...OPEN_RETURN, items: [{ itemId: ITEM_A, units: 1.5 }] },
+    ]
+  ) assertEquals((await call(bad)).status, 400);
+  assertEquals(db.calls.length, 0);
+});
+
+Deno.test("return_open refused by the DB → 409 bad_state with the message", async () => {
+  const { db, call } = setup();
+  db.rpcRaises.set("online_return_open", "outside the 48 h window");
+  const r = await call(OPEN_RETURN);
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+  assert(r.body.error.includes("outside the 48 h window"));
+});
+
+Deno.test("return_photo_url: ext from content type, path from the RPC, orderId/path fields ignored", async () => {
+  const { db, call, storageCalls } = setup();
+  db.returnOrders.set(RETURN_ID, ORDER_ID);
+  const r = await call({
+    action: "return_photo_url",
+    returnId: RETURN_ID,
+    contentType: "image/heif",
+    orderId: "other",
+    path: "../evil/x.jpg",
+  });
+  assertEquals(r.status, 200);
+  const path = `${ORDER_ID}/${RETURN_ID}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.heic`;
+  assertEquals(r.body, {
+    ok: true,
+    uploadUrl: `https://storage.test/upload/${path}?token=t`,
+    path,
+    token: "t",
+  });
+  assertEquals(db.calls, [{
+    fn: "online_return_photo_path",
+    args: { p_return_id: RETURN_ID, p_ext: "heic" },
+  }]);
+  assertEquals(storageCalls, [{ fn: "upload", path }]);
+});
+
+Deno.test("return_photo_url: application/pdf → 400, nothing called", async () => {
+  const { db, call, storageCalls } = setup();
+  const r = await call({
+    action: "return_photo_url",
+    returnId: RETURN_ID,
+    contentType: "application/pdf",
+  });
+  assertEquals(r.status, 400);
+  assertEquals(db.calls.length + storageCalls.length, 0);
+});
+
+Deno.test("return_photo_add → RPC with actor; the client path is passed through for the DB to validate", async () => {
+  const { db, call } = setup();
+  db.returnOrders.set(RETURN_ID, ORDER_ID);
+  const r = await call({
+    action: "return_photo_add",
+    returnId: RETURN_ID,
+    path: "p.jpg",
+  });
+  assertEquals(r.status, 200);
+  assertEquals(r.body.photoId, "ffffffff-ffff-4fff-8fff-ffffffffffff");
+  assertEquals(db.calls, [{
+    fn: "online_return_add_photo",
+    args: { p_return_id: RETURN_ID, p_path: "p.jpg", p_actor: ADMIN },
+  }]);
+  assertEquals(
+    (await call({ action: "return_photo_add", returnId: RETURN_ID })).status,
+    400,
+  );
+});
+
+Deno.test("return_photo_add replayed path (unique violation 23505) → 409 bad_state, not 500", async () => {
+  const { db, call } = setup();
+  db.returnOrders.set(RETURN_ID, ORDER_ID);
+  db.rpcErrorCodes.set("online_return_add_photo", "23505");
+  const r = await call({ action: "return_photo_add", returnId: RETURN_ID, path: "p.jpg" });
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+});
+
+Deno.test("return_photo_view: unknown photo → 404; known → signed url for 10 minutes", async () => {
+  const { db, call, storageCalls } = setup();
+  const miss = await call({ action: "return_photo_view", photoId: PHOTO_ID });
+  assertEquals([miss.status, miss.body.code], [404, "not_found"]);
+  assertEquals(storageCalls.length, 0);
+  db.photoPaths.set(PHOTO_ID, "o/r/p.jpg");
+  const ok = await call({ action: "return_photo_view", photoId: PHOTO_ID });
+  assertEquals(ok.body, {
+    ok: true,
+    url: "https://storage.test/view/o/r/p.jpg",
+  });
+  assertEquals(storageCalls, [{ fn: "view", path: "o/r/p.jpg", seconds: 600 }]);
+});
+
+Deno.test("return_preview and return_receive map camelCase items to RPC jsonb", async () => {
+  const { db, call } = setup();
+  db.returnOrders.set(RETURN_ID, ORDER_ID);
+  const items = [{ itemId: ITEM_A, receivedUnits: 1, restockUnits: 0 }];
+  const rpcItems = [{ item_id: ITEM_A, received_units: 1, restock_units: 0 }];
+  const prev = await call({
+    action: "return_preview",
+    returnId: RETURN_ID,
+    items,
+  });
+  assertEquals(prev.body, {
+    ok: true,
+    preview: { credit_part: 100, gateway_part: 400, shipping: 0, total: 500 },
+  });
+  const rec = await call({
+    action: "return_receive",
+    returnId: RETURN_ID,
+    items,
+    note: " ok ",
+  });
+  assertEquals(rec.status, 200);
+  assertEquals(rec.body.refundId, "refund-return");
+  assertEquals(rec.body.order.id, ORDER_ID);
+  assertEquals(db.calls[0], {
+    fn: "online_return_preview",
+    args: { p_return_id: RETURN_ID, p_items: rpcItems },
+  });
+  assertEquals(db.calls[1], {
+    fn: "online_return_receive",
+    args: {
+      p_return_id: RETURN_ID,
+      p_actor: ADMIN,
+      p_items: rpcItems,
+      p_note: "ok",
+    },
+  });
+});
+
+Deno.test("return_receive DB raise → 409 bad_state; unknown return → 404", async () => {
+  const { db, call } = setup();
+  db.returnOrders.set(RETURN_ID, ORDER_ID);
+  db.rpcRaises.set("online_return_receive", "at least one photo is required");
+  const items = [{ itemId: ITEM_A, receivedUnits: 1, restockUnits: 1 }];
+  const r = await call({
+    action: "return_receive",
+    returnId: RETURN_ID,
+    items,
+  });
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+  assert(r.body.error.includes("at least one photo"));
+  const none = await call({
+    action: "return_receive",
+    returnId: "77777777-7777-4777-8777-777777777777",
+    items,
+  });
+  assertEquals([none.status, none.body.code], [404, "not_found"]);
+});
+
+Deno.test("return_cancel → RPC with actor and note; note required", async () => {
+  const { db, call } = setup();
+  db.returnOrders.set(RETURN_ID, ORDER_ID);
+  const r = await call({
+    action: "return_cancel",
+    returnId: RETURN_ID,
+    note: "customer changed mind",
+  });
+  assertEquals(r.status, 200);
+  assertEquals(db.calls, [{
+    fn: "online_return_cancel",
+    args: {
+      p_return_id: RETURN_ID,
+      p_actor: ADMIN,
+      p_note: "customer changed mind",
+    },
+  }]);
+  assertEquals(
+    (await call({ action: "return_cancel", returnId: RETURN_ID })).status,
+    400,
+  );
+});
+
+Deno.test("the order in a response carries its returns", async () => {
+  const { db, call } = setup();
+  db.returns = [{
+    id: RETURN_ID,
+    items: [],
+    photos: [{ id: PHOTO_ID, uploaded_at: "2026-10-21T00:00:00Z" }],
+  }];
+  const r = await call({
+    action: "set_availability",
+    orderId: ORDER_ID,
+    itemId: ITEM_B,
+    availableQty: 1,
+  });
+  assertEquals(r.body.order.returns[0].photos[0].id, PHOTO_ID);
+});
+
+Deno.test("return_photo_view: object missing in Storage → 404 not_found", async () => {
+  const { db, call } = setup();
+  db.photoPaths.set(PHOTO_ID, "gone/r/p.jpg");
+  const r = await call({ action: "return_photo_view", photoId: PHOTO_ID });
+  assertEquals([r.status, r.body.code], [404, "not_found"]);
+});
+
+for (
+  const [name, order, body] of [
+    ["process", {}, PROCESS],
+    ["cancel", {}, { action: "cancel", orderId: ORDER_ID, opKey: "c-1", reason: "customer asked" }],
+    ["send_back", { ...STUCK, awb: "AWB1" }, SEND_BACK],
+  ] as const
+) {
+  Deno.test(`${name}: internal reads use getOrder; only the response uses getOrderWithReturns`, async () => {
+    const { db, call } = setup({ ...order }, FULL_PLAN, true);
+    const r = await call(body);
+    assertEquals(r.status, 200);
+    // everything before the final response read is a plain getOrder (or no order read at all)
+    assertEquals(db.orderReads.at(-1), "getOrderWithReturns");
+    assertEquals(db.orderReads.slice(0, -1).filter((x) => x !== "getOrder"), []);
+  });
+}

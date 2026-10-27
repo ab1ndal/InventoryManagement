@@ -20,7 +20,7 @@ export const ORDER_FILTERS = {
 const LIST_COLUMNS =
   "id, order_ref, created_at, status, contact_name, contact_phone, subtotal, promo_discount, " +
   "shipping, voucher_applied, credit_applied, gateway_amount, problem, process_error, " +
-  "order_items(qty)";
+  "order_items(qty, shipped_qty), returns:order_returns(status, items:order_return_items(received_units))";
 
 export class OrderActionError extends Error {
   constructor(message, { status = null, code = null } = {}) {
@@ -64,13 +64,29 @@ export async function listOrders(filter = "all") {
   return data || [];
 }
 
+// Embeds are aliased (items:, photos:), so they are ordered here instead of with referencedTable.
+const byId = (a, b) => (a.item_id < b.item_id ? -1 : a.item_id > b.item_id ? 1 : 0);
+const byUploadedAt = (a, b) => Date.parse(a.uploaded_at) - Date.parse(b.uploaded_at);
+const sortReturns = (returns) =>
+  returns.map((r) => ({
+    ...r,
+    items: [...(r.items || [])].sort(byId),
+    photos: [...(r.photos || [])].sort(byUploadedAt),
+  }));
+
 export async function getOrder(id) {
-  const [order, items, events, refunds, jobs] = await Promise.all([
+  const [order, items, events, refunds, jobs, returns] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_items").select("*").eq("order_id", id).order("line_no"),
     supabase.from("order_events").select("*").eq("order_id", id).order("id"),
     supabase.from("order_refunds").select("*").eq("order_id", id).order("created_at"),
     supabase.from("order_jobs").select("*").eq("order_id", id).order("created_at"),
+    // Photo storage paths are never selected: staff view a photo through return_photo_view.
+    supabase
+      .from("order_returns")
+      .select("*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at)")
+      .eq("order_id", id)
+      .order("opened_at"),
   ]);
   for (const [what, res] of [
     ["order", order],
@@ -78,6 +94,7 @@ export async function getOrder(id) {
     ["order events", events],
     ["refunds", refunds],
     ["jobs", jobs],
+    ["returns", returns],
   ]) {
     if (res.error) raise(`Loading ${what}`, res.error);
   }
@@ -95,7 +112,7 @@ export async function getOrder(id) {
   }
 
   return {
-    order: order.data,
+    order: { ...order.data, returns: sortReturns(returns.data || []) },
     items: items.data || [],
     events: events.data || [],
     refunds: refunds.data || [],

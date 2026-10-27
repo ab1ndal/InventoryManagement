@@ -97,3 +97,85 @@ export function processRefundPreview(items, availability, shipping) {
   if (allUnavailable) paise += Math.round(Number(shipping || 0) * 100);
   return { lines, amount: paise / 100, allUnavailable };
 }
+
+// ---------- returns ----------
+
+export const RETURN_REASON_LABELS = {
+  damaged_wrong: "Damaged / wrong item",
+  change_of_mind: "Change of mind",
+};
+
+// Mirrors the DB rule: window = contacted_at − delivered_at (48 h damaged/wrong, 7 days change of mind).
+const RETURN_WINDOW_HOURS = { damaged_wrong: 48, change_of_mind: 7 * 24 };
+
+function elapsedHours(deliveredAt, contactedAt) {
+  return (new Date(contactedAt) - new Date(deliveredAt)) / 3600000;
+}
+
+export function outsideReturnWindow(reason, deliveredAt, contactedAt) {
+  if (!deliveredAt || !contactedAt) return false;
+  return elapsedHours(deliveredAt, contactedAt) > RETURN_WINDOW_HOURS[reason];
+}
+
+// "Hour 30 of 48" (damaged/wrong) or "Day 2 of 7" (change of mind). Counts the hour/day
+// we are in, so exactly at the limit still reads "48 of 48" and one minute later "49 of 48".
+export function windowLabel(reason, deliveredAt, contactedAt) {
+  if (!deliveredAt || !contactedAt || !RETURN_WINDOW_HOURS[reason]) return "";
+  const hours = Math.max(0, elapsedHours(deliveredAt, contactedAt));
+  if (reason === "damaged_wrong") return `Hour ${Math.max(1, Math.ceil(hours))} of 48`;
+  return `Day ${Math.max(1, Math.ceil(hours / 24))} of 7`;
+}
+
+function sum(list, pick) {
+  return (list || []).reduce((s, x) => s + Number(pick(x) || 0), 0);
+}
+
+function refundedReturnUnits(order) {
+  return sum(
+    (order.returns || []).filter((r) => r.status === "refunded"),
+    (r) => sum(r.items, (i) => i.received_units)
+  );
+}
+
+// "Returned" when every shipped unit came back through refunded returns, "Partly returned" when some did.
+// order.order_items carry shipped_qty (the list embeds them; the detail passes its items).
+export function returnBadge(order) {
+  const refunded = refundedReturnUnits(order);
+  if (refunded <= 0) return null;
+  const shipped = sum(order.order_items, (i) => i.shipped_qty);
+  return refunded >= shipped ? "Returned" : "Partly returned";
+}
+
+// Units of one item still free to return: shipped − units in open returns − units received back
+// by refunded returns. The server re-checks.
+export function returnableUnits(item, returns = []) {
+  let used = 0;
+  for (const r of returns) {
+    for (const ri of r.items || []) {
+      if (ri.item_id !== item.id) continue;
+      if (r.status === "open") used += Number(ri.units || 0);
+      else if (r.status === "refunded") used += Number(ri.received_units || 0);
+    }
+  }
+  return Math.max(0, Number(item.shipped_qty || 0) - used);
+}
+
+// A datetime-local minimum must not fall before a seconds-precise instant, so round up to the next minute.
+export function ceilToMinute(date) {
+  return new Date(Math.ceil(date.getTime() / 60000) * 60000);
+}
+
+// Value for <input type="datetime-local"> in the browser's local zone.
+export function toLocalInputValue(date) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+// datetime-local text → ISO string with zone (the server rejects offset-less timestamps); null if blank/invalid.
+export function localInputToIso(value) {
+  const d = new Date(value);
+  return value && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
+}

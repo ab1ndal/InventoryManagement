@@ -31,7 +31,7 @@ import { isSoldOut } from "../lib/stock";
 
 const TRUST_POINTS = [
   { icon: Heart, label: "Handpicked with love" },
-  { icon: RefreshCw, label: "Exchange in store within 7 days" },
+  { icon: RefreshCw, label: "7-day returns & exchange" },
   { icon: MessageCircle, label: "WhatsApp help" },
 ];
 
