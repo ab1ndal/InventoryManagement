@@ -19,12 +19,20 @@ Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/f
   https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth
 
 ### Shiprocket setup: RESUME HERE (paused 2026-10-25)
-- [ ] IN FLIGHT 2026-10-26, branch `fix/shipping-quote-weight-cheapest` (3 commits, not pushed/deployed):
-  cheapest courier (was recommended); quote at max(dead, volumetric) with ASSUMED packages by heaviest
-  class (bag 30×40×4 / bag 40×50×5 / box 45×35×12, same dims sent at Process); flat fallback ₹99→₹150
-  (server + WhatsApp checkout). 347 deno + 34 checkout tests green. Next: rate table 0.5–5 kg (needs a
-  fresh token: owner reruns login into scratchpad login.json), PR, deploy quote/order functions, merge.
-  Measure real packed parcels after test shipments and replace the assumed sizes in `_shared/shipping.ts`.
+- [x] Shipping quote fixes merged to main 2026-10-26 (branch `fix/shipping-quote-weight-cheapest`): cheapest
+  courier (was recommended); quote at max(dead, volumetric) with ASSUMED packages by heaviest class
+  (bag 30×40×4 / bag 40×50×5 / box 45×35×12, same dims sent at Process); flat fallback ₹99→₹150
+  (server + WhatsApp checkout). 347 deno + 34 checkout tests green.
+- [ ] Deploy the changed Edge Functions (everything importing `_shared/quote.ts`, `_shared/process.ts`,
+  `_shared/shiprocket.ts`, `_shared/pricing.ts`). Until then live checkout still quotes the recommended
+  courier at dead weight with a ₹99 fallback; only the WhatsApp ₹150 is live (Vercel, on merge).
+- [ ] Rate table 0.5–5 kg × 6 UP cities: owner reruns the login command (token → scratchpad
+  `sr/login.json`), Claude runs `sr/rates.mjs`. Needed for the box class (3.78 kg, lehenga/sherwani).
+- [ ] Buy packaging (2 bag sizes + 1 box); pack a kurti, saree, lehenga; measure + weigh; replace the
+  assumed sizes in `_shared/shipping.ts` (and LIGHT/MEDIUM/HEAVY kg if real weights differ).
+- [ ] GST: after the test parcel, compare wallet deduction with the quoted rate. If rates exclude 18% GST,
+  add the markup to quotes (composition dealer: no ITC, GST is a cost; can't show GST to the customer).
+- [ ] Ask CA: is the shipping charged to customers part of composition turnover (1% tax on it)?
 Full steps: `tasks/accounts-setup.md` §3. Shiprocket works from the US (no region block, unlike Cashfree).
 - [x] Signup + business details (company "Bindals Creation", site bindalscreations.com).
 - [x] Pickup address nickname `Shop` (= `PICKUP_LOCATION` in `_shared/shiprocket.ts`) saved, VERIFIED,
