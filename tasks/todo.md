@@ -109,11 +109,14 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
 
 ### Follow-ups (non-blocking)
 - "Send back to To-check" for an order stuck in processing after AWB (ship builder gap 1).
-- Courier fallback if quoted courier refuses; Shiprocket duplicate order_id / update-keeps-shipment checks.
+- [x] Courier fallback (branch `fix/shiprocket-followups`, 2026-10-27): Process retries assign-AWB without
+  courier_id when Shiprocket refuses the quoted courier (status 200/400/422 only; never after a timeout).
+  Watch `awb_quoted_courier_refused` logs: the default courier may cost more than the quote.
+- Shiprocket duplicate order_id / update-keeps-shipment checks (need live account).
 - BillTable/BillingForm: block edit/cancel/delete of online (Website) bills; hide Website from the in-store
   payment picker (review S5).
 - `salesmethods` serial sequence lags its rows (pre-existing; new in-store method inserts would collide).
-- Two Shiprocket token-store helpers (pay context.ts vs ship process.ts) — consolidate.
+- [x] Token-store helpers consolidated: process.ts uses context.ts `dbTokenStore` (2026-10-27).
 
 ## STOREFRONT: open items (pruned 2026-10-25)
 

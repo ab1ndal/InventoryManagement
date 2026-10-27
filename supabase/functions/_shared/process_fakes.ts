@@ -422,6 +422,8 @@ export class FakeShiprocket implements ShiprocketClient {
   calls: { method: Method; args: unknown[] }[] = [];
   /** Methods that fail on their next call only. */
   failOnce = new Set<Method>();
+  /** HTTP status of an injected failure (200 = Shiprocket answered and refused). */
+  failStatus = 200;
   /** Methods that wait on this promise before answering. */
   gates = new Map<Method, Promise<void>>();
   trackResult: TrackResult = {
@@ -444,7 +446,7 @@ export class FakeShiprocket implements ShiprocketClient {
     this.calls.push({ method, args });
     const gate = this.gates.get(method);
     if (gate) await gate;
-    if (this.failOnce.delete(method)) throw new ShiprocketError(200, `${method}: injected failure`);
+    if (this.failOnce.delete(method)) throw new ShiprocketError(this.failStatus, `${method}: injected failure`);
   }
 
   async token() {

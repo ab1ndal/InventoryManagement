@@ -13,7 +13,14 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createShiprocket, type ShiprocketClient, type SrOrderInput, type TokenStore } from "./shiprocket.ts";
+import { dbTokenStore } from "./context.ts";
+import {
+  type AwbResult,
+  createShiprocket,
+  type ShiprocketClient,
+  ShiprocketError,
+  type SrOrderInput,
+} from "./shiprocket.ts";
 import { parcelPackage, parcelWeightKg } from "./shipping.ts";
 
 const DEFAULT_STATE = "Uttar Pradesh";
@@ -177,28 +184,6 @@ export function supabaseOrdersDb(client: SupabaseClient): OrdersDb {
   };
 }
 
-/** Shiprocket token cached in integration_tokens (service role). */
-export function dbTokenStore(client: SupabaseClient, provider = "shiprocket"): TokenStore {
-  return {
-    async get() {
-      const { data, error } = await client.from("integration_tokens").select("token, expires_at")
-        .eq("provider", provider).maybeSingle();
-      if (error) throw new DbError("integration_tokens", error.code ?? null, error.message);
-      if (!data?.token || !data.expires_at) return null;
-      return { token: data.token as string, expiresAt: new Date(data.expires_at as string) };
-    },
-    async set(token, expiresAt) {
-      const { error } = await client.from("integration_tokens").upsert({
-        provider,
-        token,
-        expires_at: expiresAt.toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-      if (error) throw new DbError("integration_tokens", error.code ?? null, error.message);
-    },
-  };
-}
-
 /** Real client from SHIPROCKET_API_EMAIL / SHIPROCKET_API_PASSWORD; missing secrets fail at first call. */
 export function shiprocketFromEnv(client: SupabaseClient): ShiprocketClient {
   return createShiprocket({
@@ -224,6 +209,37 @@ async function ext<T>(step: string, call: () => Promise<T>): Promise<T> {
     return await call();
   } catch (err) {
     throw new CourierError(step, errorText(err));
+  }
+}
+
+/**
+ * Statuses where Shiprocket answered and refused the assignment, so no AWB exists yet.
+ * A timeout (0), auth or 5xx failure might have assigned one: never re-assign after those.
+ */
+const AWB_REFUSED_STATUSES = new Set([200, 400, 422]);
+
+/**
+ * Quoted courier first. If Shiprocket refuses it (courier dropped the pincode, weight limit),
+ * let Shiprocket pick its default so Retry doesn't hit the same refusal forever; that
+ * courier's rate can differ from what the shopper paid. An empty wallet refuses both calls.
+ */
+async function assignAwb(
+  sr: ShiprocketClient,
+  shipmentId: number,
+  quotedCourierId: number | null,
+  orderRef: string,
+): Promise<AwbResult> {
+  if (quotedCourierId === null) return await sr.assignAwb(shipmentId);
+  try {
+    return await sr.assignAwb(shipmentId, quotedCourierId);
+  } catch (err) {
+    if (!(err instanceof ShiprocketError) || !AWB_REFUSED_STATUSES.has(err.status)) throw err;
+    logEvent("warn", "awb_quoted_courier_refused", {
+      order_ref: orderRef,
+      courier_id: quotedCourierId,
+      error: errorText(err),
+    });
+    return await sr.assignAwb(shipmentId);
   }
 }
 
@@ -515,7 +531,7 @@ export async function runProcess(
 
     let { awb, courier_id: courierId, courier_name: courierName, manifest_url: manifestUrl, label_url: labelUrl } = o;
     if (!awb) {
-      const r = await courier("awb", () => sr.assignAwb(shipmentId, o.quoted_courier_id ?? undefined));
+      const r = await courier("awb", () => assignAwb(sr, shipmentId, o.quoted_courier_id, o.order_ref));
       courierId = Number.isFinite(r.courierId) ? r.courierId : null;
       courierName = r.courierName || null;
       awb = r.awb;
