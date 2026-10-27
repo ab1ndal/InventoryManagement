@@ -8,7 +8,7 @@
  *   promo → shipping → voucher → store credit.
  *   1. promoDiscount on the subtotal, shared over lines by line value.
  *   2. shipping: free if subtotal − promo ≥ ₹5,000, else rate rounded up to
- *      the next ₹10, else flat ₹99 when there is no rate.
+ *      the next ₹10, else flat ₹150 when there is no rate.
  *   3. voucherApplied = min(voucher value, amount due).
  *   4. creditApplied = min(requested, available, due − voucher).
  *   5. R7: if 0 < gateway < ₹1 and some voucher/credit was applied, credit is
@@ -81,7 +81,7 @@ export type QuoteInput = {
 };
 
 export const FREE_SHIPPING_THRESHOLD = 5000;
-export const FLAT_SHIPPING = 99;
+export const FLAT_SHIPPING = 150;
 /** Cashfree's minimum order amount. */
 export const MIN_GATEWAY_AMOUNT = 1;
 
@@ -137,7 +137,7 @@ export function promoDiscount(promo: Promo | null, subtotal: number): number {
 
 /**
  * Shipping in rupees. Free at ₹5,000+ of discounted goods; otherwise the
- * courier rate rounded up to the next ₹10; flat ₹99 when there is no usable
+ * courier rate rounded up to the next ₹10; flat ₹150 when there is no usable
  * rate (null, non-finite or ≤ 0).
  */
 export function shippingCharge(rate: number | null, discountedSubtotal: number): number {

@@ -10,7 +10,7 @@
 
 import { type Line, type Promo, promoDiscount, type Quote, quoteOrder } from "./pricing.ts";
 import { checkUpPincode, type PincodeCheck } from "./pincode.ts";
-import { parcelWeightKg } from "./shipping.ts";
+import { chargeableWeightKg } from "./shipping.ts";
 import type { ShiprocketClient } from "./shiprocket.ts";
 import { ApiError, type Store, type VariantRow } from "./context.ts";
 
@@ -199,7 +199,7 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
 
   const creditAvailable = who.authUserId ? (await store.creditBalance(who.authUserId)) ?? 0 : 0;
 
-  // Pincode (R16) and courier rate; the rate never blocks checkout (₹99 fallback).
+  // Pincode (R16) and courier rate; the rate never blocks checkout (₹150 fallback).
   const postcodeState = shiprocket ? (pc: string) => shiprocket.postcodeState(pc) : () => Promise.resolve(null);
   const pincode = req.pincode === null ? null : await checkUpPincode(req.pincode, postcodeState);
 
@@ -211,7 +211,7 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
     const units = lines.flatMap((l) => Array.from({ length: l.qty }, () => l.category));
     const rate = await shiprocket.rate({
       deliveryPincode: req.pincode.trim(),
-      weightKg: parcelWeightKg(units),
+      weightKg: chargeableWeightKg(units),
       declaredValue: Math.round(goods * 100) / 100,
     });
     if (rate) {

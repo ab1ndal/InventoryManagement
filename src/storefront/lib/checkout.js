@@ -43,9 +43,9 @@ export const INDIAN_STATES = [
   "Puducherry",
 ];
 
-const STANDARD_SHIPPING_FEE = 99;
+const STANDARD_SHIPPING_FEE = 150;
 
-// Flat ₹99 shipping below ₹5000 subtotal, free at/above it.
+// Flat ₹150 shipping below ₹5000 subtotal, free at/above it.
 export function shippingFee(subtotal) {
   return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
 }

@@ -9,7 +9,7 @@
  * more on a 401 (retry that request once).
  *
  * Lookups used at checkout (postcodeState, rate) never throw: any failure
- * is null, and the caller applies its fallback (R16 pincode rule, ₹99 flat).
+ * is null, and the caller applies its fallback (R16 pincode rule, ₹150 flat).
  * Every other method throws ShiprocketError, so Process can stop and retry.
  */
 
@@ -20,7 +20,7 @@ export const PICKUP_LOCATION = "Shop";
 export const PICKUP_PINCODE = "201001";
 export const TOKEN_TTL_MS = 10 * 24 * 60 * 60 * 1000;
 export const TOKEN_REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000;
-/** Checkout lookups (rate, postcode): spec §7 "no rate within 5 s → ₹99". */
+/** Checkout lookups (rate, postcode): spec §7 "no rate within 5 s → flat fee" (₹150 since 2026-10-26). */
 export const LOOKUP_TIMEOUT_MS = 5_000;
 export const CALL_TIMEOUT_MS = 20_000;
 const BILLING_CITY_MAX = 30;
@@ -120,9 +120,10 @@ export function srOrderDate(d: Date): string {
 }
 
 /**
- * R18: the recommended courier if it is listed and usable; else the lowest
- * etd_hours, ties broken by the lower rate. Usable = not blocked, finite
- * rate > 0. Numbers may arrive as strings.
+ * R18 (owner decision 2026-10-26): the cheapest usable courier, ties broken
+ * by the lower etd_hours (missing sorts last). Shiprocket's recommended
+ * courier is ignored: it was often dearer and the shopper pays the rate.
+ * Usable = not blocked, finite rate > 0. Numbers may arrive as strings.
  */
 export function selectCourier(body: unknown): RateQuote | null {
   const b = body as Json | null;
@@ -149,12 +150,8 @@ export function selectCourier(body: unknown): RateQuote | null {
     );
   if (usable.length === 0) return null;
 
-  const recommendedId = num(data.recommended_courier_company_id);
-  let pick = usable.find((c) => c.courierId === recommendedId);
-  if (!pick) {
-    const etd = (h: number) => (Number.isFinite(h) ? h : Infinity);
-    pick = [...usable].sort((a, b) => etd(a.etdHours) - etd(b.etdHours) || a.rate - b.rate)[0];
-  }
+  const etd = (h: number) => (Number.isFinite(h) ? h : Infinity);
+  const pick = [...usable].sort((a, b) => a.rate - b.rate || etd(a.etdHours) - etd(b.etdHours))[0];
   return {
     rate: pick.rate,
     courierId: pick.courierId,
@@ -335,7 +332,7 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
         // UNVERIFIED: unserviceable-pincode body shape; empty list/missing data/blocked → null.
         return selectCourier(data);
       } catch {
-        // Timeout or network: caller charges the flat ₹99.
+        // Timeout or network: caller charges the flat ₹150.
         return null;
       }
     },

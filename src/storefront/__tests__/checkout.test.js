@@ -1,8 +1,8 @@
 import { addressSchema, shippingFee } from "../lib/checkout";
 
 describe("shippingFee", () => {
-  it("charges ₹99 below the ₹5000 free-shipping threshold", () => {
-    expect(shippingFee(4999)).toBe(99);
+  it("charges ₹150 below the ₹5000 free-shipping threshold", () => {
+    expect(shippingFee(4999)).toBe(150);
   });
 
   it("is free at exactly ₹5000", () => {

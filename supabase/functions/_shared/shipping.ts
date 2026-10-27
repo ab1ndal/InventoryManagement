@@ -14,6 +14,17 @@ export const HEAVY_KG = 2;
 export const EXTRA_UNIT_KG = 0.5;
 export const MAX_PARCEL_KG = 5;
 
+export type Package = { lengthCm: number; breadthCm: number; heightCm: number };
+
+// Assumed sizes (owner, 2026-10-26: nothing shipped yet, no packaging bought).
+// Replace with measured packed parcels after the first test shipments.
+const SMALL_BAG: Package = { lengthCm: 30, breadthCm: 40, heightCm: 4 };
+const LARGE_BAG: Package = { lengthCm: 40, breadthCm: 50, heightCm: 5 };
+const BOX: Package = { lengthCm: 45, breadthCm: 35, heightCm: 12 };
+
+/** Couriers bill the greater of dead weight and L × B × H (cm) / 5000. */
+const VOLUMETRIC_DIVISOR = 5000;
+
 const LIGHT = [
   "Kurti", "KUR",
   "Short Kurta", "SK",
@@ -63,4 +74,22 @@ export function parcelWeightKg(categories: (string | null)[]): number {
   if (categories.length === 0) return 0;
   const heaviest = Math.max(...categories.map(unitWeightKg));
   return Math.min(MAX_PARCEL_KG, heaviest + EXTRA_UNIT_KG * (categories.length - 1));
+}
+
+/** Packaging for the heaviest unit's class: light → small bag, medium → large bag, heavy → box. */
+export function parcelPackage(categories: (string | null)[]): Package {
+  const heaviest = Math.max(0, ...categories.map(unitWeightKg));
+  if (heaviest >= HEAVY_KG) return BOX;
+  if (heaviest >= MEDIUM_KG) return LARGE_BAG;
+  return SMALL_BAG;
+}
+
+/**
+ * Weight the courier bills: the greater of dead and volumetric weight. The
+ * checkout rate lookup sends weight only, so quoting dead weight would price a
+ * bulky parcel a slab or more below what Shiprocket charges.
+ */
+export function chargeableWeightKg(categories: (string | null)[]): number {
+  const p = parcelPackage(categories);
+  return Math.max(parcelWeightKg(categories), (p.lengthCm * p.breadthCm * p.heightCm) / VOLUMETRIC_DIVISOR);
 }
