@@ -19,6 +19,12 @@ Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/f
   https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth
 
 ### Shiprocket setup: RESUME HERE (paused 2026-10-25)
+- [ ] IN FLIGHT 2026-10-26, branch `fix/shipping-quote-weight-cheapest` (3 commits, not pushed/deployed):
+  cheapest courier (was recommended); quote at max(dead, volumetric) with ASSUMED packages by heaviest
+  class (bag 30×40×4 / bag 40×50×5 / box 45×35×12, same dims sent at Process); flat fallback ₹99→₹150
+  (server + WhatsApp checkout). 347 deno + 34 checkout tests green. Next: rate table 0.5–5 kg (needs a
+  fresh token: owner reruns login into scratchpad login.json), PR, deploy quote/order functions, merge.
+  Measure real packed parcels after test shipments and replace the assumed sizes in `_shared/shipping.ts`.
 Full steps: `tasks/accounts-setup.md` §3. Shiprocket works from the US (no region block, unlike Cashfree).
 - [x] Signup + business details (company "Bindals Creation", site bindalscreations.com).
 - [x] Pickup address nickname `Shop` (= `PICKUP_LOCATION` in `_shared/shiprocket.ts`) saved, VERIFIED,
