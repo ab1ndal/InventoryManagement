@@ -14,7 +14,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createShiprocket, type ShiprocketClient, type SrOrderInput, type TokenStore } from "./shiprocket.ts";
-import { PARCEL_BREADTH_CM, PARCEL_HEIGHT_CM, PARCEL_LENGTH_CM, parcelWeightKg } from "./shipping.ts";
+import { parcelPackage, parcelWeightKg } from "./shipping.ts";
 
 const DEFAULT_STATE = "Uttar Pradesh";
 /** Error text stored on the order (sr_last_error, process_error) is capped. */
@@ -299,9 +299,7 @@ export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
     },
     items,
     subTotal: round2(items.reduce((s, i) => s + i.sellingPrice * i.units, 0)),
-    lengthCm: PARCEL_LENGTH_CM,
-    breadthCm: PARCEL_BREADTH_CM,
-    heightCm: PARCEL_HEIGHT_CM,
+    ...parcelPackage(categories),
     weightKg: parcelWeightKg(categories),
   };
 }

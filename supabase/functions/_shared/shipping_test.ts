@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { chargeableWeightKg, parcelWeightKg } from "./shipping.ts";
+import { chargeableWeightKg, parcelPackage, parcelWeightKg } from "./shipping.ts";
 
 Deno.test("heaviest unit + 0.5 kg per extra unit", () => {
   assertEquals(parcelWeightKg(["Lehenga", "Kurti", "Kurti"]), 3);
@@ -30,9 +30,21 @@ Deno.test("empty parcel weighs 0", () => {
   assertEquals(parcelWeightKg([]), 0);
 });
 
-Deno.test("chargeable weight: the standard box's volumetric weight is the floor", () => {
-  // 32 × 28 × 5 cm / 5000 = 0.896 kg, so a single light unit bills above its 0.5 kg.
-  assertEquals(chargeableWeightKg(0.5), 0.896);
-  assertEquals(chargeableWeightKg(1), 1);
-  assertEquals(chargeableWeightKg(3), 3);
+Deno.test("package follows the heaviest unit's class", () => {
+  const small = { lengthCm: 30, breadthCm: 40, heightCm: 4 };
+  const large = { lengthCm: 40, breadthCm: 50, heightCm: 5 };
+  const box = { lengthCm: 45, breadthCm: 35, heightCm: 12 };
+  assertEquals(parcelPackage(["Kurti", "Kurti"]), small);
+  assertEquals(parcelPackage(["Saree", "Kurti"]), large);
+  assertEquals(parcelPackage(["Lehenga", "Kurti"]), box);
+  assertEquals(parcelPackage([null]), large);
+  assertEquals(parcelPackage([]), small);
+});
+
+Deno.test("chargeable weight is the greater of dead and volumetric (L × B × H / 5000)", () => {
+  assertEquals(chargeableWeightKg(["Kurti"]), 0.96); // small bag 0.96 > 0.5 dead
+  assertEquals(chargeableWeightKg(["Kurti", "Kurti", "Kurti"]), 1.5); // dead 1.5 > 0.96
+  assertEquals(chargeableWeightKg(["Saree"]), 2); // large bag 2.0 > 1 dead
+  assertEquals(chargeableWeightKg(["Lehenga"]), 3.78); // box 3.78 > 2 dead
+  assertEquals(chargeableWeightKg(Array(12).fill("Lehenga")), 5); // dead capped at 5 > 3.78
 });

@@ -11,7 +11,6 @@ import {
   shippableDiffers,
 } from "./process.ts";
 import { FakeDb, fakeItems, fakeOrder, FakeShiprocket, FULL_PLAN, ITEM_A, ITEM_B, ORDER_ID } from "./process_fakes.ts";
-import { PARCEL_BREADTH_CM, PARCEL_HEIGHT_CM, PARCEL_LENGTH_CM } from "./shipping.ts";
 import { handle } from "./jobs/shiprocket_create.ts";
 import type { JobContext } from "./jobs/types.ts";
 import type { SrOrderInput } from "./shiprocket.ts";
@@ -25,7 +24,7 @@ Deno.test("buildSrInput: bare ref on first attempt, -n suffix from attempt 2", (
   assertEquals(buildSrInput(fakeOrder({ sr_attempt: 2 }), lines).orderRef, "WEB-000123-2");
 });
 
-Deno.test("buildSrInput: paid values, sub_total, box dims, weight by category per unit", () => {
+Deno.test("buildSrInput: paid values, sub_total, package dims, weight by category per unit", () => {
   const input = buildSrInput(fakeOrder(), createLines(fakeItems()));
   assertEquals(input.orderRef, "WEB-000123");
   assertEquals(input.items, [
@@ -33,12 +32,8 @@ Deno.test("buildSrInput: paid values, sub_total, box dims, weight by category pe
     { name: "Kurti / L / Blue", sku: "BC25002-L-Blue", units: 2, sellingPrice: 500 },
   ]);
   assertEquals(input.subTotal, 4000);
-  assertEquals([input.lengthCm, input.breadthCm, input.heightCm], [
-    PARCEL_LENGTH_CM,
-    PARCEL_BREADTH_CM,
-    PARCEL_HEIGHT_CM,
-  ]);
-  assertEquals([PARCEL_LENGTH_CM, PARCEL_BREADTH_CM, PARCEL_HEIGHT_CM], [32, 28, 5]);
+  // Lehenga is the heaviest unit, so the parcel goes in the box.
+  assertEquals([input.lengthCm, input.breadthCm, input.heightCm], [45, 35, 12]);
   // Lehenga 2 kg heaviest + 0.5 per extra unit (2 Kurtis)
   assertEquals(input.weightKg, 3);
   assertEquals(input.billing.phone, "9876543210");

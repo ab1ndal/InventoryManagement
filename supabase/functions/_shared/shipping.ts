@@ -14,13 +14,16 @@ export const HEAVY_KG = 2;
 export const EXTRA_UNIT_KG = 0.5;
 export const MAX_PARCEL_KG = 5;
 
-/** Spec §12: one standard box for every parcel. */
-export const PARCEL_LENGTH_CM = 32;
-export const PARCEL_BREADTH_CM = 28;
-export const PARCEL_HEIGHT_CM = 5;
+export type Package = { lengthCm: number; breadthCm: number; heightCm: number };
+
+// Assumed sizes (owner, 2026-10-26: nothing shipped yet, no packaging bought).
+// Replace with measured packed parcels after the first test shipments.
+const SMALL_BAG: Package = { lengthCm: 30, breadthCm: 40, heightCm: 4 };
+const LARGE_BAG: Package = { lengthCm: 40, breadthCm: 50, heightCm: 5 };
+const BOX: Package = { lengthCm: 45, breadthCm: 35, heightCm: 12 };
+
 /** Couriers bill the greater of dead weight and L × B × H (cm) / 5000. */
 const VOLUMETRIC_DIVISOR = 5000;
-const BOX_VOLUMETRIC_KG = (PARCEL_LENGTH_CM * PARCEL_BREADTH_CM * PARCEL_HEIGHT_CM) / VOLUMETRIC_DIVISOR;
 
 const LIGHT = [
   "Kurti", "KUR",
@@ -73,11 +76,20 @@ export function parcelWeightKg(categories: (string | null)[]): number {
   return Math.min(MAX_PARCEL_KG, heaviest + EXTRA_UNIT_KG * (categories.length - 1));
 }
 
+/** Packaging for the heaviest unit's class: light → small bag, medium → large bag, heavy → box. */
+export function parcelPackage(categories: (string | null)[]): Package {
+  const heaviest = Math.max(0, ...categories.map(unitWeightKg));
+  if (heaviest >= HEAVY_KG) return BOX;
+  if (heaviest >= MEDIUM_KG) return LARGE_BAG;
+  return SMALL_BAG;
+}
+
 /**
- * Weight the courier bills for a parcel in the standard box. The checkout
- * rate lookup sends weight only, so without this floor a 0.5 kg parcel is
- * quoted a slab below what Shiprocket charges for the 0.896 kg box.
+ * Weight the courier bills: the greater of dead and volumetric weight. The
+ * checkout rate lookup sends weight only, so quoting dead weight would price a
+ * bulky parcel a slab or more below what Shiprocket charges.
  */
-export function chargeableWeightKg(deadWeightKg: number): number {
-  return Math.max(deadWeightKg, BOX_VOLUMETRIC_KG);
+export function chargeableWeightKg(categories: (string | null)[]): number {
+  const p = parcelPackage(categories);
+  return Math.max(parcelWeightKg(categories), (p.lengthCm * p.breadthCm * p.heightCm) / VOLUMETRIC_DIVISOR);
 }

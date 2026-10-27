@@ -119,8 +119,10 @@ stock holds. Abandoned-cart nudges. Multiple shipments per order.
 - `shipping` (owner decision 2026-10-23): free if (subtotal − promo_discount) ≥ ₹5,000.
   Otherwise the **Shiprocket rate of the cheapest usable courier** (owner decision 2026-10-26; was
   the recommended courier, which live calls showed can cost more) for the delivery pincode and the
-  cart's parcel weight (§12), floored at the standard box's volumetric weight (32×28×5 cm / 5000 =
-  0.896 kg) because couriers bill the greater of the two,
+  cart's parcel weight (§12), floored at the package's volumetric weight (L×B×H cm / 5000) because
+  couriers bill the greater of the two. Package by heaviest unit class (assumed 2026-10-26, nothing
+  shipped yet): light → bag 30×40×4 (0.96 kg), medium → bag 40×50×5 (2 kg), heavy → box 45×35×12
+  (3.78 kg); the same dims go to Shiprocket at Process. Replace with measured sizes after test parcels,
   prepaid, **rounded up to the next ₹10**. If Shiprocket can't be reached within 5 s or returns
   no rate, charge a **flat ₹150** (₹99 until 2026-10-26; live Lite-plan rates run ₹74–₹149 up to 2 kg) (checkout never blocks on the rate API). The quoted courier id
   is stored on the order and preferred when booking at Process. Computed once at order time and
