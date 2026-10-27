@@ -14,6 +14,14 @@ export const HEAVY_KG = 2;
 export const EXTRA_UNIT_KG = 0.5;
 export const MAX_PARCEL_KG = 5;
 
+/** Spec §12: one standard box for every parcel. */
+export const PARCEL_LENGTH_CM = 32;
+export const PARCEL_BREADTH_CM = 28;
+export const PARCEL_HEIGHT_CM = 5;
+/** Couriers bill the greater of dead weight and L × B × H (cm) / 5000. */
+const VOLUMETRIC_DIVISOR = 5000;
+const BOX_VOLUMETRIC_KG = (PARCEL_LENGTH_CM * PARCEL_BREADTH_CM * PARCEL_HEIGHT_CM) / VOLUMETRIC_DIVISOR;
+
 const LIGHT = [
   "Kurti", "KUR",
   "Short Kurta", "SK",
@@ -63,4 +71,13 @@ export function parcelWeightKg(categories: (string | null)[]): number {
   if (categories.length === 0) return 0;
   const heaviest = Math.max(...categories.map(unitWeightKg));
   return Math.min(MAX_PARCEL_KG, heaviest + EXTRA_UNIT_KG * (categories.length - 1));
+}
+
+/**
+ * Weight the courier bills for a parcel in the standard box. The checkout
+ * rate lookup sends weight only, so without this floor a 0.5 kg parcel is
+ * quoted a slab below what Shiprocket charges for the 0.896 kg box.
+ */
+export function chargeableWeightKg(deadWeightKg: number): number {
+  return Math.max(deadWeightKg, BOX_VOLUMETRIC_KG);
 }

@@ -161,7 +161,7 @@ const courier = (id: number, rate: number | string, etdHours: number | string, e
 });
 const serviceability = (data: Record<string, unknown>) => ({ status: 200, currency: "INR", data });
 
-Deno.test("rate: query params and recommended courier picked", async () => {
+Deno.test("rate: query params and cheapest courier picked, not the recommended one", async () => {
   const t = setup(() =>
     jsonResponse(
       200,
@@ -172,7 +172,7 @@ Deno.test("rate: query params and recommended courier picked", async () => {
     )
   );
   const r = await t.sr.rate({ deliveryPincode: "226001", weightKg: 1.5, declaredValue: 2499 });
-  assertEquals(r, { rate: 73, courierId: 2, courierName: "Courier 2", etdDays: 3 });
+  assertEquals(r, { rate: 40, courierId: 1, courierName: "Courier 1", etdDays: 3 });
   const u = new URL(t.apiCalls()[0].url);
   assertEquals(u.pathname, "/v1/external/courier/serviceability/");
   assertEquals(Object.fromEntries(u.searchParams), {
@@ -184,15 +184,14 @@ Deno.test("rate: query params and recommended courier picked", async () => {
   });
 });
 
-Deno.test("R18: recommended missing from list → lowest etd_hours, ties lowest rate", () => {
+Deno.test("R18: lowest rate wins, ties lowest etd_hours", () => {
   const r = selectCourier(serviceability({
-    recommended_courier_company_id: 99,
-    available_courier_companies: [courier(1, 80, 48), courier(2, 60, 48), courier(3, 40, 72)],
+    available_courier_companies: [courier(1, 80, 24), courier(2, 40, 72), courier(3, 40, 48)],
   }));
-  assertEquals(r?.courierId, 2);
+  assertEquals(r?.courierId, 3);
 });
 
-Deno.test("R18: recommended but blocked (flag or blocked list) → fallback", () => {
+Deno.test("R18: cheapest but blocked (flag or blocked list) → next cheapest", () => {
   assertEquals(
     selectCourier(serviceability({
       recommended_courier_company_id: 1,
@@ -221,9 +220,9 @@ Deno.test("R18: string numbers are parsed", () => {
   assertEquals(r, { rate: 54.5, courierId: 7, courierName: "Courier 7", etdDays: 4 });
 });
 
-Deno.test("R18: missing etd_hours sorts last", () => {
+Deno.test("R18: missing etd_hours sorts last among equal rates", () => {
   const r = selectCourier(serviceability({
-    available_courier_companies: [courier(1, 10, ""), courier(2, 90, 72)],
+    available_courier_companies: [courier(1, 50, ""), courier(2, 50, 72)],
   }));
   assertEquals(r?.courierId, 2);
 });

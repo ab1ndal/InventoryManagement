@@ -38,7 +38,8 @@ Deno.test("quote: prices from the DB, courier rate rounded up, client fields ign
   assertEquals(r.response.quote.gatewayAmount, 1080);
   assertEquals(r.response.pincode, { ok: true });
   assertEquals(r.courierId, 12);
-  assertEquals(sr.calls.rate, [{ deliveryPincode: "201001", weightKg: 0.5, declaredValue: 1000 }]);
+  // One 0.5 kg unit is quoted at the box's 0.896 kg volumetric weight, as couriers bill it.
+  assertEquals(sr.calls.rate, [{ deliveryPincode: "201001", weightKg: 0.896, declaredValue: 1000 }]);
   assertEquals(r.response.live, true);
   assertEquals(r.response.unavailable, []);
   assertEquals(r.response.code, null);

@@ -14,12 +14,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createShiprocket, type ShiprocketClient, type SrOrderInput, type TokenStore } from "./shiprocket.ts";
-import { parcelWeightKg } from "./shipping.ts";
+import { PARCEL_BREADTH_CM, PARCEL_HEIGHT_CM, PARCEL_LENGTH_CM, parcelWeightKg } from "./shipping.ts";
 
-/** Spec §12: one standard box for every parcel. */
-export const PARCEL_LENGTH_CM = 32;
-export const PARCEL_BREADTH_CM = 28;
-export const PARCEL_HEIGHT_CM = 5;
 const DEFAULT_STATE = "Uttar Pradesh";
 /** Error text stored on the order (sr_last_error, process_error) is capped. */
 const ERROR_TEXT_MAX = 500;

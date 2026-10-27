@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { parcelWeightKg } from "./shipping.ts";
+import { chargeableWeightKg, parcelWeightKg } from "./shipping.ts";
 
 Deno.test("heaviest unit + 0.5 kg per extra unit", () => {
   assertEquals(parcelWeightKg(["Lehenga", "Kurti", "Kurti"]), 3);
@@ -28,4 +28,11 @@ Deno.test("unknown or missing category is medium", () => {
 
 Deno.test("empty parcel weighs 0", () => {
   assertEquals(parcelWeightKg([]), 0);
+});
+
+Deno.test("chargeable weight: the standard box's volumetric weight is the floor", () => {
+  // 32 × 28 × 5 cm / 5000 = 0.896 kg, so a single light unit bills above its 0.5 kg.
+  assertEquals(chargeableWeightKg(0.5), 0.896);
+  assertEquals(chargeableWeightKg(1), 1);
+  assertEquals(chargeableWeightKg(3), 3);
 });

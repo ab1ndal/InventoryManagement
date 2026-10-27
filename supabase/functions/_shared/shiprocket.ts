@@ -120,9 +120,10 @@ export function srOrderDate(d: Date): string {
 }
 
 /**
- * R18: the recommended courier if it is listed and usable; else the lowest
- * etd_hours, ties broken by the lower rate. Usable = not blocked, finite
- * rate > 0. Numbers may arrive as strings.
+ * R18 (owner decision 2026-10-26): the cheapest usable courier, ties broken
+ * by the lower etd_hours (missing sorts last). Shiprocket's recommended
+ * courier is ignored: it was often dearer and the shopper pays the rate.
+ * Usable = not blocked, finite rate > 0. Numbers may arrive as strings.
  */
 export function selectCourier(body: unknown): RateQuote | null {
   const b = body as Json | null;
@@ -149,12 +150,8 @@ export function selectCourier(body: unknown): RateQuote | null {
     );
   if (usable.length === 0) return null;
 
-  const recommendedId = num(data.recommended_courier_company_id);
-  let pick = usable.find((c) => c.courierId === recommendedId);
-  if (!pick) {
-    const etd = (h: number) => (Number.isFinite(h) ? h : Infinity);
-    pick = [...usable].sort((a, b) => etd(a.etdHours) - etd(b.etdHours) || a.rate - b.rate)[0];
-  }
+  const etd = (h: number) => (Number.isFinite(h) ? h : Infinity);
+  const pick = [...usable].sort((a, b) => a.rate - b.rate || etd(a.etdHours) - etd(b.etdHours))[0];
   return {
     rate: pick.rate,
     courierId: pick.courierId,

@@ -10,7 +10,7 @@
 
 import { type Line, type Promo, promoDiscount, type Quote, quoteOrder } from "./pricing.ts";
 import { checkUpPincode, type PincodeCheck } from "./pincode.ts";
-import { parcelWeightKg } from "./shipping.ts";
+import { chargeableWeightKg, parcelWeightKg } from "./shipping.ts";
 import type { ShiprocketClient } from "./shiprocket.ts";
 import { ApiError, type Store, type VariantRow } from "./context.ts";
 
@@ -211,7 +211,7 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
     const units = lines.flatMap((l) => Array.from({ length: l.qty }, () => l.category));
     const rate = await shiprocket.rate({
       deliveryPincode: req.pincode.trim(),
-      weightKg: parcelWeightKg(units),
+      weightKg: chargeableWeightKg(parcelWeightKg(units)),
       declaredValue: Math.round(goods * 100) / 100,
     });
     if (rate) {

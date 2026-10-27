@@ -117,8 +117,10 @@ stock holds. Abandoned-cart nudges. Multiple shipments per order.
 - `promo_discount` from at most **one** website-valid code (see §9), allocated to lines in
   proportion to line value (rounded to paise; remainder on the largest line).
 - `shipping` (owner decision 2026-10-23): free if (subtotal − promo_discount) ≥ ₹5,000.
-  Otherwise the **Shiprocket rate of the recommended courier** (`recommended_courier_company_id`;
-  fastest serviceable if absent) for the delivery pincode and the cart's parcel weight (§12),
+  Otherwise the **Shiprocket rate of the cheapest usable courier** (owner decision 2026-10-26; was
+  the recommended courier, which live calls showed can cost more) for the delivery pincode and the
+  cart's parcel weight (§12), floored at the standard box's volumetric weight (32×28×5 cm / 5000 =
+  0.896 kg) because couriers bill the greater of the two,
   prepaid, **rounded up to the next ₹10**. If Shiprocket can't be reached within 5 s or returns
   no rate, charge a **flat ₹99** (checkout never blocks on the rate API). The quoted courier id
   is stored on the order and preferred when booking at Process. Computed once at order time and

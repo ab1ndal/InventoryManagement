@@ -5,15 +5,13 @@ import {
   CourierError,
   createLines,
   ensureSrOrder,
-  PARCEL_BREADTH_CM,
-  PARCEL_HEIGHT_CM,
-  PARCEL_LENGTH_CM,
   runProcess,
   runRebook,
   runSendBack,
   shippableDiffers,
 } from "./process.ts";
 import { FakeDb, fakeItems, fakeOrder, FakeShiprocket, FULL_PLAN, ITEM_A, ITEM_B, ORDER_ID } from "./process_fakes.ts";
+import { PARCEL_BREADTH_CM, PARCEL_HEIGHT_CM, PARCEL_LENGTH_CM } from "./shipping.ts";
 import { handle } from "./jobs/shiprocket_create.ts";
 import type { JobContext } from "./jobs/types.ts";
 import type { SrOrderInput } from "./shiprocket.ts";
