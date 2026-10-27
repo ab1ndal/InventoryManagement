@@ -38,3 +38,6 @@ vcf-export/
 # product description pipeline working files (photos, logs)
 /.describe-work/
 .claude/skills/
+
+# local JPEG copies of hero banners
+docs/hero/

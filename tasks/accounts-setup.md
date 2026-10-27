@@ -86,10 +86,23 @@ Everything in the **shop's** name (BINDAL'S CREATION, GSTIN 09ABVPB4203A1Z4). Pr
    - 0.5 kg and 1 kg and 2 kg to a Ghaziabad pincode (e.g. 201002)
    - the same weights to Lucknow (226001) and Varanasi (221001)
    These decide whether the flat ₹99 fee below ₹5,000 holds up.
+
+   **Public calculator, 2026-10-25** (shiprocket.in/shipping-rate-calculator, no login, prepaid,
+   value ₹3,000, no dimensions; cheapest courier; GST inclusion not shown, assume +18%):
+
+   | To | 0.5 kg | 1 kg | 2 kg |
+   |---|---|---|---|
+   | Ghaziabad 201002 | ₹49.72, 1 day (Xpressbees) | ₹83.52, 1 day (Amazon surface) | ₹84.72, 1 day (Shadowfax surface) |
+   | Lucknow 226001 | ₹57.72, 2 days (Xpressbees) | ₹108.72, 2 days (Xpressbees air) | ₹104.72, 2 days (Shadowfax surface) |
+   | Varanasi 221001 | ₹57.72, 3 days (Xpressbees) | ₹96.92, 3 days (Amazon surface) | ₹104.72, 3 days (Shadowfax surface) |
+
+   Re-check inside the logged-in dashboard (Lite plan rates, real box dimensions may raise
+   volumetric weight).
 6. **One test parcel** to a family address in UP: create order → pick courier → label →
    pickup → watch tracking. Learns the flow used for Diwali orders.
 7. **API user** (for the website integration): Settings → API → **Create API User**, using the
-   second email. Grant only Orders, Shipments/Courier, Tracking and Pincode modules. The password
+   second email. Grant only Orders, Shipments/Courier, Tracking, Pincode and Settings (pickup)
+   modules, and set Buyer's Details to Allowed (otherwise addresses may come back masked). The password
    is shown **once**: put it straight into Supabase secrets (section 4) yourself, or into a
    password manager to hand over in person. **Never send it in chat or email.**
 
@@ -120,8 +133,21 @@ Done by whoever sets up the website, not shared in chat:
 
 ## Checklist
 - [ ] CA answers received
-- [ ] Cashfree account activated
-- [ ] Shiprocket KYC done, pickup address `Shop` verified, test parcel sent, rates shared
+- [ ] Cashfree account activated. **Blocked (2026-10-25):** Cashfree (Saurabh Kumar, Sales Ops,
+      saurabh.kumar@cashfree.com) wants one business proof besides GST. Plan: Udyam certificate,
+      the **4-page "Print with Annexure"** PDF (1-page not enough). Reply sent 2026-10-25 from
+      bindalscreations@gmail.com: Udyam coming, Abhinav logs in from US, asked to confirm 0% offer.
+      VCIP (video KYC) closed: Cashfree Care confirmed no VCIP call needed for onboarding.
+      Cashfree Care reply 2026-10-25: account **active with limited access** (can transact up to
+      current limit) while under review, up to 10 working days. Upload Udyam via dashboard **KYC
+      information → Upload business documents** only (email/ticket uploads not processed). No IP
+      whitelisting; access from abroad fine as long as business is Indian. 0% offer confirmed
+      for direct signups on/after 2026-07-21 in an eligible category; GST still charged.
+- [ ] Udyam registration done, 4-page PDF uploaded on Cashfree dashboard (KYC → Upload business documents)
+- [x] Shiprocket signup + business details (company "Bindals Creation"), 2026-10-25
+- [x] Pickup address `Shop` saved + VERIFIED, primary, Shiprocket pickup available (Pooja Bindal
+      9810873280, Mon/Wed–Sun 10:00–20:30), 2026-10-25; public rate table in step 5
+- [ ] Shiprocket KYC done, wallet ₹500, test parcel sent
 - [ ] Shiprocket API user created, credentials in Supabase secrets
 - [x] Terms / Privacy / Refund content finalised (2026-10-23)
 - [ ] (Phase B) secrets added to Supabase and Vercel
