@@ -23,9 +23,9 @@ Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/f
   courier (was recommended); quote at max(dead, volumetric) with ASSUMED packages by heaviest class
   (bag 30×40×4 / bag 40×50×5 / box 45×35×12, same dims sent at Process); flat fallback ₹99→₹150
   (server + WhatsApp checkout). 347 deno + 34 checkout tests green.
-- [ ] Deploy the changed Edge Functions (everything importing `_shared/quote.ts`, `_shared/process.ts`,
-  `_shared/shiprocket.ts`, `_shared/pricing.ts`). Until then live checkout still quotes the recommended
-  courier at dead weight with a ₹99 fallback; only the WhatsApp ₹150 is live (Vercel, on merge).
+- [x] Deployed 2026-10-27 (05:37 UTC): checkout-quote, create-order, run-jobs, courier-status, cashfree-webhook,
+  order-status (--no-verify-jwt), admin-order-action (JWT on). Live quote to Lucknow 226001: Kurti ₹140,
+  Saree ₹150, Lehenga ₹190 (source "rate"); no pincode → ₹150 flat.
 - [ ] Rate table 0.5–5 kg × 6 UP cities: owner reruns the login command (token → scratchpad
   `sr/login.json`), Claude runs `sr/rates.mjs`. Needed for the box class (3.78 kg, lehenga/sherwani).
 - [ ] Buy packaging (2 bag sizes + 1 box); pack a kurti, saree, lehenga; measure + weigh; replace the
