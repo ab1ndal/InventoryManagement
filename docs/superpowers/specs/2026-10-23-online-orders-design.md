@@ -122,7 +122,7 @@ stock holds. Abandoned-cart nudges. Multiple shipments per order.
   cart's parcel weight (§12), floored at the standard box's volumetric weight (32×28×5 cm / 5000 =
   0.896 kg) because couriers bill the greater of the two,
   prepaid, **rounded up to the next ₹10**. If Shiprocket can't be reached within 5 s or returns
-  no rate, charge a **flat ₹99** (checkout never blocks on the rate API). The quoted courier id
+  no rate, charge a **flat ₹150** (₹99 until 2026-10-26; live Lite-plan rates run ₹74–₹149 up to 2 kg) (checkout never blocks on the rate API). The quoted courier id
   is stored on the order and preferred when booking at Process. Computed once at order time and
   **never increased** later (the shopper is not re-charged if the parcel gets lighter or the
   rate changes).
@@ -221,7 +221,7 @@ service role.
 
 `checkout-quote` (public; prices a cart + code + credit + pincode, returns lines and totals;
 pincode/UP check and shipping rate via Shiprocket with a 5 s timeout, falling back to the
-prefix check and flat ₹99; the pricing function takes the shipping rate as an input so it stays
+prefix check and flat ₹150; the pricing function takes the shipping rate as an input so it stays
 pure),
 `create-order` (public; re-quote, insert order, Cashfree order, return payment session or
 confirm zero-amount), `cashfree-webhook` (verify signature on raw body, idempotent confirm,

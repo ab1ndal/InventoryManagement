@@ -9,7 +9,7 @@
  * more on a 401 (retry that request once).
  *
  * Lookups used at checkout (postcodeState, rate) never throw: any failure
- * is null, and the caller applies its fallback (R16 pincode rule, ₹99 flat).
+ * is null, and the caller applies its fallback (R16 pincode rule, ₹150 flat).
  * Every other method throws ShiprocketError, so Process can stop and retry.
  */
 
@@ -20,7 +20,7 @@ export const PICKUP_LOCATION = "Shop";
 export const PICKUP_PINCODE = "201001";
 export const TOKEN_TTL_MS = 10 * 24 * 60 * 60 * 1000;
 export const TOKEN_REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000;
-/** Checkout lookups (rate, postcode): spec §7 "no rate within 5 s → ₹99". */
+/** Checkout lookups (rate, postcode): spec §7 "no rate within 5 s → flat fee" (₹150 since 2026-10-26). */
 export const LOOKUP_TIMEOUT_MS = 5_000;
 export const CALL_TIMEOUT_MS = 20_000;
 const BILLING_CITY_MAX = 30;
@@ -332,7 +332,7 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
         // UNVERIFIED: unserviceable-pincode body shape; empty list/missing data/blocked → null.
         return selectCourier(data);
       } catch {
-        // Timeout or network: caller charges the flat ₹99.
+        // Timeout or network: caller charges the flat ₹150.
         return null;
       }
     },

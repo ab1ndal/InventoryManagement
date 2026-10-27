@@ -91,10 +91,10 @@ Deno.test("shippingCharge rounds rate up to next ₹10", () => {
   assertEquals(shippingCharge(80.01, 1200), 90);
 });
 
-Deno.test("shippingCharge falls back to ₹99 without a rate", () => {
-  assertEquals(shippingCharge(null, 1200), 99);
-  assertEquals(shippingCharge(0, 1200), 99);
-  assertEquals(shippingCharge(Number.NaN, 1200), 99);
+Deno.test("shippingCharge falls back to ₹150 without a rate", () => {
+  assertEquals(shippingCharge(null, 1200), 150);
+  assertEquals(shippingCharge(0, 1200), 150);
+  assertEquals(shippingCharge(Number.NaN, 1200), 150);
 });
 
 Deno.test("shippingCharge is free at ₹5,000 and above", () => {
@@ -305,8 +305,8 @@ Deno.test("R7 does nothing when no credit or voucher was applied", () => {
     shippingRate: null,
     ...NO_TENDER,
   });
-  assertEquals(q.amountDue, 99.5);
-  assertEquals(q.gatewayAmount, 99.5);
+  assertEquals(q.amountDue, 150.5);
+  assertEquals(q.gatewayAmount, 150.5);
   assertQuoteInvariants(q);
 });
 

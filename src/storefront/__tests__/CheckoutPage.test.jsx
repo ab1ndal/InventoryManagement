@@ -47,9 +47,9 @@ it("renders contact/address fields and the order summary", () => {
   expect(screen.getByPlaceholderText(/phone/i)).toBeInTheDocument();
   expect(screen.getByPlaceholderText(/address line 1/i)).toBeInTheDocument();
   expect(screen.getByText("Silk Saree (FREE/Red) ×2")).toBeInTheDocument();
-  // subtotal ₹3,000, below ₹5000 threshold → ₹99 shipping shown
+  // subtotal ₹3,000, below ₹5000 threshold → ₹150 shipping shown
   expect(screen.getAllByText("₹3,000").length).toBeGreaterThan(0);
-  expect(screen.getByText("₹99")).toBeInTheDocument();
+  expect(screen.getByText("₹150")).toBeInTheDocument();
 });
 
 it("keeps the place-order button disabled and offers no COD", () => {

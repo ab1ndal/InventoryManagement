@@ -199,7 +199,7 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
 
   const creditAvailable = who.authUserId ? (await store.creditBalance(who.authUserId)) ?? 0 : 0;
 
-  // Pincode (R16) and courier rate; the rate never blocks checkout (₹99 fallback).
+  // Pincode (R16) and courier rate; the rate never blocks checkout (₹150 fallback).
   const postcodeState = shiprocket ? (pc: string) => shiprocket.postcodeState(pc) : () => Promise.resolve(null);
   const pincode = req.pincode === null ? null : await checkUpPincode(req.pincode, postcodeState);
 

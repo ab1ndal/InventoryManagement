@@ -30,7 +30,7 @@ describe("constants", () => {
   });
 
   it("shippingFee uses the same threshold", () => {
-    expect(shippingFee(FREE_SHIPPING_THRESHOLD - 1)).toBe(99);
+    expect(shippingFee(FREE_SHIPPING_THRESHOLD - 1)).toBe(150);
     expect(shippingFee(FREE_SHIPPING_THRESHOLD)).toBe(0);
   });
 });

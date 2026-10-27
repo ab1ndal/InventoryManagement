@@ -51,7 +51,7 @@ Deno.test("quote: Uttarakhand pincode 263001 → not_up, no rate lookup, flat sh
   assertEquals(r.response.pincode, { ok: false, reason: "not_up" });
   assertEquals(sr.calls.rate.length, 0);
   assertEquals(r.response.shippingSource, "flat");
-  assertEquals(r.response.quote.shipping, 99);
+  assertEquals(r.response.quote.shipping, 150);
 });
 
 Deno.test("quote: shared prefix with a failed lookup → unverifiable (R16)", async () => {
@@ -59,13 +59,13 @@ Deno.test("quote: shared prefix with a failed lookup → unverifiable (R16)", as
   assertEquals((await buildQuote(d, req({ pincode: "247001" }), guest)).response.pincode, { ok: false, reason: "unverifiable" });
 });
 
-Deno.test("quote: no pincode → pincode null and flat ₹99; rate failure → flat", async () => {
+Deno.test("quote: no pincode → pincode null and flat ₹150; rate failure → flat", async () => {
   const { deps: d } = deps();
   const r = await buildQuote(d, req({ pincode: null }), guest);
-  assertEquals([r.response.pincode, r.response.shippingSource, r.response.quote.shipping], [null, "flat", 99]);
+  assertEquals([r.response.pincode, r.response.shippingSource, r.response.quote.shipping], [null, "flat", 150]);
   const f = deps({ rate: null });
   const r2 = await buildQuote(f.deps, req(), guest);
-  assertEquals([r2.response.shippingSource, r2.response.quote.shipping, r2.courierId], ["flat", 99, null]);
+  assertEquals([r2.response.shippingSource, r2.response.quote.shipping, r2.courierId], ["flat", 150, null]);
 });
 
 Deno.test("quote: ₹5,000+ goods ship free without a rate call", async () => {
