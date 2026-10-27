@@ -148,6 +148,7 @@ Done by whoever sets up the website, not shared in chat:
 - [x] Pickup address `Shop` saved + VERIFIED, primary, Shiprocket pickup available (Pooja Bindal
       9810873280, Mon/Wed–Sun 10:00–20:30), 2026-10-25; public rate table in step 5
 - [ ] Shiprocket KYC done, wallet ₹500, test parcel sent
-- [ ] Shiprocket API user created, credentials in Supabase secrets
+- [x] Shiprocket API user created (bindalscreations+api@gmail.com; modules Orders, Shipments,
+      Courier; Settings left off, no Settings endpoint used), credentials in Supabase secrets, 2026-10-26
 - [x] Terms / Privacy / Refund content finalised (2026-10-23)
 - [ ] (Phase B) secrets added to Supabase and Vercel

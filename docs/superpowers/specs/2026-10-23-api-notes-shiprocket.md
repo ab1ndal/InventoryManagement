@@ -266,11 +266,18 @@ Compare `x-api-key` in constant time. The plan already re-fetches `/courier/trac
 
 ## Live checks to run once the API user exists (all UNVERIFIED above)
 
-1. Login response field names.
-2. Serviceability for an unserviceable pincode (body shape).
-3. `state` / `state_code` for a UP pincode (201001).
+1. Login response field names. **VERIFIED 2026-10-26:** `company_id, created_at, email, first_name, id, last_name, token`.
+2. Serviceability for an unserviceable pincode (body shape). **VERIFIED 2026-10-26:** HTTP 200 with body
+   `{"status":404,"message":"No courier service available between 201001 and 999999"}` and no `data`
+   (same for 744301). `selectCourier` already returns null for it. Serviceable body: `status` 200,
+   `data.available_courier_companies[]` with numeric `rate`, `etd_hours`, `estimated_delivery_days`, `blocked`;
+   no `blocked_courier_companies` key was present.
+3. `state` / `state_code` for a UP pincode (201001). **VERIFIED 2026-10-26:** `{success:true, postcode_details:{state:"Uttar Pradesh", state_code:"UP", city:"Ghaziabad"}}`;
+   226001 → Uttar Pradesh/UP/Lucknow; 110001 → Delhi/DL.
 4. Duplicate `order_id` create response.
 5. Whether update/adhoc changes weight and dimensions.
 6. Assign-AWB failure body when the wallet is empty.
 7. Webhook retry behaviour (watch function logs after returning 500 once on a test).
-8. `X-RateLimit` window.
+8. `X-RateLimit` window. **Partly seen 2026-10-26:** no `X-RateLimit-*` headers on serviceability;
+   `/open/postcode/details` sent limit 60, wallet-balance sent limit 360. No reset or window header, so the window is still unknown.
+9. Wallet balance (2026-10-26): `GET /account/details/wallet-balance` → `{"data":{"balance_amount":"0"}}` (string).
