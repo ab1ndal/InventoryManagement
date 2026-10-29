@@ -20,7 +20,7 @@ Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/f
   https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth
 
 ### Shiprocket setup: RESUME HERE (updated 2026-10-29)
-Next, in order: test parcel (live checks 5/7, webhook, GST compare) → rate table →
+Courier fallback deployed 2026-10-29. Next, in order: test parcel (live checks 5/7, webhook, GST compare) → rate table →
 packaging → shipping + returns scenarios → Cashfree go-live (step 7 below).
 - [x] Shipping quote fixes merged to main 2026-10-26 (branch `fix/shipping-quote-weight-cheapest`): cheapest
   courier (was recommended); quote at max(dead, volumetric) with ASSUMED packages by heaviest class
@@ -121,7 +121,8 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
 
 ### Follow-ups (non-blocking)
 - "Send back to To-check" for an order stuck in processing after AWB (ship builder gap 1).
-- [x] Courier fallback (branch `fix/shiprocket-followups`, 2026-10-27): Process retries assign-AWB without
+- [x] Courier fallback (PR #75, merged + deployed 2026-10-29: run-jobs, courier-status, admin-order-action v12,
+  ACTIVE, unauthenticated POST → 401): Process retries assign-AWB without
   courier_id when Shiprocket refuses the quoted courier (status 200/400/422 only; never after a timeout).
   Watch `awb_quoted_courier_refused` logs: the default courier may cost more than the quote.
 - Shiprocket update-keeps-shipment check (live check 5, with the test parcel). Duplicate order_id verified 2026-10-29.
