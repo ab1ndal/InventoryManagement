@@ -152,7 +152,8 @@ Done by whoever sets up the website, not shared in chat:
 - [x] Shiprocket signup + business details (company "Bindals Creation"), 2026-10-25
 - [x] Pickup address `Shop` saved + VERIFIED, primary, Shiprocket pickup available (Pooja Bindal
       9810873280, Mon/Wed–Sun 10:00–20:30), 2026-10-25; public rate table in step 5
-- [ ] Shiprocket KYC done, wallet ₹500, test parcel sent
+- [x] Shiprocket KYC done + wallet ₹500 recharged (₹1,000 with cashback), 2026-10-29
+- [ ] Shiprocket test parcel sent (through the site: sandbox payment, then admin Process → real AWB)
 - [x] Shiprocket API user created (bindalscreations+api@gmail.com; modules Orders, Shipments,
       Courier; Settings left off, no Settings endpoint used), credentials in Supabase secrets, 2026-10-26
 - [x] Terms / Privacy / Refund content finalised (2026-10-23)
