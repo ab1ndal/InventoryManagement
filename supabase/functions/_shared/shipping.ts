@@ -93,3 +93,22 @@ export function chargeableWeightKg(categories: (string | null)[]): number {
   const p = parcelPackage(categories);
   return Math.max(parcelWeightKg(categories), (p.lengthCm * p.breadthCm * p.heightCm) / VOLUMETRIC_DIVISOR);
 }
+
+/**
+ * Charge when Shiprocket gives no rate (outage, timeout, no pincode yet), by
+ * chargeable weight. Highest cheapest-courier freight anywhere in UP from
+ * 201001 (API, 2026-10-29: 11 cities) rounded up to ₹10, so the fallback never
+ * undercharges freight (owner rule); nearby pincodes pay a little more.
+ */
+const FALLBACK_SLABS: { upToKg: number; charge: number }[] = [
+  { upToKg: 0.5, charge: 90 },
+  { upToKg: 1, charge: 140 },
+  { upToKg: 2, charge: 150 },
+  { upToKg: 3, charge: 180 },
+  { upToKg: MAX_PARCEL_KG, charge: 230 },
+];
+
+export function fallbackShippingCharge(weightKg: number): number {
+  const slab = FALLBACK_SLABS.find((s) => weightKg <= s.upToKg);
+  return (slab ?? FALLBACK_SLABS[FALLBACK_SLABS.length - 1]).charge;
+}

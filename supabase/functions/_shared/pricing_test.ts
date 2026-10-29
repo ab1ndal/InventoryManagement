@@ -97,6 +97,12 @@ Deno.test("shippingCharge falls back to ₹150 without a rate", () => {
   assertEquals(shippingCharge(Number.NaN, 1200), 150);
 });
 
+Deno.test("shippingCharge uses the given fallback without a rate", () => {
+  assertEquals(shippingCharge(null, 1200, 190), 190);
+  assertEquals(shippingCharge(120, 1200, 190), 120);
+  assertEquals(shippingCharge(null, 5000, 190), 0);
+});
+
 Deno.test("shippingCharge is free at ₹5,000 and above", () => {
   assertEquals(shippingCharge(120, 5000), 0);
   assertEquals(shippingCharge(null, 5000), 0);

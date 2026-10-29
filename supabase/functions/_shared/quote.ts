@@ -10,7 +10,7 @@
 
 import { type Line, type Promo, promoDiscount, type Quote, quoteOrder } from "./pricing.ts";
 import { checkUpPincode, type PincodeCheck } from "./pincode.ts";
-import { chargeableWeightKg } from "./shipping.ts";
+import { chargeableWeightKg, fallbackShippingCharge } from "./shipping.ts";
 import type { ShiprocketClient } from "./shiprocket.ts";
 import { ApiError, type Store, type VariantRow } from "./context.ts";
 
@@ -199,19 +199,19 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
 
   const creditAvailable = who.authUserId ? (await store.creditBalance(who.authUserId)) ?? 0 : 0;
 
-  // Pincode (R16) and courier rate; the rate never blocks checkout (₹150 fallback).
+  // Pincode (R16) and courier rate; the rate never blocks checkout (weight-slab fallback).
   const postcodeState = shiprocket ? (pc: string) => shiprocket.postcodeState(pc) : () => Promise.resolve(null);
   const pincode = req.pincode === null ? null : await checkUpPincode(req.pincode, postcodeState);
 
   const subtotal = lines.reduce((s, l) => s + Math.round(l.unitPrice * 100) * l.qty, 0) / 100;
   const goods = subtotal - promoDiscount(promo, subtotal);
+  const weightKg = chargeableWeightKg(lines.flatMap((l) => Array.from({ length: l.qty }, () => l.category)));
   let shippingRate: number | null = null;
   let courierId: number | null = null;
   if (goods < 5000 && pincode?.ok && shiprocket && req.pincode) {
-    const units = lines.flatMap((l) => Array.from({ length: l.qty }, () => l.category));
     const rate = await shiprocket.rate({
       deliveryPincode: req.pincode.trim(),
-      weightKg: chargeableWeightKg(units),
+      weightKg,
       declaredValue: Math.round(goods * 100) / 100,
     });
     if (rate) {
@@ -224,6 +224,7 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
     lines,
     promo,
     shippingRate,
+    fallbackShipping: fallbackShippingCharge(weightKg),
     creditRequested: req.creditRequested,
     creditAvailable,
     voucherValue,
