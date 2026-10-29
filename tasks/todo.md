@@ -105,6 +105,21 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
    order_refund_legs all 'completed'). Known: shiprocket_create job retries cancelled orders only while
    Shiprocket is unconfigured (not-configured branch runs before the status skip). First real order = WEB-000006.
 7. Switch CASHFREE_ENV=production + live keys, superadmin flips "Online checkout" on in /admin/online-orders.
+   Go-live audit 2026-10-29 (Claude, read-only):
+   - [x] Production domain whitelist: bindalscreations.com APPROVED (added 2026-10-24). Confirm www works on the
+     first real payment.
+   - [x] Production success webhook: default NOTIFY_URL entry exists and create-order sends notify_url, so
+     PAYMENT_SUCCESS reaches cashfree-webhook. [ ] Add an endpoint for failed + user-dropped (log-only events).
+   - [x] Payment methods active: UPI, credit + debit cards (Visa/Mastercard/RuPay/Maestro). Net Banking OFF
+     (optional: request activation). Amex not available.
+   - [ ] 6 sandbox refund legs (WEB-000001/3/4/5) stuck "processing": the hourly refund-sweeper polls them and
+     sandbox never completes them. Close them BEFORE switching keys, or production polls error every hour.
+   - [ ] Owner: production API keys (2FA) → Supabase secrets CASHFREE_CLIENT_ID / CASHFREE_CLIENT_SECRET,
+     CASHFREE_ENV=production. Never in chat.
+   - [x] Order-history revert ready as draft PR #81 (430 storefront tests pass); merge at switch-on.
+   - [ ] Custom SMTP for Supabase Auth before PR #81: customers sign in by magic link to see orders, and the
+     built-in mailer is rate-limited.
+   - [ ] API + success-rate alerts (Cashfree dashboard → Developers), optional.
    **PENDING (owner 2026-10-29).** Cashfree production account is active (PG + Links + Forms, settlement bank
    active), so nothing on Cashfree's side blocks this. Do it only after the Shiprocket setup above: wallet,
    the test parcel, then the shipping + returns scenarios (KYC + live check 6 done 2026-10-29).
