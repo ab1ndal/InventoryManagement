@@ -35,8 +35,11 @@ packaging → shipping + returns scenarios → Cashfree go-live (step 7 below).
   only; dashboard adds a ₹5 "Smart Order" line; no GST shown anywhere. If GST is extra, absorbed loss ≈ ₹17 /
   ₹25 / ₹37 per order (light/medium/heavy).
   **Owner decision 2026-10-29: keep the rule as is** (live rate rounded up to ₹10, free ≥ ₹5,000, ₹150 fallback);
-  accept the GST loss. Still open, decide after the test parcel: add the ₹5 Smart Order if the wallet
-  deduction includes it; raise the ₹150 fallback to ₹230 (heavy to Kanpur is ₹230).
+  accept the GST loss. Owner rule: never undercharge freight. Fallback (no rate) is now by weight slab (PR #79,
+  deployed checkout-quote + create-order 2026-10-29): ≤0.5 kg ₹90, ≤1 ₹140, ≤2 ₹150, ≤3 ₹180, ≤5 ₹230 (highest UP
+  freight per slab). Live check: no pincode Kurti ₹140 / Lehenga ₹230; Lucknow rate ₹140 / ₹190. WhatsApp checkout
+  (checkout off) still flat ₹150. Still open after the test parcel: add the ₹5 Smart Order if the wallet deduction
+  includes it.
 - [ ] Buy packaging (2 bag sizes + 1 box); pack a kurti, saree, lehenga; measure + weigh; replace the
   assumed sizes in `_shared/shipping.ts` (and LIGHT/MEDIUM/HEAVY kg if real weights differ).
 - [ ] GST: after the test parcel, compare wallet deduction with the quoted rate. If rates exclude 18% GST,
