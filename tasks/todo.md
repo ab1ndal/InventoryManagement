@@ -156,8 +156,7 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
 - [x] BillTable/BillingForm: online (Website) bills locked (no edit/cancel/delete, globe marker) and Website
   hidden from the in-store payment picker: PR #84, merged 2026-10-29. Same PR pinned the ReturnsSection test
   clock (3 tests went red on 2026-10-28 when the real date left the 7-day window). Full suite 775/775.
-- [ ] `salesmethods` sequence (last_value 6, max id 7): migration_salesmethods_sequence.sql in PR #85. Owner runs
-  `npm run migrate`, then merge.
+- [x] `salesmethods` sequence realigned (last_value 7 = max id): PR #85, migrated + merged 2026-10-29.
 - [x] Token-store helpers consolidated: process.ts uses context.ts `dbTokenStore` (2026-10-27).
 
 ## STOREFRONT: open items (pruned 2026-10-25)
