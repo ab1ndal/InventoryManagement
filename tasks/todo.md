@@ -20,7 +20,7 @@ Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/f
   https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth
 
 ### Shiprocket setup: RESUME HERE (updated 2026-10-29)
-Courier fallback deployed 2026-10-29. Next, in order: test parcel (live checks 5/7, webhook, GST compare) → rate table →
+Courier fallback deployed 2026-10-29. Next, in order: test parcel (live checks 5/7, webhook, GST compare) →
 packaging → shipping + returns scenarios → Cashfree go-live (step 7 below).
 - [x] Shipping quote fixes merged to main 2026-10-26 (branch `fix/shipping-quote-weight-cheapest`): cheapest
   courier (was recommended); quote at max(dead, volumetric) with ASSUMED packages by heaviest class
@@ -29,9 +29,14 @@ packaging → shipping + returns scenarios → Cashfree go-live (step 7 below).
 - [x] Deployed 2026-10-27 (05:37 UTC): checkout-quote, create-order, run-jobs, courier-status, cashfree-webhook,
   order-status (--no-verify-jwt), admin-order-action (JWT on). Live quote to Lucknow 226001: Kurti ₹140,
   Saree ₹150, Lehenga ₹190 (source "rate"); no pincode → ₹150 flat.
-- [ ] Rate table 0.5–5 kg × 6 UP cities: owner runs the API-user login curl in their own terminal (password
-  via `read -s`, token → the session scratchpad `sr/login.json`, valid ~10 days), Claude runs `sr/rates.mjs` (lived in an
-  earlier session's scratchpad: rewrite if missing). Needed for the box class (3.78 kg, lehenga/sherwani).
+- [x] Rate table 2026-10-29 (API, cheapest courier, prepaid, from 201001, 11 UP cities × 0.5–5 kg; JSON in that
+  session's scratchpad `sr/rates-2026-10-29.json`). Charged now (ceil ₹10): light ~1 kg ₹110 Ghaziabad / ₹130–140
+  rest of UP; medium 2 kg ₹120 / ₹150; heavy ~4 kg ₹170 / ₹190, Bareilly + Kanpur ₹230. API `rate` = freight
+  only; dashboard adds a ₹5 "Smart Order" line; no GST shown anywhere. If GST is extra, absorbed loss ≈ ₹17 /
+  ₹25 / ₹37 per order (light/medium/heavy).
+  **Owner decision 2026-10-29: keep the rule as is** (live rate rounded up to ₹10, free ≥ ₹5,000, ₹150 fallback);
+  accept the GST loss. Still open, decide after the test parcel: add the ₹5 Smart Order if the wallet
+  deduction includes it; raise the ₹150 fallback to ₹230 (heavy to Kanpur is ₹230).
 - [ ] Buy packaging (2 bag sizes + 1 box); pack a kurti, saree, lehenga; measure + weigh; replace the
   assumed sizes in `_shared/shipping.ts` (and LIGHT/MEDIUM/HEAVY kg if real weights differ).
 - [ ] GST: after the test parcel, compare wallet deduction with the quoted rate. If rates exclude 18% GST,
