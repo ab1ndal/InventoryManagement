@@ -118,6 +118,7 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
    - [ ] Owner: production API keys (2FA) → Supabase secrets CASHFREE_CLIENT_ID / CASHFREE_CLIENT_SECRET,
      CASHFREE_ENV=production. Never in chat.
    - [x] Order history restored: PR #81 merged 2026-10-29 (owner: nobody orders yet, ship now).
+   - [x] Shiprocket pickup `Shop`: toggle looks on (green outline, knob right), VERIFIED, PRIMARY (2026-10-29).
    - [ ] Custom SMTP for Supabase Auth before PR #81: customers sign in by magic link to see orders, and the
      built-in mailer is rate-limited.
    - [ ] API + success-rate alerts (Cashfree dashboard → Developers), optional.
@@ -152,9 +153,11 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
   courier_id when Shiprocket refuses the quoted courier (status 200/400/422 only; never after a timeout).
   Watch `awb_quoted_courier_refused` logs: the default courier may cost more than the quote.
 - Shiprocket update-keeps-shipment check (live check 5, with the test parcel). Duplicate order_id verified 2026-10-29.
-- BillTable/BillingForm: block edit/cancel/delete of online (Website) bills; hide Website from the in-store
-  payment picker (review S5).
-- `salesmethods` serial sequence lags its rows (pre-existing; new in-store method inserts would collide).
+- [x] BillTable/BillingForm: online (Website) bills locked (no edit/cancel/delete, globe marker) and Website
+  hidden from the in-store payment picker: PR #84, merged 2026-10-29. Same PR pinned the ReturnsSection test
+  clock (3 tests went red on 2026-10-28 when the real date left the 7-day window). Full suite 775/775.
+- [ ] `salesmethods` sequence (last_value 6, max id 7): migration_salesmethods_sequence.sql in PR #85. Owner runs
+  `npm run migrate`, then merge.
 - [x] Token-store helpers consolidated: process.ts uses context.ts `dbTokenStore` (2026-10-27).
 
 ## STOREFRONT: open items (pruned 2026-10-25)
