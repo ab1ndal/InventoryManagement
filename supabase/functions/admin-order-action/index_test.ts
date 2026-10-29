@@ -168,6 +168,8 @@ for (const failing of STEPS) {
   Deno.test(`process: ${failing} fails → 502 courier_error; retry resumes without repeating earlier calls`, async () => {
     const { db, sr, call } = setup();
     sr.failOnce.add(failing);
+    // A timeout: assignAwb must not fall back to another courier after one.
+    sr.failStatus = 0;
     const first = await call(PROCESS);
     assertEquals([first.status, first.body.code], [502, "courier_error"]);
     assertEquals(db.order.status, "processing");

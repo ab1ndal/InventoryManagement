@@ -143,7 +143,12 @@ Done by whoever sets up the website, not shared in chat:
       information → Upload business documents** only (email/ticket uploads not processed). No IP
       whitelisting; access from abroad fine as long as business is Indian. 0% offer confirmed
       for direct signups on/after 2026-07-21 in an eligible category; GST still charged.
-- [ ] Udyam registration done, 4-page PDF uploaded on Cashfree dashboard (KYC → Upload business documents)
+- [x] Udyam registration done; dashboard upload did not work, so support asked for it by email and the
+      owner emailed it, 2026-10-29
+- [x] Cashfree rejected activation 2026-10-28 (ticket 8666638), then activated it manually 2026-10-29
+      (email to owner). Dashboard checked 2026-10-29: Payment Gateway, Payment Links, Payment Forms
+      activated, "digital KYC is complete"; all tickets resolved. The dashboard's VCIP box is stale:
+      support confirmed no video KYC for this account.
 - [x] Shiprocket signup + business details (company "Bindals Creation"), 2026-10-25
 - [x] Pickup address `Shop` saved + VERIFIED, primary, Shiprocket pickup available (Pooja Bindal
       9810873280, Mon/Wed–Sun 10:00–20:30), 2026-10-25; public rate table in step 5
