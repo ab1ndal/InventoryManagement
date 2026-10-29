@@ -274,9 +274,17 @@ Compare `x-api-key` in constant time. The plan already re-fetches `/courier/trac
    no `blocked_courier_companies` key was present.
 3. `state` / `state_code` for a UP pincode (201001). **VERIFIED 2026-10-26:** `{success:true, postcode_details:{state:"Uttar Pradesh", state_code:"UP", city:"Ghaziabad"}}`;
    226001 → Uttar Pradesh/UP/Lucknow; 110001 → Delhi/DL.
-4. Duplicate `order_id` create response.
+4. Duplicate `order_id` create response. **VERIFIED 2026-10-29:** no error. `/orders/create/adhoc` with an
+   existing `order_id` returns HTTP 200 and the EXISTING order (same `order_id`/`shipment_id`, no second order).
+   If that order is cancelled, it still returns it with `"status":"CANCELED","status_code":5`; no new order is made.
+   So a cancelled ref can never be rebooked under the same id: `srOrderRef` adds `-n` for attempt >= 2 (process.ts).
 5. Whether update/adhoc changes weight and dimensions.
-6. Assign-AWB failure body when the wallet is empty.
+6. Assign-AWB failure body when the wallet is empty. **VERIFIED 2026-10-29** (balance "0"): HTTP 200,
+   `{"status_code":350,"message":"Please recharge your ShipRocket wallet. The minimum required balance is Rs 100",
+   "awb_assign_status":0,"response":{"data":{"courier_id":"","awb_assign_error":"<same text>"}}}`.
+   `assignAwb` throws ShiprocketError(200, "/courier/assign/awb: Please recharge ..."); process.ts treats 200 as a
+   refusal, retries without the courier, gets the same refusal, and the admin sees the recharge message.
+   Test order TEST-EMPTYWALLET-1 (SR 1689435390 / shipment 1685078741) cancelled; wallet stayed 0.
 7. Webhook retry behaviour (watch function logs after returning 500 once on a test).
 8. `X-RateLimit` window. **Partly seen 2026-10-26:** no `X-RateLimit-*` headers on serviceability;
    `/open/postcode/details` sent limit 60, wallet-balance sent limit 360. No reset or window header, so the window is still unknown.
