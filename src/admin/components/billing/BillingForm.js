@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computePreTaxBalanceDiscount, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
-import { tallyPayment, storeCreditDeductionDelta } from "./paymentHelpers";
+import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -2213,7 +2213,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                       <SelectValue placeholder="Payment method" />
                     </SelectTrigger>
                     <SelectContent>
-                      {salesMethods.map((m) => (
+                      {salesMethods.filter((m) => !isWebsiteMethod(m)).map((m) => (
                         <SelectItem
                           key={m.salesmethodid}
                           value={String(m.salesmethodid)}
@@ -2293,7 +2293,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                             <SelectValue placeholder="Method" />
                           </SelectTrigger>
                           <SelectContent>
-                            {salesMethods.map((m) => (
+                            {salesMethods.filter((m) => !isWebsiteMethod(m)).map((m) => (
                               <SelectItem key={m.salesmethodid} value={String(m.salesmethodid)}>
                                 {m.methodname}
                               </SelectItem>

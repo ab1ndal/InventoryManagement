@@ -4,7 +4,8 @@ import { flushSync } from "react-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageSquare } from "lucide-react";
+import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageSquare, Globe } from "lucide-react";
+import { isWebsiteMethod } from "./billing/paymentHelpers";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
@@ -316,7 +317,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type"
+          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type, salesmethods(methodname)"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
@@ -874,14 +875,23 @@ export default function BillTable({ onEdit }) {
                   </td>
                   <td className="p-2">
                     <div className="flex gap-1 justify-center">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onEdit(b.billid)}
-                        title="Edit bill"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      {isWebsiteMethod(b.salesmethods) ? (
+                        <span
+                          className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground"
+                          title="Online order bill: manage it in Online Orders"
+                        >
+                          <Globe className="h-4 w-4" />
+                        </span>
+                      ) : (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => onEdit(b.billid)}
+                          title="Edit bill"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"
@@ -925,7 +935,7 @@ export default function BillTable({ onEdit }) {
                           )}
                         </Button>
                       )}
-                      {b.paymentstatus !== "cancelled" && (
+                      {b.paymentstatus !== "cancelled" && !isWebsiteMethod(b.salesmethods) && (
                         <Button
                           size="icon"
                           variant="ghost"
@@ -941,18 +951,20 @@ export default function BillTable({ onEdit }) {
                           <Ban className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        title={
-                          b.finalized
-                            ? "Delete finalized bill (restores stock)"
-                            : "Delete draft"
-                        }
-                        onClick={() => handleDelete(b)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!isWebsiteMethod(b.salesmethods) && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={
+                            b.finalized
+                              ? "Delete finalized bill (restores stock)"
+                              : "Delete draft"
+                          }
+                          onClick={() => handleDelete(b)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

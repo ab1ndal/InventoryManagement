@@ -47,10 +47,21 @@ const renderSection = (props = {}) => {
   return onChanged;
 };
 
+// The Open return dialog defaults "Contacted at" to now; pin now inside the
+// 7-day change-of-mind window after DELIVERED so the tests don't depend on
+// today's date.
+const NOW = "2026-10-22T10:00:00Z";
+
 beforeEach(() => {
+  jest.useFakeTimers("modern");
+  jest.setSystemTime(new Date(NOW));
   mockActions = [];
   mockActionImpl = null;
   mockToasts = [];
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 test("Open return caps units at what is still returnable", async () => {

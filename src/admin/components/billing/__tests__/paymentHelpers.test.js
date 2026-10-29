@@ -1,4 +1,4 @@
-import { sumPayments, tallyPayment, storeCreditDeductionDelta } from "../paymentHelpers";
+import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod } from "../paymentHelpers";
 
 describe("storeCreditDeductionDelta", () => {
   test("deducts the full amount when the balance covers it", () => {
@@ -65,5 +65,17 @@ describe("tallyPayment", () => {
     const t = tallyPayment([{ amount: 1000.1 }, { amount: 2000.2 }], 3499.7, 6500);
     expect(t.totalPaid).toBe(6500);
     expect(t.isFullyPaid).toBe(true);
+  });
+});
+
+describe("isWebsiteMethod", () => {
+  it("matches the online-order method by name, any case", () => {
+    expect(isWebsiteMethod({ methodname: "Website" })).toBe(true);
+    expect(isWebsiteMethod({ methodname: " website " })).toBe(true);
+  });
+  it("is false for in-store methods and missing values", () => {
+    expect(isWebsiteMethod({ methodname: "UPI" })).toBe(false);
+    expect(isWebsiteMethod(null)).toBe(false);
+    expect(isWebsiteMethod({})).toBe(false);
   });
 });
