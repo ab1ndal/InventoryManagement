@@ -123,8 +123,9 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
      Checkout still off. Next: test parcel as a real paid order.
    - [x] Order history restored: PR #81 merged 2026-10-29 (owner: nobody orders yet, ship now).
    - [x] Shiprocket pickup `Shop`: toggle looks on (green outline, knob right), VERIFIED, PRIMARY (2026-10-29).
-   - [ ] Custom SMTP for Supabase Auth before PR #81: customers sign in by magic link to see orders, and the
-     built-in mailer is rate-limited.
+   - [~] Custom SMTP for Supabase Auth: Gmail SMTP ON 2026-10-29 (30 emails/h), delivery works but lands in Spam,
+     and saved branded templates are not applied yet. Plan: tasks/auth-email-plan.md (retest → support → own
+     Send Email hook).
    - [ ] API + success-rate alerts (Cashfree dashboard → Developers), optional.
    **PENDING (owner 2026-10-29).** Cashfree production account is active (PG + Links + Forms, settlement bank
    active), so nothing on Cashfree's side blocks this. Do it only after the Shiprocket setup above: wallet,
