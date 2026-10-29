@@ -1,5 +1,11 @@
 # Customer login email (Supabase Auth) — plan
 
+**RESOLVED 2026-10-29 11:05 PT:** test email arrived in the INBOX with the branded template, and the link
+landed on /account signed in. Templates took ~15 min to apply after saving (sends at 10:50/10:53 still
+used the default). Redirect fixed by adding `https://www.bindalscreations.com/**` and
+`https://bindalscreations.com/**` to Redirect URLs (before, /account fell back to the Site URL = home).
+Steps 2-3 below not needed; kept for reference.
+
 Status 2026-10-29. Owner goal: customers who sign in by email link get a branded email that
 lands in the inbox, sent from bindalscreations@gmail.com.
 
