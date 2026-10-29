@@ -25,4 +25,10 @@ describe("ContactPage", () => {
       "https://maps.google.com/?cid=3990311017020362668"
     );
   });
+
+  it("shows the real shop photos", () => {
+    render(<ContactPage />);
+    expect(screen.getByRole("img", { name: /shop front/i })).toHaveAttribute("src", "/store/store-front.webp");
+    expect(screen.getByRole("img", { name: /inside the shop/i })).toHaveAttribute("src", "/store/store-interior.webp");
+  });
 });

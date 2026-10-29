@@ -23,8 +23,11 @@ describe("BrandStory", () => {
     expect(container.textContent).not.toMatch(/crafted/i);
   });
 
-  it("does not show a photo placeholder while no store photo exists", () => {
+  it("shows the real store photo", () => {
     renderStory();
-    expect(screen.queryByText(/store photo/i)).toBeNull();
+    expect(screen.getByRole("img", { name: /inside the bindal's creation store/i })).toHaveAttribute(
+      "src",
+      "/store/store-sarees.webp"
+    );
   });
 });

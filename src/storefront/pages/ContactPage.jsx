@@ -9,7 +9,10 @@ const ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Utta
 const STORE_LAT_LNG = "28.6658525,77.4270128";
 const MAP_SRC = `https://www.google.com/maps?q=${STORE_LAT_LNG}&z=17&output=embed`;
 const DIRECTIONS_URL = "https://maps.google.com/?cid=3990311017020362668";
-const STORE_PHOTOS = [];
+const STORE_PHOTOS = [
+  { src: "/store/store-front.webp", alt: "Bindal's Creation shop front at Sihani Gate Market, Ghaziabad" },
+  { src: "/store/store-interior.webp", alt: "Inside the shop: saree shelves and a suit on display" },
+];
 
 export default function ContactPage() {
   return (
@@ -68,8 +71,7 @@ export default function ContactPage() {
           </div>
 
           {/* Real shop photos only: grey placeholder boxes read as an
-              unfinished site (owner 2026-10-25). Add { src, alt } entries
-              once the owner sends them. */}
+              unfinished site (owner 2026-10-25). */}
           {STORE_PHOTOS.length > 0 && (
             <div className="grid grid-cols-2 gap-3 pt-2">
               {STORE_PHOTOS.map(({ src, alt }) => (
