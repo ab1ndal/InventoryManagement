@@ -109,14 +109,17 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
    - [x] Production domain whitelist: bindalscreations.com APPROVED (added 2026-10-24). Confirm www works on the
      first real payment.
    - [x] Production success webhook: default NOTIFY_URL entry exists and create-order sends notify_url, so
-     PAYMENT_SUCCESS reaches cashfree-webhook. [ ] Add an endpoint for failed + user-dropped (log-only events):
-     URL https://epotsxdugwfhyeiudjox.supabase.co/functions/v1/cashfree-webhook (approved; dashboard logged out).
+     PAYMENT_SUCCESS reaches cashfree-webhook. [x] Production endpoint added 2026-10-29:
+     https://epotsxdugwfhyeiudjox.supabase.co/functions/v1/cashfree-webhook, version 2026-01-01, success + failed +
+     user-dropped, default retries; dashboard test → 200 (signature verified with the production secret). Cashfree
+     also shows a second NOTIFY_URL row (2026-01-01, same 3 events) next to the 2023-08-01 default; both hit the same
+     function, duplicates are harmless (handler re-reads Cashfree). Left as is.
    - [x] Payment methods active: UPI, credit + debit cards (Visa/Mastercard/RuPay/Maestro). Net Banking OFF
      (optional: request activation). Amex not available.
    - [x] 6 sandbox refund legs (WEB-000001/3/4/5) closed 2026-10-29 (owner approved): legs + their 4 refunds set
      'failed' with note "Sandbox test refund; closed before production keys" ('completed' would email). No jobs queued.
-   - [ ] Owner: production API keys (2FA) → Supabase secrets CASHFREE_CLIENT_ID / CASHFREE_CLIENT_SECRET,
-     CASHFREE_ENV=production. Never in chat.
+   - [x] Owner: production API keys set in Supabase 2026-10-29; CASHFREE_ENV digest = sha256("production").
+     Checkout still off. Next: test parcel as a real paid order.
    - [x] Order history restored: PR #81 merged 2026-10-29 (owner: nobody orders yet, ship now).
    - [x] Shiprocket pickup `Shop`: toggle looks on (green outline, knob right), VERIFIED, PRIMARY (2026-10-29).
    - [ ] Custom SMTP for Supabase Auth before PR #81: customers sign in by magic link to see orders, and the
