@@ -75,6 +75,8 @@ export type QuoteInput = {
   lines: Line[];
   promo: Promo | null;
   shippingRate: number | null;
+  /** Charge used when `shippingRate` is unusable; defaults to FLAT_SHIPPING. */
+  fallbackShipping?: number;
   creditRequested: number;
   creditAvailable: number;
   voucherValue: number;
@@ -137,12 +139,16 @@ export function promoDiscount(promo: Promo | null, subtotal: number): number {
 
 /**
  * Shipping in rupees. Free at ₹5,000+ of discounted goods; otherwise the
- * courier rate rounded up to the next ₹10; flat ₹150 when there is no usable
- * rate (null, non-finite or ≤ 0).
+ * courier rate rounded up to the next ₹10; `fallback` (default flat ₹150) when
+ * there is no usable rate (null, non-finite or ≤ 0).
  */
-export function shippingCharge(rate: number | null, discountedSubtotal: number): number {
+export function shippingCharge(
+  rate: number | null,
+  discountedSubtotal: number,
+  fallback: number = FLAT_SHIPPING,
+): number {
   if (toPaise(discountedSubtotal) >= toPaise(FREE_SHIPPING_THRESHOLD)) return 0;
-  if (rate === null || !Number.isFinite(rate) || rate <= 0) return FLAT_SHIPPING;
+  if (rate === null || !Number.isFinite(rate) || rate <= 0) return fallback;
   return Math.ceil(toPaise(rate) / 1000) * 10;
 }
 
@@ -182,7 +188,7 @@ export function allocate(totalPaise: number, weights: number[]): number[] {
 }
 
 export function quoteOrder(input: QuoteInput): Quote {
-  const { lines, promo, shippingRate } = input;
+  const { lines, promo, shippingRate, fallbackShipping } = input;
   if (lines.length === 0) throw new RangeError("quoteOrder: no lines");
   assertMoney("creditRequested", input.creditRequested);
   assertMoney("creditAvailable", input.creditAvailable);
@@ -202,7 +208,7 @@ export function quoteOrder(input: QuoteInput): Quote {
   const paidValues = lineValues.map((v, i) => v - promoShares[i]);
   const goods = subtotal - promoP;
 
-  const shipping = toPaise(shippingCharge(shippingRate, toRupees(goods)));
+  const shipping = toPaise(shippingCharge(shippingRate, toRupees(goods), fallbackShipping));
   const due = goods + shipping;
 
   let voucher = Math.min(toPaise(input.voucherValue), due);

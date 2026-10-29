@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { chargeableWeightKg, parcelPackage, parcelWeightKg } from "./shipping.ts";
+import { chargeableWeightKg, fallbackShippingCharge, parcelPackage, parcelWeightKg } from "./shipping.ts";
 
 Deno.test("heaviest unit + 0.5 kg per extra unit", () => {
   assertEquals(parcelWeightKg(["Lehenga", "Kurti", "Kurti"]), 3);
@@ -47,4 +47,24 @@ Deno.test("chargeable weight is the greater of dead and volumetric (L × B × H 
   assertEquals(chargeableWeightKg(["Saree"]), 2); // large bag 2.0 > 1 dead
   assertEquals(chargeableWeightKg(["Lehenga"]), 3.78); // box 3.78 > 2 dead
   assertEquals(chargeableWeightKg(Array(12).fill("Lehenga")), 5); // dead capped at 5 > 3.78
+});
+
+Deno.test("fallback charge follows the chargeable-weight slab", () => {
+  assertEquals(fallbackShippingCharge(0.5), 90);
+  assertEquals(fallbackShippingCharge(0.96), 140);
+  assertEquals(fallbackShippingCharge(1), 140);
+  assertEquals(fallbackShippingCharge(2), 150);
+  assertEquals(fallbackShippingCharge(2.01), 180);
+  assertEquals(fallbackShippingCharge(3.78), 230);
+  assertEquals(fallbackShippingCharge(5), 230);
+});
+
+Deno.test("fallback charge for the real parcel classes", () => {
+  assertEquals(fallbackShippingCharge(chargeableWeightKg(["Kurti"])), 140);
+  assertEquals(fallbackShippingCharge(chargeableWeightKg(["Saree"])), 150);
+  assertEquals(fallbackShippingCharge(chargeableWeightKg(["Lehenga"])), 230);
+});
+
+Deno.test("fallback charge above the 5 kg cap uses the top slab", () => {
+  assertEquals(fallbackShippingCharge(7), 230);
 });
