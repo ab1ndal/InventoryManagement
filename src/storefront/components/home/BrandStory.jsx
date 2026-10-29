@@ -2,9 +2,9 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 
-// Set to a real brand/store photo URL to show the image column. Until one
-// exists the section is text only (no placeholder box).
-const STORE_PHOTO_URL = null;
+// Real store photo (owner's photos, 2026-10-25). Set to null to fall back to
+// the text-only layout; never use a placeholder box.
+const STORE_PHOTO_URL = "/store/store-sarees.webp";
 
 export default function BrandStory() {
   return (
