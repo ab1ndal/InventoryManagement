@@ -44,3 +44,12 @@ export function storeCreditDeductionDelta(balance, deduction) {
   const bal = Number(balance || 0);
   return round2(Math.max(0, bal - Number(deduction || 0)) - bal);
 }
+
+/**
+ * The 'Website' sales method marks bills made by online orders. They are created
+ * and changed only through Online Orders (refunds, returns, Bill of Supply), so the
+ * in-store picker hides the method and the bill list locks those bills.
+ */
+export function isWebsiteMethod(method) {
+  return (method?.methodname ?? "").trim().toLowerCase() === "website";
+}
