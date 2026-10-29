@@ -1,5 +1,17 @@
 # Todo
 
+## ⏭ NEXT, HIGH PRIORITY (owner 2026-10-29): real-money payment test on production
+
+Removes the biggest go-live risk without shipping anything. Needs the owner at /admin/online-orders and their
+phone for UPI approval (~10 min):
+1. Owner switches Online checkout ON.
+2. Claude places an order for a cheap item in Chrome; owner approves a small real UPI payment.
+3. Verify: order PAID via the production webhook, shop "new order" email + customer email arrive, payment in the
+   Cashfree production dashboard, `www.` domain accepted by Cashfree.js in production mode.
+4. Owner cancels in admin with refund to original; verify the refund on production (refund-sweeper completes the leg).
+5. Checkout OFF again (or stay on if all passed). Shipping (Process) stays untested until the test parcel;
+   fallback = book by hand in Shiprocket.
+
 ## ONLINE ORDERS: built, awaiting go-live (2026-10-24)
 
 Live DB has every migration (atomic writes, online orders, r7, refunds, ship); `checkout_live = false`.
