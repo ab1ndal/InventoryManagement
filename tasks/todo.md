@@ -125,7 +125,7 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
    - [x] Shiprocket pickup `Shop`: toggle looks on (green outline, knob right), VERIFIED, PRIMARY (2026-10-29).
    - [x] Custom SMTP for Supabase Auth: Gmail SMTP ON 2026-10-29 (30 emails/h); branded "Confirm sign up" + "Magic
      link" templates live (applied ~15 min after save); redirect wildcards added; test landed in Inbox and opened
-     /account signed in. Details: tasks/auth-email-plan.md. Optional: Google profile photo on bindalscreations@gmail.com.
+     /account signed in. Details: tasks/auth-email-plan.md. Google profile photo on bindalscreations@gmail.com = public/logo-b-dark.png (2026-10-29).
    - [ ] API + success-rate alerts (Cashfree dashboard → Developers), optional.
    **PENDING (owner 2026-10-29).** Cashfree production account is active (PG + Links + Forms, settlement bank
    active), so nothing on Cashfree's side blocks this. Do it only after the Shiprocket setup above: wallet,
