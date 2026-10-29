@@ -218,7 +218,15 @@ new products.
   access (email drafted). Avoid a VPN while the account is under review.
 - [x] Cashfree settlement bank account ACTIVE (Union Bank, account name BINDALS CREATION), checked in
   the dashboard 2026-10-29.
-- [ ] CA: composition shop selling online intra-state from its own site; HSN (6210 on record vs 6204/6211/6203).
+- [ ] CA: composition shop selling online intra-state from its own site.
+- PARKED (owner 2026-10-29): HSN on Bills of Supply. CGST Rule 49 lists HSN among BoS particulars; the
+  ≤₹5 cr B2C relief is written for tax invoices (Rule 46), unclear for BoS. CA can't advise on product
+  classification. Draft mapping if revived: 6203 men's ensembles/suits/trousers/jeans/kurta pajama/sherwani/
+  blazer/Nehru; 6204 women's lehenga/gown/dress/readymade suits/cord sets/skirt-top/sharara/plazo/kurti;
+  6205 shirt; 6206 tops; 6109/6110/6104 knitted T-shirt/sweatshirt/legging; 6214 dupatta/shawl/safa;
+  7117 mala; sarees by fibre: 5407 synthetic (georgette/chiffon/crepe/satin/art silk), 5007 pure silk,
+  5208 cotton, 5804 net. Open: are "Silk" sarees art silk; is ST "Suits" unstitched fabric; kurti 6204 vs
+  6206. GST registration lists 6210/5903/5209/5407/7117 (6210 = felt/coated garments, likely wrong).
 
 ## RETENTION (after checkout goes live)
 
