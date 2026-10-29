@@ -187,7 +187,9 @@ Review findings + triage: `tasks/site-review-2026-10-25.md`.
 
 **Owner (content / decisions)**
 - [ ] Photos of 2-4 custom pieces already made (customer reference + finished piece) for /customize. Top trust fix.
-- [ ] Real shop photos: storefront + interior (Contact), shop/tailor photo for About (replaces CC stock).
+- [x] Real shop photos live 2026-10-29 (PR #97): Home brand story = saree shelves, Contact = shop front + interior
+  (public/store/*.webp from docs/Photos IMG_7810/7813/7804). Still open: a tailor/embroidery photo to replace the
+  CC BY zari stock photo on About (Craftsmanship section); none of the owner's photos show that.
 - [ ] Fix BC25022's price in admin (₹0, hidden from the storefront until then).
 - [ ] Decide: product names back on cards? "Diwali Glam" name? sentence-case page titles? Inter body font?
 - [ ] First-order discount terms (amount + how to claim) before it goes on the promo line.
