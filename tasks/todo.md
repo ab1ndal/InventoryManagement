@@ -123,9 +123,9 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
      Checkout still off. Next: test parcel as a real paid order.
    - [x] Order history restored: PR #81 merged 2026-10-29 (owner: nobody orders yet, ship now).
    - [x] Shiprocket pickup `Shop`: toggle looks on (green outline, knob right), VERIFIED, PRIMARY (2026-10-29).
-   - [~] Custom SMTP for Supabase Auth: Gmail SMTP ON 2026-10-29 (30 emails/h), delivery works but lands in Spam,
-     and saved branded templates are not applied yet. Plan: tasks/auth-email-plan.md (retest → support → own
-     Send Email hook).
+   - [x] Custom SMTP for Supabase Auth: Gmail SMTP ON 2026-10-29 (30 emails/h); branded "Confirm sign up" + "Magic
+     link" templates live (applied ~15 min after save); redirect wildcards added; test landed in Inbox and opened
+     /account signed in. Details: tasks/auth-email-plan.md. Optional: Google profile photo on bindalscreations@gmail.com.
    - [ ] API + success-rate alerts (Cashfree dashboard → Developers), optional.
    **PENDING (owner 2026-10-29).** Cashfree production account is active (PG + Links + Forms, settlement bank
    active), so nothing on Cashfree's side blocks this. Do it only after the Shiprocket setup above: wallet,
@@ -222,7 +222,7 @@ new products.
 
 ## RETENTION (after checkout goes live)
 
-- [ ] Custom SMTP before magic-link login goes to prod (orders already mail via Gmail).
+- [x] Custom SMTP before magic-link login goes to prod: done 2026-10-29 (Gmail SMTP, branded templates).
 - [ ] Abandoned-cart emails (signed-in customers).
 - [ ] Liked-item emails (back in stock, price drop); needs consent + unsubscribe.
 - [ ] Later, only if demand shows: COD with a surcharge and OTP/WhatsApp confirmation.
