@@ -89,7 +89,7 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
    default retry. No refund events offered on that form; refund-sweeper polls refunds after 1 h instead.
    Unsigned POST returns 401 (deployed, signature check on). Redo in Production at go-live. Shiprocket webhook →
    `https://www.bindalscreations.com/hooks/courier-status` with x-api-key token.
-5. Revert `b4a5e49` (restores Account → Order history).
+5. [x] Revert `b4a5e49` (restores Account → Order history): PR #81, merged 2026-10-29.
 6. Sandbox end-to-end with checkout switched on for testing only: pay (UPI testsuccess@gocash), shelf check
    1 of 2 unavailable, Process (AWB/label/BoS), refund both choices, cancel, tracking webhook. Settle the
    UNVERIFIED API items (api notes files) against real responses.
@@ -109,14 +109,15 @@ Browser work uses Claude in Chrome; owner is already logged in to app.shiprocket
    - [x] Production domain whitelist: bindalscreations.com APPROVED (added 2026-10-24). Confirm www works on the
      first real payment.
    - [x] Production success webhook: default NOTIFY_URL entry exists and create-order sends notify_url, so
-     PAYMENT_SUCCESS reaches cashfree-webhook. [ ] Add an endpoint for failed + user-dropped (log-only events).
+     PAYMENT_SUCCESS reaches cashfree-webhook. [ ] Add an endpoint for failed + user-dropped (log-only events):
+     URL https://epotsxdugwfhyeiudjox.supabase.co/functions/v1/cashfree-webhook (approved; dashboard logged out).
    - [x] Payment methods active: UPI, credit + debit cards (Visa/Mastercard/RuPay/Maestro). Net Banking OFF
      (optional: request activation). Amex not available.
-   - [ ] 6 sandbox refund legs (WEB-000001/3/4/5) stuck "processing": the hourly refund-sweeper polls them and
-     sandbox never completes them. Close them BEFORE switching keys, or production polls error every hour.
+   - [x] 6 sandbox refund legs (WEB-000001/3/4/5) closed 2026-10-29 (owner approved): legs + their 4 refunds set
+     'failed' with note "Sandbox test refund; closed before production keys" ('completed' would email). No jobs queued.
    - [ ] Owner: production API keys (2FA) → Supabase secrets CASHFREE_CLIENT_ID / CASHFREE_CLIENT_SECRET,
      CASHFREE_ENV=production. Never in chat.
-   - [x] Order-history revert ready as draft PR #81 (430 storefront tests pass); merge at switch-on.
+   - [x] Order history restored: PR #81 merged 2026-10-29 (owner: nobody orders yet, ship now).
    - [ ] Custom SMTP for Supabase Auth before PR #81: customers sign in by magic link to see orders, and the
      built-in mailer is rate-limited.
    - [ ] API + success-rate alerts (Cashfree dashboard → Developers), optional.
