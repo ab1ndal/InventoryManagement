@@ -20,7 +20,8 @@ Deploy gotcha: `supabase functions deploy <fn> --use-api --import-map supabase/f
   https://claude.ai/artifact/XypgAiSTZZFiUNMJBFRBth
 
 ### Shiprocket setup: RESUME HERE (updated 2026-10-29)
-Courier fallback deployed 2026-10-29. Next, in order: test parcel (live checks 5/7, webhook, GST compare) →
+Courier fallback deployed 2026-10-29. **Test parcel DEFERRED by owner 2026-10-29** (Cashfree is on production keys,
+checkout off; until the parcel runs, the first real order is the first real Process). Then, in order: test parcel (live checks 5/7, webhook, GST compare) →
 packaging → shipping + returns scenarios → Cashfree go-live (step 7 below).
 - [x] Shipping quote fixes merged to main 2026-10-26 (branch `fix/shipping-quote-weight-cheapest`): cheapest
   courier (was recommended); quote at max(dead, volumetric) with ASSUMED packages by heaviest class
