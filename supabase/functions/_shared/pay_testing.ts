@@ -235,14 +235,17 @@ export class FakeCashfree implements CashfreeClient {
 export const definiteCfError = () => new CashfreeError(400, "order_amount_invalid", "POST /orders: bad amount");
 export const ambiguousCfError = () => new CashfreeError(0, "timeout", "POST /orders: timed out");
 
-export function fakeShiprocket(opts: { state?: string | null; rate?: RateQuote | null } = {}) {
+export function fakeShiprocket(
+  opts: { state?: string | null; city?: string | null; rate?: RateQuote | null } = {},
+) {
   const calls = { postcode: [] as string[], rate: [] as { deliveryPincode: string; weightKg: number; declaredValue: number }[] };
   const notUsed = () => Promise.reject(new Error("not used in Pay tests"));
   const client: ShiprocketClient = {
     token: () => Promise.resolve("t"),
-    postcodeState: (pc) => {
+    postcodeDetails: (pc) => {
       calls.postcode.push(pc);
-      return Promise.resolve(opts.state === undefined ? "Uttar Pradesh" : opts.state);
+      const state = opts.state === undefined ? "Uttar Pradesh" : opts.state;
+      return Promise.resolve(state === null ? null : { state, city: opts.city === undefined ? "Ghaziabad" : opts.city });
     },
     rate: (input) => {
       calls.rate.push(input);

@@ -52,7 +52,14 @@ export type CreateOrderResponse = {
 };
 
 type Contact = { name: string; phone: string; email: string | null };
-type Address = Contact & { line1: string; line2: string | null; city: string; state: string; pincode: string };
+type Address = Contact & {
+  line1: string;
+  line2: string | null;
+  landmark: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+};
 
 /** Pickup needs only the contact: nothing is delivered, so address lines are not read. */
 function parseAddress(raw: unknown, fulfilment: Fulfilment): Contact | Address {
@@ -84,6 +91,7 @@ function parseAddress(raw: unknown, fulfilment: Fulfilment): Contact | Address {
     ...contact,
     line1: str("line1", 200, true)!,
     line2: str("line2", 200, false),
+    landmark: str("landmark", 100, false),
     city: str("city", 60, true)!,
     state: str("state", 60, true)!,
     pincode: str("pincode", 10, true)!,
@@ -256,6 +264,7 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
           phone: address.phone,
           line1: address.line1,
           line2: address.line2,
+          landmark: address.landmark,
           city: address.city,
           state: address.state,
           pincode: address.pincode,

@@ -33,6 +33,7 @@ function whatsappHref(items, subtotal, shipping, address) {
           address.email,
           address.line1,
           address.line2,
+          address.landmark && `Landmark: ${address.landmark}`,
           `${address.city}, ${address.state} ${address.pincode}`,
         ]
   )
@@ -71,7 +72,9 @@ export default function CheckoutPage() {
 
   const form = useForm({
     resolver: zodResolver(checkoutSchema),
-    mode: "onChange",
+    // Errors appear once a field has been visited, not while the shopper is
+    // still working down the form (isValid is tracked regardless of mode).
+    mode: "onTouched",
     defaultValues: {
       fulfilment: "ship",
       name: "",
@@ -79,6 +82,7 @@ export default function CheckoutPage() {
       email: "",
       line1: "",
       line2: "",
+      landmark: "",
       city: "",
       state: "",
       pincode: "",
@@ -178,23 +182,46 @@ export default function CheckoutPage() {
               <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Shipping address</h2>
               <div className="space-y-3">
                 <div>
-                  <label htmlFor="line1" className="sr-only">Address line 1</label>
+                  <label htmlFor="pincode" className="sr-only">Pincode</label>
+                  <input
+                    id="pincode"
+                    {...register("pincode")}
+                    placeholder="Pincode"
+                    inputMode="numeric"
+                    autoComplete="postal-code"
+                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                  />
+                  {errors.pincode && <p className="text-xs text-red-600 mt-1">{errors.pincode.message}</p>}
+                </div>
+                <div>
+                  <label htmlFor="line1" className="sr-only">Flat, House no., Building, Apartment</label>
                   <input
                     id="line1"
                     {...register("line1")}
-                    placeholder="Address line 1"
+                    placeholder="Flat, House no., Building, Apartment"
                     className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
                   />
                   {errors.line1 && <p className="text-xs text-red-600 mt-1">{errors.line1.message}</p>}
                 </div>
                 <div>
-                  <label htmlFor="line2" className="sr-only">Address line 2 (optional)</label>
+                  <label htmlFor="line2" className="sr-only">Area, Street, Sector, Village</label>
                   <input
                     id="line2"
                     {...register("line2")}
-                    placeholder="Address line 2 (optional)"
+                    placeholder="Area, Street, Sector, Village"
                     className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
                   />
+                  {errors.line2 && <p className="text-xs text-red-600 mt-1">{errors.line2.message}</p>}
+                </div>
+                <div>
+                  <label htmlFor="landmark" className="sr-only">Landmark (optional)</label>
+                  <input
+                    id="landmark"
+                    {...register("landmark")}
+                    placeholder="Landmark (optional), e.g. Near Durga Bhabhi Chowk"
+                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                  />
+                  {errors.landmark && <p className="text-xs text-red-600 mt-1">{errors.landmark.message}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -208,29 +235,19 @@ export default function CheckoutPage() {
                     {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
                   </div>
                   <div>
-                    <label htmlFor="pincode" className="sr-only">Pincode</label>
-                    <input
-                      id="pincode"
-                      {...register("pincode")}
-                      placeholder="Pincode"
-                      className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                    />
-                    {errors.pincode && <p className="text-xs text-red-600 mt-1">{errors.pincode.message}</p>}
+                    <label htmlFor="state" className="sr-only">State</label>
+                    <select
+                      id="state"
+                      {...register("state")}
+                      className="w-full border border-storefront-border px-3 py-2 text-sm font-sans bg-white"
+                    >
+                      <option value="">Select state</option>
+                      {INDIAN_STATES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    {errors.state && <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>}
                   </div>
-                </div>
-                <div>
-                  <label htmlFor="state" className="sr-only">State</label>
-                  <select
-                    id="state"
-                    {...register("state")}
-                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans bg-white"
-                  >
-                    <option value="">Select state</option>
-                    {INDIAN_STATES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  {errors.state && <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>}
                 </div>
               </div>
             </section>

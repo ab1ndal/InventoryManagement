@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import FreeShippingNudge from "./FreeShippingNudge";
 import CheckoutSummary from "./CheckoutSummary";
@@ -14,7 +14,7 @@ import {
   newAttemptKey,
 } from "../lib/ordersApi";
 import { rememberPendingOrder } from "../lib/pendingOrder";
-import { UP_STATE } from "../lib/checkout";
+import { INDIAN_STATES, UP_STATE } from "../lib/checkout";
 
 const QUOTE_DEBOUNCE_MS = 300;
 const PINCODE = /^\d{6}$/;
@@ -37,7 +37,27 @@ function toAddress(values) {
   address.state = values.state;
   address.pincode = values.pincode.trim();
   if (values.line2?.trim()) address.line2 = values.line2.trim();
+  if (values.landmark?.trim()) address.landmark = values.landmark.trim();
   return address;
+}
+
+// Fills City and State from the quote's pincode lookup (Shiprocket, server
+// side) once per pincode. A field is filled only while empty or still holding
+// the previous autofill, so whatever the shopper typed is never overwritten.
+function autofillFromPincode(pincode, lookup, last, getValues, setValue) {
+  if (last.pincode === pincode) return;
+  last.pincode = pincode;
+  const fill = (field, value) => {
+    if (!value) return;
+    const current = getValues(field) || "";
+    if (current && current !== last[field]) return;
+    last[field] = value;
+    if (current !== value) setValue(field, value, { shouldValidate: true });
+  };
+  fill("city", lookup.city);
+  // The State select only takes our listed names; an unknown spelling is left for the shopper.
+  const state = typeof lookup.state === "string" ? lookup.state.trim().toLowerCase() : "";
+  fill("state", INDIAN_STATES.find((s) => s.toLowerCase() === state));
 }
 
 function unavailableText(entry, items) {
@@ -68,6 +88,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
   const [requoteTick, setRequoteTick] = useState(0);
   const [notice, setNotice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const autofilled = useRef({ pincode: "", city: "", state: "" });
 
   const fulfilment = watch("fulfilment");
   const pickup = fulfilment === "pickup";
@@ -119,6 +140,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
         }
         setResponse(res);
         setQuoteError(false);
+        if (pincode && res.pincode?.ok) autofillFromPincode(pincode, res.pincode, autofilled.current, getValues, setValue);
         if (appliedCode) {
           const status = res.code?.status ?? "invalid";
           setCodeNotice({ ok: status === "ok", text: CODE_MESSAGES[status] ?? CODE_MESSAGES.invalid, detail: status === "ok" ? res.code?.message : null });
@@ -137,7 +159,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [lineItems, fulfilment, pincode, appliedCode, creditRequested, requoteTick, onCheckoutOff]);
+  }, [lineItems, fulfilment, pincode, appliedCode, creditRequested, requoteTick, onCheckoutOff, getValues, setValue]);
 
   function applyCode() {
     const code = codeInput.trim();

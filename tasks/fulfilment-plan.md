@@ -1,6 +1,6 @@
 # Fulfilment options: out-of-state orders, store pickup, Porter, shipping quote fixes
 
-Status 2026-10-30: plan APPROVED. Shipped: PR A #101, PR B #102, PR C #103. Next: PR D (Porter).
+Status 2026-10-30: plan APPROVED. Shipped: PR A #101, PR B #102, PR C #103, PR D #104. Next: PR F (address format), then PR E (holds), PR G.
 
 ## Owner decisions (2026-10-29)
 - Site copy keeps saying "we ship within UP", but checkout **never hard-blocks** an out-of-UP address. The owner

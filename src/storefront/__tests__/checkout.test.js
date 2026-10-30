@@ -19,8 +19,8 @@ describe("addressSchema", () => {
     name: "Priya Sharma",
     phone: "9810873280",
     email: "priya@example.com",
-    line1: "58 Sihani Gate Market",
-    line2: "",
+    line1: "58",
+    line2: "Sihani Gate Market",
     city: "Ghaziabad",
     state: "Uttar Pradesh",
     pincode: "201001",
@@ -28,6 +28,19 @@ describe("addressSchema", () => {
 
   it("accepts a valid Indian address", () => {
     expect(addressSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("requires the area/street line; landmark optional up to 100 characters", () => {
+    const missing = addressSchema.safeParse({ ...valid, line2: " " });
+    expect(missing.success).toBe(false);
+    expect(missing.error.issues[0].message).toBe("Enter your area, street or village");
+    expect(addressSchema.safeParse({ ...valid, landmark: "Near Durga Bhabhi Chowk" }).success).toBe(true);
+    expect(addressSchema.safeParse({ ...valid, landmark: "x".repeat(101) }).success).toBe(false);
+  });
+
+  it("accepts a short flat number but not a blank one", () => {
+    expect(addressSchema.safeParse({ ...valid, line1: "7" }).success).toBe(true);
+    expect(addressSchema.safeParse({ ...valid, line1: "  " }).success).toBe(false);
   });
 
   it("rejects a 9-digit phone number", () => {
@@ -71,6 +84,6 @@ describe("checkoutSchema", () => {
   it("requires the address when shipping", () => {
     const result = checkoutSchema.safeParse({ ...contact, fulfilment: "ship", line1: "", city: "", state: "", pincode: "" });
     expect(result.success).toBe(false);
-    expect(result.error.issues.map((i) => i.path[0])).toEqual(expect.arrayContaining(["line1", "city", "state", "pincode"]));
+    expect(result.error.issues.map((i) => i.path[0])).toEqual(expect.arrayContaining(["line1", "line2", "city", "state", "pincode"]));
   });
 });

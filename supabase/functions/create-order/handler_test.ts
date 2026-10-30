@@ -89,6 +89,20 @@ Deno.test("create-order: an address outside Uttar Pradesh is accepted", async ()
   assertEquals((create.p_order as Record<string, unknown>).shipping, 250, "national fallback slab");
 });
 
+Deno.test("create-order: landmark is stored in the address (trimmed, capped); absent → null", async () => {
+  const { res, deps } = await call(body({ address: { ...address, line2: "Sector 5", landmark: "  Near Durga Bhabhi Chowk " } }));
+  assertEquals(res.status, 200);
+  const [create] = deps.store.callsTo("online_order_create");
+  const a = (create.p_order as Record<string, unknown>).address as Record<string, unknown>;
+  assertEquals([a.line2, a.landmark], ["Sector 5", "Near Durga Bhabhi Chowk"]);
+
+  const plain = await call(body());
+  const [c2] = plain.deps.store.callsTo("online_order_create");
+  assertEquals(((c2.p_order as Record<string, unknown>).address as Record<string, unknown>).landmark, null);
+
+  await expectError(body({ address: { ...address, landmark: "x".repeat(101) } }), 422, "invalid_address");
+});
+
 Deno.test("create-order: store pickup needs only the contact; ₹0 shipping, no pincode, no courier", async () => {
   const sr = fakeShiprocket();
   const contact = { name: "Asha Gupta", phone: "98765 43210", email: "" };

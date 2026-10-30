@@ -9,7 +9,7 @@
  */
 
 import { type Line, type Promo, promoDiscount, type Quote, quoteOrder } from "./pricing.ts";
-import { checkPincode, type PincodeCheck } from "./pincode.ts";
+import { checkPincode, isPincodeFormat, type PincodeCheck } from "./pincode.ts";
 import { chargeableWeightKg, fallbackShippingCharge, fallbackShippingChargeIndia } from "./shipping.ts";
 import type { ShiprocketClient } from "./shiprocket.ts";
 import { ApiError, type Store, type VariantRow } from "./context.ts";
@@ -211,26 +211,22 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
   const creditAvailable = who.authUserId ? (await store.creditBalance(who.authUserId)) ?? 0 : 0;
 
   // Pincode (R16) and courier rate; the rate never blocks checkout (weight-slab fallback).
-  const postcodeState = shiprocket ? (pc: string) => shiprocket.postcodeState(pc) : () => Promise.resolve(null);
+  // The rate needs only a well-formed pincode, so both Shiprocket lookups run in parallel.
+  const postcodeDetails = shiprocket ? (pc: string) => shiprocket.postcodeDetails(pc) : () => Promise.resolve(null);
   const pickup = req.fulfilment === "pickup";
-  const pincode = pickup || req.pincode === null ? null : await checkPincode(req.pincode, postcodeState);
+  const pin = pickup || req.pincode === null ? null : req.pincode.trim();
 
   const subtotal = lines.reduce((s, l) => s + Math.round(l.unitPrice * 100) * l.qty, 0) / 100;
   const goods = subtotal - promoDiscount(promo, subtotal);
   const weightKg = chargeableWeightKg(lines.flatMap((l) => Array.from({ length: l.qty }, () => l.category)));
-  let shippingRate: number | null = null;
-  let courierId: number | null = null;
-  if (!pickup && goods < 5000 && pincode?.ok && shiprocket && req.pincode) {
-    const rate = await shiprocket.rate({
-      deliveryPincode: req.pincode.trim(),
-      weightKg,
-      declaredValue: Math.round(goods * 100) / 100,
-    });
-    if (rate) {
-      shippingRate = rate.rate;
-      courierId = rate.courierId;
-    }
-  }
+  const [pincode, rate] = await Promise.all([
+    pin === null ? Promise.resolve(null) : checkPincode(pin, postcodeDetails),
+    pin !== null && goods < 5000 && shiprocket && isPincodeFormat(pin)
+      ? shiprocket.rate({ deliveryPincode: pin, weightKg, declaredValue: Math.round(goods * 100) / 100 })
+      : Promise.resolve(null),
+  ]);
+  const shippingRate: number | null = rate ? rate.rate : null;
+  const courierId: number | null = rate ? rate.courierId : null;
 
   const quote = quoteOrder({
     lines,

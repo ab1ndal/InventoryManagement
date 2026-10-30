@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { checkPincode, type PincodeCheck } from "./pincode.ts";
 
-type Row = [pincode: string, lookup: string | null, expected: PincodeCheck];
+type Row = [pincode: string, lookup: string | null, expected: { ok: true; inUp: boolean } | { ok: false; reason: "format" }];
 
 // R16 table: every valid pincode is accepted; only `inUp` varies.
 const ROWS: Row[] = [
@@ -34,19 +34,26 @@ const ROWS: Row[] = [
 
 for (const [pincode, lookup, expected] of ROWS) {
   Deno.test(`checkPincode(${JSON.stringify(pincode)}, lookup=${lookup}) → ${JSON.stringify(expected)}`, async () => {
-    assertEquals(await checkPincode(pincode, () => Promise.resolve(lookup)), expected);
+    const details = lookup === null ? null : { state: lookup, city: null };
+    const want: PincodeCheck = expected.ok ? { ...expected, city: null, state: lookup } : expected;
+    assertEquals(await checkPincode(pincode, () => Promise.resolve(details)), want);
   });
 }
 
-Deno.test("no lookup for a bad format or a non-UP prefix", async () => {
+Deno.test("lookup runs for every valid pincode (autofill), never for a bad format", async () => {
   const seen: string[] = [];
   const lookup = (p: string) => {
     seen.push(p);
-    return Promise.resolve("Uttar Pradesh");
+    return Promise.resolve({ state: "Maharashtra", city: "Mumbai" });
   };
-  await checkPincode("12345", lookup);
-  await checkPincode("400001", lookup);
+  assertEquals(await checkPincode("12345", lookup), { ok: false, reason: "format" });
   assertEquals(seen, []);
+  // Outside 20–28 the lookup only supplies city/state; the prefix still decides inUp.
+  assertEquals(await checkPincode("400001", lookup), { ok: true, inUp: false, city: "Mumbai", state: "Maharashtra" });
   await checkPincode(" 201001", lookup);
-  assertEquals(seen, ["201001"]);
+  assertEquals(seen, ["400001", "201001"]);
+});
+
+Deno.test("no lookup configured → city and state null, inUp from the prefix", async () => {
+  assertEquals(await checkPincode("110001", () => Promise.resolve(null)), { ok: true, inUp: false, city: null, state: null });
 });
