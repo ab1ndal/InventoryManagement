@@ -39,7 +39,9 @@ export async function loadEmailOrder(store: Store, orderId: string): Promise<Ema
     creditApplied: o.credit_applied,
     gatewayAmount: o.gateway_amount,
     awb: o.awb,
+    courier: o.courier,
     courierName: o.courier_name,
+    manualTrackingUrl: o.manual_tracking_url,
     leftoverVoucher: o.leftover_voucher_id && leftoverValue !== null
       ? { code: o.leftover_voucher_id, value: leftoverValue }
       : null,
@@ -62,9 +64,8 @@ export async function sendOrderEmail(ctx: JobContext, store: Store, job: OrderJo
       mail = shopNewOrder(order, site);
       break;
     case "email_shipped":
-      if (!order.awb) throw new Error(`order ${order.orderRef} has no AWB yet`);
       to = order.contactEmail;
-      mail = shipped({ ...order, awb: order.awb }, site);
+      mail = shipped(order, site);
       break;
     case "email_delivered":
       to = order.contactEmail;

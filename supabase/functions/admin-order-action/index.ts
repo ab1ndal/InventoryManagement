@@ -4,6 +4,7 @@
  *
  *   set_availability {orderId, itemId, availableQty}
  *   process          {orderId, opKey}            claim → prepare → Shiprocket steps → packed (ship orders only)
+ *   dispatch_manual  {orderId, trackingUrl?}     Porter, booked by hand: paid ship order (shelf checked) → shipped | cancelled
  *   mark_ready       {orderId}                   store pickup: paid (shelf checked) → ready_for_pickup | cancelled
  *   mark_collected   {orderId}                   store pickup: ready_for_pickup → delivered
  *   cancel           {orderId, opKey, reason}    paid, or ready_for_pickup (store pickup)
@@ -12,7 +13,7 @@
  *   rebook           {orderId, opKey, parcelLost, note, manualCancelConfirmed?} packed/shipped → paid | cancelled
  *   release_op       {orderId, opKey}            abandon a send_back / rebook whose booking was not cancelled
  *   rto_received     {orderId}
- *   mark_delivered   {orderId, deliveredAt, reason}                            superadmin only
+ *   mark_delivered   {orderId, deliveredAt, reason}   superadmin only; any admin for a Porter order (reason optional)
  *   return_open      {orderId, reason, contactedAt, items, note, returnAwb?, overrideReason?}
  *   return_photo_url {returnId, contentType}  →  {uploadUrl, path, token}
  *   return_photo_add {returnId, path}
@@ -45,6 +46,7 @@ import {
   logEvent,
   type OrdersDb,
   runCancel,
+  runDispatchManual,
   runProcess,
   runRebook,
   runRetry,
@@ -102,6 +104,23 @@ function boolField(body: Record<string, unknown>, key: string, optional = false)
   if (optional && v === undefined) return false;
   if (typeof v !== "boolean") throw new BadRequest(`${key} must be true or false`);
   return v;
+}
+
+/** Max length of a pasted courier tracking link (matches the orders column check). */
+const TRACKING_URL_MAX = 500;
+
+/** Optional https:// link shown to the shopper; blank → null. */
+function trackingUrlField(body: Record<string, unknown>, key: string): string | null {
+  const v = body[key];
+  if (v === undefined || v === null) return null;
+  if (typeof v !== "string") throw new BadRequest(`${key} must be text`);
+  const url = v.trim();
+  if (!url) return null;
+  const parsed = URL.canParse(url) ? new URL(url) : null;
+  if (!parsed || parsed.protocol !== "https:" || /\s/.test(url) || url.length > TRACKING_URL_MAX) {
+    throw new BadRequest(`${key} must be an https:// link`);
+  }
+  return url;
 }
 
 function textField(body: Record<string, unknown>, key: string): string {
@@ -168,6 +187,17 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         if (r.kind === "courier_error") return fail(502, "courier_error", r.message);
         if (r.kind === "cancelled") return await orderBody(orderId, { refundId: r.refundId });
         return await orderBody(orderId, { billId: r.billId, ...(r.refundId ? { refundId: r.refundId } : {}) });
+      }
+
+      case "dispatch_manual": {
+        // One transaction in Postgres (the Porter booking is outside our system), so no op key:
+        // a repeat returns the stored result.
+        const orderId = uuidField(body, "orderId");
+        const r = await runDispatchManual(ship, orderId, user.id, trackingUrlField(body, "trackingUrl"));
+        return await orderBody(orderId, {
+          ...(r.billId ? { billId: r.billId } : {}),
+          ...(r.refundId ? { refundId: r.refundId } : {}),
+        });
       }
 
       case "mark_ready": {
@@ -258,14 +288,17 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
 
       case "mark_delivered": {
         const orderId = uuidField(body, "orderId");
-        if (!(await deps.isSuperadmin(user.id))) {
+        // No courier webhook ever delivers a Porter order, so any admin closes it. For Shiprocket
+        // orders a manual delivery overrides tracking: superadmin only, reason required.
+        const porter = (await deps.db.getOrder(orderId))?.courier === "porter";
+        if (!porter && !(await deps.isSuperadmin(user.id))) {
           throw new HttpError(403, "superadmin access required");
         }
         await deps.db.rpc("online_order_mark_delivered", {
           p_order_id: orderId,
           p_actor: user.id,
           p_delivered_at: isoTimestamp(body.deliveredAt, "deliveredAt"),
-          p_reason: textField(body, "reason"),
+          p_reason: porter ? optionalText(body.reason, "reason") : textField(body, "reason"),
         });
         return await orderBody(orderId);
       }

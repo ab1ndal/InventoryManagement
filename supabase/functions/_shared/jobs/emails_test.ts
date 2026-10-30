@@ -79,3 +79,16 @@ Deno.test("email jobs: email_ready_for_pickup → shopper with the shop address"
   assertEquals(sent.map((m) => [m.to, m.subject]), [["asha@example.com", "Order WEB-000001 is ready for pickup"]]);
   assertStringIncludes(sent[0].text, "58 Sihani Gate Market");
 });
+
+Deno.test("email jobs: Porter shipped email needs no AWB; carries the link or a WhatsApp note", async () => {
+  const porter = { status: "shipped", courier: "porter" as const, courier_name: "Porter" };
+  const a = setup({ ...porter, manual_tracking_url: "https://porter.in/track/abc" });
+  await sendOrderEmail(a.ctx, a.store, a.job("email_shipped:porter"));
+  assertEquals(a.sent.map((m) => m.subject), ["Order WEB-000001 has shipped"]);
+  assertStringIncludes(a.sent[0].text, "with Porter");
+  assertStringIncludes(a.sent[0].text, "Track it here: https://porter.in/track/abc");
+  const b = setup(porter);
+  await sendOrderEmail(b.ctx, b.store, b.job("email_shipped:porter"));
+  assertStringIncludes(b.sent[0].text, "on WhatsApp");
+  assertEquals(b.sent[0].text.includes("shiprocket") || b.sent[0].text.includes("AWB"), false);
+});

@@ -159,7 +159,7 @@ export default function OrderPage() {
       <OrderTimeline status={order.status} fulfilment={order.fulfilment} />
       {order.fulfilment !== "pickup" && order.trackingUrl && (
         <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
-          Track with the courier
+          {order.courier === "porter" ? "Track with Porter" : "Track with the courier"}
         </a>
       )}
 

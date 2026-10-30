@@ -107,6 +107,7 @@ export function normalizeOrder(row) {
       gatewayAmount: Number(row.gateway_amount ?? 0),
     },
     trackingUrl: row.tracking_url ?? null,
+    courier: row.courier ?? null,
     courierName: row.courier_name ?? null,
     awb: row.awb ?? null,
     leftoverVoucher: null,

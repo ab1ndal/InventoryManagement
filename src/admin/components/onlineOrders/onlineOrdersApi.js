@@ -21,7 +21,7 @@ export const ORDER_FILTERS = {
 
 const LIST_COLUMNS =
   "id, order_ref, created_at, status, contact_name, contact_phone, subtotal, promo_discount, " +
-  "shipping, voucher_applied, credit_applied, gateway_amount, problem, process_error, address, fulfilment, " +
+  "shipping, voucher_applied, credit_applied, gateway_amount, problem, process_error, address, fulfilment, courier, " +
   "order_items(qty, shipped_qty), returns:order_returns(status, items:order_return_items(received_units))";
 
 export class OrderActionError extends Error {

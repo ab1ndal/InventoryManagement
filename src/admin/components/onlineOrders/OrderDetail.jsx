@@ -12,11 +12,12 @@ import {
   DialogTitle,
 } from "../../../components/ui/dialog";
 import { action, getMyRole, getOrder, newOpKey } from "./onlineOrdersApi";
-import { OutsideUpBadge, PickupBadge, ReturnBadge, StatusBadge } from "./OrderList";
+import { OutsideUpBadge, PickupBadge, PorterBadge, ReturnBadge, StatusBadge } from "./OrderList";
 import ReturnsSection from "./ReturnsSection";
 import {
   formatDateTime,
   formatRupees,
+  isValidTrackingUrl,
   localInputToIso,
   processRefundPreview,
   ceilToMinute,
@@ -86,6 +87,9 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [rebookNote, setRebookNote] = useState("");
   const [deliveredAt, setDeliveredAt] = useState("");
   const [deliveredReason, setDeliveredReason] = useState("");
+  // Process dialog of a ship order: Shiprocket (booked here) or Porter (booked by hand in the Porter app).
+  const [courier, setCourier] = useState("shiprocket");
+  const [porterLink, setPorterLink] = useState("");
   // Courier cancel failure inside a send-back/rebook dialog; the dialog stays open so the
   // same op key can be resumed (retry, or superadmin manual-cancel confirmation).
   const [dialogProblem, setDialogProblem] = useState(null);
@@ -137,6 +141,8 @@ export default function OrderDetail({ orderId, onChanged }) {
     setParcelLost(false);
     setRebookNote("");
     setDeliveredReason("");
+    setCourier("shiprocket");
+    setPorterLink("");
     setDialogProblem(null);
     setDeliveredError(null);
     opRef.current = null;
@@ -251,6 +257,9 @@ export default function OrderDetail({ orderId, onChanged }) {
   const isPaid = order.status === "paid";
   const isPickup = order.fulfilment === "pickup";
   const isReadyForPickup = order.status === "ready_for_pickup";
+  const isPorter = order.courier === "porter";
+  const porterChosen = dialog === "process" && courier === "porter";
+  const porterLinkValid = !porterLink.trim() || isValidTrackingUrl(porterLink.trim());
   const allChecked = items.every((it) => checked.has(it.id));
   const failedJobs = jobs.filter((j) => j.status === "failed");
   const showRetry = Boolean(order.process_error || failedJobs.length || courierError);
@@ -259,12 +268,17 @@ export default function OrderDetail({ orderId, onChanged }) {
   // A send back / rebook left claimed (e.g. courier cancel failed) is resumable once its lease expires.
   const canSendBack =
     order.status === "processing" && ["process", "send_back"].includes(order.op_action) && leaseExpired;
+  // Rebook re-sends a Shiprocket shipment; a Porter delivery has none.
   const canRebook =
+    !isPorter &&
     ["packed", "shipped", "out_for_delivery"].includes(order.status) &&
     (!order.op_action || (order.op_action === "rebook" && leaseExpired));
-  // Superadmin-only manual fallback when the courier never reported delivery; the server enforces both.
+  // Shiprocket: superadmin-only fallback when the courier never reported delivery. Porter: no courier
+  // ever reports it, so any admin closes it. The server enforces both.
   const canMarkDelivered =
-    role === "superadmin" && ["shipped", "out_for_delivery"].includes(order.status) && !order.delivered_at;
+    (role === "superadmin" || isPorter) &&
+    ["shipped", "out_for_delivery"].includes(order.status) &&
+    !order.delivered_at;
   const deliveredIso = localInputToIso(deliveredAt);
   // The server allows at most 30 days back and nothing before payment; a minute of slack covers the
   // time between rendering and submitting.
@@ -303,6 +317,7 @@ export default function OrderDetail({ orderId, onChanged }) {
           <ReturnBadge order={{ ...order, order_items: items }} />
           <OutsideUpBadge address={order.address} fulfilment={order.fulfilment} />
           <PickupBadge fulfilment={order.fulfilment} />
+          <PorterBadge courier={order.courier} />
         </div>
       </div>
 
@@ -427,7 +442,7 @@ export default function OrderDetail({ orderId, onChanged }) {
       </section>
 
       {/* Shipment */}
-      {(order.awb || order.label_url || order.manifest_url || order.bill_id) && (
+      {(order.awb || order.label_url || order.manifest_url || order.bill_id || order.manual_tracking_url) && (
         <section className="text-sm">
           <h4 className="mb-2 font-medium">Shipment</h4>
           <ul className="space-y-1">
@@ -442,6 +457,13 @@ export default function OrderDetail({ orderId, onChanged }) {
                   rel="noreferrer"
                 >
                   {order.awb}
+                </a>
+              </li>
+            )}
+            {order.manual_tracking_url && (
+              <li>
+                <a className="text-blue-600 underline" href={order.manual_tracking_url} target="_blank" rel="noreferrer">
+                  Porter tracking link
                 </a>
               </li>
             )}
@@ -618,11 +640,20 @@ export default function OrderDetail({ orderId, onChanged }) {
               : `${shipUnits} unit${shipUnits === 1 ? "" : "s"} will be kept for the customer, a Bill of Supply created and the customer emailed to collect.`
             : preview.allUnavailable
               ? "Nothing is available to ship: the order will be cancelled and fully refunded, including shipping."
-              : `${shipUnits} unit${shipUnits === 1 ? "" : "s"} will be booked with the courier and a Bill of Supply created.`
+              : porterChosen
+                ? `Book the delivery in the Porter app first. ${shipUnits} unit${shipUnits === 1 ? "" : "s"} will be marked shipped with Porter, a Bill of Supply created and the customer emailed.`
+                : `${shipUnits} unit${shipUnits === 1 ? "" : "s"} will be booked with the courier and a Bill of Supply created.`
         }
         confirmLabel={
-          preview.allUnavailable ? "Cancel and refund" : dialog === "ready" ? "Ready for pickup" : "Process"
+          preview.allUnavailable
+            ? "Cancel and refund"
+            : dialog === "ready"
+              ? "Ready for pickup"
+              : porterChosen
+                ? "Dispatched"
+                : "Process"
         }
+        confirmDisabled={porterChosen && !porterLinkValid}
         pending={pending}
         onClose={closeDialog}
         onConfirm={() =>
@@ -631,12 +662,57 @@ export default function OrderDetail({ orderId, onChanged }) {
                 { action: "mark_ready", orderId },
                 preview.allUnavailable ? "Order cancelled and refunded" : "Order ready for pickup"
               )
-            : run(
-                { action: "process", orderId, opKey: opKeyFor("process") },
-                preview.allUnavailable ? "Order cancelled and refunded" : "Order processed"
-              )
+            : porterChosen
+              ? run(
+                  { action: "dispatch_manual", orderId, trackingUrl: porterLink.trim() || null },
+                  preview.allUnavailable ? "Order cancelled and refunded" : "Order dispatched with Porter"
+                )
+              : run(
+                  { action: "process", orderId, opKey: opKeyFor("process") },
+                  preview.allUnavailable ? "Order cancelled and refunded" : "Order processed"
+                )
         }
       >
+        {dialog === "process" && (
+          <div className="space-y-2 text-sm">
+            <div role="radiogroup" aria-label="Courier" className="space-y-1">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="courier"
+                  checked={courier === "shiprocket"}
+                  onChange={() => setCourier("shiprocket")}
+                />
+                Shiprocket
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="courier"
+                  checked={courier === "porter"}
+                  onChange={() => setCourier("porter")}
+                />
+                Porter (manual)
+              </label>
+            </div>
+            {porterChosen && (
+              <label className="block">
+                <span className="mb-1 block font-medium">Porter tracking link (optional)</span>
+                <input
+                  type="url"
+                  aria-label="Porter tracking link"
+                  className="h-9 w-full rounded-md border border-input bg-white px-2"
+                  value={porterLink}
+                  onChange={(e) => setPorterLink(e.target.value)}
+                  placeholder="https://…"
+                />
+                {!porterLinkValid && (
+                  <span className="mt-1 block text-xs text-red-700">Paste the full https:// link from Porter.</span>
+                )}
+              </label>
+            )}
+          </div>
+        )}
         {preview.lines.length > 0 ? (
           <div className="text-sm">
             <p className="mb-1 font-medium">To be refunded</p>
@@ -784,9 +860,13 @@ export default function OrderDetail({ orderId, onChanged }) {
       <ConfirmDialog
         open={dialog === "delivered"}
         title={`Mark ${order.order_ref} delivered?`}
-        description="Use only when the courier never reported delivery. The delivery date starts the return window and cannot be changed afterwards."
+        description={
+          isPorter
+            ? "Use when Porter has dropped the parcel. The delivery date starts the return window and cannot be changed afterwards."
+            : "Use only when the courier never reported delivery. The delivery date starts the return window and cannot be changed afterwards."
+        }
         confirmLabel="Mark delivered"
-        confirmDisabled={!deliveredIso || !deliveredReason.trim()}
+        confirmDisabled={!deliveredIso || (!isPorter && !deliveredReason.trim())}
         pending={pending}
         onClose={closeDialog}
         onConfirm={() =>
@@ -809,7 +889,7 @@ export default function OrderDetail({ orderId, onChanged }) {
             />
           </label>
           <label className="block">
-            <span className="mb-1 block font-medium">Reason (required)</span>
+            <span className="mb-1 block font-medium">Reason ({isPorter ? "optional" : "required"})</span>
             <Textarea
               aria-label="Delivery reason"
               value={deliveredReason}

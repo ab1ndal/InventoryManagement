@@ -63,6 +63,17 @@ describe("TrackOrderPage", () => {
     expect(screen.getByText("Silk Saree (FREE/Red) ×2")).toBeInTheDocument();
   });
 
+  it("labels a Porter order's manual link Track with Porter", async () => {
+    supabase.rpc.mockResolvedValue({
+      data: { ...DELIVERED, status: "shipped", courier: "porter", courier_name: "Porter", awb: null, tracking_url: "https://porter.in/track/abc" },
+      error: null,
+    });
+    renderPage();
+    submit("WEB-000007", "9810873280");
+    expect(await screen.findByRole("link", { name: "Track with Porter" })).toHaveAttribute("href", "https://porter.in/track/abc");
+    expect(screen.queryByRole("link", { name: /track with the courier/i })).not.toBeInTheDocument();
+  });
+
   it("shows a collected store-pickup order without a courier link", async () => {
     supabase.rpc.mockResolvedValue({
       data: { ...DELIVERED, fulfilment: "pickup", shipping: 0, gateway_amount: 3000, courier_name: null, awb: null, tracking_url: null },

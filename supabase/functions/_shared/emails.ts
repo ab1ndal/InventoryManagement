@@ -23,7 +23,10 @@ export type EmailOrder = {
   creditApplied: number;
   gatewayAmount: number;
   awb: string | null;
+  courier: "shiprocket" | "porter" | null;
   courierName: string | null;
+  /** Link staff pasted for a hand-booked (Porter) delivery; null when none. */
+  manualTrackingUrl: string | null;
   leftoverVoucher: { code: string; value: number } | null;
 };
 
@@ -120,13 +123,22 @@ export function shopNewOrder(o: EmailOrder, siteUrl: string): Email {
   };
 }
 
-export function shipped(o: EmailOrder & { awb: string }, siteUrl: string): Email {
+/** A Shiprocket shipment needs its AWB; a Porter delivery has none (link optional). */
+export function shipped(o: EmailOrder, siteUrl: string): Email {
+  let tracking: string[];
+  if (o.courier === "porter") {
+    tracking = o.manualTrackingUrl
+      ? [`Track it here: ${o.manualTrackingUrl}`]
+      : ["We'll share the delivery details with you on WhatsApp."];
+  } else {
+    if (!o.awb) throw new Error(`order ${o.orderRef} has no AWB yet`);
+    tracking = [`Tracking number (AWB): ${o.awb}`, `Track it here: ${trackingUrl(o.awb)}`];
+  }
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",
     `Your order ${o.orderRef} is on its way${o.courierName ? ` with ${o.courierName}` : ""}.`,
-    `Tracking number (AWB): ${o.awb}`,
-    `Track it here: ${trackingUrl(o.awb)}`,
+    ...tracking,
     "",
     `Your order: ${siteUrl}/order/${o.orderRef}`,
     "",

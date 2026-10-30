@@ -65,6 +65,28 @@ const mockRows = {
       order_items: [{ qty: 1 }],
     },
   ],
+  shipped: [
+    {
+      id: "o5",
+      order_ref: "WEB-000005",
+      created_at: "2026-10-24T10:00:00Z",
+      status: "shipped",
+      fulfilment: "ship",
+      courier: "porter",
+      contact_name: "Ravi",
+      address: { line1: "2 Raj Nagar", city: "Ghaziabad", state: "Uttar Pradesh", pincode: "201002" },
+      contact_phone: "+915555555555",
+      subtotal: 900,
+      promo_discount: 0,
+      shipping: 99,
+      voucher_applied: 0,
+      credit_applied: 0,
+      gateway_amount: 999,
+      problem: null,
+      process_error: null,
+      order_items: [{ qty: 1 }],
+    },
+  ],
   problems: [
     {
       id: "o2",
@@ -170,4 +192,13 @@ test("Pickup tab shows store pickup orders with their badge and no Outside UP", 
   expect(row).toHaveTextContent("Ready for pickup");
   expect(row).toHaveTextContent("Store pickup");
   expect(row).not.toHaveTextContent("Outside UP");
+});
+
+test("a Porter order carries a Porter badge", async () => {
+  render(<OrderList onSelect={() => {}} refreshKey={0} />);
+  const shipRow = await screen.findByRole("row", { name: /WEB-000001/ });
+  expect(shipRow).not.toHaveTextContent("Porter");
+  fireEvent.click(screen.getByRole("tab", { name: "Shipped" }));
+  const row = await screen.findByRole("row", { name: /WEB-000005/ });
+  expect(row).toHaveTextContent("Porter");
 });

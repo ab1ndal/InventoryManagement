@@ -36,11 +36,12 @@ Errors: 403 `checkout_off`; 409 `price_changed` (re-quote); 409 `out_of_stock`; 
 
 ### POST `order-status`
 Req: `{ orderRef, accessToken }` (or no token with a signed-in owner's JWT)
-Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", items: [{ name, size, color, qty, status }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
+Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", courier: "shiprocket"|"porter"|null, items: [{ name, size, color, qty, status }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
+(`courier: null` = the default Shiprocket flow. `trackingUrl`: the Shiprocket link when there is an AWB; for a Porter order the link staff pasted, or null.)
 404 for unknown ref or bad token (identical).
 
 ### RPC `online_order_lookup` (anon, for /track)
-`supabase.rpc("online_order_lookup", { p_order_ref, p_phone })` → same shape as order-status `Res` but snake_case from SQL, or `null`. UI normalises.
+`supabase.rpc("online_order_lookup", { p_order_ref, p_phone })` → same shape as order-status `Res` but snake_case from SQL, or `null`. UI normalises. (`courier`, `tracking_url` as above.)
 
 ### RPC `my_online_orders` (authenticated, for /account/orders) → array of order summaries (see migration).
 
@@ -56,6 +57,11 @@ Reads: direct table selects (admin RLS) on `orders`, `order_items`, `order_event
 ### POST `admin-order-action`
 Req: `{ action: "set_availability", orderId, itemId, availableQty }`
    | `{ action: "process", orderId, opKey }`           // ship orders only; a pickup order → 409 bad_state
+   | `{ action: "dispatch_manual", orderId, trackingUrl?: string|null }`
+     // Porter, booked by hand: paid ship order (shelf checked, no AWB) → shipped with courier 'porter' (billId)
+     // or cancelled (nothing available; refundId). trackingUrl optional, https:// only, ≤ 500 chars (else 400).
+     // The Shiprocket order made at payment is cancelled best effort; a failure is left on orders.problem.
+     // No opKey: a repeat returns the stored result. A Porter order refuses process / send_back / rebook (409 bad_state).
    | `{ action: "mark_ready", orderId }`               // pickup: paid (shelf checked) → ready_for_pickup (billId) or cancelled (nothing available; refundId)
    | `{ action: "mark_collected", orderId }`           // pickup: ready_for_pickup → delivered (delivered_at = now)
    | `{ action: "cancel", orderId, opKey, reason }`    // paid, or ready_for_pickup
@@ -69,6 +75,7 @@ Req: `{ action: "set_availability", orderId, itemId, availableQty }`
    | `{ action: "release_op", orderId, opKey }`
      // any admin: abandon a send_back / rebook claim whose courier booking was NOT cancelled
    | `{ action: "mark_delivered", orderId, deliveredAt: <ISO-8601 with zone>, reason }`   // superadmin only; delivered_at is never changed once set, at most 30 days back
+     // Porter order (courier 'porter'): any admin, reason optional
    | `{ action: "return_open", orderId, reason: "damaged_wrong"|"change_of_mind", contactedAt: <ISO-8601 with zone>, items: [{ itemId, units }], note, returnAwb?, overrideReason? }`
      // outside the return window only a superadmin may open it, with a non-blank overrideReason
    | `{ action: "return_photo_url", returnId, contentType }`  // image/jpeg|png|webp|heic|heif; any orderId / path in the body is ignored
@@ -86,7 +93,7 @@ Res 200: `{ ok: true, order: <orders row>, refundId?: string, billId?: number }`
 - `return_preview` → `{ ok, preview: { credit_part, gateway_part, shipping, total } }` (no `order`).
 - `return_receive` → also `status` (`refunded` | `rejected`), `refund`, and `refundId` when a refund was created.
 - `return_cancel`, `mark_delivered` → just the order.
-Errors: 400 `invalid_request` (bad/missing field; `note` blank, `parcelLost` / `manualCancelConfirmed` not boolean; return actions: bad `reason`, `contactedAt` / `deliveredAt` not an ISO timestamp with zone, `items` empty or listing an item twice, `units` not a positive integer, `receivedUnits` / `restockUnits` not non-negative integers or restock above received, `contentType` not an allowed image type), 403 `forbidden` (`manualCancelConfirmed: true` from a non-superadmin, `set_live` or `mark_delivered` from an admin), 404 `not_found` (unknown `returnId` on add-photo / receive / cancel, unknown `photoId`), 409 `busy` (another staff action holds the order), 409 `bad_state`, 502 `courier_error` (order left in `processing` with `process_error`; Retry resumes).
+Errors: 400 `invalid_request` (bad/missing field; `note` blank, `parcelLost` / `manualCancelConfirmed` not boolean; return actions: bad `reason`, `contactedAt` / `deliveredAt` not an ISO timestamp with zone, `items` empty or listing an item twice, `units` not a positive integer, `receivedUnits` / `restockUnits` not non-negative integers or restock above received, `contentType` not an allowed image type, `trackingUrl` not an https:// link), 403 `forbidden` (`manualCancelConfirmed: true` from a non-superadmin, `set_live`, or `mark_delivered` of a non-Porter order, from an admin), 404 `not_found` (unknown `returnId` on add-photo / receive / cancel, unknown `photoId`), 409 `busy` (another staff action holds the order), 409 `bad_state`, 502 `courier_error` (order left in `processing` with `process_error`; Retry resumes).
 
 `cancel` on an order that is already `cancelled` (e.g. by a rebook that refunded everything) → 200 with the order and no `refundId`.
 

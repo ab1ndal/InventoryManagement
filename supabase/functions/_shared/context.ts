@@ -128,6 +128,8 @@ export type OrderRow = {
   attempt_key: string | null;
   status: string;
   fulfilment: "ship" | "pickup";
+  courier: "shiprocket" | "porter" | null;
+  manual_tracking_url: string | null;
   customerid: number | null;
   auth_user_id: string | null;
   contact_name: string;
@@ -195,7 +197,8 @@ export type Store = {
 
 const ORDER_COLUMNS = "id, order_ref, attempt_key, status, fulfilment, customerid, auth_user_id, contact_name, " +
   "contact_phone, contact_email, address, subtotal, promo_discount, shipping, voucher_applied, credit_applied, gateway_amount, " +
-  "cf_order_id, cf_payment_id, awb, courier_name, leftover_voucher_id, problem, created_at";
+  "cf_order_id, cf_payment_id, awb, courier, courier_name, manual_tracking_url, leftover_voucher_id, problem, " +
+  "created_at";
 
 const MONEY_KEYS = ["subtotal", "promo_discount", "shipping", "voucher_applied", "credit_applied", "gateway_amount"] as const;
 
