@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import { useProduct } from "../hooks/useProduct";
+import { useVariantAvailability } from "../hooks/useVariantAvailability";
 import { getProductImagePaths } from "../lib/productImage";
 import ProductDetailPage from "../pages/ProductDetailPage";
 import { MEASURE_INTRO } from "../pages/sizeGuideContent";
@@ -13,6 +14,7 @@ jest.mock("lib/supabaseClient", () => ({
   supabase: { from: jest.fn() },
 }));
 jest.mock("../hooks/useProduct", () => ({ useProduct: jest.fn() }));
+jest.mock("../hooks/useVariantAvailability", () => ({ useVariantAvailability: jest.fn() }));
 jest.mock("../lib/productImage", () => ({
   getProductImagePaths: jest.fn(),
   imageUrl: (path) => path,
@@ -79,6 +81,7 @@ beforeEach(() => {
   window.scrollTo = jest.fn(); // jsdom does not implement scrolling
   // CRA resets mock implementations before each test, so set them here.
   getProductImagePaths.mockResolvedValue(["one.png", "two.png"]);
+  useVariantAvailability.mockReturnValue(null);
   mockRelated();
 });
 
@@ -263,5 +266,34 @@ describe("ProductDetailPage — stock limit", () => {
     addPeach();
     expect(flyToCart).not.toHaveBeenCalled();
     expect(toast.info).toHaveBeenCalledWith("The last piece is already in your cart", expect.anything());
+  });
+});
+
+describe("ProductDetailPage — units held in other carts", () => {
+  function availabilityFor(row) {
+    useVariantAvailability.mockImplementation((variantId) => (variantId === "v2" ? { variant_id: "v2", ...row } : null));
+  }
+
+  it("says the piece is in someone's cart and blocks adding it", () => {
+    const inTenMinutes = new Date(Date.now() + 9.5 * 60000).toISOString();
+    availabilityFor({ stock: 1, held_by_others: 1, available: 0, my_held: 0, others_expire_at: inTenMinutes });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(screen.getByText("In someone's cart — may free up in 10 min")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: /in someone's cart/i });
+    expect(button).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /sold out/i })).not.toBeInTheDocument();
+    fireEvent.click(button);
+    expect(mockAddItem).not.toHaveBeenCalled();
+  });
+
+  it("caps the cart at what this shopper can have", () => {
+    availabilityFor({ stock: 3, held_by_others: 1, available: 2, my_held: 0, others_expire_at: null });
+    mockAddItem.mockReturnValue(1);
+    renderPage(PRODUCT, [VARIANTS[0], { ...VARIANTS[1], stock: 3 }]);
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(screen.getByText("Only 2 pieces left in this design")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /add to cart/i }));
+    expect(mockAddItem).toHaveBeenCalledWith(expect.objectContaining({ variant_id: "v2", stock: 2 }));
   });
 });

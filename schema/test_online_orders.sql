@@ -336,11 +336,12 @@ begin
 end $$;
 rollback;
 
--- concurrent last unit (sequential form): stock 1, two orders → second races
+-- concurrent last unit (sequential form): two orders hold the 2 units, a shop sale leaves 1
+-- (holds don't stop POS) → the first to pay takes it, the second races
 begin;
 do $$
 declare
-  v uuid := pg_temp.mk_variant(1500, 1);
+  v uuid := pg_temp.mk_variant(1500, 2);
   v2 uuid := pg_temp.mk_variant(700, 5);
   a record;
   b record;
@@ -351,6 +352,7 @@ begin
   select * into a from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)), '{"phone":"+919800000011"}');
   select * into b from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1),
                                                           jsonb_build_object('v', v2, 'qty', 1)), '{"phone":"+919800000012"}');
+  perform public.stock_adjust(v, -1, 'instore sale', 'bill:race');
   assert (pg_temp.pay(a.order_ref)) ->> 'result' = 'confirmed', 'a confirmed';
   res := pg_temp.pay(b.order_ref);
   assert res ->> 'result' = 'confirmed', 'b confirmed';
@@ -367,16 +369,17 @@ begin
 end $$;
 rollback;
 
--- every unit raced → order cancelled at confirm with shipping refunded
+-- every unit raced (a shop sale took the held unit) → order cancelled at confirm with shipping refunded
 begin;
 do $$
 declare
-  v uuid := pg_temp.mk_variant(1500, 0);
+  v uuid := pg_temp.mk_variant(1500, 1);
   a record;
   res jsonb;
 begin
   perform pg_temp.go_live();
   select * into a from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)));
+  perform public.stock_adjust(v, -1, 'instore sale', 'bill:race');
   res := pg_temp.pay(a.order_ref);
   assert res ->> 'status' = 'cancelled', 'cancelled when nothing in stock';
   assert (select total_amount from public.order_refunds where id = (res ->> 'refund_id')::uuid) = 1599, 'full refund incl shipping';

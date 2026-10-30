@@ -17,6 +17,8 @@ jest.mock("../context/CartContext", () => ({
     updateQty: jest.fn(),
     removeItem: jest.fn(),
     revalidateCart: mockRevalidate,
+    renewHolds: jest.fn(),
+    holdExpiresAt: null,
   }),
 }));
 

@@ -5,6 +5,7 @@
  */
 
 import { hashIp, optionalUser } from "../_shared/http.ts";
+import { holderKeyFor, parseGuestKey } from "../_shared/holds.ts";
 import { type AppDeps, browserEndpoint, readJsonBody } from "../_shared/context.ts";
 import {
   buildQuote,
@@ -23,12 +24,13 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
     const code = optionalString(body.code, "code");
     const creditRequested = parseCredit(body.creditRequested);
     const fulfilment = parseFulfilment(body.fulfilment);
+    const guestKey = parseGuestKey(body.holderKey);
     const user = await optionalUser(req, deps.verifyJwt, deps.env.anonKey ? [deps.env.anonKey] : []);
     const ipHash = deps.env.ipHashSalt ? await hashIp(req, deps.env.ipHashSalt) : null;
     const result = await buildQuote(
       deps,
       { items, pincode, code, creditRequested, phone: null, fulfilment },
-      { authUserId: user?.id ?? null, ipHash },
+      { authUserId: user?.id ?? null, ipHash, holderKey: holderKeyFor(user, guestKey) },
     );
     return result.response;
   });

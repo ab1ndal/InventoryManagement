@@ -4,8 +4,8 @@ import { upsertItem, fetchLiveVariantData } from "../lib/cartApi";
 jest.mock("lib/supabaseClient", () => {
   const getUser = jest.fn();
   getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
-  const auth = { getUser };
-  const api = { auth, _table: null, from: jest.fn() };
+  const auth = { getUser, getSession: jest.fn() };
+  const api = { auth, _table: null, from: jest.fn(), rpc: jest.fn() };
   return { supabase: api };
 });
 jest.mock("../lib/productImage", () => ({
@@ -31,6 +31,27 @@ describe("cartApi.upsertItem", () => {
 });
 
 describe("cartApi.fetchLiveVariantData", () => {
+  beforeEach(() => {
+    supabase.auth.getSession.mockResolvedValue({ data: { session: { user: { id: "u1" } } } });
+    // Availability unreadable by default: these cases cover the raw-stock fallback.
+    supabase.rpc.mockResolvedValue({ data: null, error: { message: "function variant_availability does not exist" } });
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => console.warn.mockRestore());
+
+  it("uses this shopper's availability (stock minus others' holds) as the stock", async () => {
+    mockTables({ variants: [], products: [{ productid: "BC1", retailprice: "1500" }] });
+    supabase.rpc.mockResolvedValue({
+      data: [{ variant_id: "v1", stock: 3, held_by_others: 2, available: 1, my_held: 1, others_expire_at: null }],
+      error: null,
+    });
+    const live = await fetchLiveVariantData([{ variant_id: "v1", product_id: "BC1", quantity: 1 }]);
+    expect(supabase.rpc).toHaveBeenCalledWith("variant_availability", { p_variant_ids: ["v1"], p_holder_key: "u:u1" });
+    expect(supabase.from).not.toHaveBeenCalledWith("productsizecolors");
+    expect(live).toEqual({ v1: { stock: 1, price: 1500 } });
+  });
+
   function mockTables({ variants, products }) {
     supabase.from.mockImplementation((table) => ({
       select: () => ({

@@ -9,6 +9,7 @@
  *   expire — R5: each pending order older than 45 min is checked with
  *     Cashfree: PAID → the confirm path; EXPIRED/TERMINATED or never created
  *     → online_order_fail(expired); still ACTIVE after 24 h → problem flag.
+ *     Also purges stock holds expired over a day ago (stock_holds_purge).
  */
 
 import { json } from "../_shared/http.ts";
@@ -84,6 +85,12 @@ type StaleRow = { order_id: string; order_ref: string; cf_order_id: string | nul
 export async function expireStale(
   deps: RunJobsDeps,
 ): Promise<{ checked: number; confirmed: number; expired: number; flagged: number; errors: number }> {
+  // Tidiness only: expired stock holds never count anyway, so a failed purge just waits for the next sweep.
+  try {
+    await deps.store.rpc("stock_holds_purge", {});
+  } catch (err) {
+    logEvent("warn", "stock_holds_purge_failed", { error: errorMessage(err) });
+  }
   const stale = (await deps.store.rpc<StaleRow[]>("online_order_list_stale", { p_min_age: "45 minutes" })) ?? [];
   const tally = { checked: 0, confirmed: 0, expired: 0, flagged: 0, errors: 0 };
   if (!deps.cashfree) {

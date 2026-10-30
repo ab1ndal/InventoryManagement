@@ -58,3 +58,18 @@ Deno.test("checkout-quote: bad input 400, all-unknown items 409 out_of_stock, ho
   assertEquals(hostile.headers.get("access-control-allow-origin"), null);
   await hostile.body?.cancel();
 });
+
+Deno.test("checkout-quote: holderKey → availability for that holder; JWT user wins; bad key 400", async () => {
+  const g = "g:55555555-5555-4555-8555-555555555555";
+  const deps = testDeps();
+  deps.store.impls.variant_availability = () => [{ variant_id: V1, stock: 1, held_by_others: 1, available: 0, my_held: 0, others_expire_at: null }];
+  const j = await (await handler(post(URL_, { items: [{ variantId: V1, qty: 1 }], holderKey: g }), deps)).json();
+  assertEquals(j.unavailable, [{ variantId: V1, available: 0 }]);
+  assertEquals(deps.store.callsTo("variant_availability")[0].p_holder_key, g);
+  await (await handler(post(URL_, { items: [{ variantId: V1, qty: 1 }], holderKey: g }, { authorization: "Bearer user.jwt" }), deps)).body
+    ?.cancel();
+  assertEquals(deps.store.callsTo("variant_availability")[1].p_holder_key, `u:${USER}`);
+  const bad = await handler(post(URL_, { items: [{ variantId: V1, qty: 1 }], holderKey: "x" }), deps);
+  assertEquals(bad.status, 400);
+  await bad.body?.cancel();
+});

@@ -16,6 +16,7 @@
 
 import { CashfreeError, type CfOrder } from "../_shared/cashfree.ts";
 import { hashIp, optionalUser } from "../_shared/http.ts";
+import { holderKeyFor, parseGuestKey } from "../_shared/holds.ts";
 import {
   ApiError,
   type AppDeps,
@@ -108,6 +109,8 @@ function createError(err: DbError): ApiError | null {
   const m = err.message;
   if (err.code === "42501" || m.includes("checkout is not live")) return new ApiError(403, "checkout_off", "checkout is not open");
   if (m.includes("code not valid")) return new ApiError(422, "invalid_code", "That code isn't valid.");
+  // Stock went (or went into someone else's hold) between the quote and the insert.
+  if (m.includes("out of stock")) return new ApiError(409, "out_of_stock", "Some items are no longer in stock.");
   if (/invalid phone|invalid pincode|name is required|address is required/.test(m)) {
     return new ApiError(422, "invalid_address", "Please check your name, phone and address.");
   }
@@ -235,7 +238,9 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
     const address = parseAddress(body.address, fulfilment);
     const code = optionalString(body.code, "code");
     const creditRequested = parseCredit(body.creditRequested);
+    const guestKey = parseGuestKey(body.holderKey);
     const user = await optionalUser(req, deps.verifyJwt, deps.env.anonKey ? [deps.env.anonKey] : []);
+    const holderKey = holderKeyFor(user, guestKey);
 
     if (!(await deps.store.checkoutLive())) throw new ApiError(403, "checkout_off", "checkout is not open");
 
@@ -246,7 +251,7 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
     const result = await buildQuote(
       deps,
       { items, pincode: "pincode" in address ? address.pincode : null, code, creditRequested, phone: address.phone, fulfilment },
-      { authUserId: user?.id ?? null, ipHash },
+      { authUserId: user?.id ?? null, ipHash, holderKey },
     );
     const r = result.response;
     if (r.pincode && !r.pincode.ok) throw new ApiError(422, "invalid_address", "Pincode must be 6 digits.");
@@ -272,6 +277,7 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
         : { name: address.name, phone: address.phone },
       accessTokenHash: hash,
       fulfilment,
+      holderKey,
     });
 
     let created: { order_id: string; order_ref: string; created: boolean } | undefined;

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Two-session concurrency test for the online order functions (plan review focus #4, R1).
-# Needs the throwaway DB from scripts/test-db.sh with all online-order migrations applied (through _rebook):
+# Needs the throwaway DB from scripts/test-db.sh with all online-order migrations applied (through _holds):
 #   scripts/test-db.sh up
-#   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_rebook.sql>
+#   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_holds.sql>
 #   schema/test_harness/concurrency_test.sh
-# Session A confirms an order for the last unit and holds its transaction open;
-# session B confirms a second order for the same unit and must block, then race.
-# Session C runs an in-store stock_adjust on another variant while A holds it.
+# Session A confirms an order that holds the last unit and keeps its transaction open;
+# session B confirms a second order for the same unit (one from before stock holds, so it
+# holds nothing) and must block, then race. Session C runs an in-store stock_adjust on
+# another variant while A holds it. A later section runs it the other way round: the
+# non-holder pays first and still can't take the held unit.
 set -euo pipefail
 DIR="${TEST_DB_DIR:-${TMPDIR:-/tmp}/bc-test-db}"
 PORT="${TEST_DB_PORT:-54329}"
@@ -28,6 +30,8 @@ insert into public.productsizecolors (productid, size, color, stock, variantid) 
   ('CONC1', 'M', 'Red', 1, '$V1'), ('CONC2', 'M', 'Red', 10, '$V2');
 update public.storefront_settings set checkout_live = true where id = 1;
 create temp table mk (n int, ref text);
+-- B (n=2) first: a pending order from before stock holds existed, so its holds are dropped.
+-- A (n=1) then holds the last unit for its shopper.
 insert into mk select n, (public.online_order_create(
     jsonb_build_object('contact', jsonb_build_object('name', 'Concurrency Test', 'phone', '+91980000010' || n),
       'address', jsonb_build_object('pincode', '201001'),
@@ -35,7 +39,17 @@ insert into mk select n, (public.online_order_create(
     jsonb_build_array(
       jsonb_build_object('variant_id', '$V1', 'qty', 1, 'unit_price', 1000),
       jsonb_build_object('variant_id', '$V2', 'qty', 1, 'unit_price', 500)), null)).order_ref
-  from generate_series(1, 2) n;
+  from (values (2)) x(n);
+delete from public.stock_holds where order_id = (select o.id from public.orders o join mk on mk.ref = o.order_ref where mk.n = 2);
+insert into mk select n, (public.online_order_create(
+    jsonb_build_object('contact', jsonb_build_object('name', 'Concurrency Test', 'phone', '+91980000010' || n),
+      'address', jsonb_build_object('pincode', '201001'),
+      'subtotal', 1500, 'shipping', 99, 'gateway_amount', 1599,
+      'holder_key', 'g:' || gen_random_uuid()),
+    jsonb_build_array(
+      jsonb_build_object('variant_id', '$V1', 'qty', 1, 'unit_price', 1000),
+      jsonb_build_object('variant_id', '$V2', 'qty', 1, 'unit_price', 500)), null)).order_ref
+  from (values (1)) x(n);
 \o $OUT/refs
 select ref from mk order by n;
 \o
@@ -64,18 +78,20 @@ select (select stock from public.productsizecolors where variantid = '$V1') || '
     || (select count(*) from public.order_refunds r join public.orders o on o.id = r.order_id
          where o.order_ref = '$REF_B' and r.reason = 'stock_race' and r.status = 'awaiting_choice') || ' '
     || (select count(*) from public.order_refunds r join public.orders o on o.id = r.order_id
-         where o.order_ref = '$REF_A');
+         where o.order_ref = '$REF_A') || ' '
+    || (select count(*) from public.stock_holds h join public.orders o on o.id = h.order_id
+         where o.contact_name = 'Concurrency Test');
 update public.storefront_settings set checkout_live = false where id = 1;
 delete from public.orders where contact_name = 'Concurrency Test';
 delete from public.productsizecolors where variantid in ('$V1', '$V2');
 delete from public.products where productid in ('CONC1', 'CONC2');
 SQL
 
-read -r S1 S2 RACE_B REFUNDS_A < "$OUT/check"
+read -r S1 S2 RACE_B REFUNDS_A HOLDS_LEFT < "$OUT/check"
 echo "A: $(cat "$OUT/a" | tr '\n' ' ')"
 echo "B: $(cat "$OUT/b")"
 echo "C: $(cat "$OUT/c")"
-echo "stock V1=$S1 V2=$S2 raceRefundB=$RACE_B refundsA=$REFUNDS_A waitedB=${WAITED}s"
+echo "stock V1=$S1 V2=$S2 raceRefundB=$RACE_B refundsA=$REFUNDS_A holdsLeft=$HOLDS_LEFT waitedB=${WAITED}s"
 fail=0
 [ "$S1" = "0.000" ] || { echo "FAIL: last unit stock should be 0"; fail=1; }
 [ "$S2" = "5.000" ] || { echo "FAIL: V2 should be 10 - 1 - 1 - 3 = 5"; fail=1; }
@@ -83,6 +99,85 @@ fail=0
 [ "$REFUNDS_A" = "0" ] || { echo "FAIL: A should have no refund"; fail=1; }
 grep -q '"race_units": \[{"units": 1' "$OUT/b" || { echo "FAIL: B result should report 1 race unit"; fail=1; }
 [ "$WAITED" -ge 1 ] || { echo "FAIL: B did not wait for A's lock"; fail=1; }
+[ "$HOLDS_LEFT" = "0" ] || { echo "FAIL: confirmed orders must leave no stock holds"; fail=1; }
+
+# ---- stock holds: the non-holder pays first and blocks; the holder still gets the unit ----
+V5=55555555-5555-4555-8555-555555555555
+cleanup_hold() {
+  "${PSQL[@]}" > /dev/null <<SQL
+update public.storefront_settings set checkout_live = false where id = 1;
+delete from public.orders where contact_name = 'Concurrency Hold';
+delete from public.productsizecolors where variantid = '$V5';
+delete from public.products where productid = 'CONC5';
+SQL
+}
+cleanup_hold
+"${PSQL[@]}" > "$OUT/hold_refs" <<SQL
+insert into public.products (productid, name, purchaseprice, retailprice) values ('CONC5', 'Conc five', 500, 1000);
+insert into public.productsizecolors (productid, size, color, stock, variantid) values ('CONC5', 'M', 'Red', 1, '$V5');
+update public.storefront_settings set checkout_live = true where id = 1;
+create temp table hk (n int, ref text);
+-- n=1 non-holder (pre-holds order, holds dropped), n=2 holder
+insert into hk select 1, (public.online_order_create(
+    jsonb_build_object('contact', jsonb_build_object('name', 'Concurrency Hold', 'phone', '+919800000201'),
+      'address', jsonb_build_object('pincode', '201001'), 'subtotal', 1000, 'shipping', 99, 'gateway_amount', 1099),
+    jsonb_build_array(jsonb_build_object('variant_id', '$V5', 'qty', 1, 'unit_price', 1000)), null)).order_ref;
+delete from public.stock_holds where order_id = (select o.id from public.orders o join hk on hk.ref = o.order_ref);
+insert into hk select 2, (public.online_order_create(
+    jsonb_build_object('contact', jsonb_build_object('name', 'Concurrency Hold', 'phone', '+919800000202'),
+      'address', jsonb_build_object('pincode', '201001'), 'subtotal', 1000, 'shipping', 99, 'gateway_amount', 1099,
+      'holder_key', 'g:' || gen_random_uuid()),
+    jsonb_build_array(jsonb_build_object('variant_id', '$V5', 'qty', 1, 'unit_price', 1000)), null)).order_ref;
+select ref from hk order by n;
+SQL
+REF_N="$(sed -n 1p "$OUT/hold_refs")"
+REF_H="$(sed -n 2p "$OUT/hold_refs")"
+"${PSQL[@]}" -c "begin" \
+  -c "select public.online_order_confirm_payment('$REF_N', 'cf_$REF_N', 1099, 'INR') ->> 'status'" \
+  -c "select pg_sleep(2)" -c "commit" > "$OUT/hold_n" &
+PID_N=$!
+sleep 0.5
+START=$(date +%s)
+"${PSQL[@]}" -c "select public.online_order_confirm_payment('$REF_H', 'cf_$REF_H', 1099, 'INR') ->> 'status'" > "$OUT/hold_h"
+HOLD_WAITED=$(( $(date +%s) - START ))
+wait "$PID_N"
+HOLD_CHECK="$("${PSQL[@]}" -c "select (select stock from public.productsizecolors where variantid = '$V5') || ' '
+  || (select count(*) from public.order_refunds r join public.orders o on o.id = r.order_id
+       where o.order_ref = '$REF_N' and r.reason = 'stock_race') || ' '
+  || (select count(*) from public.order_refunds r join public.orders o on o.id = r.order_id where o.order_ref = '$REF_H')")"
+cleanup_hold
+read -r S5 RACE_N REFUNDS_H <<< "$HOLD_CHECK"
+echo "hold: N=$(tr '\n' ' ' < "$OUT/hold_n") H=$(cat "$OUT/hold_h") stock V5=$S5 raceN=$RACE_N refundsH=$REFUNDS_H waitedH=${HOLD_WAITED}s"
+[ "$S5" = "0.000" ] || { echo "FAIL: held unit should be sold exactly once"; fail=1; }
+grep -q '^cancelled$' "$OUT/hold_n" || { echo "FAIL: non-holder paying first must not take the held unit"; fail=1; }
+[ "$(cat "$OUT/hold_h")" = "paid" ] || { echo "FAIL: holder should be paid"; fail=1; }
+[ "$RACE_N" = "1" ] || { echo "FAIL: non-holder should get one stock_race refund"; fail=1; }
+[ "$REFUNDS_H" = "0" ] || { echo "FAIL: holder should have no refund"; fail=1; }
+[ "$HOLD_WAITED" -ge 1 ] || { echo "FAIL: holder did not wait for the non-holder's lock"; fail=1; }
+
+# ---- cart holds: two shoppers hold the last unit at once → exactly one gets it ----
+V6=66666666-6666-4666-8666-666666666666
+"${PSQL[@]}" > /dev/null <<SQL
+delete from public.productsizecolors where variantid = '$V6';
+delete from public.products where productid = 'CONC6';
+insert into public.products (productid, name, purchaseprice, retailprice) values ('CONC6', 'Conc six', 500, 1000);
+insert into public.productsizecolors (productid, size, color, stock, variantid) values ('CONC6', 'M', 'Red', 1, '$V6');
+SQL
+HOLD_SQL="select public.stock_hold_set('g:' || gen_random_uuid(), '[{\"variant_id\": \"$V6\", \"qty\": 1}]', null, false) -> 'items' -> 0 ->> 'held'"
+"${PSQL[@]}" -c "begin" -c "$HOLD_SQL" -c "select pg_sleep(1.5)" -c "commit" > "$OUT/cart_x" &
+PID_CX=$!
+sleep 0.5
+"${PSQL[@]}" -c "$HOLD_SQL" > "$OUT/cart_y"
+wait "$PID_CX"
+CART_HOLDS="$("${PSQL[@]}" -c "select coalesce(sum(qty), 0) from public.stock_holds where variant_id = '$V6'")"
+"${PSQL[@]}" > /dev/null <<SQL
+delete from public.code_attempts where scope = 'hold' and key in (select holder_key from public.stock_holds where variant_id = '$V6');
+delete from public.productsizecolors where variantid = '$V6';
+delete from public.products where productid = 'CONC6';
+SQL
+echo "cart hold race: X=$(tr '\n' ' ' < "$OUT/cart_x") Y=$(cat "$OUT/cart_y") held=$CART_HOLDS"
+[ "$CART_HOLDS" = "1" ] || { echo "FAIL: the last unit must be held once"; fail=1; }
+grep -q '^1$' "$OUT/cart_x" && [ "$(cat "$OUT/cart_y")" = "0" ] || { echo "FAIL: first holder 1, second 0"; fail=1; }
 
 # ---- _online_bill_offset: two sessions, same refund -> exactly items + 1 shipping rows ----
 V3=33333333-3333-4333-8333-333333333333

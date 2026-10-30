@@ -1,5 +1,6 @@
 import { supabase } from "lib/supabaseClient";
 import { getProductImageUrl } from "../lib/productImage";
+import { currentHolderKey } from "./holder";
 
 async function currentUserId() {
   const { data } = await supabase.auth.getUser();
@@ -56,6 +57,31 @@ export async function clearServerCart() {
   if (error) throw error;
 }
 
+// Per-variant rows { variant_id, stock, held_by_others, available, my_held,
+// others_expire_at }: `available` is what this shopper can buy — stock minus
+// other shoppers' active cart holds, counting this shopper's own holds.
+export async function fetchVariantAvailability(variantIds) {
+  const { data, error } = await supabase.rpc("variant_availability", {
+    p_variant_ids: variantIds,
+    p_holder_key: await currentHolderKey(),
+  });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Stock this shopper can have per variant. Raw stock is the fallback so the
+// cart still revalidates if availability can't be read.
+async function fetchVariantStock(variantIds) {
+  try {
+    const rows = await fetchVariantAvailability(variantIds);
+    return rows.map((r) => ({ variantid: r.variant_id, stock: r.available }));
+  } catch (error) {
+    console.warn("variant_availability failed; revalidating against raw stock", { variantIds, error });
+    const { data } = await supabase.from("productsizecolors").select("variantid, stock").in("variantid", variantIds);
+    return data;
+  }
+}
+
 // Live stock (per variant) + price (per product) for the given cart items.
 // Variants whose product is no longer readable (RLS hides products without
 // photos) are left out, so revalidateItems drops them instead of keeping a
@@ -64,8 +90,8 @@ export async function fetchLiveVariantData(items) {
   if (!items.length) return {};
   const variantIds = items.map((i) => i.variant_id);
   const productIds = [...new Set(items.map((i) => i.product_id))];
-  const [{ data: variants }, { data: products }] = await Promise.all([
-    supabase.from("productsizecolors").select("variantid, stock").in("variantid", variantIds),
+  const [variants, { data: products }] = await Promise.all([
+    fetchVariantStock(variantIds),
     supabase.from("products").select("productid, retailprice").in("productid", productIds),
   ]);
   const priceByProduct = {};

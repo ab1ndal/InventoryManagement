@@ -136,6 +136,14 @@ Deno.test("hashIp: first x-forwarded-for hop, salted SHA-256 hex", async () => {
   await assertRejects(() => hashIp(req({ "x-forwarded-for": "1.2.3.4" }), ""));
 });
 
+Deno.test("hashIp: preferCfConnectingIp uses cf-connecting-ip over a spoofable x-forwarded-for", async () => {
+  const viaXff = await hashIp(req({ "x-forwarded-for": "203.0.113.7" }), "salt1");
+  const spoofed = req({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "198.51.100.1, 203.0.113.7" });
+  assertEquals(await hashIp(spoofed, "salt1", { preferCfConnectingIp: true }), viaXff);
+  assert((await hashIp(spoofed, "salt1")) !== viaXff, "default keeps the first x-forwarded-for hop");
+  assertEquals(await hashIp(req({ "x-forwarded-for": "203.0.113.7" }), "salt1", { preferCfConnectingIp: true }), viaXff);
+});
+
 Deno.test("supabaseVerifier maps auth.getUser; error/no user → null", async () => {
   const fake = (result: unknown) => ({ auth: { getUser: () => Promise.resolve(result) } }) as unknown as SupabaseClient;
   assertEquals(await supabaseVerifier(fake({ data: { user: { id: "u-9" } }, error: null }))("t"), { id: "u-9" });

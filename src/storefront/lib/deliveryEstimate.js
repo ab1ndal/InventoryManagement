@@ -22,3 +22,11 @@ export function stockNote(stock) {
   if (!Number.isFinite(n) || n <= 0 || n > 3) return null;
   return n === 1 ? "Last piece in this design" : `Only ${n} pieces left in this design`;
 }
+
+// Shown when every unit in stock sits in other shoppers' carts. Their holds
+// lapse after 15 minutes unless they check out, so it may come back.
+export function heldNote(othersExpireAt, now = Date.now()) {
+  const end = Date.parse(othersExpireAt ?? "");
+  if (!Number.isFinite(end)) return "In someone's cart right now";
+  return `In someone's cart — may free up in ${Math.max(1, Math.ceil((end - now) / 60000))} min`;
+}

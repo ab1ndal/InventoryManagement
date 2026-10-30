@@ -51,7 +51,7 @@ function whatsappHref(items, subtotal, shipping, address) {
 }
 
 export default function CheckoutPage() {
-  const { items } = useCart();
+  const { items, renewHolds } = useCart();
   // Until the switch is read (and whenever it is off) the page is exactly the
   // WhatsApp flow; the live checkout never renders on an unknown state.
   const [live, setLive] = useState(false);
@@ -67,6 +67,11 @@ export default function CheckoutPage() {
       active = false;
     };
   }, []);
+
+  // Keep the cart's units reserved while the shopper fills in the form.
+  useEffect(() => {
+    renewHolds();
+  }, [renewHolds]);
 
   const goOffline = useCallback(() => setLive(false), []);
 

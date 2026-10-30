@@ -13,6 +13,7 @@ import { checkPincode, isPincodeFormat, type PincodeCheck } from "./pincode.ts";
 import { chargeableWeightKg, fallbackShippingCharge, fallbackShippingChargeIndia } from "./shipping.ts";
 import type { ShiprocketClient } from "./shiprocket.ts";
 import { ApiError, type Store, type VariantRow } from "./context.ts";
+import { availableByVariant } from "./holds.ts";
 
 export const MAX_LINES = 30;
 export const MAX_QTY = 20;
@@ -33,7 +34,8 @@ export type QuoteRequest = {
   fulfilment: Fulfilment;
 };
 
-export type Identity = { authUserId: string | null; ipHash: string | null };
+/** holderKey: whose stock holds count as this shopper's own (u:/g: key; see holds.ts). */
+export type Identity = { authUserId: string | null; ipHash: string | null; holderKey?: string | null };
 
 export type CodeResult = {
   status: "ok" | "invalid" | "rate_limited";
@@ -147,7 +149,12 @@ const numOrNull =(v: unknown) => (v === null || v === undefined || v === "" ? nu
 export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identity): Promise<QuoteResult> {
   const { store, shiprocket } = deps;
 
-  const [live, variantRows] = await Promise.all([store.checkoutLive(), store.variants(req.items.map((i) => i.variantId))]);
+  const ids = req.items.map((i) => i.variantId);
+  const [live, variantRows, held] = await Promise.all([
+    store.checkoutLive(),
+    store.variants(ids),
+    availableByVariant(store, ids, who.holderKey ?? null),
+  ]);
   const byId = new Map<string, VariantRow>(variantRows.map((v) => [v.variantId.toLowerCase(), v]));
 
   const unavailable: QuoteResponse["unavailable"] = [];
@@ -158,7 +165,8 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
       unavailable.push({ variantId: it.variantId, available: 0 });
       continue;
     }
-    const available = Math.max(0, Math.floor(v.stock));
+    // Units in other shoppers' carts / pending orders are not for sale to this one.
+    const available = held.get(v.variantId.toLowerCase()) ?? Math.max(0, Math.floor(v.stock));
     if (available < it.qty) unavailable.push({ variantId: v.variantId, available });
     lines.push({
       itemKey: v.variantId,
@@ -297,6 +305,7 @@ export function orderPayload(
     address: Record<string, unknown>;
     accessTokenHash: string;
     fulfilment: Fulfilment;
+    holderKey: string | null;
   },
 ): { p_order: Record<string, unknown>; p_items: Record<string, unknown>[] } {
   const q = result.quote;
@@ -316,6 +325,7 @@ export function orderPayload(
       quoted_courier_id: result.courierId,
       access_token_hash: extra.accessTokenHash,
       fulfilment: extra.fulfilment,
+      holder_key: extra.holderKey,
     },
     p_items: q.lines.map((l) => ({
       variant_id: l.variantId,

@@ -1,4 +1,4 @@
-import { mergeCarts, revalidateItems, addToItems, maxQuantity } from "../lib/cartLogic";
+import { mergeCarts, revalidateItems, addToItems, maxQuantity, applyHoldResults } from "../lib/cartLogic";
 
 const item = (variant_id, quantity, extra = {}) => ({
   variant_id, product_id: "BC1", quantity, name: "Saree",
@@ -69,5 +69,41 @@ describe("revalidateItems stock", () => {
   it("records the live stock on each kept item", () => {
     const { items } = revalidateItems([item("a", 1)], { a: { stock: 4, price: 1000 } });
     expect(items[0].stock).toBe(4);
+  });
+});
+
+describe("applyHoldResults", () => {
+  const hold = (variantId, available, reason = null) => ({ variantId, requested: 0, held: 0, available, reason });
+  const res = (items, extra = {}) => ({ rateLimited: false, items, expiresAt: null, ...extra });
+
+  it("cuts a line back to what other shoppers' holds leave", () => {
+    const { items, capped } = applyHoldResults([item("v1", 3), item("v2", 1)], res([hold("v1", 2), hold("v2", 1)]));
+    expect(items).toEqual([item("v1", 2, { stock: 2 }), item("v2", 1)]);
+    expect(capped).toEqual([{ variant_id: "v1", product_id: "BC1", name: "Saree", quantity: 2 }]);
+  });
+
+  it("removes a line when nothing is left for this shopper", () => {
+    const { items, capped } = applyHoldResults([item("v1", 1)], res([hold("v1", 0, "unavailable")]));
+    expect(items).toEqual([]);
+    expect(capped).toEqual([{ variant_id: "v1", product_id: "BC1", name: "Saree", quantity: 0 }]);
+  });
+
+  it("leaves the cart alone on anti-hoarding caps when the units are still free", () => {
+    const cart = [item("v1", 3), item("v2", 2)];
+    const { items, capped } = applyHoldResults(cart, res([hold("v1", 3, "holder_cap"), hold("v2", 5, "ip_cap")]));
+    expect(items).toBe(cart);
+    expect(capped).toEqual([]);
+  });
+
+  it("ignores a rate-limited response", () => {
+    const cart = [item("v1", 3)];
+    const { items, capped } = applyHoldResults(cart, res([hold("v1", 0)], { rateLimited: true }));
+    expect(items).toBe(cart);
+    expect(capped).toEqual([]);
+  });
+
+  it("ignores results for variants no longer in the cart", () => {
+    const cart = [item("v1", 1)];
+    expect(applyHoldResults(cart, res([hold("v9", 0)])).items).toBe(cart);
   });
 });

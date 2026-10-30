@@ -14,6 +14,7 @@ import {
   newAttemptKey,
 } from "../lib/ordersApi";
 import { rememberPendingOrder } from "../lib/pendingOrder";
+import { guestHolderKey } from "../lib/holder";
 import { INDIAN_STATES, UP_STATE } from "../lib/checkout";
 
 const QUOTE_DEBOUNCE_MS = 300;
@@ -127,7 +128,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
     let active = true;
     setQuoting(true);
     const timer = setTimeout(async () => {
-      const payload = { items: lineItems, fulfilment };
+      const payload = { items: lineItems, fulfilment, holderKey: guestHolderKey() };
       if (pincode) payload.pincode = pincode;
       if (appliedCode) payload.code = appliedCode;
       if (creditRequested > 0) payload.creditRequested = creditRequested;
@@ -188,7 +189,13 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
     setSubmitting(true);
     setNotice(null);
     try {
-      const payload = { attemptKey, items: lineItems, fulfilment: values.fulfilment, address: toAddress(values) };
+      const payload = {
+        attemptKey,
+        items: lineItems,
+        fulfilment: values.fulfilment,
+        address: toAddress(values),
+        holderKey: guestHolderKey(),
+      };
       if (appliedCode) payload.code = appliedCode;
       if (creditRequested > 0) payload.creditRequested = creditRequested;
       const res = await createOrder(payload);

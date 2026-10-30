@@ -63,6 +63,11 @@ export function createOrder(payload) {
   return invoke("create-order", payload);
 }
 
+// Holds cart units for 15 minutes so other shoppers can't take them meanwhile.
+export function cartHold(payload) {
+  return invoke("cart-hold", payload);
+}
+
 export function orderStatus({ orderRef, accessToken }) {
   return invoke("order-status", accessToken ? { orderRef, accessToken } : { orderRef });
 }
