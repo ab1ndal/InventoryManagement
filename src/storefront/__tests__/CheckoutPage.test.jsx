@@ -76,6 +76,20 @@ it("enables the WhatsApp control once the address form is valid", async () => {
   expect(whatsappLink).toHaveAttribute("href", expect.stringContaining("Ghaziabad"));
 });
 
+it("offers WhatsApp checkout for an address outside Uttar Pradesh", async () => {
+  render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
+
+  userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
+  userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
+  userEvent.type(screen.getByPlaceholderText(/address line 1/i), "12 Marine Drive");
+  userEvent.type(screen.getByPlaceholderText(/^city$/i), "Mumbai");
+  userEvent.selectOptions(screen.getByRole("combobox"), "Maharashtra");
+  userEvent.type(screen.getByPlaceholderText(/pincode/i), "400001");
+
+  const whatsappLink = await screen.findByRole("link", { name: /complete your order on whatsapp/i });
+  expect(whatsappLink).toHaveAttribute("href", expect.stringContaining("Maharashtra"));
+});
+
 it("passes the item subtotal to the free-shipping nudge", () => {
   render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
   expect(screen.getByTestId("free-shipping-nudge")).toHaveAttribute("data-amount", "3000");

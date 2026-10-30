@@ -1,4 +1,4 @@
-import { outsideReturnWindow, returnBadge, returnableUnits, windowLabel } from "../orderHelpers";
+import { isOutsideUp, outsideReturnWindow, returnBadge, returnableUnits, windowLabel } from "../orderHelpers";
 
 const D = "2026-10-20T10:00:00Z";
 const at = (iso) => iso;
@@ -38,4 +38,13 @@ test("returnableUnits: shipped minus open units minus refunded received units", 
   expect(returnableUnits(item, [])).toBe(5);
   expect(returnableUnits(item, [ret("open", 0), ret("refunded", 1), ret("cancelled", 0)])).toBe(2);
   expect(returnableUnits({ id: "i2", shipped_qty: 1 }, [ret("open", 0)])).toBe(1);
+});
+
+test("isOutsideUp: flags any state other than Uttar Pradesh", () => {
+  expect(isOutsideUp({ state: "Uttar Pradesh", pincode: "201001" })).toBe(false);
+  expect(isOutsideUp({ state: " uttar pradesh " })).toBe(false);
+  expect(isOutsideUp({ state: "Maharashtra", pincode: "400001" })).toBe(true);
+  expect(isOutsideUp({ state: "Uttarakhand", pincode: "263001" })).toBe(true);
+  expect(isOutsideUp({})).toBe(false);
+  expect(isOutsideUp(null)).toBe(false);
 });

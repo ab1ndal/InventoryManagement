@@ -35,16 +35,18 @@ describe("addressSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects addresses outside Uttar Pradesh with a clear message", () => {
-    const result = addressSchema.safeParse({ ...valid, state: "Delhi", pincode: "110001" });
-    expect(result.success).toBe(false);
-    const messages = result.error.issues.map((i) => i.message).join(" ");
-    expect(messages).toMatch(/Uttar Pradesh only/i);
+  it("accepts an address outside Uttar Pradesh", () => {
+    expect(addressSchema.safeParse({ ...valid, city: "New Delhi", state: "Delhi", pincode: "110001" }).success).toBe(true);
   });
 
-  it("rejects a pincode outside the Uttar Pradesh range", () => {
-    const result = addressSchema.safeParse({ ...valid, pincode: "110001" });
+  it("requires a state", () => {
+    const result = addressSchema.safeParse({ ...valid, state: "" });
     expect(result.success).toBe(false);
+    expect(result.error.issues[0].message).toBe("Select a state");
+  });
+
+  it("rejects a pincode starting with 0", () => {
+    expect(addressSchema.safeParse({ ...valid, pincode: "012345" }).success).toBe(false);
   });
 
   it("rejects a 5-digit pincode", () => {

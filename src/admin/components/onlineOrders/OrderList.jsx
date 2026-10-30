@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatRupees,
   hasProblem,
+  isOutsideUp,
   itemCount,
   orderTotal,
   returnBadge,
@@ -31,6 +32,15 @@ export function ReturnBadge({ order }) {
   return (
     <span className="ml-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
       {label}
+    </span>
+  );
+}
+
+export function OutsideUpBadge({ address }) {
+  if (!isOutsideUp(address)) return null;
+  return (
+    <span className="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+      Outside UP
     </span>
   );
 }
@@ -117,6 +127,7 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
                 <td className="px-3 py-2">
                   <StatusBadge status={o.status} />
                   <ReturnBadge order={o} />
+                  <OutsideUpBadge address={o.address} />
                 </td>
                 <td className="px-3 py-2">
                   {hasProblem(o) && (

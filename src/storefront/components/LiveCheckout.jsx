@@ -5,7 +5,6 @@ import CheckoutSummary from "./CheckoutSummary";
 import { useStorefrontAuth } from "../context/StorefrontAuthContext";
 import { formatSize } from "../lib/sizes";
 import {
-  WHATSAPP_URL,
   quote,
   createOrder,
   createOrderMessage,
@@ -15,14 +14,13 @@ import {
   newAttemptKey,
 } from "../lib/ordersApi";
 import { rememberPendingOrder } from "../lib/pendingOrder";
+import { UP_STATE } from "../lib/checkout";
 
 const QUOTE_DEBOUNCE_MS = 300;
 const PINCODE = /^\d{6}$/;
 
-const PINCODE_MESSAGES = {
-  not_up: "We currently deliver within Uttar Pradesh only. WhatsApp us for other locations.",
-  unverifiable: "We couldn't verify this pincode right now. Please try again or WhatsApp us.",
-};
+const OUTSIDE_UP_NOTE =
+  "We usually deliver within Uttar Pradesh. For other states we'll confirm delivery with you on WhatsApp before dispatch.";
 
 const CODE_MESSAGES = {
   ok: "Code applied",
@@ -196,7 +194,9 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
   }
 
   const q = response?.quote;
-  const pincodeReason = response?.pincode && !response.pincode.ok ? response.pincode.reason : null;
+  // Soft note only: out-of-UP orders are accepted and the owner confirms fulfilment (2026-10-30).
+  const stateValue = watch("state");
+  const outsideUp = response?.pincode?.inUp === false || (Boolean(stateValue) && stateValue !== UP_STATE);
   const unavailable = response?.unavailable ?? [];
   const canPay =
     formState.isValid &&
@@ -280,11 +280,8 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
         </div>
       )}
 
-      {pincodeReason && PINCODE_MESSAGES[pincodeReason] && (
-        <p role="alert" className="mt-4 text-sm font-sans text-red-600">
-          {PINCODE_MESSAGES[pincodeReason]}{" "}
-          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="underline">WhatsApp us</a>
-        </p>
+      {outsideUp && (
+        <p className="mt-4 text-sm font-sans text-storefront-muted">{OUTSIDE_UP_NOTE}</p>
       )}
       {unavailable.length > 0 && (
         <div role="alert" className="mt-4 text-sm font-sans text-red-600 space-y-1">

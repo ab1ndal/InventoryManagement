@@ -45,7 +45,7 @@ function quoteResponse(over = {}) {
       gatewayAmount: 3080, amountDue: 3080, freeShippingGap: 2000,
       ...quoteOver,
     },
-    pincode: { ok: true },
+    pincode: { ok: true, inUp: true },
     shippingSource: "rate",
     code: null,
     creditAvailable: 0,
@@ -70,12 +70,12 @@ function renderPage() {
   );
 }
 
-function fillAddress(pincode = "201001") {
+function fillAddress(pincode = "201001", state = "Uttar Pradesh") {
   userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
   userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
   userEvent.type(screen.getByPlaceholderText(/address line 1/i), "58 Sihani Gate Market");
   userEvent.type(screen.getByPlaceholderText(/^city$/i), "Ghaziabad");
-  userEvent.selectOptions(screen.getByRole("combobox"), "Uttar Pradesh");
+  userEvent.selectOptions(screen.getByRole("combobox"), state);
   userEvent.type(screen.getByPlaceholderText(/pincode/i), pincode);
 }
 
@@ -98,6 +98,7 @@ it("shows server totals and a Pay button with the gateway amount", async () => {
   await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("₹80"));
   expect(screen.getByTestId("quote-to-pay")).toHaveTextContent("₹3,080");
   const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
+  expect(screen.queryByText(/We usually deliver within Uttar Pradesh/)).not.toBeInTheDocument();
   await waitFor(() => expect(pay).toBeEnabled());
   expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], pincode: "201001" });
 });
@@ -201,23 +202,29 @@ it("hides store credit for guests", async () => {
   expect(screen.queryByLabelText(/use store credit/i)).not.toBeInTheDocument();
 });
 
-it("explains a pincode outside Uttar Pradesh and blocks payment", async () => {
+it("accepts an address outside Uttar Pradesh with a soft note and Pay enabled", async () => {
   mockApi.quote.mockImplementation(async (p) =>
-    p.pincode ? quoteResponse({ pincode: { ok: false, reason: "not_up" } }) : quoteResponse()
+    p.pincode ? quoteResponse({ pincode: { ok: true, inUp: false } }) : quoteResponse({ pincode: null })
   );
   renderPage();
-  fillAddress("248001");
-  expect(await screen.findByText(/We currently deliver within Uttar Pradesh only\. WhatsApp us for other locations\./)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /pay ₹/i })).toBeDisabled();
+  fillAddress("400001", "Maharashtra");
+  expect(
+    await screen.findByText(
+      "We usually deliver within Uttar Pradesh. For other states we'll confirm delivery with you on WhatsApp before dispatch."
+    )
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Pay ₹3,080" })).toBeEnabled());
 });
 
-it("explains an unverifiable pincode", async () => {
+it("shows the soft note when the pincode is outside UP even if the state says UP", async () => {
   mockApi.quote.mockImplementation(async (p) =>
-    p.pincode ? quoteResponse({ pincode: { ok: false, reason: "unverifiable" } }) : quoteResponse()
+    p.pincode ? quoteResponse({ pincode: { ok: true, inUp: false } }) : quoteResponse({ pincode: null })
   );
   renderPage();
   fillAddress("247001");
-  expect(await screen.findByText(/We couldn't verify this pincode right now\. Please try again or WhatsApp us\./)).toBeInTheDocument();
+  expect(await screen.findByText(/We usually deliver within Uttar Pradesh\./)).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Pay ₹3,080" })).toBeEnabled());
 });
 
 it("warns about unavailable items and blocks payment", async () => {

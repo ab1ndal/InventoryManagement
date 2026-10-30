@@ -90,8 +90,7 @@ function createError(err: DbError): ApiError | null {
   const m = err.message;
   if (err.code === "42501" || m.includes("checkout is not live")) return new ApiError(403, "checkout_off", "checkout is not open");
   if (m.includes("code not valid")) return new ApiError(422, "invalid_code", "That code isn't valid.");
-  if (m.includes("Uttar Pradesh")) return new ApiError(422, "not_up", "We deliver within Uttar Pradesh only.");
-  if (/invalid phone|name is required|address is required/.test(m)) {
+  if (/invalid phone|invalid pincode|name is required|address is required/.test(m)) {
     return new ApiError(422, "invalid_address", "Please check your name, phone and address.");
   }
   if (/price changed|mismatch|not found|balance is lower|exceeds amount due|must be 0 or at least/.test(m)) {
@@ -231,17 +230,7 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
       { authUserId: user?.id ?? null, ipHash },
     );
     const r = result.response;
-    if (r.pincode && !r.pincode.ok) {
-      if (r.pincode.reason === "not_up") throw new ApiError(422, "not_up", "We deliver within Uttar Pradesh only.");
-      if (r.pincode.reason === "unverifiable") {
-        throw new ApiError(
-          422,
-          "unverifiable_pincode",
-          "We couldn't verify this pincode right now, please try again or WhatsApp us.",
-        );
-      }
-      throw new ApiError(422, "invalid_address", "Pincode must be 6 digits.");
-    }
+    if (r.pincode && !r.pincode.ok) throw new ApiError(422, "invalid_address", "Pincode must be 6 digits.");
     if (r.code?.status === "rate_limited") throw new ApiError(429, "rate_limited", "Too many attempts. Please try later.");
     if (r.code?.status === "invalid") throw new ApiError(422, "invalid_code", "That code isn't valid.");
     if (r.unavailable.length > 0) throw new ApiError(409, "out_of_stock", "Some items are no longer in stock.");

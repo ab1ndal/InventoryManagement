@@ -59,6 +59,13 @@ export function itemCount(o) {
   return (o.order_items || []).reduce((s, i) => s + Number(i.qty || 0), 0);
 }
 
+// Checkout accepts any state but the shop usually ships within UP; the owner decides
+// fulfilment for the rest (2026-10-30). orders.address.state is required by create-order.
+export function isOutsideUp(address) {
+  const state = typeof address?.state === "string" ? address.state.trim().toLowerCase() : "";
+  return state !== "" && state !== "uttar pradesh";
+}
+
 export function hasProblem(o, jobs = []) {
   return Boolean(
     o.problem || o.process_error || o.status === "rto" || jobs.some((j) => j.status === "failed")

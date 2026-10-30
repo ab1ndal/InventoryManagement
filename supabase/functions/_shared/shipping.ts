@@ -117,3 +117,30 @@ export function fallbackShippingCharge(weightKg: number): number {
   const slab = FALLBACK_SLABS.find((s) => weightKg <= s.upToKg);
   return (slab ?? FALLBACK_SLABS[FALLBACK_SLABS.length - 1]).charge;
 }
+
+/**
+ * Fallback outside Uttar Pradesh (owner 2026-10-30: deliver anywhere in India),
+ * by chargeable weight. Highest cheapest-courier freight from 201001 across 16
+ * cities (incl. Mumbai, Chennai, Guwahati, Srinagar, Port Blair; API sample
+ * 2026-10-30) rounded up to ₹10 and made non-decreasing, so it never
+ * undercharges freight. 5–6 kg is the 6 kg sample (max ₹1,301.40); above 6 kg
+ * the top slab applies (no sample; rare cart).
+ */
+const FALLBACK_SLABS_INDIA: { upToKg: number; charge: number }[] = [
+  { upToKg: 0.5, charge: 150 },
+  { upToKg: 1, charge: 250 },
+  { upToKg: 1.5, charge: 360 },
+  { upToKg: 2, charge: 470 },
+  { upToKg: 2.5, charge: 550 },
+  { upToKg: 3, charge: 660 },
+  { upToKg: 3.5, charge: 770 },
+  { upToKg: 4, charge: 870 },
+  { upToKg: 4.5, charge: 980 },
+  { upToKg: 5, charge: 1090 },
+  { upToKg: 6, charge: 1310 },
+];
+
+export function fallbackShippingChargeIndia(weightKg: number): number {
+  const slab = FALLBACK_SLABS_INDIA.find((s) => weightKg <= s.upToKg);
+  return (slab ?? FALLBACK_SLABS_INDIA[FALLBACK_SLABS_INDIA.length - 1]).charge;
+}

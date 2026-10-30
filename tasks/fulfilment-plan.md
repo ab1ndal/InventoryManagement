@@ -113,3 +113,27 @@ Status 2026-10-30: plan APPROVED by owner; executing PR A.
 - **PR G — sign-in prompt + phone-only path:** nudge sign-in for follow-ups/reminders; can a shopper go through
   with phone only? Needs owner decision on an OTP channel (SMS needs DLT registration; WhatsApp OTP needs Meta
   Cloud API) — research + recommendation, build what needs no new external account.
+
+## PR E design — 15-minute cart hold (research 2026-10-30)
+Facts: no stock is reserved today. `online_order_create` never touches stock; `online_order_confirm_payment`
+takes stock "first paid wins" and refunds the loser (`stock_race`). Every shopper read (PDP, grid, cart
+revalidate, quote) uses raw `productsizecolors.stock` (anon-readable). Guests have no server identity (cart in
+localStorage `bc_cart`); anonymous sign-in is not used (and would give guests the `authenticated` role, which has
+blanket UPDATE on attribute tables — avoid). pg_cron + run-jobs exist.
+
+Design (defaults chosen while running unattended; owner can change):
+- Table `stock_holds(id, variant_id, holder_key, qty, expires_at, order_id null, ip_hash)`; active = expires_at > now()
+  (no sweeper needed for correctness; a daily purge for tidiness). holder_key = auth user id when signed in,
+  else a random id kept in localStorage (`bc_holder`).
+- Edge function `cart-hold` (service role): set/replace the holder's hold for a variant to the cart quantity,
+  capped at stock − others' active holds; renews to 15 min on every cart change. Caps against hoarding: max 5 units
+  per holder across all variants, max 10 active units per IP hash, at most 1 hold create per variant per holder per
+  minute.
+- Availability = stock − active holds by others. PDP (selected variant), cart revalidate and checkout quote use
+  it via an anon RPC `variant_availability(variant_ids)`. PDP shows "In someone's cart — may free up in N min"
+  when all units are held. Shop grid unchanged (still raw stock) to keep the change contained.
+- Checkout: `online_order_create` attaches the holder's holds to the order and extends them to 45 min (Cashfree
+  window 30 min + expiry sweep). `confirm_payment` takes at most stock − holds of others, so a non-holder can no
+  longer pay for a held unit; `online_order_fail`/expiry releases the order's holds.
+- In-store POS ignores holds (physical sale wins); the online holder then sees "no longer available" at checkout.
+- Hold expiry shown in the cart: "Held for you for 14:32".

@@ -9,8 +9,8 @@
  */
 
 import { type Line, type Promo, promoDiscount, type Quote, quoteOrder } from "./pricing.ts";
-import { checkUpPincode, type PincodeCheck } from "./pincode.ts";
-import { chargeableWeightKg, fallbackShippingCharge } from "./shipping.ts";
+import { checkPincode, type PincodeCheck } from "./pincode.ts";
+import { chargeableWeightKg, fallbackShippingCharge, fallbackShippingChargeIndia } from "./shipping.ts";
 import type { ShiprocketClient } from "./shiprocket.ts";
 import { ApiError, type Store, type VariantRow } from "./context.ts";
 
@@ -201,7 +201,7 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
 
   // Pincode (R16) and courier rate; the rate never blocks checkout (weight-slab fallback).
   const postcodeState = shiprocket ? (pc: string) => shiprocket.postcodeState(pc) : () => Promise.resolve(null);
-  const pincode = req.pincode === null ? null : await checkUpPincode(req.pincode, postcodeState);
+  const pincode = req.pincode === null ? null : await checkPincode(req.pincode, postcodeState);
 
   const subtotal = lines.reduce((s, l) => s + Math.round(l.unitPrice * 100) * l.qty, 0) / 100;
   const goods = subtotal - promoDiscount(promo, subtotal);
@@ -224,7 +224,8 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
     lines,
     promo,
     shippingRate,
-    fallbackShipping: fallbackShippingCharge(weightKg),
+    // National slabs outside UP; with no pincode yet the UP estimate shows.
+    fallbackShipping: pincode?.ok && !pincode.inUp ? fallbackShippingChargeIndia(weightKg) : fallbackShippingCharge(weightKg),
     creditRequested: req.creditRequested,
     creditAvailable,
     voucherValue,

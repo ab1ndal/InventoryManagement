@@ -1,5 +1,11 @@
 import { assertEquals } from "@std/assert";
-import { chargeableWeightKg, fallbackShippingCharge, parcelPackage, parcelWeightKg } from "./shipping.ts";
+import {
+  chargeableWeightKg,
+  fallbackShippingCharge,
+  fallbackShippingChargeIndia,
+  parcelPackage,
+  parcelWeightKg,
+} from "./shipping.ts";
 
 Deno.test("units stack: parcel weight is the sum of every unit", () => {
   assertEquals(parcelWeightKg(["Lehenga", "Kurti", "Kurti"]), 3);
@@ -77,4 +83,19 @@ Deno.test("fallback charge for stacked parcels", () => {
 
 Deno.test("fallback charge above 10 kg uses the top slab", () => {
   assertEquals(fallbackShippingCharge(12), 360);
+});
+
+Deno.test("national fallback charge follows the chargeable-weight slab", () => {
+  assertEquals(fallbackShippingChargeIndia(0.5), 150);
+  assertEquals(fallbackShippingChargeIndia(0.96), 250);
+  assertEquals(fallbackShippingChargeIndia(1.5), 360);
+  assertEquals(fallbackShippingChargeIndia(2), 470);
+  assertEquals(fallbackShippingChargeIndia(2.5), 550);
+  assertEquals(fallbackShippingChargeIndia(3), 660);
+  assertEquals(fallbackShippingChargeIndia(3.5), 770);
+  assertEquals(fallbackShippingChargeIndia(3.78), 870);
+  assertEquals(fallbackShippingChargeIndia(4.5), 980);
+  assertEquals(fallbackShippingChargeIndia(5), 1090);
+  assertEquals(fallbackShippingChargeIndia(5.01), 1310);
+  assertEquals(fallbackShippingChargeIndia(12), 1310);
 });

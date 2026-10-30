@@ -102,6 +102,16 @@ test("shows the money breakdown", async () => {
   expect(screen.getByText("Paid online").nextSibling).toHaveTextContent("₹1,749.00");
 });
 
+test("shows an Outside UP badge only for an address outside Uttar Pradesh", async () => {
+  const { unmount } = render(<OrderDetail orderId="o1" />);
+  await screen.findByText("WEB-000007");
+  expect(screen.queryByText("Outside UP")).not.toBeInTheDocument();
+  unmount();
+  mockDetail = detail({ order: { address: { line1: "12 Marine Drive", city: "Mumbai", state: "Maharashtra", pincode: "400001" } } });
+  render(<OrderDetail orderId="o1" />);
+  expect(await screen.findByText("Outside UP")).toBeInTheDocument();
+});
+
 test("Process stays disabled until every line has been set", async () => {
   render(<OrderDetail orderId="o1" />);
   await screen.findByText("Kurta");
