@@ -8,7 +8,7 @@
  * A token is valid 10 days; we log in again when < 24 h is left, and once
  * more on a 401 (retry that request once).
  *
- * Lookups used at checkout (postcodeState, rate) never throw: any failure
+ * Lookups used at checkout (postcodeDetails, rate) never throw: any failure
  * is null, and the caller applies its fallback (R16 pincode rule, ₹150 flat).
  * Every other method throws ShiprocketError, so Process can stop and retry.
  */
@@ -40,6 +40,9 @@ export type TokenStore = {
   get(): Promise<{ token: string; expiresAt: Date } | null>;
   set(token: string, expiresAt: Date): Promise<void>;
 };
+
+/** Shiprocket's `postcode_details` (state + city), used for the UP check and checkout autofill. */
+export type PostcodeDetails = { state: string; city: string | null };
 
 export type RateQuote = { rate: number; courierId: number; courierName: string; etdDays: number | null };
 
@@ -83,7 +86,7 @@ export type TrackResult = {
 
 export type ShiprocketClient = {
   token(): Promise<string>;
-  postcodeState(pincode: string): Promise<string | null>;
+  postcodeDetails(pincode: string): Promise<PostcodeDetails | null>;
   rate(input: { deliveryPincode: string; weightKg: number; declaredValue: number }): Promise<RateQuote | null>;
   createOrder(input: SrOrderInput, fallbackEmail: string): Promise<SrOrderIds>;
   updateOrder(input: SrOrderInput, fallbackEmail: string): Promise<SrOrderIds>;
@@ -303,15 +306,17 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
   return {
     token,
 
-    async postcodeState(pincode) {
+    async postcodeDetails(pincode) {
       try {
         const path = `/open/postcode/details?postcode=${encodeURIComponent(pincode)}`;
         // UNVERIFIED: whether /open/ needs the token; we always send it.
         const { status, data } = await api("GET", path, undefined, LOOKUP_TIMEOUT_MS);
         const d = data as Json | null;
-        const state = (d?.postcode_details as Json | undefined)?.state;
+        const details = d?.postcode_details as Json | undefined;
+        const state = details?.state;
         if (status !== 200 || d?.success !== true || typeof state !== "string" || !state.trim()) return null;
-        return state.trim();
+        const city = typeof details?.city === "string" && details.city.trim() ? details.city.trim() : null;
+        return { state: state.trim(), city };
       } catch {
         // Checkout must not fail on a lookup; null routes the caller to its R16 fallback.
         return null;

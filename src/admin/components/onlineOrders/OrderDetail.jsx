@@ -66,7 +66,7 @@ function addressText(a, fulfilment) {
   if (!a) return "";
   // A pickup order's address holds only the contact the customer gave at checkout.
   if (fulfilment === "pickup") return [a.name, a.phone, a.email].filter(Boolean).join(", ");
-  return [a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(", ");
+  return [a.line1, a.line2, a.landmark && `Landmark: ${a.landmark}`, a.city, a.state, a.pincode].filter(Boolean).join(", ");
 }
 
 function variantText(it) {

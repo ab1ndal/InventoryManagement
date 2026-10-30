@@ -63,9 +63,13 @@ function moneyLines(o: EmailOrder): string[] {
 
 function addressLines(a: Record<string, unknown>): string[] {
   const s = (k: string) => (typeof a[k] === "string" && (a[k] as string).trim() ? (a[k] as string).trim() : null);
-  return [s("line1"), s("line2"), [s("city"), s("state"), s("pincode")].filter(Boolean).join(", ")].filter(
-    (x): x is string => !!x,
-  );
+  const landmark = s("landmark");
+  return [
+    s("line1"),
+    s("line2"),
+    landmark && `Landmark: ${landmark}`,
+    [s("city"), s("state"), s("pincode")].filter(Boolean).join(", "),
+  ].filter((x): x is string => !!x);
 }
 
 // Out-of-UP orders are accepted but fulfilled case by case (owner 2026-10-30).

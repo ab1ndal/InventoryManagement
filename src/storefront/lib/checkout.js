@@ -63,9 +63,13 @@ const contactSchema = z.object({
   email: z.string().email("Invalid email").optional().or(z.literal("")),
 });
 
+// Indian address convention (Amazon/Flipkart/Myntra): flat/house and
+// area/street are both required, landmark optional. Minimums stay small: a
+// flat can be "12" and a village name short.
 export const addressSchema = contactSchema.extend({
-  line1: z.string().min(3, "Enter your address"),
-  line2: z.string().optional().or(z.literal("")),
+  line1: z.string().trim().min(1, "Enter your flat, house no. or building"),
+  line2: z.string().trim().min(2, "Enter your area, street or village"),
+  landmark: z.string().trim().max(100, "Keep the landmark under 100 characters").optional().or(z.literal("")),
   city: z.string().min(2, "Enter your city"),
   state: z.enum(INDIAN_STATES, { errorMap: () => ({ message: "Select a state" }) }),
   pincode: z.string().regex(/^[1-9]\d{5}$/, "Enter a valid 6-digit pincode"),

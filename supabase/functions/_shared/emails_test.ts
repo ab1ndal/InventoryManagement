@@ -60,6 +60,12 @@ Deno.test("shopNewOrder: contact, address and the admin link", () => {
   assertStringIncludes(m.text, `${SITE}/admin/online-orders`);
 });
 
+Deno.test("shopNewOrder: landmark line when present", () => {
+  const m = shopNewOrder({ ...o, address: { ...o.address, line2: "Sector 5", landmark: "Near Durga Bhabhi Chowk" } }, SITE);
+  assertStringIncludes(m.text, "  1 MG Road\n  Sector 5\n  Landmark: Near Durga Bhabhi Chowk\n  Ghaziabad, Uttar Pradesh, 201001");
+  assertEquals(shopNewOrder(o, SITE).text.includes("Landmark"), false);
+});
+
 Deno.test("shipped: AWB and tracking link; delivered", () => {
   const m = shipped({ ...o, awb: "AWB123", courierName: "Delhivery" }, SITE);
   assertEquals(m.subject, "Order WEB-000042 has shipped");

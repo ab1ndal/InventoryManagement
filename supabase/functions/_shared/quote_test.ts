@@ -14,7 +14,7 @@ const req = (over: Partial<QuoteRequest> = {}): QuoteRequest => ({
   ...over,
 });
 
-function deps(opts: { state?: string | null; rate?: null } = {}) {
+function deps(opts: { state?: string | null; city?: string | null; rate?: null } = {}) {
   const store = new FakeStore();
   const sr = fakeShiprocket(opts);
   return { store, sr, deps: { store, shiprocket: sr.client } };
@@ -37,7 +37,9 @@ Deno.test("quote: prices from the DB, courier rate rounded up, client fields ign
   assertEquals(r.response.quote.shipping, 80);
   assertEquals(r.response.shippingSource, "rate");
   assertEquals(r.response.quote.gatewayAmount, 1080);
-  assertEquals(r.response.pincode, { ok: true, inUp: true });
+  // City/state from the postcode lookup let checkout fill those fields.
+  assertEquals(r.response.pincode, { ok: true, inUp: true, city: "Ghaziabad", state: "Uttar Pradesh" });
+  assertEquals(sr.calls.postcode, ["201001"]);
   assertEquals(r.courierId, 12);
   // One 0.5 kg unit is quoted at the small bag's 0.96 kg volumetric weight, as couriers bill it.
   assertEquals(sr.calls.rate, [{ deliveryPincode: "201001", weightKg: 0.96, declaredValue: 1000 }]);
@@ -47,24 +49,26 @@ Deno.test("quote: prices from the DB, courier rate rounded up, client fields ign
 });
 
 Deno.test("quote: Uttarakhand pincode 263001 → accepted outside UP, courier rate asked", async () => {
-  const { deps: d, sr } = deps({ state: "Uttarakhand" });
+  const { deps: d, sr } = deps({ state: "Uttarakhand", city: "Nainital" });
   const r = await buildQuote(d, req({ pincode: "263001" }), guest);
-  assertEquals(r.response.pincode, { ok: true, inUp: false });
+  assertEquals(r.response.pincode, { ok: true, inUp: false, city: "Nainital", state: "Uttarakhand" });
   assertEquals(sr.calls.rate.map((c) => c.deliveryPincode), ["263001"]);
   assertEquals([r.response.shippingSource, r.response.quote.shipping], ["rate", 80]);
 });
 
 Deno.test("quote: outside UP with no courier rate → national slab (Kurti ₹250)", async () => {
-  const { deps: d } = deps({ rate: null });
+  const { deps: d, sr } = deps({ state: "Maharashtra", city: "Mumbai", rate: null });
   const r = await buildQuote(d, req({ pincode: "400001" }), guest);
-  assertEquals(r.response.pincode, { ok: true, inUp: false });
+  // The lookup now runs outside the UP prefixes too, for autofill only.
+  assertEquals(r.response.pincode, { ok: true, inUp: false, city: "Mumbai", state: "Maharashtra" });
+  assertEquals(sr.calls.postcode, ["400001"]);
   assertEquals([r.response.shippingSource, r.response.quote.shipping], ["flat", 250]);
 });
 
 Deno.test("quote: shared prefix with a failed lookup → accepted, not counted as UP (R16)", async () => {
   const { deps: d } = deps({ state: null, rate: null });
   const r = await buildQuote(d, req({ pincode: "247001" }), guest);
-  assertEquals(r.response.pincode, { ok: true, inUp: false });
+  assertEquals(r.response.pincode, { ok: true, inUp: false, city: null, state: null });
   assertEquals(r.response.quote.shipping, 250);
 });
 

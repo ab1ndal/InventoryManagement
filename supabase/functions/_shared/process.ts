@@ -302,7 +302,9 @@ export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   const categories = lines.flatMap(({ item, units }) =>
     Array.from({ length: units }, () => item.category_name ?? item.category_id)
   );
-  const address2 = str(a.line2);
+  // Shiprocket adhoc has no landmark field; it rides on address_2 so the courier sees it.
+  const landmark = str(a.landmark);
+  const address2 = [str(a.line2), landmark ? `Landmark: ${landmark}` : ""].filter(Boolean).join(", ");
   return {
     orderRef: srOrderRef(o),
     orderDate: new Date(o.paid_at ?? o.created_at),

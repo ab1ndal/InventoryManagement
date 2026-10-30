@@ -45,7 +45,7 @@ it("renders contact/address fields and the order summary", () => {
   render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
   expect(screen.getByPlaceholderText(/full name/i)).toBeInTheDocument();
   expect(screen.getByPlaceholderText(/phone/i)).toBeInTheDocument();
-  expect(screen.getByPlaceholderText(/address line 1/i)).toBeInTheDocument();
+  expect(screen.getByPlaceholderText(/flat, house no/i)).toBeInTheDocument();
   expect(screen.getByText("Silk Saree (FREE/Red) ×2")).toBeInTheDocument();
   // subtotal ₹3,000, below ₹5000 threshold → ₹150 shipping shown
   expect(screen.getAllByText("₹3,000").length).toBeGreaterThan(0);
@@ -66,14 +66,31 @@ it("enables the WhatsApp control once the address form is valid", async () => {
 
   userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
   userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
-  userEvent.type(screen.getByPlaceholderText(/address line 1/i), "58 Sihani Gate Market");
+  userEvent.type(screen.getByPlaceholderText(/pincode/i), "201001");
+  userEvent.type(screen.getByPlaceholderText(/flat, house no/i), "58");
+  userEvent.type(screen.getByPlaceholderText(/area, street/i), "Sihani Gate Market");
+  userEvent.type(screen.getByPlaceholderText(/^landmark/i), "Near Durga Bhabhi Chowk");
   userEvent.type(screen.getByPlaceholderText(/^city$/i), "Ghaziabad");
   userEvent.selectOptions(screen.getByRole("combobox"), "Uttar Pradesh");
-  userEvent.type(screen.getByPlaceholderText(/pincode/i), "201001");
 
   const whatsappLink = await screen.findByRole("link", { name: /complete your order on whatsapp/i });
   expect(whatsappLink).toHaveAttribute("href", expect.stringContaining("wa.me/919810873280"));
-  expect(whatsappLink).toHaveAttribute("href", expect.stringContaining("Ghaziabad"));
+  const text = decodeURIComponent(whatsappLink.getAttribute("href").split("?text=")[1]);
+  expect(text).toContain("58\nSihani Gate Market\nLandmark: Near Durga Bhabhi Chowk\nGhaziabad, Uttar Pradesh 201001");
+});
+
+it("requires the area/street line for delivery", async () => {
+  render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
+  userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
+  userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
+  userEvent.type(screen.getByPlaceholderText(/pincode/i), "201001");
+  userEvent.type(screen.getByPlaceholderText(/flat, house no/i), "58");
+  userEvent.type(screen.getByPlaceholderText(/^city$/i), "Ghaziabad");
+  userEvent.selectOptions(screen.getByRole("combobox"), "Uttar Pradesh");
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  expect(screen.getByRole("button", { name: /complete your order on whatsapp/i })).toBeDisabled();
+  userEvent.type(screen.getByPlaceholderText(/area, street/i), "Sihani Gate Market");
+  expect(await screen.findByRole("link", { name: /complete your order on whatsapp/i })).toBeInTheDocument();
 });
 
 it("offers WhatsApp checkout for an address outside Uttar Pradesh", async () => {
@@ -81,10 +98,11 @@ it("offers WhatsApp checkout for an address outside Uttar Pradesh", async () => 
 
   userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
   userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
-  userEvent.type(screen.getByPlaceholderText(/address line 1/i), "12 Marine Drive");
+  userEvent.type(screen.getByPlaceholderText(/pincode/i), "400001");
+  userEvent.type(screen.getByPlaceholderText(/flat, house no/i), "12");
+  userEvent.type(screen.getByPlaceholderText(/area, street/i), "Marine Drive");
   userEvent.type(screen.getByPlaceholderText(/^city$/i), "Mumbai");
   userEvent.selectOptions(screen.getByRole("combobox"), "Maharashtra");
-  userEvent.type(screen.getByPlaceholderText(/pincode/i), "400001");
 
   const whatsappLink = await screen.findByRole("link", { name: /complete your order on whatsapp/i });
   expect(whatsappLink).toHaveAttribute("href", expect.stringContaining("Maharashtra"));
@@ -107,7 +125,7 @@ it("offers store pickup on WhatsApp with contact details only", async () => {
   // check (ship branch) resolve first, or its stale result lands last.
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   userEvent.click(screen.getByRole("radio", { name: /pick up at the shop/i }));
-  expect(screen.queryByPlaceholderText(/address line 1/i)).not.toBeInTheDocument();
+  expect(screen.queryByPlaceholderText(/flat, house no/i)).not.toBeInTheDocument();
   expect(screen.getByText("Free (store pickup)")).toBeInTheDocument();
   expect(screen.queryByTestId("free-shipping-nudge")).not.toBeInTheDocument();
 

@@ -112,6 +112,16 @@ test("shows an Outside UP badge only for an address outside Uttar Pradesh", asyn
   expect(await screen.findByText("Outside UP")).toBeInTheDocument();
 });
 
+test("address shows the landmark when the shopper gave one", async () => {
+  mockDetail = detail({
+    order: { address: { line1: "Flat 4", line2: "Sector 5", landmark: "Near Durga Bhabhi Chowk", city: "Lucknow", state: "Uttar Pradesh", pincode: "226001" } },
+  });
+  render(<OrderDetail orderId="o1" />);
+  expect(
+    await screen.findByText("Flat 4, Sector 5, Landmark: Near Durga Bhabhi Chowk, Lucknow, Uttar Pradesh, 226001")
+  ).toBeInTheDocument();
+});
+
 test("Process stays disabled until every line has been set", async () => {
   render(<OrderDetail orderId="o1" />);
   await screen.findByText("Kurta");

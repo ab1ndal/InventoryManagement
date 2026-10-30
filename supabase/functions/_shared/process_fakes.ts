@@ -503,9 +503,9 @@ export class FakeShiprocket implements ShiprocketClient {
     await this.hit("token", []);
     return "t";
   }
-  async postcodeState(pincode: string) {
-    await this.hit("postcodeState", [pincode]);
-    return "Uttar Pradesh";
+  async postcodeDetails(pincode: string) {
+    await this.hit("postcodeDetails", [pincode]);
+    return { state: "Uttar Pradesh", city: "Ghaziabad" };
   }
   async rate(input: { deliveryPincode: string; weightKg: number; declaredValue: number }) {
     await this.hit("rate", [input]);

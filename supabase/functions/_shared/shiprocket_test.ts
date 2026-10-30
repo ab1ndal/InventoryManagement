@@ -114,30 +114,41 @@ Deno.test("401 twice → throws, only one retry", async () => {
   assertEquals(t.apiCalls().length, 2);
 });
 
-// ---------- postcodeState ----------
+// ---------- postcodeDetails ----------
 
-Deno.test("postcodeState: returns state; sends bearer token", async () => {
+Deno.test("postcodeDetails: returns state and city; sends bearer token", async () => {
   const t = setup(() =>
-    jsonResponse(200, { success: true, postcode_details: { postcode: "201001", state: "Uttar Pradesh", state_code: "UP" } })
+    jsonResponse(200, {
+      success: true,
+      postcode_details: { postcode: "201001", city: " Ghaziabad ", locality: [], state: "Uttar Pradesh", state_code: "UP" },
+    })
   );
-  assertEquals(await t.sr.postcodeState("201001"), "Uttar Pradesh");
+  assertEquals(await t.sr.postcodeDetails("201001"), { state: "Uttar Pradesh", city: "Ghaziabad" });
   const c = t.apiCalls()[0];
   assertEquals(c.url, `${BASE}/open/postcode/details?postcode=201001`);
   // UNVERIFIED pin: we always send the token to the /open/ endpoint.
   assertEquals(c.headers.get("authorization"), "Bearer cached");
 });
 
-Deno.test("postcodeState: null on 403 unknown, success false, timeout, network, login failure", async () => {
+Deno.test("postcodeDetails: city missing or blank → null city, state still returned", async () => {
+  const r = (city: unknown) =>
+    setup(() => jsonResponse(200, { success: true, postcode_details: { state: "Delhi", city } })).sr.postcodeDetails("110001");
+  assertEquals(await r(undefined), { state: "Delhi", city: null });
+  assertEquals(await r("  "), { state: "Delhi", city: null });
+  assertEquals(await r(42), { state: "Delhi", city: null });
+});
+
+Deno.test("postcodeDetails: null on 403 unknown, success false, timeout, network, login failure", async () => {
   assertEquals(
     await setup(() => jsonResponse(403, { message: "Mapped City-State details not found for 999999", status_code: 403 }))
-      .sr.postcodeState("999999"),
+      .sr.postcodeDetails("999999"),
     null,
   );
-  assertEquals(await setup(() => jsonResponse(200, { success: false })).sr.postcodeState("201001"), null);
+  assertEquals(await setup(() => jsonResponse(200, { success: false })).sr.postcodeDetails("201001"), null);
   const { delay, requested } = instantDelay();
-  assertEquals(await setup(hang, { delay }).sr.postcodeState("201001"), null);
+  assertEquals(await setup(hang, { delay }).sr.postcodeDetails("201001"), null);
   assertEquals(requested, [5_000]);
-  assertEquals(await setup(() => Promise.reject(new TypeError("dns"))).sr.postcodeState("201001"), null);
+  assertEquals(await setup(() => Promise.reject(new TypeError("dns"))).sr.postcodeDetails("201001"), null);
   const noLogin = createShiprocket({
     email: "a",
     password: "b",
@@ -145,7 +156,7 @@ Deno.test("postcodeState: null on 403 unknown, success false, timeout, network, 
     tokenStore: memoryStore().store,
     delay: neverDelay,
   });
-  assertEquals(await noLogin.postcodeState("201001"), null);
+  assertEquals(await noLogin.postcodeDetails("201001"), null);
 });
 
 // ---------- rate (R18) ----------

@@ -73,10 +73,11 @@ function renderPage() {
 function fillAddress(pincode = "201001", state = "Uttar Pradesh") {
   userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
   userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
-  userEvent.type(screen.getByPlaceholderText(/address line 1/i), "58 Sihani Gate Market");
+  userEvent.type(screen.getByPlaceholderText(/pincode/i), pincode);
+  userEvent.type(screen.getByPlaceholderText(/flat, house no/i), "58");
+  userEvent.type(screen.getByPlaceholderText(/area, street/i), "Sihani Gate Market");
   userEvent.type(screen.getByPlaceholderText(/^city$/i), "Ghaziabad");
   userEvent.selectOptions(screen.getByRole("combobox"), state);
-  userEvent.type(screen.getByPlaceholderText(/pincode/i), pincode);
 }
 
 beforeEach(() => {
@@ -249,7 +250,94 @@ it("navigates to the order page when credit or a voucher covered everything", as
     attemptKey: ATTEMPT_KEY,
     items: [{ variantId: "v1", qty: 2 }],
     fulfilment: "ship",
-    address: { name: "Priya Sharma", phone: "9810873280", line1: "58 Sihani Gate Market", city: "Ghaziabad", state: "Uttar Pradesh", pincode: "201001" },
+    address: { name: "Priya Sharma", phone: "9810873280", line1: "58", line2: "Sihani Gate Market", city: "Ghaziabad", state: "Uttar Pradesh", pincode: "201001" },
+  });
+});
+
+describe("Indian address format", () => {
+  it("orders the address fields pincode first, landmark optional", () => {
+    renderPage();
+    const ids = Array.from(document.querySelectorAll("section input, section select")).map((el) => el.id); // eslint-disable-line testing-library/no-node-access
+    expect(ids).toEqual(["name", "phone", "email", "pincode", "line1", "line2", "landmark", "city", "state"]);
+    expect(screen.getByPlaceholderText("Flat, House no., Building, Apartment")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Area, Street, Sector, Village")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/^Landmark \(optional\)/)).toBeInTheDocument();
+  });
+
+  it("fills City and State from the pincode lookup in the quote", async () => {
+    mockApi.quote.mockImplementation(async (p) =>
+      p.pincode ? quoteResponse({ pincode: { ok: true, inUp: true, city: "Ghaziabad", state: "Uttar Pradesh" } }) : quoteResponse({ pincode: null })
+    );
+    renderPage();
+    userEvent.type(screen.getByPlaceholderText(/pincode/i), "201001");
+    await waitFor(() => expect(screen.getByPlaceholderText(/^city$/i)).toHaveValue("Ghaziabad"));
+    expect(screen.getByRole("combobox")).toHaveValue("Uttar Pradesh");
+    // Still editable after the autofill.
+    userEvent.clear(screen.getByPlaceholderText(/^city$/i));
+    userEvent.type(screen.getByPlaceholderText(/^city$/i), "Modinagar");
+    expect(screen.getByPlaceholderText(/^city$/i)).toHaveValue("Modinagar");
+  });
+
+  it("replaces its own autofill on a new pincode but never a city the shopper typed", async () => {
+    const places = { "201001": ["Ghaziabad", "Uttar Pradesh"], "400001": ["Mumbai", "Maharashtra"] };
+    mockApi.quote.mockImplementation(async (p) => {
+      const place = places[p.pincode];
+      return place ? quoteResponse({ pincode: { ok: true, inUp: false, city: place[0], state: place[1] } }) : quoteResponse({ pincode: null });
+    });
+    renderPage();
+    const pincode = screen.getByPlaceholderText(/pincode/i);
+    const city = screen.getByPlaceholderText(/^city$/i);
+    userEvent.type(pincode, "201001");
+    await waitFor(() => expect(city).toHaveValue("Ghaziabad"));
+    userEvent.clear(pincode);
+    userEvent.type(pincode, "400001");
+    await waitFor(() => expect(city).toHaveValue("Mumbai"));
+    expect(screen.getByRole("combobox")).toHaveValue("Maharashtra");
+
+    userEvent.clear(city);
+    userEvent.type(city, "Navi Mumbai");
+    userEvent.clear(pincode);
+    userEvent.type(pincode, "201001");
+    await waitFor(() => expect(screen.getByRole("combobox")).toHaveValue("Uttar Pradesh"));
+    expect(city).toHaveValue("Navi Mumbai");
+  });
+
+  it("sends the landmark with the order", async () => {
+    mockApi.createOrder.mockResolvedValue({ orderRef: "WEB-000004", accessToken: "tok", paymentSessionId: null, cashfreeMode: "sandbox", paid: true });
+    mockApi.quote.mockImplementation(async () => quoteResponse({ quote: { gatewayAmount: 0, amountDue: 0, voucherApplied: 3080 } }));
+    renderPage();
+    fillAddress();
+    userEvent.type(screen.getByPlaceholderText(/^landmark/i), " Near Durga Bhabhi Chowk ");
+    const place = await screen.findByRole("button", { name: "Place order" });
+    await waitFor(() => expect(place).toBeEnabled());
+    userEvent.click(place);
+    await waitFor(() => expect(mockApi.createOrder).toHaveBeenCalled());
+    expect(mockApi.createOrder.mock.calls[0][0].address).toEqual({
+      name: "Priya Sharma",
+      phone: "9810873280",
+      line1: "58",
+      line2: "Sihani Gate Market",
+      landmark: "Near Durga Bhabhi Chowk",
+      city: "Ghaziabad",
+      state: "Uttar Pradesh",
+      pincode: "201001",
+    });
+  });
+
+  it("shows a field's error only after the shopper leaves it", async () => {
+    renderPage();
+    await screen.findByTestId("quote-shipping");
+    const line1 = screen.getByPlaceholderText(/flat, house no/i);
+    userEvent.type(screen.getByPlaceholderText(/pincode/i), "2010");
+    expect(screen.queryByText("Enter a valid 6-digit pincode")).not.toBeInTheDocument();
+    userEvent.click(line1);
+    expect(await screen.findByText("Enter a valid 6-digit pincode")).toBeInTheDocument();
+    // Fields not visited yet stay quiet.
+    expect(screen.queryByText("Enter your flat, house no. or building")).not.toBeInTheDocument();
+    expect(screen.queryByText("Enter your city")).not.toBeInTheDocument();
+    userEvent.tab();
+    expect(await screen.findByText("Enter your flat, house no. or building")).toBeInTheDocument();
+    expect(screen.queryByText("Enter your city")).not.toBeInTheDocument();
   });
 });
 
@@ -310,7 +398,7 @@ describe("store pickup", () => {
     expect(screen.getByTestId("free-shipping-nudge")).toBeInTheDocument();
 
     userEvent.click(screen.getByRole("radio", { name: /pick up at the shop/i }));
-    expect(screen.queryByPlaceholderText(/address line 1/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/flat, house no/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/pincode/i)).not.toBeInTheDocument();
     expect(screen.getByText("58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("Free (store pickup)"));
@@ -319,7 +407,7 @@ describe("store pickup", () => {
     expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "pickup" });
 
     userEvent.click(screen.getByRole("radio", { name: /ship to me/i }));
-    expect(screen.getByPlaceholderText(/address line 1/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/flat, house no/i)).toBeInTheDocument();
     await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship" }));
   });
 

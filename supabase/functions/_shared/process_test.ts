@@ -41,6 +41,15 @@ Deno.test("buildSrInput: paid values, sub_total, package dims, weight by categor
   assertEquals(input.billing.state, "Uttar Pradesh");
 });
 
+Deno.test("buildSrInput: landmark joins address_2; landmark alone; neither → no address2", () => {
+  const lines = createLines(fakeItems());
+  const withAddress = (a: Record<string, unknown>) => buildSrInput(fakeOrder({ address: { ...fakeOrder().address, ...a } }), lines);
+  assertEquals(withAddress({ landmark: " Durga Bhabhi Chowk " }).billing.address2, "Near Clock Tower, Landmark: Durga Bhabhi Chowk");
+  assertEquals(withAddress({ line2: null, landmark: "Durga Bhabhi Chowk" }).billing.address2, "Landmark: Durga Bhabhi Chowk");
+  // Orders from before PR F have no landmark key.
+  assertEquals("address2" in withAddress({ line2: "" }).billing, false);
+});
+
 Deno.test("createLines: stock-race units (never took stock) are left out", () => {
   const items = fakeItems();
   items[1] = { ...items[1], stock_taken: 1, refunded_qty: 1 };
