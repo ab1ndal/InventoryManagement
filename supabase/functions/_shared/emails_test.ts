@@ -1,9 +1,18 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { delivered, type EmailOrder, orderConfirmed, shipped, shopNewOrder } from "./emails.ts";
+import {
+  delivered,
+  type EmailOrder,
+  orderConfirmed,
+  readyForPickup,
+  SHOP_ADDRESS,
+  shipped,
+  shopNewOrder,
+} from "./emails.ts";
 
 const SITE = "https://www.bindalscreations.com";
 const o: EmailOrder = {
   orderRef: "WEB-000042",
+  fulfilment: "ship",
   contactName: "Asha Gupta",
   contactPhone: "+919876543210",
   contactEmail: "asha@example.com",
@@ -56,4 +65,33 @@ Deno.test("shipped: AWB and tracking link; delivered", () => {
   assertStringIncludes(m.text, "AWB): AWB123");
   assertStringIncludes(m.text, "https://shiprocket.co/tracking/AWB123");
   assertEquals(delivered(o, SITE).subject, "Order WEB-000042 delivered");
+});
+
+const pickup: EmailOrder = { ...o, fulfilment: "pickup", shipping: 0, address: { name: "Asha Gupta", phone: "+919876543210" } };
+
+Deno.test("store pickup: confirmed says we'll tell them when it's ready, not delivery", () => {
+  const m = orderConfirmed(pickup, SITE);
+  assertStringIncludes(m.text, `You chose store pickup at ${SHOP_ADDRESS}.`);
+  assertStringIncludes(m.text, "We'll email you when your order is ready to collect");
+  assertStringIncludes(m.text, "Shipping: Free (store pickup)");
+  assert(!/deliver|parcel|ships/i.test(m.text), "no delivery wording");
+});
+
+Deno.test("store pickup: shop alert says Store pickup and to mark it ready", () => {
+  const m = shopNewOrder(pickup, SITE);
+  assertEquals(m.subject, "New online order WEB-000042 (store pickup)");
+  assertStringIncludes(m.text, "  Store pickup");
+  assertStringIncludes(m.text, `Check the shelf and mark it ready for pickup: ${SITE}/admin/online-orders`);
+});
+
+Deno.test("store pickup: ready email has the shop address and the order number; collected wording", () => {
+  const m = readyForPickup(pickup, SITE);
+  assertEquals(m.subject, "Order WEB-000042 is ready for pickup");
+  assertStringIncludes(m.text, "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001");
+  assertStringIncludes(m.text, "Please bring your order number (WEB-000042)");
+  assertStringIncludes(m.text, "WhatsApp us");
+  assertStringIncludes(m.text, `${SITE}/order/WEB-000042`);
+  const d = delivered(pickup, SITE);
+  assertEquals(d.subject, "Order WEB-000042 collected");
+  assertStringIncludes(d.text, "You've collected your order WEB-000042.");
 });

@@ -28,6 +28,7 @@ const REF_RE = /^WEB-\d{6,}$/;
 export type OrderStatusResponse = {
   orderRef: string;
   status: string;
+  fulfilment: "ship" | "pickup";
   items: { name: string; size: string | null; color: string | null; qty: number; status: string }[];
   totals: {
     subtotal: number;
@@ -81,6 +82,7 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
     return {
       orderRef: order.order_ref,
       status: order.status,
+      fulfilment: order.fulfilment,
       items: items.map((i) => ({ name: i.product_name, size: i.size, color: i.color, qty: i.qty, status: i.status })),
       totals: {
         subtotal: order.subtotal,

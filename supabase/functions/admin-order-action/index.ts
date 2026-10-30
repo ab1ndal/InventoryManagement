@@ -3,8 +3,10 @@
  * docs/superpowers/plans/2026-10-23-online-orders-http-contracts.md § admin-order-action.
  *
  *   set_availability {orderId, itemId, availableQty}
- *   process          {orderId, opKey}            claim → prepare → Shiprocket steps → packed
- *   cancel           {orderId, opKey, reason}
+ *   process          {orderId, opKey}            claim → prepare → Shiprocket steps → packed (ship orders only)
+ *   mark_ready       {orderId}                   store pickup: paid (shelf checked) → ready_for_pickup | cancelled
+ *   mark_collected   {orderId}                   store pickup: ready_for_pickup → delivered
+ *   cancel           {orderId, opKey, reason}    paid, or ready_for_pickup (store pickup)
  *   retry            {orderId}                   re-run failed jobs / resume Process
  *   send_back        {orderId, opKey, manualCancelConfirmed?}                  stalled Process → paid
  *   rebook           {orderId, opKey, parcelLost, note, manualCancelConfirmed?} packed/shipped → paid | cancelled
@@ -156,12 +158,35 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
 
       case "process": {
         const orderId = uuidField(body, "orderId");
+        // The DB claim refuses pickup too; this gives staff a clearer reason than "order is paid".
+        if ((await deps.db.getOrder(orderId))?.fulfilment === "pickup") {
+          return fail(409, "bad_state", "store pickup orders are not shipped: use Ready for pickup");
+        }
         const r = await runProcess(ship, orderId, user.id, textField(body, "opKey"));
         if (r.kind === "busy") return fail(409, "busy", "another staff action holds this order");
         if (r.kind === "bad_state") return fail(409, "bad_state", `order is ${r.status}`);
         if (r.kind === "courier_error") return fail(502, "courier_error", r.message);
         if (r.kind === "cancelled") return await orderBody(orderId, { refundId: r.refundId });
         return await orderBody(orderId, { billId: r.billId, ...(r.refundId ? { refundId: r.refundId } : {}) });
+      }
+
+      case "mark_ready": {
+        // One transaction in Postgres (no courier call), so no op key: a repeat returns the stored result.
+        const orderId = uuidField(body, "orderId");
+        const r = await deps.db.rpc<{ status: string; bill_id: number | null; refund_id: string | null }>(
+          "online_order_mark_ready",
+          { p_order_id: orderId, p_actor: user.id },
+        );
+        return await orderBody(orderId, {
+          ...(r.bill_id ? { billId: r.bill_id } : {}),
+          ...(r.refund_id ? { refundId: r.refund_id } : {}),
+        });
+      }
+
+      case "mark_collected": {
+        const orderId = uuidField(body, "orderId");
+        await deps.db.rpc("online_order_mark_collected", { p_order_id: orderId, p_actor: user.id });
+        return await orderBody(orderId);
       }
 
       case "cancel": {

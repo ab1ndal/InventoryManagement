@@ -22,6 +22,14 @@ Deno.test("checkout-quote: no pincode → pincode null", async () => {
   assertEquals(j.pincode, null);
 });
 
+Deno.test("checkout-quote: fulfilment pickup → ₹0 shipping, source pickup, pincode ignored; bad value 400", async () => {
+  const j = await (await handler(post(URL_, { items: [{ variantId: V1, qty: 1 }], pincode: "201001", fulfilment: "pickup" }), testDeps()))
+    .json();
+  assertEquals([j.quote.shipping, j.quote.freeShippingGap, j.shippingSource, j.pincode], [0, 0, "pickup", null]);
+  const bad = await handler(post(URL_, { items: [{ variantId: V1, qty: 1 }], fulfilment: "courier" }), testDeps());
+  assertEquals(bad.status, 400);
+});
+
 Deno.test("checkout-quote: live false still quotes, with live:false", async () => {
   const deps = testDeps();
   deps.store.live = false;

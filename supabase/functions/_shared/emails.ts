@@ -10,6 +10,7 @@ export type EmailItem = { name: string; size: string | null; color: string | nul
 
 export type EmailOrder = {
   orderRef: string;
+  fulfilment: "ship" | "pickup";
   contactName: string;
   contactPhone: string;
   contactEmail: string | null;
@@ -29,6 +30,7 @@ export type EmailOrder = {
 export type Email = { subject: string; text: string };
 
 export const SHOP_NAME = "Bindals Creation";
+export const SHOP_ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001";
 
 const inr = (n: number) =>
   "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
@@ -48,7 +50,7 @@ function firstName(name: string): string {
 function moneyLines(o: EmailOrder): string[] {
   const lines = [`Items: ${inr(o.subtotal)}`];
   if (o.promoDiscount > 0) lines.push(`Discount: -${inr(o.promoDiscount)}`);
-  lines.push(`Shipping: ${o.shipping > 0 ? inr(o.shipping) : "Free"}`);
+  lines.push(`Shipping: ${o.fulfilment === "pickup" ? "Free (store pickup)" : o.shipping > 0 ? inr(o.shipping) : "Free"}`);
   if (o.voucherApplied > 0) lines.push(`Voucher: -${inr(o.voucherApplied)}`);
   if (o.creditApplied > 0) lines.push(`Store credit: -${inr(o.creditApplied)}`);
   lines.push(`Total paid: ${inr(o.subtotal - o.promoDiscount + o.shipping)}` +
@@ -69,9 +71,13 @@ function inUp(a: Record<string, unknown>): boolean {
 }
 
 export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
-  const delivery = inUp(o.address)
-    ? "We deliver within Uttar Pradesh."
-    : "We'll confirm delivery to your address on WhatsApp before dispatch.";
+  const next = o.fulfilment === "pickup"
+    ? `You chose store pickup at ${SHOP_ADDRESS}. We'll email you when your order is ready to collect (usually 1–2 days).`
+    : `${
+      inUp(o.address)
+        ? "We deliver within Uttar Pradesh."
+        : "We'll confirm delivery to your address on WhatsApp before dispatch."
+    } We'll email you again when your parcel ships.`;
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",
@@ -84,7 +90,7 @@ export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
       ? ["", `Your voucher had ${inr(o.leftoverVoucher.value)} left over. Use this new code next time: ${o.leftoverVoucher.code}`]
       : []),
     "",
-    `${delivery} We'll email you again when your parcel ships.`,
+    next,
     "",
     `Your order: ${siteUrl}/order/${o.orderRef}`,
     "",
@@ -98,15 +104,20 @@ export function shopNewOrder(o: EmailOrder, siteUrl: string): Email {
     `New online order ${o.orderRef}.`,
     "",
     `Customer: ${o.contactName}, ${o.contactPhone}${o.contactEmail ? `, ${o.contactEmail}` : ""}`,
-    ...addressLines(o.address).map((l) => `  ${l}`),
+    ...(o.fulfilment === "pickup" ? ["  Store pickup"] : addressLines(o.address).map((l) => `  ${l}`)),
     "",
     ...o.items.map(itemLine),
     "",
     ...moneyLines(o),
     "",
-    `Check the shelf and process it: ${siteUrl}/admin/online-orders`,
+    o.fulfilment === "pickup"
+      ? `Check the shelf and mark it ready for pickup: ${siteUrl}/admin/online-orders`
+      : `Check the shelf and process it: ${siteUrl}/admin/online-orders`,
   ].join("\n");
-  return { subject: `New online order ${o.orderRef}`, text };
+  return {
+    subject: `New online order ${o.orderRef}${o.fulfilment === "pickup" ? " (store pickup)" : ""}`,
+    text,
+  };
 }
 
 export function shipped(o: EmailOrder & { awb: string }, siteUrl: string): Email {
@@ -124,16 +135,39 @@ export function shipped(o: EmailOrder & { awb: string }, siteUrl: string): Email
   return { subject: `Order ${o.orderRef} has shipped`, text };
 }
 
-export function delivered(o: EmailOrder, siteUrl: string): Email {
+export function readyForPickup(o: EmailOrder, siteUrl: string): Email {
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",
-    `Your order ${o.orderRef} has been delivered. We hope you love it.`,
+    `Your order ${o.orderRef} is ready to collect at our shop:`,
+    SHOP_NAME,
+    SHOP_ADDRESS,
+    "",
+    ...o.items.map(itemLine),
+    "",
+    `Please bring your order number (${o.orderRef}). It's already paid.`,
+    "If you have a question, reply to this email or WhatsApp us.",
+    "",
+    `Your order: ${siteUrl}/order/${o.orderRef}`,
+    "",
+    `- ${SHOP_NAME}`,
+  ].join("\n");
+  return { subject: `Order ${o.orderRef} is ready for pickup`, text };
+}
+
+export function delivered(o: EmailOrder, siteUrl: string): Email {
+  const pickup = o.fulfilment === "pickup";
+  const text = [
+    `Hi ${firstName(o.contactName)},`,
+    "",
+    pickup
+      ? `You've collected your order ${o.orderRef}. We hope you love it.`
+      : `Your order ${o.orderRef} has been delivered. We hope you love it.`,
     "If anything isn't right, reply to this email or WhatsApp us.",
     "",
     `Shop again: ${siteUrl}`,
     "",
     `- ${SHOP_NAME}`,
   ].join("\n");
-  return { subject: `Order ${o.orderRef} delivered`, text };
+  return { subject: `Order ${o.orderRef} ${pickup ? "collected" : "delivered"}`, text };
 }

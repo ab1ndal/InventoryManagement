@@ -57,6 +57,7 @@ export function order(over: Partial<OrderRow> = {}): OrderRow {
     order_ref: "WEB-000001",
     attempt_key: ATTEMPT,
     status: "pending_payment",
+    fulfilment: "ship",
     customerid: 7,
     auth_user_id: null,
     contact_name: "Asha Gupta",

@@ -6,8 +6,9 @@ import Seo from "../components/Seo";
 import FreeShippingNudge from "../components/FreeShippingNudge";
 import { useCart } from "../context/CartContext";
 import { formatSize } from "../lib/sizes";
-import { addressSchema, shippingFee, INDIAN_STATES } from "../lib/checkout";
+import { checkoutSchema, shippingFee, INDIAN_STATES } from "../lib/checkout";
 import { getCheckoutLive } from "../lib/ordersApi";
+import { SHOP_ADDRESS } from "../lib/siteConfig";
 import LiveCheckout from "../components/LiveCheckout";
 
 const WHATSAPP = "919810873280";
@@ -19,17 +20,22 @@ function subtotalOf(items) {
 // Builds the WhatsApp message: order lines + the address the shopper just
 // entered, so the store can act on it without any order being created here.
 function whatsappHref(items, subtotal, shipping, address) {
+  const pickup = address.fulfilment === "pickup";
   const lines = items
     .map((i) => `• ${i.name} (${formatSize(i.size)}/${i.color}) ×${i.quantity} — ₹${(i.price * i.quantity).toLocaleString("en-IN")}`)
     .join("\n");
-  const addressLines = [
-    address.name,
-    address.phone,
-    address.email,
-    address.line1,
-    address.line2,
-    `${address.city}, ${address.state} ${address.pincode}`,
-  ]
+  const addressLines = (
+    pickup
+      ? [address.name, address.phone, address.email]
+      : [
+          address.name,
+          address.phone,
+          address.email,
+          address.line1,
+          address.line2,
+          `${address.city}, ${address.state} ${address.pincode}`,
+        ]
+  )
     .filter(Boolean)
     .join("\n");
   const text =
@@ -37,7 +43,7 @@ function whatsappHref(items, subtotal, shipping, address) {
     `Subtotal: ₹${subtotal.toLocaleString("en-IN")}\n` +
     `Shipping: ${shipping === 0 ? "Free" : `₹${shipping}`}\n` +
     `Total: ₹${(subtotal + shipping).toLocaleString("en-IN")}\n\n` +
-    `Deliver to:\n${addressLines}`;
+    `${pickup ? "Store pickup" : "Deliver to"}:\n${addressLines}`;
   // encodeURIComponent so address/product text with &, #, + etc. doesn't
   // corrupt or truncate the prefilled message (newlines become %0A).
   return `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(text)}`;
@@ -64,9 +70,10 @@ export default function CheckoutPage() {
   const goOffline = useCallback(() => setLive(false), []);
 
   const form = useForm({
-    resolver: zodResolver(addressSchema),
+    resolver: zodResolver(checkoutSchema),
     mode: "onChange",
     defaultValues: {
+      fulfilment: "ship",
       name: "",
       phone: "",
       email: "",
@@ -88,10 +95,11 @@ export default function CheckoutPage() {
     return <Navigate to="/cart" replace />;
   }
 
-  const subtotal = subtotalOf(items);
-  const shipping = shippingFee(subtotal);
-  const total = subtotal + shipping;
   const address = watch();
+  const pickup = address.fulfilment === "pickup";
+  const subtotal = subtotalOf(items);
+  const shipping = pickup ? 0 : shippingFee(subtotal);
+  const total = subtotal + shipping;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
@@ -100,6 +108,34 @@ export default function CheckoutPage() {
 
       <form onSubmit={handleSubmit(() => {})} className="grid grid-cols-1 md:grid-cols-2 gap-10">
         <div className="space-y-8">
+          <fieldset>
+            <legend className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Delivery</legend>
+            <div className="space-y-3">
+              <label
+                className={`flex items-start gap-3 border px-3 py-3 text-sm font-sans text-storefront-charcoal cursor-pointer ${
+                  pickup ? "border-storefront-border" : "border-storefront-charcoal"
+                }`}
+              >
+                <input type="radio" value="ship" {...register("fulfilment")} className="mt-0.5" />
+                <span>Ship to me</span>
+              </label>
+              <label
+                className={`flex items-start gap-3 border px-3 py-3 text-sm font-sans text-storefront-charcoal cursor-pointer ${
+                  pickup ? "border-storefront-charcoal" : "border-storefront-border"
+                }`}
+              >
+                <input type="radio" value="pickup" {...register("fulfilment")} className="mt-0.5" />
+                <span>
+                  Pick up at the shop (free)
+                  <span className="block text-xs text-storefront-muted mt-1">{SHOP_ADDRESS}</span>
+                  <span className="block text-xs text-storefront-muted">
+                    We'll message you when it's ready (usually 1–2 days).
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
           <section>
             <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Contact</h2>
             <div className="space-y-3">
@@ -137,66 +173,68 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          <section>
-            <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Shipping address</h2>
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="line1" className="sr-only">Address line 1</label>
-                <input
-                  id="line1"
-                  {...register("line1")}
-                  placeholder="Address line 1"
-                  className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                />
-                {errors.line1 && <p className="text-xs text-red-600 mt-1">{errors.line1.message}</p>}
-              </div>
-              <div>
-                <label htmlFor="line2" className="sr-only">Address line 2 (optional)</label>
-                <input
-                  id="line2"
-                  {...register("line2")}
-                  placeholder="Address line 2 (optional)"
-                  className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+          {!pickup && (
+            <section>
+              <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Shipping address</h2>
+              <div className="space-y-3">
                 <div>
-                  <label htmlFor="city" className="sr-only">City</label>
+                  <label htmlFor="line1" className="sr-only">Address line 1</label>
                   <input
-                    id="city"
-                    {...register("city")}
-                    placeholder="City"
+                    id="line1"
+                    {...register("line1")}
+                    placeholder="Address line 1"
                     className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
                   />
-                  {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
+                  {errors.line1 && <p className="text-xs text-red-600 mt-1">{errors.line1.message}</p>}
                 </div>
                 <div>
-                  <label htmlFor="pincode" className="sr-only">Pincode</label>
+                  <label htmlFor="line2" className="sr-only">Address line 2 (optional)</label>
                   <input
-                    id="pincode"
-                    {...register("pincode")}
-                    placeholder="Pincode"
+                    id="line2"
+                    {...register("line2")}
+                    placeholder="Address line 2 (optional)"
                     className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
                   />
-                  {errors.pincode && <p className="text-xs text-red-600 mt-1">{errors.pincode.message}</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="city" className="sr-only">City</label>
+                    <input
+                      id="city"
+                      {...register("city")}
+                      placeholder="City"
+                      className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                    />
+                    {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
+                  </div>
+                  <div>
+                    <label htmlFor="pincode" className="sr-only">Pincode</label>
+                    <input
+                      id="pincode"
+                      {...register("pincode")}
+                      placeholder="Pincode"
+                      className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                    />
+                    {errors.pincode && <p className="text-xs text-red-600 mt-1">{errors.pincode.message}</p>}
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="state" className="sr-only">State</label>
+                  <select
+                    id="state"
+                    {...register("state")}
+                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans bg-white"
+                  >
+                    <option value="">Select state</option>
+                    {INDIAN_STATES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  {errors.state && <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>}
                 </div>
               </div>
-              <div>
-                <label htmlFor="state" className="sr-only">State</label>
-                <select
-                  id="state"
-                  {...register("state")}
-                  className="w-full border border-storefront-border px-3 py-2 text-sm font-sans bg-white"
-                >
-                  <option value="">Select state</option>
-                  {INDIAN_STATES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-                {errors.state && <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>}
-              </div>
-            </div>
-          </section>
+            </section>
+          )}
         </div>
 
         {live ? (
@@ -212,9 +250,11 @@ export default function CheckoutPage() {
                 </li>
               ))}
             </ul>
-            <div className="pt-4">
-              <FreeShippingNudge amount={subtotal} cartItems={items} />
-            </div>
+            {!pickup && (
+              <div className="pt-4">
+                <FreeShippingNudge amount={subtotal} cartItems={items} />
+              </div>
+            )}
             <div className="border-t border-storefront-border pt-4 mt-2 space-y-2 text-sm font-sans text-storefront-charcoal">
               <div className="flex justify-between">
                 <span>Subtotal</span>
@@ -222,7 +262,9 @@ export default function CheckoutPage() {
               </div>
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span className="tabular-nums">{shipping === 0 ? "Free" : `₹${shipping.toLocaleString("en-IN")}`}</span>
+                <span className="tabular-nums">
+                  {pickup ? "Free (store pickup)" : shipping === 0 ? "Free" : `₹${shipping.toLocaleString("en-IN")}`}
+                </span>
               </div>
               <div className="flex justify-between font-semibold pt-2 border-t border-storefront-border">
                 <span>Total</span>

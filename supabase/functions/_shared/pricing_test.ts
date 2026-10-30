@@ -241,6 +241,12 @@ Deno.test("free-shipping gap is clamped at 0", () => {
   assertEquals(over.shipping, 0);
 });
 
+Deno.test("store pickup: no shipping below ₹5,000 and no free-shipping gap", () => {
+  const q = quoteOrder({ lines: [line("A", 1200, 1)], promo: null, shippingRate: 73, pickup: true, ...NO_TENDER });
+  assertEquals([q.shipping, q.freeShippingGap, q.amountDue, q.gatewayAmount], [0, 0, 1200, 1200]);
+  assertEquals([q.shippingGateway, q.shippingNonGateway], [0, 0]);
+});
+
 Deno.test("quoteOrder rejects invalid input", () => {
   const base = { promo: null, shippingRate: 73, ...NO_TENDER };
   assertThrows(() => quoteOrder({ ...base, lines: [] }), RangeError);

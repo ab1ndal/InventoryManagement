@@ -20,6 +20,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export type QuoteItem = { variantId: string; qty: number };
 
+export type Fulfilment = "ship" | "pickup";
+
 export type QuoteRequest = {
   items: QuoteItem[];
   pincode: string | null;
@@ -27,6 +29,8 @@ export type QuoteRequest = {
   creditRequested: number;
   /** Shopper phone (create-order only); feeds once-per-customer and R9 limits. */
   phone: string | null;
+  /** Pickup: ₹0 shipping, no pincode check or courier rate. */
+  fulfilment: Fulfilment;
 };
 
 export type Identity = { authUserId: string | null; ipHash: string | null };
@@ -62,7 +66,7 @@ export type QuoteResponse = {
     freeShippingGap: number;
   };
   pincode: PincodeCheck | null;
-  shippingSource: "rate" | "flat" | "free";
+  shippingSource: "rate" | "flat" | "free" | "pickup";
   code: CodeResult | null;
   creditAvailable: number;
   unavailable: { variantId: string; available: number }[];
@@ -97,6 +101,13 @@ export function parseItems(raw: unknown): QuoteItem[] {
   const items = [...merged].map(([variantId, qty]) => ({ variantId, qty }));
   if (items.some((i) => i.qty > MAX_QTY)) throw new ApiError(400, "bad_request", `at most ${MAX_QTY} of one item`);
   return items;
+}
+
+/** Omitted means ship (clients from before store pickup). */
+export function parseFulfilment(raw: unknown): Fulfilment {
+  if (raw === undefined || raw === null) return "ship";
+  if (raw !== "ship" && raw !== "pickup") throw new ApiError(400, "bad_request", "fulfilment must be ship or pickup");
+  return raw;
 }
 
 export function parseCredit(raw: unknown): number {
@@ -201,14 +212,15 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
 
   // Pincode (R16) and courier rate; the rate never blocks checkout (weight-slab fallback).
   const postcodeState = shiprocket ? (pc: string) => shiprocket.postcodeState(pc) : () => Promise.resolve(null);
-  const pincode = req.pincode === null ? null : await checkPincode(req.pincode, postcodeState);
+  const pickup = req.fulfilment === "pickup";
+  const pincode = pickup || req.pincode === null ? null : await checkPincode(req.pincode, postcodeState);
 
   const subtotal = lines.reduce((s, l) => s + Math.round(l.unitPrice * 100) * l.qty, 0) / 100;
   const goods = subtotal - promoDiscount(promo, subtotal);
   const weightKg = chargeableWeightKg(lines.flatMap((l) => Array.from({ length: l.qty }, () => l.category)));
   let shippingRate: number | null = null;
   let courierId: number | null = null;
-  if (goods < 5000 && pincode?.ok && shiprocket && req.pincode) {
+  if (!pickup && goods < 5000 && pincode?.ok && shiprocket && req.pincode) {
     const rate = await shiprocket.rate({
       deliveryPincode: req.pincode.trim(),
       weightKg,
@@ -226,11 +238,12 @@ export async function buildQuote(deps: QuoteDeps, req: QuoteRequest, who: Identi
     shippingRate,
     // National slabs outside UP; with no pincode yet the UP estimate shows.
     fallbackShipping: pincode?.ok && !pincode.inUp ? fallbackShippingChargeIndia(weightKg) : fallbackShippingCharge(weightKg),
+    pickup,
     creditRequested: req.creditRequested,
     creditAvailable,
     voucherValue,
   });
-  const shippingSource = quote.shipping === 0 ? "free" : shippingRate !== null ? "rate" : "flat";
+  const shippingSource = pickup ? "pickup" : quote.shipping === 0 ? "free" : shippingRate !== null ? "rate" : "flat";
   if (code?.kind === "voucher") {
     const leftPaise = Math.round(voucherValue * 100) - Math.round(quote.voucherApplied * 100);
     if (leftPaise > 0) code.message = `${formatInr(leftPaise / 100)} left on your voucher will be emailed to you after you pay.`;
@@ -287,6 +300,7 @@ export function orderPayload(
     contact: OrderContact;
     address: Record<string, unknown>;
     accessTokenHash: string;
+    fulfilment: Fulfilment;
   },
 ): { p_order: Record<string, unknown>; p_items: Record<string, unknown>[] } {
   const q = result.quote;
@@ -305,6 +319,7 @@ export function orderPayload(
       gateway_amount: q.gatewayAmount,
       quoted_courier_id: result.courierId,
       access_token_hash: extra.accessTokenHash,
+      fulfilment: extra.fulfilment,
     },
     p_items: q.lines.map((l) => ({
       variant_id: l.variantId,

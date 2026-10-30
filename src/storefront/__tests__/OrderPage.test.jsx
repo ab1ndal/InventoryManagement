@@ -124,3 +124,14 @@ it("says not found for an unknown ref or bad token", async () => {
   renderAt("/order/WEB-000404?t=bad");
   expect(await screen.findByText("We couldn't find that order")).toBeInTheDocument();
 });
+
+it("shows a ready store-pickup order with the shop address and no courier link", async () => {
+  mockOrderStatus.mockResolvedValue(
+    order("ready_for_pickup", { fulfilment: "pickup", totals: { subtotal: 3000, promoDiscount: 0, shipping: 0, voucherApplied: 0, creditApplied: 0, gatewayAmount: 3000 } })
+  );
+  renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByText("Payment received — order confirmed")).toBeInTheDocument();
+  expect(screen.getByText(/ready at our shop: 58 Sihani Gate Market/)).toBeInTheDocument();
+  expect(screen.getByText("Free (store pickup)")).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /track with the courier/i })).not.toBeInTheDocument();
+});

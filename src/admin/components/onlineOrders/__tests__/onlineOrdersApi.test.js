@@ -45,6 +45,16 @@ test("shipped tab includes out_for_delivery", async () => {
   expect(opsOf("orders")).toContainEqual(["in", "status", ["shipped", "out_for_delivery"]]);
 });
 
+test("pickup tab lists ready_for_pickup orders only", async () => {
+  await listOrders("pickup");
+  expect(opsOf("orders")).toContainEqual(["in", "status", ["ready_for_pickup"]]);
+});
+
+test("list selects fulfilment", async () => {
+  await listOrders("all");
+  expect(opsOf("orders").find((o) => o[0] === "select")[1]).toContain("fulfilment");
+});
+
 test("problems tab ORs problem, process_error, rto and orders with failed jobs", async () => {
   mockResults.order_jobs = { data: [{ order_id: "o1" }, { order_id: "o1" }, { order_id: "o2" }], error: null };
   await listOrders("problems");

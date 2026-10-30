@@ -63,6 +63,7 @@ export type OrderRow = {
   id: string;
   order_ref: string;
   status: string;
+  fulfilment: "ship" | "pickup";
   contact_name: string;
   contact_phone: string;
   contact_email: string | null;
@@ -338,7 +339,8 @@ async function mustGetOrder(db: OrdersDb, orderId: string): Promise<OrderRow> {
 }
 
 /**
- * Creates the Shiprocket order once. Skips when sr_order_id is stored, or when the
+ * Creates the Shiprocket order once. Skips when sr_order_id is stored, when the order
+ * is a store pickup (Retry calls this for any paid order without one), or when the
  * order is no longer shippable (cancelled before the job ran). A Shiprocket failure
  * is recorded as sr_create_failed and rethrown as CourierError so the job retries.
  * `opKey` (Process running it inline) fences the checkpoints; the job passes none.
@@ -347,6 +349,10 @@ export async function ensureSrOrder(deps: ShipDeps, orderId: string, opKey?: str
   const fence = opKey ? { p_op_key: opKey } : {};
   const o = await mustGetOrder(deps.db, orderId);
   if (o.sr_order_id) return "exists";
+  if (o.fulfilment === "pickup") {
+    logEvent("info", "sr_create_skipped", { order_ref: o.order_ref, reason: "store pickup" });
+    return "skipped";
+  }
   if (o.status !== "paid" && o.status !== "processing") {
     logEvent("info", "sr_create_skipped", { order_ref: o.order_ref, status: o.status });
     return "skipped";

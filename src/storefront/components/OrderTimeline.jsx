@@ -1,5 +1,6 @@
 import React from "react";
-import { TIMELINE_STEPS, completedStep } from "../lib/orderStatus";
+import { completedStep, timelineSteps } from "../lib/orderStatus";
+import { SHOP_ADDRESS } from "../lib/siteConfig";
 
 const OFF_PATH = {
   cancelled: "This order was cancelled. Any amount paid is being refunded.",
@@ -7,15 +8,16 @@ const OFF_PATH = {
   rto_received: "This parcel came back to us. The item value is being refunded; shipping is not refundable.",
 };
 
-// Paid → Packed → Shipped → Out for delivery → Delivered, with the
-// cancelled / returned-to-origin exits shown as a note under the steps.
-export default function OrderTimeline({ status }) {
-  const done = completedStep(status);
+// Paid → Packed → Shipped → Out for delivery → Delivered (store pickup:
+// Paid → Ready for pickup → Collected), with the cancelled /
+// returned-to-origin exits shown as a note under the steps.
+export default function OrderTimeline({ status, fulfilment }) {
+  const done = completedStep(status, fulfilment);
   if (done < 0) return null;
   return (
     <div className="font-sans text-sm text-storefront-charcoal">
       <ol aria-label="Order progress" className="flex flex-col sm:flex-row sm:justify-between gap-3 sm:gap-2">
-        {TIMELINE_STEPS.map((step, index) => {
+        {timelineSteps(fulfilment).map((step, index) => {
           const complete = index <= done;
           return (
             <li key={step} data-complete={complete ? "true" : "false"} className="flex items-center gap-2">
@@ -37,6 +39,11 @@ export default function OrderTimeline({ status }) {
           );
         })}
       </ol>
+      {fulfilment === "pickup" && status === "ready_for_pickup" && (
+        <p className="mt-4 text-sm">
+          Your order is ready at our shop: {SHOP_ADDRESS}. Bring your order number.
+        </p>
+      )}
       {OFF_PATH[status] && <p className="mt-4 text-sm text-red-700">{OFF_PATH[status]}</p>}
     </div>
   );

@@ -100,7 +100,7 @@ it("shows server totals and a Pay button with the gateway amount", async () => {
   const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
   expect(screen.queryByText(/We usually deliver within Uttar Pradesh/)).not.toBeInTheDocument();
   await waitFor(() => expect(pay).toBeEnabled());
-  expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], pincode: "201001" });
+  expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship", pincode: "201001" });
 });
 
 it("shows Calculating… instead of a stale figure while a re-quote is in flight", async () => {
@@ -159,7 +159,7 @@ it("shows code messages and lets an applied code be removed", async () => {
 
   userEvent.click(screen.getByRole("button", { name: "Remove" }));
   expect(screen.queryByText("Code applied")).not.toBeInTheDocument();
-  await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }] }));
+  await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship" }));
 });
 
 it("shows the leftover-voucher note the server sends", async () => {
@@ -248,6 +248,7 @@ it("navigates to the order page when credit or a voucher covered everything", as
   expect(mockApi.createOrder).toHaveBeenCalledWith({
     attemptKey: ATTEMPT_KEY,
     items: [{ variantId: "v1", qty: 2 }],
+    fulfilment: "ship",
     address: { name: "Priya Sharma", phone: "9810873280", line1: "58 Sihani Gate Market", city: "Ghaziabad", state: "Uttar Pradesh", pincode: "201001" },
   });
 });
@@ -291,4 +292,72 @@ it("falls back to the WhatsApp flow when the server says checkout is off", async
   mockApi.quote.mockResolvedValue({ live: false });
   renderPage();
   expect(await screen.findByRole("button", { name: /complete your order on whatsapp/i })).toBeInTheDocument();
+});
+
+function pickupQuote(over = {}) {
+  return quoteResponse({ pincode: null, shippingSource: "pickup", quote: { shipping: 0, gatewayAmount: 3000, amountDue: 3000, freeShippingGap: 0 }, ...over });
+}
+
+describe("store pickup", () => {
+  beforeEach(() => {
+    mockApi.quote.mockImplementation(async (p) => (p.fulfilment === "pickup" ? pickupQuote() : quoteResponse()));
+  });
+
+  it("hides the address, re-quotes for pickup and shows free store-pickup shipping", async () => {
+    renderPage();
+    await screen.findByTestId("quote-shipping");
+    expect(screen.getByRole("radio", { name: /ship to me/i })).toBeChecked();
+    expect(screen.getByTestId("free-shipping-nudge")).toBeInTheDocument();
+
+    userEvent.click(screen.getByRole("radio", { name: /pick up at the shop/i }));
+    expect(screen.queryByPlaceholderText(/address line 1/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/pincode/i)).not.toBeInTheDocument();
+    expect(screen.getByText("58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("Free (store pickup)"));
+    expect(screen.getByTestId("quote-to-pay")).toHaveTextContent("₹3,000");
+    expect(screen.queryByTestId("free-shipping-nudge")).not.toBeInTheDocument();
+    expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "pickup" });
+
+    userEvent.click(screen.getByRole("radio", { name: /ship to me/i }));
+    expect(screen.getByPlaceholderText(/address line 1/i)).toBeInTheDocument();
+    await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship" }));
+  });
+
+  it("enables Pay with only name and phone, and sends no address lines", async () => {
+    const checkout = jest.fn().mockResolvedValue({});
+    mockApi.loadCashfree.mockResolvedValue({ checkout });
+    mockApi.createOrder.mockResolvedValue({ orderRef: "WEB-000003", accessToken: "tok", paymentSessionId: "session_9", cashfreeMode: "sandbox", paid: false });
+    renderPage();
+    // userEvent fires synchronously; let react-hook-form's mount-time validity
+    // check (ship branch) resolve first, or its stale result lands last.
+    await screen.findByTestId("quote-shipping");
+    userEvent.click(screen.getByRole("radio", { name: /pick up at the shop/i }));
+    userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
+    userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
+    const pay = await screen.findByRole("button", { name: "Pay ₹3,000" });
+    await waitFor(() => expect(pay).toBeEnabled());
+    userEvent.click(pay);
+    await waitFor(() => expect(checkout).toHaveBeenCalledWith({ paymentSessionId: "session_9", redirectTarget: "_self" }));
+    expect(mockApi.createOrder).toHaveBeenCalledWith({
+      attemptKey: ATTEMPT_KEY,
+      items: [{ variantId: "v1", qty: 2 }],
+      fulfilment: "pickup",
+      address: { name: "Priya Sharma", phone: "9810873280" },
+    });
+  });
+
+  it("keeps Pay disabled until the quote on screen is a pickup quote", async () => {
+    // A server that ignores `fulfilment` answers with a ship quote and no pincode.
+    mockApi.quote.mockImplementation(async () => quoteResponse({ pincode: null }));
+    renderPage();
+    // userEvent fires synchronously; let react-hook-form's mount-time validity
+    // check (ship branch) resolve first, or its stale result lands last.
+    await screen.findByTestId("quote-shipping");
+    userEvent.click(screen.getByRole("radio", { name: /pick up at the shop/i }));
+    userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
+    userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
+    await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith(expect.objectContaining({ fulfilment: "pickup" })));
+    await waitFor(() => expect(screen.getByTestId("quote-to-pay")).not.toHaveTextContent("Calculating…"));
+    expect(screen.getByRole("button", { name: /pay ₹/i })).toBeDisabled();
+  });
 });

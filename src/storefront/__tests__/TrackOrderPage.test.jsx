@@ -62,4 +62,18 @@ describe("TrackOrderPage", () => {
     expect(screen.getByRole("link", { name: /track with the courier/i })).toHaveAttribute("href", "https://shiprocket.co/tracking/AWB1");
     expect(screen.getByText("Silk Saree (FREE/Red) ×2")).toBeInTheDocument();
   });
+
+  it("shows a collected store-pickup order without a courier link", async () => {
+    supabase.rpc.mockResolvedValue({
+      data: { ...DELIVERED, fulfilment: "pickup", shipping: 0, gateway_amount: 3000, courier_name: null, awb: null, tracking_url: null },
+      error: null,
+    });
+    renderPage();
+    submit("WEB-000007", "9810873280");
+    const progress = await screen.findByRole("list", { name: /order progress/i });
+    const steps = within(progress).getAllByRole("listitem");
+    expect(steps.map((s) => s.textContent.replace(/\s*\((done|pending)\)/, ""))).toEqual(["✓Paid", "✓Ready for pickup", "✓Collected"]);
+    expect(screen.getByText("Collected", { selector: "p" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /track with the courier/i })).not.toBeInTheDocument();
+  });
 });

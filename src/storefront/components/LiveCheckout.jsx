@@ -29,15 +29,13 @@ const CODE_MESSAGES = {
 };
 
 function toAddress(values) {
-  const address = {
-    name: values.name.trim(),
-    phone: values.phone.trim(),
-    line1: values.line1.trim(),
-    city: values.city.trim(),
-    state: values.state,
-    pincode: values.pincode.trim(),
-  };
+  const address = { name: values.name.trim(), phone: values.phone.trim() };
   if (values.email?.trim()) address.email = values.email.trim();
+  if (values.fulfilment === "pickup") return address;
+  address.line1 = values.line1.trim();
+  address.city = values.city.trim();
+  address.state = values.state;
+  address.pincode = values.pincode.trim();
   if (values.line2?.trim()) address.line2 = values.line2.trim();
   return address;
 }
@@ -71,8 +69,11 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
   const [notice, setNotice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const fulfilment = watch("fulfilment");
+  const pickup = fulfilment === "pickup";
   const pincodeValue = watch("pincode") || "";
-  const pincode = PINCODE.test(pincodeValue.trim()) ? pincodeValue.trim() : "";
+  // A pickup quote needs no pincode, so typing one must not trigger re-quotes.
+  const pincode = !pickup && PINCODE.test(pincodeValue.trim()) ? pincodeValue.trim() : "";
   const lineItems = useMemo(
     () => items.map((i) => ({ variantId: i.variant_id, qty: i.quantity })),
     [items]
@@ -105,7 +106,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
     let active = true;
     setQuoting(true);
     const timer = setTimeout(async () => {
-      const payload = { items: lineItems };
+      const payload = { items: lineItems, fulfilment };
       if (pincode) payload.pincode = pincode;
       if (appliedCode) payload.code = appliedCode;
       if (creditRequested > 0) payload.creditRequested = creditRequested;
@@ -136,7 +137,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [lineItems, pincode, appliedCode, creditRequested, requoteTick, onCheckoutOff]);
+  }, [lineItems, fulfilment, pincode, appliedCode, creditRequested, requoteTick, onCheckoutOff]);
 
   function applyCode() {
     const code = codeInput.trim();
@@ -165,7 +166,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
     setSubmitting(true);
     setNotice(null);
     try {
-      const payload = { attemptKey, items: lineItems, address: toAddress(values) };
+      const payload = { attemptKey, items: lineItems, fulfilment: values.fulfilment, address: toAddress(values) };
       if (appliedCode) payload.code = appliedCode;
       if (creditRequested > 0) payload.creditRequested = creditRequested;
       const res = await createOrder(payload);
@@ -196,7 +197,8 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
   const q = response?.quote;
   // Soft note only: out-of-UP orders are accepted and the owner confirms fulfilment (2026-10-30).
   const stateValue = watch("state");
-  const outsideUp = response?.pincode?.inUp === false || (Boolean(stateValue) && stateValue !== UP_STATE);
+  const outsideUp =
+    !pickup && (response?.pincode?.inUp === false || (Boolean(stateValue) && stateValue !== UP_STATE));
   const unavailable = response?.unavailable ?? [];
   const canPay =
     formState.isValid &&
@@ -204,7 +206,8 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
     !quoting &&
     !quoteError &&
     !submitting &&
-    response.pincode?.ok === true &&
+    // The quote on screen must be for the chosen option: a pickup quote has no pincode.
+    (pickup ? response.shippingSource === "pickup" : response.pincode?.ok === true) &&
     unavailable.length === 0;
   const nudgeAmount = q ? q.subtotal - q.promoDiscount : items.reduce((s, i) => s + i.price * i.quantity, 0);
 
@@ -216,9 +219,11 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
       ) : (
         <p className="text-sm font-sans text-storefront-muted py-3">{quoteError ? "" : "Calculating your total…"}</p>
       )}
-      <div className="pt-4">
-        <FreeShippingNudge amount={nudgeAmount} cartItems={items} />
-      </div>
+      {!pickup && (
+        <div className="pt-4">
+          <FreeShippingNudge amount={nudgeAmount} cartItems={items} />
+        </div>
+      )}
 
       <div className="mt-6 space-y-2">
         <label htmlFor="checkout-code" className="block text-xs font-sans tracking-wide text-storefront-charcoal">

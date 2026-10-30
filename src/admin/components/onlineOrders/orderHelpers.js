@@ -6,6 +6,7 @@ export const STATUS_LABELS = {
   processing: "Processing",
   cancelling: "Cancelling",
   packed: "Packed",
+  ready_for_pickup: "Ready for pickup",
   shipped: "Shipped",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
@@ -21,6 +22,7 @@ export const STATUS_CLASSES = {
   processing: "bg-blue-100 text-blue-800",
   cancelling: "bg-blue-100 text-blue-800",
   packed: "bg-indigo-100 text-indigo-800",
+  ready_for_pickup: "bg-sky-100 text-sky-800",
   shipped: "bg-sky-100 text-sky-800",
   out_for_delivery: "bg-sky-100 text-sky-800",
   delivered: "bg-green-100 text-green-800",
@@ -60,8 +62,10 @@ export function itemCount(o) {
 }
 
 // Checkout accepts any state but the shop usually ships within UP; the owner decides
-// fulfilment for the rest (2026-10-30). orders.address.state is required by create-order.
-export function isOutsideUp(address) {
+// fulfilment for the rest (2026-10-30). orders.address.state is required by create-order
+// for shipped orders; a pickup order's address is only the contact, so it is never outside UP.
+export function isOutsideUp(address, fulfilment = "ship") {
+  if (fulfilment === "pickup") return false;
   const state = typeof address?.state === "string" ? address.state.trim().toLowerCase() : "";
   return state !== "" && state !== "uttar pradesh";
 }

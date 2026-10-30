@@ -1,5 +1,6 @@
 // Email job handlers (Pay slice): email_confirmed, email_shop, email_shipped,
-// email_delivered. Enqueued by the DB (confirm, apply_tracking) and run by run-jobs.
+// email_delivered, email_ready_for_pickup. Enqueued by the DB (confirm, apply_tracking,
+// mark_ready, mark_collected) and run by run-jobs.
 //
 // Missing shopper email skips the customer email and finishes the job (R17);
 // a mailer without credentials resolves {sent:false} and also finishes, so
@@ -8,7 +9,15 @@
 // whose finish was lost can repeat one email; that is accepted (at-least-once).
 import type { JobContext, OrderJob } from "./types.ts";
 import { createStore, logEvent, type Store } from "../context.ts";
-import { delivered, type Email, type EmailOrder, orderConfirmed, shipped, shopNewOrder } from "../emails.ts";
+import {
+  delivered,
+  type Email,
+  type EmailOrder,
+  orderConfirmed,
+  readyForPickup,
+  shipped,
+  shopNewOrder,
+} from "../emails.ts";
 
 export async function loadEmailOrder(store: Store, orderId: string): Promise<EmailOrder> {
   const o = await store.orderById(orderId);
@@ -17,6 +26,7 @@ export async function loadEmailOrder(store: Store, orderId: string): Promise<Ema
   const leftoverValue = o.leftover_voucher_id ? await store.voucherValue(o.leftover_voucher_id) : null;
   return {
     orderRef: o.order_ref,
+    fulfilment: o.fulfilment,
     contactName: o.contact_name,
     contactPhone: o.contact_phone,
     contactEmail: o.contact_email?.trim() || null,
@@ -59,6 +69,10 @@ export async function sendOrderEmail(ctx: JobContext, store: Store, job: OrderJo
     case "email_delivered":
       to = order.contactEmail;
       mail = delivered(order, site);
+      break;
+    case "email_ready_for_pickup":
+      to = order.contactEmail;
+      mail = readyForPickup(order, site);
       break;
     default:
       throw new Error(`emails: unknown job kind ${job.kind}`);

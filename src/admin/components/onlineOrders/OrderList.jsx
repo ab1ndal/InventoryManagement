@@ -14,14 +14,16 @@ import {
   returnBadge,
 } from "./orderHelpers";
 
-export function StatusBadge({ status }) {
+export function StatusBadge({ status, fulfilment }) {
+  const label =
+    status === "delivered" && fulfilment === "pickup" ? "Collected" : STATUS_LABELS[status] || status;
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
         STATUS_CLASSES[status] || "bg-gray-100 text-gray-700"
       }`}
     >
-      {STATUS_LABELS[status] || status}
+      {label}
     </span>
   );
 }
@@ -36,11 +38,20 @@ export function ReturnBadge({ order }) {
   );
 }
 
-export function OutsideUpBadge({ address }) {
-  if (!isOutsideUp(address)) return null;
+export function OutsideUpBadge({ address, fulfilment }) {
+  if (!isOutsideUp(address, fulfilment)) return null;
   return (
     <span className="ml-1 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
       Outside UP
+    </span>
+  );
+}
+
+export function PickupBadge({ fulfilment }) {
+  if (fulfilment !== "pickup") return null;
+  return (
+    <span className="ml-1 inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800">
+      Store pickup
     </span>
   );
 }
@@ -125,9 +136,10 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
                 <td className="px-3 py-2 text-right">{itemCount(o)}</td>
                 <td className="px-3 py-2 text-right">{formatRupees(orderTotal(o))}</td>
                 <td className="px-3 py-2">
-                  <StatusBadge status={o.status} />
+                  <StatusBadge status={o.status} fulfilment={o.fulfilment} />
                   <ReturnBadge order={o} />
-                  <OutsideUpBadge address={o.address} />
+                  <OutsideUpBadge address={o.address} fulfilment={o.fulfilment} />
+                  <PickupBadge fulfilment={o.fulfilment} />
                 </td>
                 <td className="px-3 py-2">
                   {hasProblem(o) && (

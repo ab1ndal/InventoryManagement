@@ -1,4 +1,11 @@
-import { isOutsideUp, outsideReturnWindow, returnBadge, returnableUnits, windowLabel } from "../orderHelpers";
+import {
+  STATUS_LABELS,
+  isOutsideUp,
+  outsideReturnWindow,
+  returnBadge,
+  returnableUnits,
+  windowLabel,
+} from "../orderHelpers";
 
 const D = "2026-10-20T10:00:00Z";
 const at = (iso) => iso;
@@ -47,4 +54,14 @@ test("isOutsideUp: flags any state other than Uttar Pradesh", () => {
   expect(isOutsideUp({ state: "Uttarakhand", pincode: "263001" })).toBe(true);
   expect(isOutsideUp({})).toBe(false);
   expect(isOutsideUp(null)).toBe(false);
+});
+
+test("isOutsideUp: never for a pickup order", () => {
+  expect(isOutsideUp({ name: "Asha", phone: "+919999999999" }, "pickup")).toBe(false);
+  expect(isOutsideUp({ state: "Maharashtra" }, "pickup")).toBe(false);
+  expect(isOutsideUp({ state: "Maharashtra" }, "ship")).toBe(true);
+});
+
+test("ready_for_pickup has a label", () => {
+  expect(STATUS_LABELS.ready_for_pickup).toBe("Ready for pickup");
 });

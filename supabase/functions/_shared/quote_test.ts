@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects, assertThrows } from "@std/assert";
-import { buildQuote, orderPayload, parseItems, type QuoteRequest } from "./quote.ts";
+import { buildQuote, orderPayload, parseFulfilment, parseItems, type QuoteRequest } from "./quote.ts";
 import { ApiError } from "./context.ts";
 import { fakeShiprocket, FakeStore, USER, V1, V2, variant } from "./pay_testing.ts";
 
@@ -10,6 +10,7 @@ const req = (over: Partial<QuoteRequest> = {}): QuoteRequest => ({
   code: null,
   creditRequested: 0,
   phone: null,
+  fulfilment: "ship",
   ...over,
 });
 
@@ -149,6 +150,28 @@ Deno.test("quote: store credit only for a verified user, capped at the balance",
   assertEquals([u.response.creditAvailable, u.response.quote.creditApplied, u.response.quote.gatewayAmount], [700, 700, 380]);
 });
 
+Deno.test("quote: store pickup → ₹0 shipping, no pincode check or courier rate, source pickup", async () => {
+  const { deps: d, sr } = deps();
+  const r = await buildQuote(d, req({ fulfilment: "pickup", pincode: "201001" }), guest);
+  assertEquals([r.response.quote.shipping, r.response.quote.freeShippingGap, r.response.quote.gatewayAmount], [0, 0, 1000]);
+  assertEquals([r.response.shippingSource, r.response.pincode, r.courierId], ["pickup", null, null]);
+  assertEquals(sr.calls.rate, []);
+  assertEquals(sr.calls.postcode, []);
+  const p = orderPayload(r, {
+    attemptKey: "a",
+    contact: { name: "A", phone: "9876543210", email: null },
+    address: { name: "A", phone: "9876543210" },
+    accessTokenHash: "h",
+    fulfilment: "pickup",
+  });
+  assertEquals([p.p_order.fulfilment, p.p_order.shipping, p.p_order.quoted_courier_id], ["pickup", 0, null]);
+});
+
+Deno.test("parseFulfilment: default ship, rejects anything else", () => {
+  assertEquals([parseFulfilment(undefined), parseFulfilment(null), parseFulfilment("pickup")], ["ship", "ship", "pickup"]);
+  for (const bad of ["Pickup", "", 1]) assertEquals(assertThrows(() => parseFulfilment(bad), ApiError).status, 400);
+});
+
 Deno.test("orderPayload: online_order_create shape with credit_part = nonGatewayPart", async () => {
   const { deps: d, store } = deps();
   store.credit.set(USER, 500);
@@ -163,7 +186,9 @@ Deno.test("orderPayload: online_order_create shape with credit_part = nonGateway
     contact: { name: "A", phone: "9876543210", email: null },
     address: { pincode: "201001" },
     accessTokenHash: "h",
+    fulfilment: "ship",
   });
+  assertEquals(p.p_order.fulfilment, "ship");
   assertEquals(p.p_order.credit_applied, 500);
   assertEquals(p.p_order.quoted_courier_id, 12);
   assertEquals(p.p_order.access_token_hash, "h");

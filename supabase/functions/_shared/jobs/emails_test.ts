@@ -72,3 +72,10 @@ Deno.test("email jobs: a rebooked order's second shipment (kind:attempt) still s
   assertEquals(sent.length, 2);
   assertStringIncludes(sent[0].text, "https://shiprocket.co/tracking/AWB2");
 });
+
+Deno.test("email jobs: email_ready_for_pickup → shopper with the shop address", async () => {
+  const { store, ctx, sent, job } = setup({ fulfilment: "pickup", shipping: 0, status: "ready_for_pickup" });
+  await sendOrderEmail(ctx, store, job("email_ready_for_pickup"));
+  assertEquals(sent.map((m) => [m.to, m.subject]), [["asha@example.com", "Order WEB-000001 is ready for pickup"]]);
+  assertStringIncludes(sent[0].text, "58 Sihani Gate Market");
+});

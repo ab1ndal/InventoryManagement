@@ -25,12 +25,19 @@ Deno.test("order-status: valid token → contract shape", async () => {
   assertEquals(await res.json(), {
     orderRef: o.order_ref,
     status: "shipped",
+    fulfilment: "ship",
     items: [{ name: "Silk Kurti", size: "M", color: "Red", qty: 1, status: "ordered" }],
     totals: { subtotal: 1000, promoDiscount: 0, shipping: 80, voucherApplied: 0, creditApplied: 0, gatewayAmount: 1080 },
     trackingUrl: "https://shiprocket.co/tracking/AWB1",
     leftoverVoucher: { code: "LEFT123", value: 250 },
   });
   assertEquals(deps.cashfree.getOrderCalls, 0, "only pending orders are reconciled");
+});
+
+Deno.test("order-status: store pickup order reports fulfilment and no tracking link", async () => {
+  const { deps } = await setup({ status: "ready_for_pickup", fulfilment: "pickup", shipping: 0, gateway_amount: 1000 });
+  const j = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps)).json();
+  assertEquals([j.status, j.fulfilment, j.trackingUrl, j.totals.shipping], ["ready_for_pickup", "pickup", null, 0]);
 });
 
 Deno.test("order-status: unknown ref, wrong token, no credentials, other user's JWT → identical 404", async () => {

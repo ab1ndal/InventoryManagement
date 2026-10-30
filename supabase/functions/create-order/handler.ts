@@ -27,7 +27,15 @@ import {
   newAccessToken,
   readJsonBody,
 } from "../_shared/context.ts";
-import { buildQuote, optionalString, orderPayload, parseCredit, parseItems } from "../_shared/quote.ts";
+import {
+  buildQuote,
+  type Fulfilment,
+  optionalString,
+  orderPayload,
+  parseCredit,
+  parseFulfilment,
+  parseItems,
+} from "../_shared/quote.ts";
 import { confirmNoGateway, reconcilePayment } from "../_shared/confirm.ts";
 
 export const PAYMENT_WINDOW_MS = 30 * 60 * 1000;
@@ -43,9 +51,11 @@ export type CreateOrderResponse = {
   paid: boolean;
 };
 
-type Address = { name: string; phone: string; email: string | null; line1: string; line2: string | null; city: string; state: string; pincode: string };
+type Contact = { name: string; phone: string; email: string | null };
+type Address = Contact & { line1: string; line2: string | null; city: string; state: string; pincode: string };
 
-function parseAddress(raw: unknown): Address {
+/** Pickup needs only the contact: nothing is delivered, so address lines are not read. */
+function parseAddress(raw: unknown, fulfilment: Fulfilment): Contact | Address {
   const a = (raw ?? {}) as Record<string, unknown>;
   const str = (k: string, max: number, required: boolean): string | null => {
     const v = a[k];
@@ -68,10 +78,10 @@ function parseAddress(raw: unknown): Address {
   if (email !== null && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new ApiError(422, "invalid_address", "email is not valid");
   }
+  const contact = { name: str("name", 100, true)!, phone, email };
+  if (fulfilment === "pickup") return contact;
   return {
-    name: str("name", 100, true)!,
-    phone,
-    email,
+    ...contact,
     line1: str("line1", 200, true)!,
     line2: str("line2", 200, false),
     city: str("city", 60, true)!,
@@ -213,7 +223,8 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
       throw new ApiError(400, "bad_request", "attemptKey must be a UUID v4");
     }
     const items = parseItems(body.items);
-    const address = parseAddress(body.address);
+    const fulfilment = parseFulfilment(body.fulfilment);
+    const address = parseAddress(body.address, fulfilment);
     const code = optionalString(body.code, "code");
     const creditRequested = parseCredit(body.creditRequested);
     const user = await optionalUser(req, deps.verifyJwt, deps.env.anonKey ? [deps.env.anonKey] : []);
@@ -226,7 +237,7 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
     const ipHash = deps.env.ipHashSalt ? await hashIp(req, deps.env.ipHashSalt) : null;
     const result = await buildQuote(
       deps,
-      { items, pincode: address.pincode, code, creditRequested, phone: address.phone },
+      { items, pincode: "pincode" in address ? address.pincode : null, code, creditRequested, phone: address.phone, fulfilment },
       { authUserId: user?.id ?? null, ipHash },
     );
     const r = result.response;
@@ -239,16 +250,19 @@ export function handler(req: Request, deps: CreateOrderDeps): Promise<Response> 
     const payload = orderPayload(result, {
       attemptKey,
       contact: { name: address.name, phone: address.phone, email: address.email },
-      address: {
-        name: address.name,
-        phone: address.phone,
-        line1: address.line1,
-        line2: address.line2,
-        city: address.city,
-        state: address.state,
-        pincode: address.pincode,
-      },
+      address: "pincode" in address
+        ? {
+          name: address.name,
+          phone: address.phone,
+          line1: address.line1,
+          line2: address.line2,
+          city: address.city,
+          state: address.state,
+          pincode: address.pincode,
+        }
+        : { name: address.name, phone: address.phone },
       accessTokenHash: hash,
+      fulfilment,
     });
 
     let created: { order_id: string; order_ref: string; created: boolean } | undefined;

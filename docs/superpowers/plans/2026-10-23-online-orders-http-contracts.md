@@ -12,7 +12,8 @@ exactly these shapes; UI builders call exactly these. All bodies JSON. Browser c
 `supabase.from("storefront_settings").select("checkout_live").eq("id", 1).single()`
 
 ### POST `checkout-quote`
-Req: `{ items: [{ variantId: string, qty: number }], pincode?: string, code?: string, creditRequested?: number }`
+Req: `{ items: [{ variantId: string, qty: number }], pincode?: string, code?: string, creditRequested?: number, fulfilment?: "ship"|"pickup" }`
+(`fulfilment` defaults to `ship`. `pickup`: shipping 0, freeShippingGap 0, pincode ignored → `pincode: null`, `shippingSource: "pickup"`.)
 Res 200:
 ```
 { live: boolean,
@@ -20,21 +21,22 @@ Res 200:
            subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount,
            amountDue, freeShippingGap },
   pincode: { ok: boolean, reason?: "format"|"not_up"|"unverifiable" } | null,   // null when no pincode sent
-  shippingSource: "rate"|"flat"|"free",
+  shippingSource: "rate"|"flat"|"free"|"pickup",
   code: { status: "ok"|"invalid"|"rate_limited", kind?: "voucher"|"promo", message?: string } | null,
   creditAvailable: number,          // 0 for guests
   unavailable: [{ variantId, available: number }] }  // stock lower than requested qty
 ```
 
 ### POST `create-order`
-Req: `{ attemptKey: string(uuid v4), items, address: { name, phone, email?, line1, line2?, city, state, pincode }, code?, creditRequested? }`
+Req: `{ attemptKey: string(uuid v4), items, address: { name, phone, email?, line1, line2?, city, state, pincode }, code?, creditRequested?, fulfilment?: "ship"|"pickup" }`
+(`fulfilment: "pickup"`: `address` needs only `{ name, phone, email? }`; the order stores `{ name, phone }` and ₹0 shipping.)
 Res 200: `{ orderRef: "WEB-000123", accessToken: string, paymentSessionId: string|null, cashfreeMode: "sandbox"|"production", paid: boolean }`
 (`paid: true` and `paymentSessionId: null` when credit/voucher covered everything.)
 Errors: 403 `checkout_off`; 409 `price_changed` (re-quote); 409 `out_of_stock`; 422 `invalid_address` / `not_up` / `unverifiable_pincode` / `invalid_code`; 429 `rate_limited`; 502 `gateway_error`.
 
 ### POST `order-status`
 Req: `{ orderRef, accessToken }` (or no token with a signed-in owner's JWT)
-Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received", items: [{ name, size, color, qty, status }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
+Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", items: [{ name, size, color, qty, status }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
 404 for unknown ref or bad token (identical).
 
 ### RPC `online_order_lookup` (anon, for /track)
@@ -53,8 +55,10 @@ Reads: direct table selects (admin RLS) on `orders`, `order_items`, `order_event
 
 ### POST `admin-order-action`
 Req: `{ action: "set_availability", orderId, itemId, availableQty }`
-   | `{ action: "process", orderId, opKey }`
-   | `{ action: "cancel", orderId, opKey, reason }`
+   | `{ action: "process", orderId, opKey }`           // ship orders only; a pickup order → 409 bad_state
+   | `{ action: "mark_ready", orderId }`               // pickup: paid (shelf checked) → ready_for_pickup (billId) or cancelled (nothing available; refundId)
+   | `{ action: "mark_collected", orderId }`           // pickup: ready_for_pickup → delivered (delivered_at = now)
+   | `{ action: "cancel", orderId, opKey, reason }`    // paid, or ready_for_pickup
    | `{ action: "retry", orderId }`              // re-runs failed job(s) / resumes process
    | `{ action: "rto_received", orderId }`
    | `{ action: "set_live", live: boolean }`     // superadmin only; flips storefront_settings

@@ -19,6 +19,7 @@ const NEED_PINCODE = "Enter your pincode";
 // without a pincode the shipping is unknown, so To pay is too.
 function shippingText(q, shippingSource, hasPincode, calculating) {
   if (calculating) return CALCULATING;
+  if (shippingSource === "pickup") return "Free (store pickup)";
   if (shippingSource === "free" || q.shipping === 0) return "Free";
   if (!hasPincode) return NEED_PINCODE;
   return `₹${formatRupees(q.shipping)}`;

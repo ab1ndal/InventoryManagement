@@ -38,7 +38,7 @@ function Headline({ order, timedOut }) {
       </h1>
     );
   }
-  if (isConfirmed(order.status)) {
+  if (isConfirmed(order.status, order.fulfilment)) {
     return (
       <h1 className="font-display text-3xl font-semibold text-storefront-charcoal mb-2">
         Payment received — order confirmed
@@ -105,7 +105,7 @@ export default function OrderPage() {
     };
   }, [ref, token]);
 
-  const confirmed = state.order ? isConfirmed(state.order.status) : false;
+  const confirmed = state.order ? isConfirmed(state.order.status, state.order.fulfilment) : false;
   useEffect(() => {
     if (confirmed && takePendingOrder(ref)) clearCart();
   }, [confirmed, ref, clearCart]);
@@ -156,8 +156,8 @@ export default function OrderPage() {
         </p>
       )}
 
-      <OrderTimeline status={order.status} />
-      {order.trackingUrl && (
+      <OrderTimeline status={order.status} fulfilment={order.fulfilment} />
+      {order.fulfilment !== "pickup" && order.trackingUrl && (
         <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
           Track with the courier
         </a>

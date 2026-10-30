@@ -89,6 +89,27 @@ Deno.test("create-order: an address outside Uttar Pradesh is accepted", async ()
   assertEquals((create.p_order as Record<string, unknown>).shipping, 250, "national fallback slab");
 });
 
+Deno.test("create-order: store pickup needs only the contact; ₹0 shipping, no pincode, no courier", async () => {
+  const sr = fakeShiprocket();
+  const contact = { name: "Asha Gupta", phone: "98765 43210", email: "" };
+  const { res, deps } = await call(body({ fulfilment: "pickup", address: contact }), { shiprocket: sr.client });
+  assertEquals(res.status, 200);
+  const [create] = deps.store.callsTo("online_order_create");
+  const p = create.p_order as Record<string, unknown>;
+  assertEquals([p.fulfilment, p.shipping, p.gateway_amount], ["pickup", 0, 1000]);
+  assertEquals(p.address, { name: "Asha Gupta", phone: "98765 43210" });
+  assertEquals([sr.calls.postcode, sr.calls.rate], [[], []]);
+  const bad = await call(body({ fulfilment: "drone" }));
+  assertEquals([bad.res.status, bad.json.code], [400, "bad_request"]);
+  const noPhone = await call(body({ fulfilment: "pickup", address: { name: "Asha" } }));
+  assertEquals([noPhone.res.status, noPhone.json.code], [422, "invalid_address"]);
+});
+
+Deno.test("create-order: ship still requires the address lines", async () => {
+  const { res, json } = await call(body({ address: { name: "Asha", phone: "9876543210" } }));
+  assertEquals([res.status, json.code], [422, "invalid_address"]);
+});
+
 Deno.test("create-order: signed-in user id goes to online_order_create (R8)", async () => {
   const { json, deps } = await call(body(), {}, { authorization: "Bearer user.jwt" });
   assertEquals(json.paid, false);
