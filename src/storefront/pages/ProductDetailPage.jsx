@@ -279,7 +279,7 @@ function ProductDetail({ productid }) {
   function handleAddToCart(event) {
     if (!canAddToCart) return;
     const photo = imagePaths[activeImage] ?? imagePaths[0];
-    addItem({
+    const added = addItem({
       variant_id: selectedVariant.variantid,
       product_id: productid,
       quantity,
@@ -290,12 +290,25 @@ function ProductDetail({ productid }) {
       image_url: imageUrl(photo, {
         width: 400,
       }),
+      stock: selectedVariant.stock,
     });
+    if (added === 0) {
+      const inCart =
+        selectedVariant.stock === 1
+          ? "The last piece is already in your cart"
+          : `All ${selectedVariant.stock} in stock are already in your cart`;
+      toast.info(inCart, {
+        action: { label: "View cart", onClick: openCart },
+      });
+      return;
+    }
     flyToCart({
       from: event.currentTarget,
       image: photo ? imageUrl(photo, { width: 150 }) : null,
     });
-    toast.success("Added to cart", {
+    const message =
+      added < quantity ? `Only ${selectedVariant.stock} in stock — your cart now has all of them` : "Added to cart";
+    toast.success(message, {
       action: {
         label: "View cart",
         onClick: openCart,

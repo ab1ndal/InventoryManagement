@@ -2,7 +2,7 @@ import React, {
   createContext, useContext, useState, useEffect, useCallback, useRef,
 } from "react";
 import { supabase } from "lib/supabaseClient";
-import { mergeCarts, revalidateItems } from "../lib/cartLogic";
+import { mergeCarts, revalidateItems, addToItems, maxQuantity } from "../lib/cartLogic";
 import {
   fetchServerCart, upsertItem, removeServerItem, clearServerCart, fetchLiveVariantData,
 } from "../lib/cartApi";
@@ -93,20 +93,20 @@ export function CartProvider({ children }) {
     }
   }, []);
 
+  // Returns how many units were added: fewer than asked (or 0) when the cart
+  // would otherwise hold more than the known stock.
   const addItem = useCallback(
     (payload) => {
       const { variant_id, product_id, quantity } = payload;
-      if (!quantity || quantity <= 0) return;
-      const existing = itemsRef.current.find((i) => i.variant_id === variant_id);
-      const nextQuantity = existing ? existing.quantity + quantity : quantity;
-      setItems((prev) => {
-        const exists = prev.find((i) => i.variant_id === variant_id);
-        return exists
-          ? prev.map((i) => (i.variant_id === variant_id ? { ...i, quantity: i.quantity + quantity } : i))
-          : [...prev, { ...payload }];
-      });
-      persist(variant_id, { product_id, quantity: nextQuantity });
-      trackEvent("add_to_cart", { product_id, variant_id, quantity });
+      if (!quantity || quantity <= 0) return 0;
+      const { items: next, added } = addToItems(itemsRef.current, payload);
+      if (added === 0) return 0;
+      itemsRef.current = next;
+      setItems(next);
+      const row = next.find((i) => i.variant_id === variant_id);
+      persist(variant_id, { product_id, quantity: row.quantity });
+      trackEvent("add_to_cart", { product_id, variant_id, quantity: added });
+      return added;
     },
     [persist]
   );
@@ -127,8 +127,9 @@ export function CartProvider({ children }) {
         return;
       }
       const row = itemsRef.current.find((i) => i.variant_id === variant_id);
-      setItems((prev) => prev.map((i) => (i.variant_id === variant_id ? { ...i, quantity } : i)));
-      if (row) persist(variant_id, { product_id: row.product_id, quantity });
+      const capped = Math.min(quantity, maxQuantity(row));
+      setItems((prev) => prev.map((i) => (i.variant_id === variant_id ? { ...i, quantity: capped } : i)));
+      if (row) persist(variant_id, { product_id: row.product_id, quantity: capped });
     },
     [persist]
   );

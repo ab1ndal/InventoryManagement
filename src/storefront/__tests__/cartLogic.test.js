@@ -1,4 +1,4 @@
-import { mergeCarts, revalidateItems } from "../lib/cartLogic";
+import { mergeCarts, revalidateItems, addToItems, maxQuantity } from "../lib/cartLogic";
 
 const item = (variant_id, quantity, extra = {}) => ({
   variant_id, product_id: "BC1", quantity, name: "Saree",
@@ -39,5 +39,35 @@ describe("revalidateItems", () => {
     const { items, changes } = revalidateItems([item("a", 1)], { a: { stock: 9, price: 1200 } });
     expect(items[0].price).toBe(1200);
     expect(changes).toContainEqual({ variant_id: "a", name: "Saree", type: "repriced" });
+  });
+});
+
+describe("addToItems", () => {
+  it("adds a new variant up to its stock", () => {
+    const { items, added } = addToItems([], item("a", 3, { stock: 2 }));
+    expect(added).toBe(2);
+    expect(items[0].quantity).toBe(2);
+  });
+  it("adds nothing once the cart holds all the stock", () => {
+    const start = [item("a", 1, { stock: 1 })];
+    const { items, added } = addToItems(start, item("a", 1, { stock: 1 }));
+    expect(added).toBe(0);
+    expect(items).toBe(start);
+  });
+  it("tops an existing line up to the latest known stock", () => {
+    const { items, added } = addToItems([item("a", 1)], item("a", 5, { stock: 3 }));
+    expect(added).toBe(2);
+    expect(items[0]).toMatchObject({ quantity: 3, stock: 3 });
+  });
+  it("is unbounded when stock is unknown", () => {
+    expect(addToItems([item("a", 4)], item("a", 2)).added).toBe(2);
+    expect(maxQuantity(item("a", 1))).toBe(Infinity);
+  });
+});
+
+describe("revalidateItems stock", () => {
+  it("records the live stock on each kept item", () => {
+    const { items } = revalidateItems([item("a", 1)], { a: { stock: 4, price: 1000 } });
+    expect(items[0].stock).toBe(4);
   });
 });

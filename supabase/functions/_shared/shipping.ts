@@ -1,7 +1,8 @@
 /**
  * Parcel weight for Shiprocket (spec §12). There are no per-product weights,
  * so each unit gets a class from its category: light 0.5 kg, medium 1 kg,
- * heavy 2 kg. Parcel = heaviest unit + 0.5 kg per extra unit, capped at 5 kg.
+ * heavy 2 kg. Parcel = the sum of its units (owner 2026-10-30: multiple items
+ * stack on weight; the old "heaviest + 0.5 kg per extra unit" undercharged).
  * Unknown or missing category → medium.
  *
  * Keys are the live `categories` names and ids (e.g. "Lehenga" / "LE"),
@@ -11,8 +12,6 @@
 export const LIGHT_KG = 0.5;
 export const MEDIUM_KG = 1;
 export const HEAVY_KG = 2;
-export const EXTRA_UNIT_KG = 0.5;
-export const MAX_PARCEL_KG = 5;
 
 export type Package = { lengthCm: number; breadthCm: number; heightCm: number };
 
@@ -71,12 +70,14 @@ function unitWeightKg(category: string | null): number {
 
 /** `categories` has one entry per unit (repeat a category for qty > 1). */
 export function parcelWeightKg(categories: (string | null)[]): number {
-  if (categories.length === 0) return 0;
-  const heaviest = Math.max(...categories.map(unitWeightKg));
-  return Math.min(MAX_PARCEL_KG, heaviest + EXTRA_UNIT_KG * (categories.length - 1));
+  return categories.reduce((sum, c) => sum + unitWeightKg(c), 0);
 }
 
-/** Packaging for the heaviest unit's class: light → small bag, medium → large bag, heavy → box. */
+/**
+ * Packaging for the heaviest unit's class: light → small bag, medium → large bag, heavy → box.
+ * One package whatever the count: with two or more units the summed dead weight
+ * already exceeds these packages' volumetric weight, so it is what gets billed.
+ */
 export function parcelPackage(categories: (string | null)[]): Package {
   const heaviest = Math.max(0, ...categories.map(unitWeightKg));
   if (heaviest >= HEAVY_KG) return BOX;
@@ -97,15 +98,19 @@ export function chargeableWeightKg(categories: (string | null)[]): number {
 /**
  * Charge when Shiprocket gives no rate (outage, timeout, no pincode yet), by
  * chargeable weight. Highest cheapest-courier freight anywhere in UP from
- * 201001 (API, 2026-10-29: 11 cities) rounded up to ₹10, so the fallback never
- * undercharges freight (owner rule); nearby pincodes pay a little more.
+ * 201001 (API, 11 cities: ≤5 kg 2026-10-29, 5–10 kg 2026-10-30) rounded up to
+ * ₹10, so the fallback never undercharges freight (owner rule); nearby pincodes
+ * pay a little more. Above 10 kg the top slab applies (no sample; rare cart).
  */
 const FALLBACK_SLABS: { upToKg: number; charge: number }[] = [
   { upToKg: 0.5, charge: 90 },
   { upToKg: 1, charge: 140 },
   { upToKg: 2, charge: 150 },
   { upToKg: 3, charge: 180 },
-  { upToKg: MAX_PARCEL_KG, charge: 230 },
+  { upToKg: 5, charge: 230 },
+  { upToKg: 6, charge: 270 },
+  { upToKg: 7, charge: 310 },
+  { upToKg: 10, charge: 360 },
 ];
 
 export function fallbackShippingCharge(weightKg: number): number {

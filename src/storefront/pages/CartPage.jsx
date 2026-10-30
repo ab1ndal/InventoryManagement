@@ -5,6 +5,7 @@ import Seo from "../components/Seo";
 import FreeShippingNudge from "../components/FreeShippingNudge";
 import { useCart } from "../context/CartContext";
 import { formatSize } from "../lib/sizes";
+import { maxQuantity } from "../lib/cartLogic";
 import { trackEvent } from "../lib/analytics";
 
 const WHATSAPP = "919810873280";
@@ -69,7 +70,7 @@ export default function CartPage() {
                 <div className="flex items-center border border-storefront-border">
                   <button aria-label="Decrease" onClick={() => updateQty(i.variant_id, i.quantity - 1)} className="w-8 h-8">−</button>
                   <span className="w-8 text-center text-sm tabular-nums">{i.quantity}</span>
-                  <button aria-label="Increase" onClick={() => updateQty(i.variant_id, i.quantity + 1)} className="w-8 h-8">+</button>
+                  <button aria-label="Increase" onClick={() => updateQty(i.variant_id, i.quantity + 1)} disabled={i.quantity >= maxQuantity(i)} className="w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed">+</button>
                 </div>
                 <button onClick={() => removeItem(i.variant_id)} className="text-xs font-sans text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2">
                   Remove
