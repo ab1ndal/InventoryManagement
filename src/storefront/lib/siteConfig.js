@@ -30,3 +30,6 @@ export const DRAWER_LINKS = [
   { label: "About", to: "/about" },
   { label: "Contact", to: "/contact" },
 ];
+
+// Where store-pickup orders are collected (checkout and order pages).
+export const SHOP_ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001";

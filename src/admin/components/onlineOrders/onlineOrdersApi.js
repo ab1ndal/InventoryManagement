@@ -11,6 +11,8 @@ export const ORDER_FILTERS = {
   to_check: { label: "To check", statuses: ["paid"] },
   processing: { label: "Processing", statuses: ["processing", "cancelling"] },
   packed: { label: "Packed", statuses: ["packed"] },
+  // Paid pickup orders stay in To check: the shelf check comes before Ready for pickup.
+  pickup: { label: "Pickup", statuses: ["ready_for_pickup"] },
   shipped: { label: "Shipped", statuses: ["shipped", "out_for_delivery"] },
   delivered: { label: "Delivered", statuses: ["delivered"] },
   problems: { label: "Problems" },
@@ -19,7 +21,7 @@ export const ORDER_FILTERS = {
 
 const LIST_COLUMNS =
   "id, order_ref, created_at, status, contact_name, contact_phone, subtotal, promo_discount, " +
-  "shipping, voucher_applied, credit_applied, gateway_amount, problem, process_error, address, " +
+  "shipping, voucher_applied, credit_applied, gateway_amount, problem, process_error, address, fulfilment, " +
   "order_items(qty, shipped_qty), returns:order_returns(status, items:order_return_items(received_units))";
 
 export class OrderActionError extends Error {

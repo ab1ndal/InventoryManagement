@@ -87,6 +87,7 @@ export function normalizeOrder(row) {
   return {
     orderRef: row.order_ref,
     status: row.status,
+    fulfilment: row.fulfilment ?? "ship",
     createdAt: row.created_at ?? null,
     paidAt: row.paid_at ?? null,
     items: (row.items ?? []).map((i) => ({

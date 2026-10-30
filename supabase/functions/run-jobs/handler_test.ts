@@ -40,6 +40,7 @@ Deno.test("toOrderJob: kind + ref_id → kind:ref_id; empty ref_id keeps the kin
   assertEquals(toOrderJob(row({ kind: "email_shop", ref_id: "" })).kind, "email_shop");
   assertEquals(toOrderJob(row({ kind: "email_shop", ref_id: null })).kind, "email_shop");
   assertEquals(realHandlerFor(toOrderJob(row({ kind: "refund_notify", ref_id: "r-1" })).kind) !== null, true);
+  assertEquals(realHandlerFor("email_ready_for_pickup") !== null, true);
 });
 
 Deno.test("run-jobs: dispatch by kind, finish(true) on success, finish(false) on throw / no handler", async () => {

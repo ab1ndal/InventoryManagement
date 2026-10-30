@@ -27,6 +27,7 @@ export function fakeOrder(over: Partial<OrderRow> = {}): OrderRow {
     id: ORDER_ID,
     order_ref: "WEB-000123",
     status: "paid",
+    fulfilment: "ship",
     contact_name: "Asha Verma",
     contact_phone: "+919876543210",
     contact_email: "asha@example.com",
@@ -186,6 +187,7 @@ export class FakeDb implements OrdersDb {
         const target = action === "process" ? "processing" : "cancelling";
         const res = (claimed: boolean, resumed: boolean, reason?: string) =>
           ({ claimed, resumed, ...(reason ? { reason } : {}), status: o.status, order: structuredClone(o) }) as T;
+        if (o.fulfilment === "pickup" && action !== "cancel") return res(false, false, "status");
         if ((action === "send_back" || action === "rebook") && o.op_action === action) {
           if (o.op_key === key) {
             o.op_lease_until = lease();
@@ -226,7 +228,9 @@ export class FakeDb implements OrdersDb {
           Object.assign(o, { op_key: key, op_lease_until: lease() });
           return { claimed: true, resumed: true, status: o.status } as T;
         }
-        if (o.status !== "paid") return { claimed: false, resumed: false, reason: "status", status: o.status } as T;
+        if (!(o.status === "paid" || (action === "cancel" && o.status === "ready_for_pickup"))) {
+          return { claimed: false, resumed: false, reason: "status", status: o.status } as T;
+        }
         Object.assign(o, {
           status: target,
           op_key: key,
@@ -396,6 +400,15 @@ export class FakeDb implements OrdersDb {
         return { checkout_live: args.p_live, changed: true } as T;
       case "online_order_mark_delivered":
         return { delivered: true } as T;
+      case "online_order_mark_ready":
+        if (o.fulfilment !== "pickup") throw raised(fn, `mark_ready: order ${o.order_ref} is not a store pickup`);
+        if (o.status !== "paid") throw raised(fn, `mark_ready: order must be paid (status ${o.status})`);
+        Object.assign(o, { status: "ready_for_pickup", bill_id: 77 });
+        return { status: o.status, bill_id: 77, refund_id: null, all_unavailable: false } as T;
+      case "online_order_mark_collected":
+        if (o.status !== "ready_for_pickup") throw raised(fn, `mark_collected: order must be ready for pickup`);
+        Object.assign(o, { status: "delivered", delivered_at: "2026-10-30T10:00:00Z" });
+        return { status: o.status, delivered_at: o.delivered_at } as T;
       case "online_return_open":
         return "dddddddd-dddd-4ddd-8ddd-dddddddddddd" as T;
       case "online_return_cancel":

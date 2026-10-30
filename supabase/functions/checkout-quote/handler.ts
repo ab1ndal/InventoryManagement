@@ -6,7 +6,14 @@
 
 import { hashIp, optionalUser } from "../_shared/http.ts";
 import { type AppDeps, browserEndpoint, readJsonBody } from "../_shared/context.ts";
-import { buildQuote, optionalString, parseCredit, parseItems, type QuoteResponse } from "../_shared/quote.ts";
+import {
+  buildQuote,
+  optionalString,
+  parseCredit,
+  parseFulfilment,
+  parseItems,
+  type QuoteResponse,
+} from "../_shared/quote.ts";
 
 export function handler(req: Request, deps: AppDeps): Promise<Response> {
   return browserEndpoint(req, deps.env.allowedOrigins, "checkout_quote", async (): Promise<QuoteResponse> => {
@@ -15,11 +22,12 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
     const pincode = optionalString(body.pincode, "pincode");
     const code = optionalString(body.code, "code");
     const creditRequested = parseCredit(body.creditRequested);
+    const fulfilment = parseFulfilment(body.fulfilment);
     const user = await optionalUser(req, deps.verifyJwt, deps.env.anonKey ? [deps.env.anonKey] : []);
     const ipHash = deps.env.ipHashSalt ? await hashIp(req, deps.env.ipHashSalt) : null;
     const result = await buildQuote(
       deps,
-      { items, pincode, code, creditRequested, phone: null },
+      { items, pincode, code, creditRequested, phone: null, fulfilment },
       { authUserId: user?.id ?? null, ipHash },
     );
     return result.response;

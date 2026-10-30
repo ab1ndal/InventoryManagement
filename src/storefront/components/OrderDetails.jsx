@@ -21,6 +21,7 @@ const ITEM_NOTES = {
 // Items and money of a placed order (order-status / lookup shape).
 export default function OrderDetails({ order }) {
   const t = order.totals;
+  const freeShipping = order.fulfilment === "pickup" ? "Free (store pickup)" : "Free";
   return (
     <div className="font-sans text-sm text-storefront-charcoal">
       <ul className="divide-y divide-storefront-border border-t border-storefront-border">
@@ -36,7 +37,7 @@ export default function OrderDetails({ order }) {
       <div className="border-t border-storefront-border pt-4 mt-2 space-y-2">
         <Row label="Subtotal" value={`₹${formatRupees(t.subtotal)}`} />
         {t.promoDiscount > 0 && <Row label="Promo discount" value={`−₹${formatRupees(t.promoDiscount)}`} />}
-        <Row label="Shipping" value={t.shipping > 0 ? `₹${formatRupees(t.shipping)}` : "Free"} />
+        <Row label="Shipping" value={t.shipping > 0 ? `₹${formatRupees(t.shipping)}` : freeShipping} />
         {t.voucherApplied > 0 && <Row label="Voucher" value={`−₹${formatRupees(t.voucherApplied)}`} />}
         {t.creditApplied > 0 && <Row label="Store credit" value={`−₹${formatRupees(t.creditApplied)}`} />}
         <Row label="Paid online" value={`₹${formatRupees(t.gatewayAmount)}`} strong />

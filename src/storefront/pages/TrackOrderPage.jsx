@@ -34,10 +34,10 @@ export default function TrackOrderPage() {
         <div className="space-y-6 mt-6">
           <div className="text-sm font-sans text-storefront-charcoal">
             <p className="text-xs tracking-widest uppercase text-storefront-muted">Order {result.order.orderRef}</p>
-            <p className="text-lg font-semibold mt-1">{statusLabel(result.order.status)}</p>
+            <p className="text-lg font-semibold mt-1">{statusLabel(result.order.status, result.order.fulfilment)}</p>
           </div>
-          <OrderTimeline status={result.order.status} />
-          {result.order.trackingUrl && (
+          <OrderTimeline status={result.order.status} fulfilment={result.order.fulfilment} />
+          {result.order.fulfilment !== "pickup" && result.order.trackingUrl && (
             <a href={result.order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
               Track with the courier
             </a>

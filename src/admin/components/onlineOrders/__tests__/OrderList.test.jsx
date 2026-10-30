@@ -44,6 +44,27 @@ const mockRows = {
       returns: [{ status: "refunded", items: [{ received_units: 1 }] }],
     },
   ],
+  pickup: [
+    {
+      id: "o4",
+      order_ref: "WEB-000004",
+      created_at: "2026-10-24T10:00:00Z",
+      status: "ready_for_pickup",
+      fulfilment: "pickup",
+      contact_name: "Nita",
+      address: { name: "Nita", phone: "+916666666666" },
+      contact_phone: "+916666666666",
+      subtotal: 700,
+      promo_discount: 0,
+      shipping: 0,
+      voucher_applied: 0,
+      credit_applied: 0,
+      gateway_amount: 700,
+      problem: null,
+      process_error: null,
+      order_items: [{ qty: 1 }],
+    },
+  ],
   problems: [
     {
       id: "o2",
@@ -70,6 +91,7 @@ jest.mock("../onlineOrdersApi", () => ({
     to_check: { label: "To check", statuses: ["paid"] },
     processing: { label: "Processing" },
     packed: { label: "Packed" },
+    pickup: { label: "Pickup" },
     shipped: { label: "Shipped" },
     delivered: { label: "Delivered" },
     problems: { label: "Problems" },
@@ -136,4 +158,16 @@ test("flags an order outside Uttar Pradesh", async () => {
   fireEvent.click(screen.getByRole("tab", { name: "All" }));
   const row = await screen.findByRole("row", { name: /WEB-000003/ });
   expect(row).toHaveTextContent("Outside UP");
+});
+
+test("Pickup tab shows store pickup orders with their badge and no Outside UP", async () => {
+  render(<OrderList onSelect={() => {}} refreshKey={0} />);
+  const shipRow = await screen.findByRole("row", { name: /WEB-000001/ });
+  expect(shipRow).not.toHaveTextContent("Store pickup");
+  fireEvent.click(screen.getByRole("tab", { name: "Pickup" }));
+  const row = await screen.findByRole("row", { name: /WEB-000004/ });
+  expect(mockFilters).toEqual(["to_check", "pickup"]);
+  expect(row).toHaveTextContent("Ready for pickup");
+  expect(row).toHaveTextContent("Store pickup");
+  expect(row).not.toHaveTextContent("Outside UP");
 });

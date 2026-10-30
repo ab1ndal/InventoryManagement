@@ -71,12 +71,17 @@ it("normalises the lookup RPC to the order-status shape, null when not found", a
   const order = await lookupOrder("web-000001", "9810873280");
   expect(supabase.rpc).toHaveBeenCalledWith("online_order_lookup", { p_order_ref: "web-000001", p_phone: "9810873280" });
   expect(order).toMatchObject({
-    orderRef: "WEB-000001", status: "shipped", trackingUrl: "https://shiprocket.co/tracking/123",
+    orderRef: "WEB-000001", status: "shipped", fulfilment: "ship", trackingUrl: "https://shiprocket.co/tracking/123",
     totals: { subtotal: 3000, shipping: 80, gatewayAmount: 3080 },
     items: [{ name: "Silk Saree", qty: 2, status: "shipped" }],
   });
   supabase.rpc.mockResolvedValue({ data: null, error: null });
   await expect(lookupOrder("WEB-9", "1")).resolves.toBeNull();
+});
+
+it("keeps a store-pickup order's fulfilment", async () => {
+  supabase.rpc.mockResolvedValue({ data: { ...ROW, status: "ready_for_pickup", fulfilment: "pickup" }, error: null });
+  await expect(lookupOrder("WEB-000001", "9810873280")).resolves.toMatchObject({ status: "ready_for_pickup", fulfilment: "pickup" });
 });
 
 it("lists my orders newest first, unwrapping setof jsonb rows", async () => {

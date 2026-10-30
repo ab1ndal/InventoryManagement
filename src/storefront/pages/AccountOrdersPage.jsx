@@ -66,7 +66,7 @@ export default function AccountOrdersPage() {
               </div>
               <div className="flex items-center gap-4">
                 <span className={`px-2 py-1 text-xs rounded ${BADGE_TONES[o.status] ?? "bg-storefront-cream text-storefront-charcoal"}`}>
-                  {statusLabel(o.status)}
+                  {statusLabel(o.status, o.fulfilment)}
                 </span>
                 <Link to={`/order/${o.orderRef}`} className="text-xs tracking-widest uppercase text-storefront-gold hover:underline">
                   Track

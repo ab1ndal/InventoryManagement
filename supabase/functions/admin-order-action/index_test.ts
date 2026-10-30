@@ -719,3 +719,57 @@ for (
     assertEquals(db.orderReads.slice(0, -1).filter((x) => x !== "getOrder"), []);
   });
 }
+
+// ---------- store pickup ----------
+
+const PICKUP = { fulfilment: "pickup" as const, sr_order_id: null, sr_shipment_id: null, shipping: 0 };
+
+Deno.test("pickup: process → 409 bad_state with a pickup reason, no claim, no Shiprocket", async () => {
+  const { db, sr, call } = setup(PICKUP);
+  const r = await call(PROCESS);
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+  assert(String(r.body.error).includes("store pickup"));
+  assertEquals([db.fns(), sr.methods()], [[], []]);
+});
+
+Deno.test("pickup: mark_ready → RPC with actor; returns the order and billId", async () => {
+  const { db, sr, call } = setup(PICKUP);
+  const r = await call({ action: "mark_ready", orderId: ORDER_ID });
+  assertEquals(r.status, 200);
+  assertEquals([r.body.order.status, r.body.billId, r.body.refundId], ["ready_for_pickup", 77, undefined]);
+  assertEquals(db.calls, [{ fn: "online_order_mark_ready", args: { p_order_id: ORDER_ID, p_actor: ADMIN } }]);
+  assertEquals(sr.methods(), []);
+});
+
+Deno.test("pickup: mark_ready on a ship order / twice → 409 bad_state; orderId required (400)", async () => {
+  const ship = setup();
+  assertEquals((await ship.call({ action: "mark_ready", orderId: ORDER_ID })).status, 409);
+  const p = setup(PICKUP);
+  await p.call({ action: "mark_ready", orderId: ORDER_ID });
+  assertEquals((await p.call({ action: "mark_ready", orderId: ORDER_ID })).body.code, "bad_state");
+  assertEquals((await p.call({ action: "mark_ready" })).status, 400);
+});
+
+Deno.test("pickup: mark_collected → delivered; from paid → 409 bad_state", async () => {
+  const { db, call } = setup({ ...PICKUP, status: "ready_for_pickup" });
+  const r = await call({ action: "mark_collected", orderId: ORDER_ID });
+  assertEquals([r.status, r.body.order.status], [200, "delivered"]);
+  assertEquals(db.calls, [{ fn: "online_order_mark_collected", args: { p_order_id: ORDER_ID, p_actor: ADMIN } }]);
+  const paid = setup(PICKUP);
+  assertEquals((await paid.call({ action: "mark_collected", orderId: ORDER_ID })).body.code, "bad_state");
+});
+
+Deno.test("pickup: cancel from ready_for_pickup → claim + DB cancel, no Shiprocket call or problem", async () => {
+  const { db, sr, call } = setup({ ...PICKUP, status: "ready_for_pickup", bill_id: 77 });
+  const r = await call({ action: "cancel", orderId: ORDER_ID, opKey: "c-1", reason: "not collected" });
+  assertEquals([r.status, r.body.order.status, r.body.refundId], [200, "cancelled", "refund-cancel"]);
+  assertEquals(db.fns(), ["online_order_claim", "online_order_cancel"]);
+  assertEquals([sr.methods(), db.order.problem], [[], null]);
+});
+
+Deno.test("pickup: retry never books Shiprocket for a paid pickup order", async () => {
+  const { sr, call } = setup(PICKUP);
+  const r = await call({ action: "retry", orderId: ORDER_ID });
+  assertEquals(r.status, 200);
+  assertEquals(sr.methods(), []);
+});

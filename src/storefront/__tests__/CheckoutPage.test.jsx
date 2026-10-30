@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import CheckoutPage from "../pages/CheckoutPage";
@@ -99,4 +99,24 @@ it("redirects to /cart when the cart is empty", () => {
   mockUseCart.mockReturnValue({ items: [] });
   render(<MemoryRouter initialEntries={["/checkout"]}><CheckoutPage /></MemoryRouter>);
   expect(screen.queryByText(/checkout/i)).not.toBeInTheDocument();
+});
+
+it("offers store pickup on WhatsApp with contact details only", async () => {
+  render(<MemoryRouter><CheckoutPage /></MemoryRouter>);
+  // userEvent fires synchronously; let react-hook-form's mount-time validity
+  // check (ship branch) resolve first, or its stale result lands last.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  userEvent.click(screen.getByRole("radio", { name: /pick up at the shop/i }));
+  expect(screen.queryByPlaceholderText(/address line 1/i)).not.toBeInTheDocument();
+  expect(screen.getByText("Free (store pickup)")).toBeInTheDocument();
+  expect(screen.queryByTestId("free-shipping-nudge")).not.toBeInTheDocument();
+
+  userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
+  userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
+
+  const whatsappLink = await screen.findByRole("link", { name: /complete your order on whatsapp/i });
+  const text = decodeURIComponent(whatsappLink.getAttribute("href").split("?text=")[1]);
+  expect(text).toContain("Store pickup:\nPriya Sharma\n9810873280");
+  expect(text).toContain("Shipping: Free");
+  expect(text).not.toContain("Deliver to");
 });

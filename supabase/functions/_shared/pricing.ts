@@ -77,6 +77,8 @@ export type QuoteInput = {
   shippingRate: number | null;
   /** Charge used when `shippingRate` is unusable; defaults to FLAT_SHIPPING. */
   fallbackShipping?: number;
+  /** Store pickup: no shipping at any amount, so no free-shipping gap either. */
+  pickup?: boolean;
   creditRequested: number;
   creditAvailable: number;
   voucherValue: number;
@@ -208,7 +210,7 @@ export function quoteOrder(input: QuoteInput): Quote {
   const paidValues = lineValues.map((v, i) => v - promoShares[i]);
   const goods = subtotal - promoP;
 
-  const shipping = toPaise(shippingCharge(shippingRate, toRupees(goods), fallbackShipping));
+  const shipping = input.pickup ? 0 : toPaise(shippingCharge(shippingRate, toRupees(goods), fallbackShipping));
   const due = goods + shipping;
 
   let voucher = Math.min(toPaise(input.voucherValue), due);
@@ -252,7 +254,7 @@ export function quoteOrder(input: QuoteInput): Quote {
     creditApplied: toRupees(credit),
     voucherApplied: toRupees(voucher),
     gatewayAmount: toRupees(gateway),
-    freeShippingGap: toRupees(Math.max(0, toPaise(FREE_SHIPPING_THRESHOLD) - goods)),
+    freeShippingGap: input.pickup ? 0 : toRupees(Math.max(0, toPaise(FREE_SHIPPING_THRESHOLD) - goods)),
   };
 }
 

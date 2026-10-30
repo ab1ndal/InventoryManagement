@@ -562,3 +562,96 @@ test("a return action refreshes the list through onChanged", async () => {
   fireEvent.click(within(dialog).getByRole("button", { name: "Cancel return" }));
   await waitFor(() => expect(onChanged).toHaveBeenCalled());
 });
+
+describe("store pickup", () => {
+  const pickupAddress = { name: "Asha", phone: "+919999999999" };
+  const pickup = (order = {}, rest = {}) =>
+    detail({ order: { fulfilment: "pickup", shipping: 0, gateway_amount: 2000, address: pickupAddress, ...order }, ...rest });
+  const shipOnly = ["Process", "Rebook…", "Mark delivered…", "Parcel received back", "Send back to To-check"];
+
+  test("paid: Store pickup badge, contact as address, no Outside UP, Ready for pickup gated like Process", async () => {
+    mockDetail = pickup();
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByText("Store pickup")).toBeInTheDocument();
+    expect(screen.getByText("Asha, +919999999999")).toBeInTheDocument();
+    expect(screen.queryByText("Outside UP")).not.toBeInTheDocument();
+    for (const name of shipOnly) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collected" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel order" })).toBeInTheDocument();
+
+    const ready = screen.getByRole("button", { name: "Ready for pickup" });
+    expect(ready).toBeDisabled();
+    fireEvent.click(line("i1").getByRole("button", { name: "Confirm 1" }));
+    fireEvent.click(line("i2").getByRole("button", { name: "Fewer available for Dupatta" }));
+    await waitFor(() => expect(ready).toBeEnabled());
+
+    fireEvent.click(ready);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("1 unit will be kept for the customer");
+    expect(within(dialog).getByTestId("refund-total")).toHaveTextContent("₹800.00");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Ready for pickup" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order ready for pickup"]));
+    expect(mockActions[2]).toEqual({ action: "mark_ready", orderId: "o1" });
+  });
+
+  test("paid with nothing available: Ready for pickup offers cancel and refund", async () => {
+    mockDetail = pickup({}, { items: [item({ id: "i1", line_no: 1, product_name: "Kurta", paid_value: 1200, available_qty: 0 })] });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    fireEvent.click(screen.getByRole("button", { name: "Ready for pickup" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Nothing is available: the order will be cancelled and fully refunded.");
+    expect(within(dialog).getByTestId("refund-total")).not.toHaveTextContent("incl. shipping");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel and refund" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order cancelled and refunded"]));
+    expect(mockActions).toEqual([{ action: "mark_ready", orderId: "o1" }]);
+  });
+
+  test("ready_for_pickup: Collected confirms then sends mark_collected; Cancel still offered", async () => {
+    mockDetail = pickup({ status: "ready_for_pickup", bill_id: 42 });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByText("Ready for pickup")).toBeInTheDocument(); // status badge
+    expect(screen.queryByRole("button", { name: "Ready for pickup" })).not.toBeInTheDocument();
+    for (const name of shipOnly) expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel order" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collected" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(mockActions).toEqual([]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Collected" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order marked collected"]));
+    expect(mockActions).toEqual([{ action: "mark_collected", orderId: "o1" }]);
+  });
+
+  test("ready_for_pickup: cancel sends the existing cancel payload", async () => {
+    mockDetail = pickup({ status: "ready_for_pickup" });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel order" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).not.toHaveTextContent("shipping charge");
+    fireEvent.change(within(dialog).getByLabelText("Cancel reason"), { target: { value: "No show" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel order" }));
+    await waitFor(() =>
+      expect(mockActions).toContainEqual({ action: "cancel", orderId: "o1", opKey: "key-1", reason: "No show" })
+    );
+  });
+
+  test("a delivered pickup order reads Collected", async () => {
+    mockDetail = pickup({ status: "delivered", delivered_at: "2026-10-20T10:00:00Z", returns: [] });
+    render(<OrderDetail orderId="o1" />);
+    expect(await screen.findByText("Collected")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collected" })).not.toBeInTheDocument();
+  });
+
+  test("a paid ship order offers Process, not the pickup actions", async () => {
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByRole("button", { name: "Process" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ready for pickup" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collected" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Store pickup")).not.toBeInTheDocument();
+  });
+});

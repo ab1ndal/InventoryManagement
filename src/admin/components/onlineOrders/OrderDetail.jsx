@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "../../../components/ui/dialog";
 import { action, getMyRole, getOrder, newOpKey } from "./onlineOrdersApi";
-import { OutsideUpBadge, ReturnBadge, StatusBadge } from "./OrderList";
+import { OutsideUpBadge, PickupBadge, ReturnBadge, StatusBadge } from "./OrderList";
 import ReturnsSection from "./ReturnsSection";
 import {
   formatDateTime,
@@ -61,8 +61,10 @@ function MoneyRow({ label, value, negative, strong }) {
   );
 }
 
-function addressText(a) {
+function addressText(a, fulfilment) {
   if (!a) return "";
+  // A pickup order's address holds only the contact the customer gave at checkout.
+  if (fulfilment === "pickup") return [a.name, a.phone, a.email].filter(Boolean).join(", ");
   return [a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(", ");
 }
 
@@ -75,7 +77,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [avail, setAvail] = useState({});
   const [checked, setChecked] = useState(() => new Set());
   const [savingLine, setSavingLine] = useState(null);
-  const [dialog, setDialog] = useState(null); // 'process' | 'cancel' | 'rto' | 'sendback' | 'rebook' | 'release' | 'delivered'
+  const [dialog, setDialog] = useState(null); // 'process' | 'ready' | 'collected' | 'cancel' | 'rto' | 'sendback' | 'rebook' | 'release' | 'delivered'
   const [pending, setPending] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [courierError, setCourierError] = useState(null);
@@ -247,6 +249,8 @@ export default function OrderDetail({ orderId, onChanged }) {
 
   const { order, items, events, refunds, legs, jobs } = detail;
   const isPaid = order.status === "paid";
+  const isPickup = order.fulfilment === "pickup";
+  const isReadyForPickup = order.status === "ready_for_pickup";
   const allChecked = items.every((it) => checked.has(it.id));
   const failedJobs = jobs.filter((j) => j.status === "failed");
   const showRetry = Boolean(order.process_error || failedJobs.length || courierError);
@@ -292,12 +296,13 @@ export default function OrderDetail({ orderId, onChanged }) {
             {formatDateTime(order.created_at)} · {order.contact_name} · {order.contact_phone}
             {order.contact_email ? ` · ${order.contact_email}` : ""}
           </div>
-          <div className="text-sm text-muted-foreground">{addressText(order.address)}</div>
+          <div className="text-sm text-muted-foreground">{addressText(order.address, order.fulfilment)}</div>
         </div>
         <div>
-          <StatusBadge status={order.status} />
+          <StatusBadge status={order.status} fulfilment={order.fulfilment} />
           <ReturnBadge order={{ ...order, order_items: items }} />
-          <OutsideUpBadge address={order.address} />
+          <OutsideUpBadge address={order.address} fulfilment={order.fulfilment} />
+          <PickupBadge fulfilment={order.fulfilment} />
         </div>
       </div>
 
@@ -472,12 +477,22 @@ export default function OrderDetail({ orderId, onChanged }) {
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
-        {isPaid && (
+        {isPaid && !isPickup && (
           <Button disabled={!allChecked || pending} onClick={() => setDialog("process")}>
             Process
           </Button>
         )}
-        {isPaid && (
+        {isPaid && isPickup && (
+          <Button disabled={!allChecked || pending} onClick={() => setDialog("ready")}>
+            Ready for pickup
+          </Button>
+        )}
+        {isReadyForPickup && (
+          <Button disabled={pending} onClick={() => setDialog("collected")}>
+            Collected
+          </Button>
+        )}
+        {(isPaid || isReadyForPickup) && (
           <Button variant="destructive" disabled={pending} onClick={() => setDialog("cancel")}>
             Cancel order
           </Button>
@@ -530,7 +545,7 @@ export default function OrderDetail({ orderId, onChanged }) {
       </div>
       {isPaid && !allChecked && (
         <p className="text-xs text-muted-foreground">
-          Check every item on the shelf before processing.
+          Check every item on the shelf before {isPickup ? "marking it ready for pickup" : "processing"}.
         </p>
       )}
 
@@ -594,21 +609,32 @@ export default function OrderDetail({ orderId, onChanged }) {
       </section>
 
       <ConfirmDialog
-        open={dialog === "process"}
-        title={`Process ${order.order_ref}?`}
+        open={dialog === "process" || dialog === "ready"}
+        title={dialog === "ready" ? `Ready ${order.order_ref} for pickup?` : `Process ${order.order_ref}?`}
         description={
-          preview.allUnavailable
-            ? "Nothing is available to ship: the order will be cancelled and fully refunded, including shipping."
-            : `${shipUnits} unit${shipUnits === 1 ? "" : "s"} will be booked with the courier and a Bill of Supply created.`
+          dialog === "ready"
+            ? preview.allUnavailable
+              ? "Nothing is available: the order will be cancelled and fully refunded."
+              : `${shipUnits} unit${shipUnits === 1 ? "" : "s"} will be kept for the customer, a Bill of Supply created and the customer emailed to collect.`
+            : preview.allUnavailable
+              ? "Nothing is available to ship: the order will be cancelled and fully refunded, including shipping."
+              : `${shipUnits} unit${shipUnits === 1 ? "" : "s"} will be booked with the courier and a Bill of Supply created.`
         }
-        confirmLabel={preview.allUnavailable ? "Cancel and refund" : "Process"}
+        confirmLabel={
+          preview.allUnavailable ? "Cancel and refund" : dialog === "ready" ? "Ready for pickup" : "Process"
+        }
         pending={pending}
         onClose={closeDialog}
         onConfirm={() =>
-          run(
-            { action: "process", orderId, opKey: opKeyFor("process") },
-            preview.allUnavailable ? "Order cancelled and refunded" : "Order processed"
-          )
+          dialog === "ready"
+            ? run(
+                { action: "mark_ready", orderId },
+                preview.allUnavailable ? "Order cancelled and refunded" : "Order ready for pickup"
+              )
+            : run(
+                { action: "process", orderId, opKey: opKeyFor("process") },
+                preview.allUnavailable ? "Order cancelled and refunded" : "Order processed"
+              )
         }
       >
         {preview.lines.length > 0 ? (
@@ -624,7 +650,7 @@ export default function OrderDetail({ orderId, onChanged }) {
             </ul>
             <p data-testid="refund-total">
               Refund total: <strong>{formatRupees(preview.amount)}</strong>
-              {preview.allUnavailable ? " (incl. shipping)" : ""}
+              {preview.allUnavailable && !isPickup ? " (incl. shipping)" : ""}
             </p>
           </div>
         ) : (
@@ -633,9 +659,19 @@ export default function OrderDetail({ orderId, onChanged }) {
       </ConfirmDialog>
 
       <ConfirmDialog
+        open={dialog === "collected"}
+        title={`Has the customer collected ${order.order_ref}?`}
+        description="Marks the order delivered. The collection time starts the return window and cannot be changed afterwards."
+        confirmLabel="Collected"
+        pending={pending}
+        onClose={closeDialog}
+        onConfirm={() => run({ action: "mark_collected", orderId }, "Order marked collected")}
+      />
+
+      <ConfirmDialog
         open={dialog === "cancel"}
         title={`Cancel ${order.order_ref}?`}
-        description="Every item and the shipping charge will be refunded. The customer chooses store credit or the original payment method."
+        description={`Every item${isPickup ? "" : " and the shipping charge"} will be refunded. The customer chooses store credit or the original payment method.`}
         confirmLabel="Cancel order"
         confirmDisabled={!cancelReason.trim()}
         pending={pending}

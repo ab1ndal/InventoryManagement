@@ -1,5 +1,6 @@
 // Dispatch table for order_jobs kinds. Each handler module is owned by one slice:
-//   emails.ts            -> email_confirmed, email_shop, email_shipped, email_delivered (Pay slice)
+//   emails.ts            -> email_confirmed, email_shop, email_shipped, email_delivered,
+//                           email_ready_for_pickup (Pay slice; pickup)
 //   shiprocket_create.ts -> shiprocket_create (Ship slice)
 //   refund_notify.ts     -> refund_notify:<refund id> (Refunds slice)
 import type { JobHandler } from "./types.ts";
@@ -14,6 +15,7 @@ export function handlerFor(kind: string): JobHandler | null {
     case "email_shop":
     case "email_shipped":
     case "email_delivered":
+    case "email_ready_for_pickup":
       return emails.handle;
     case "shiprocket_create":
       return shiprocketCreate.handle;

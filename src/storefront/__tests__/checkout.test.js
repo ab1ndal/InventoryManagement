@@ -1,4 +1,4 @@
-import { addressSchema, shippingFee } from "../lib/checkout";
+import { addressSchema, checkoutSchema, shippingFee } from "../lib/checkout";
 
 describe("shippingFee", () => {
   it("charges ₹150 below the ₹5000 free-shipping threshold", () => {
@@ -52,5 +52,25 @@ describe("addressSchema", () => {
   it("rejects a 5-digit pincode", () => {
     const result = addressSchema.safeParse({ ...valid, pincode: "20100" });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("checkoutSchema", () => {
+  const contact = { name: "Priya Sharma", phone: "9810873280", email: "" };
+
+  it("needs only contact details for store pickup", () => {
+    const result = checkoutSchema.safeParse({ ...contact, fulfilment: "pickup", line1: "", city: "", state: "", pincode: "" });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ ...contact, fulfilment: "pickup" });
+  });
+
+  it("still validates contact details for store pickup", () => {
+    expect(checkoutSchema.safeParse({ ...contact, phone: "12345", fulfilment: "pickup" }).success).toBe(false);
+  });
+
+  it("requires the address when shipping", () => {
+    const result = checkoutSchema.safeParse({ ...contact, fulfilment: "ship", line1: "", city: "", state: "", pincode: "" });
+    expect(result.success).toBe(false);
+    expect(result.error.issues.map((i) => i.path[0])).toEqual(expect.arrayContaining(["line1", "city", "state", "pincode"]));
   });
 });

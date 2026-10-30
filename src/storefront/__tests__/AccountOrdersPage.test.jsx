@@ -61,3 +61,18 @@ it("sends signed-out visitors to login", () => {
   expect(screen.getByText("login page")).toBeInTheDocument();
   expect(supabase.rpc).not.toHaveBeenCalled();
 });
+
+it("labels pickup orders as ready for pickup and collected", async () => {
+  mockAuth.mockReturnValue({ user: { id: "u1" }, loading: false });
+  supabase.rpc.mockResolvedValue({
+    data: [
+      { ...row("WEB-000005", "ready_for_pickup", "2026-10-25T10:00:00Z"), fulfilment: "pickup" },
+      { ...row("WEB-000004", "delivered", "2026-10-24T10:00:00Z"), fulfilment: "pickup" },
+    ],
+    error: null,
+  });
+  renderPage();
+  const rows = await screen.findAllByTestId("account-order");
+  expect(within(rows[0]).getByText("Ready for pickup")).toBeInTheDocument();
+  expect(within(rows[1]).getByText("Collected")).toBeInTheDocument();
+});
