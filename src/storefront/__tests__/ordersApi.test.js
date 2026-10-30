@@ -84,6 +84,11 @@ it("keeps a store-pickup order's fulfilment", async () => {
   await expect(lookupOrder("WEB-000001", "9810873280")).resolves.toMatchObject({ status: "ready_for_pickup", fulfilment: "pickup" });
 });
 
+it("keeps a Porter order's courier and manual tracking link", async () => {
+  supabase.rpc.mockResolvedValue({ data: { ...ROW, courier: "porter", awb: null, tracking_url: "https://porter.in/t/1" }, error: null });
+  await expect(lookupOrder("WEB-000001", "9810873280")).resolves.toMatchObject({ courier: "porter", trackingUrl: "https://porter.in/t/1" });
+});
+
 it("lists my orders newest first, unwrapping setof jsonb rows", async () => {
   supabase.rpc.mockResolvedValue({
     data: [

@@ -1,6 +1,7 @@
 import {
   STATUS_LABELS,
   isOutsideUp,
+  isValidTrackingUrl,
   outsideReturnWindow,
   returnBadge,
   returnableUnits,
@@ -64,4 +65,12 @@ test("isOutsideUp: never for a pickup order", () => {
 
 test("ready_for_pickup has a label", () => {
   expect(STATUS_LABELS.ready_for_pickup).toBe("Ready for pickup");
+});
+
+test("isValidTrackingUrl: https only, no spaces, at most 500 chars", () => {
+  expect(isValidTrackingUrl("https://porter.in/track/abc")).toBe(true);
+  expect(isValidTrackingUrl("http://porter.in/track/abc")).toBe(false);
+  expect(isValidTrackingUrl("javascript:alert(1)")).toBe(false);
+  expect(isValidTrackingUrl("https://porter.in/a b")).toBe(false);
+  expect(isValidTrackingUrl("https://p.in/" + "a".repeat(500))).toBe(false);
 });

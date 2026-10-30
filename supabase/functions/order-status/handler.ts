@@ -29,6 +29,7 @@ export type OrderStatusResponse = {
   orderRef: string;
   status: string;
   fulfilment: "ship" | "pickup";
+  courier: "shiprocket" | "porter" | null;
   items: { name: string; size: string | null; color: string | null; qty: number; status: string }[];
   totals: {
     subtotal: number;
@@ -83,6 +84,7 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
       orderRef: order.order_ref,
       status: order.status,
       fulfilment: order.fulfilment,
+      courier: order.courier,
       items: items.map((i) => ({ name: i.product_name, size: i.size, color: i.color, qty: i.qty, status: i.status })),
       totals: {
         subtotal: order.subtotal,
@@ -92,7 +94,11 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
         creditApplied: order.credit_applied,
         gatewayAmount: order.gateway_amount,
       },
-      trackingUrl: order.awb ? `https://shiprocket.co/tracking/${encodeURIComponent(order.awb)}` : null,
+      trackingUrl: order.awb
+        ? `https://shiprocket.co/tracking/${encodeURIComponent(order.awb)}`
+        : order.courier === "porter"
+        ? order.manual_tracking_url
+        : null,
       leftoverVoucher: order.leftover_voucher_id && leftoverValue !== null
         ? { code: order.leftover_voucher_id, value: leftoverValue }
         : null,

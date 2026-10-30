@@ -26,6 +26,7 @@ Deno.test("order-status: valid token → contract shape", async () => {
     orderRef: o.order_ref,
     status: "shipped",
     fulfilment: "ship",
+    courier: null,
     items: [{ name: "Silk Kurti", size: "M", color: "Red", qty: 1, status: "ordered" }],
     totals: { subtotal: 1000, promoDiscount: 0, shipping: 80, voucherApplied: 0, creditApplied: 0, gatewayAmount: 1080 },
     trackingUrl: "https://shiprocket.co/tracking/AWB1",
@@ -38,6 +39,16 @@ Deno.test("order-status: store pickup order reports fulfilment and no tracking l
   const { deps } = await setup({ status: "ready_for_pickup", fulfilment: "pickup", shipping: 0, gateway_amount: 1000 });
   const j = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps)).json();
   assertEquals([j.status, j.fulfilment, j.trackingUrl, j.totals.shipping], ["ready_for_pickup", "pickup", null, 0]);
+});
+
+Deno.test("order-status: Porter order → its manual link (or none), never a Shiprocket one", async () => {
+  const porter = { status: "shipped", courier: "porter" as const, courier_name: "Porter" };
+  const a = await setup({ ...porter, manual_tracking_url: "https://porter.in/track/abc" });
+  const j = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), a.deps)).json();
+  assertEquals([j.courier, j.trackingUrl], ["porter", "https://porter.in/track/abc"]);
+  const b = await setup(porter);
+  const k = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), b.deps)).json();
+  assertEquals([k.courier, k.trackingUrl], ["porter", null]);
 });
 
 Deno.test("order-status: unknown ref, wrong token, no credentials, other user's JWT → identical 404", async () => {

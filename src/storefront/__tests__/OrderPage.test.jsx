@@ -135,3 +135,14 @@ it("shows a ready store-pickup order with the shop address and no courier link",
   expect(screen.getByText("Free (store pickup)")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: /track with the courier/i })).not.toBeInTheDocument();
 });
+
+it("shows a Porter order's link as Track with Porter, and no link when none was given", async () => {
+  mockOrderStatus.mockResolvedValue(order("shipped", { courier: "porter", trackingUrl: "https://porter.in/track/abc" }));
+  const { unmount } = renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByRole("link", { name: "Track with Porter" })).toHaveAttribute("href", "https://porter.in/track/abc");
+  unmount();
+  mockOrderStatus.mockResolvedValue(order("shipped", { courier: "porter", trackingUrl: null }));
+  renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByRole("link", { name: "Track an order" })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /track with/i })).not.toBeInTheDocument();
+});

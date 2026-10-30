@@ -64,6 +64,9 @@ export type OrderRow = {
   order_ref: string;
   status: string;
   fulfilment: "ship" | "pickup";
+  /** null = the default Shiprocket flow; "porter" once dispatched by hand. */
+  courier: "shiprocket" | "porter" | null;
+  manual_tracking_url: string | null;
   contact_name: string;
   contact_phone: string;
   contact_email: string | null;
@@ -340,8 +343,8 @@ async function mustGetOrder(db: OrdersDb, orderId: string): Promise<OrderRow> {
 
 /**
  * Creates the Shiprocket order once. Skips when sr_order_id is stored, when the order
- * is a store pickup (Retry calls this for any paid order without one), or when the
- * order is no longer shippable (cancelled before the job ran). A Shiprocket failure
+ * is a store pickup (Retry calls this for any paid order without one) or went with
+ * Porter, or when the order is no longer shippable (cancelled before the job ran). A Shiprocket failure
  * is recorded as sr_create_failed and rethrown as CourierError so the job retries.
  * `opKey` (Process running it inline) fences the checkpoints; the job passes none.
  */
@@ -351,6 +354,10 @@ export async function ensureSrOrder(deps: ShipDeps, orderId: string, opKey?: str
   if (o.sr_order_id) return "exists";
   if (o.fulfilment === "pickup") {
     logEvent("info", "sr_create_skipped", { order_ref: o.order_ref, reason: "store pickup" });
+    return "skipped";
+  }
+  if (o.courier === "porter") {
+    logEvent("info", "sr_create_skipped", { order_ref: o.order_ref, reason: "porter" });
     return "skipped";
   }
   if (o.status !== "paid" && o.status !== "processing") {
@@ -629,6 +636,62 @@ export async function runCancel(
   }
   if (problem) await setProblem(db, before.order_ref, problem);
   return { kind: "cancelled", refundId, problem };
+}
+
+// ---------- dispatch by hand (Porter) ----------
+
+type ManualDispatchResult = {
+  status: string;
+  bill_id: number | null;
+  refund_id: string | null;
+  all_unavailable: boolean;
+  changed: boolean;
+  /** The Shiprocket order made at payment; only on the call that dispatched (or cancelled). */
+  sr_order_id: string | null;
+};
+
+export type ManualDispatchOutcome = {
+  status: string;
+  billId: number | null;
+  refundId: string | null;
+  problem: string | null;
+};
+
+/**
+ * Porter, booked by staff in the Porter app: one DB transaction (shelf-check refunds, bill,
+ * shipped), then a best-effort cancel of the Shiprocket order created at payment so nobody
+ * books it by mistake. Shiprocket being down never blocks the dispatch: a failed cancel is
+ * left on orders.problem for a dashboard cancel. A repeat (lost response) does not cancel
+ * again; if the first response was lost before the cancel ran, the unbooked Shiprocket order
+ * (no AWB, no cost) stays until someone cancels it in the dashboard.
+ */
+export async function runDispatchManual(
+  deps: ShipDeps,
+  orderId: string,
+  actor: string,
+  trackingUrl: string | null,
+): Promise<ManualDispatchOutcome> {
+  const { db } = deps;
+  const r = await db.rpc<ManualDispatchResult>("online_order_dispatch_manual", {
+    p_order_id: orderId,
+    p_actor: actor,
+    p_tracking_url: trackingUrl,
+  });
+  let problem: string | null = null;
+  if (r.changed && r.sr_order_id) {
+    try {
+      const srOrderId = Number(r.sr_order_id);
+      if (!Number.isFinite(srOrderId)) throw new Error(`invalid Shiprocket order id ${r.sr_order_id}`);
+      await deps.shiprocket.cancel([srOrderId]);
+      logEvent("info", "sr_cancelled_for_manual_dispatch", { order_id: orderId, sr_order_id: r.sr_order_id });
+    } catch (err) {
+      problem = `Shiprocket order ${r.sr_order_id} not cancelled (${errorText(err)}) — ` +
+        "cancel it in Shiprocket dashboard";
+      await setProblem(db, (await mustGetOrder(db, orderId)).order_ref, problem);
+    }
+  }
+  logEvent("info", "order_dispatched_manual", { order_id: orderId, status: r.status, changed: r.changed });
+  return { status: r.status, billId: r.bill_id, refundId: r.refund_id, problem };
 }
 
 // ---------- send back / rebook ----------

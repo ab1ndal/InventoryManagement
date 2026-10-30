@@ -70,6 +70,11 @@ export function isOutsideUp(address, fulfilment = "ship") {
   return state !== "" && state !== "uttar pradesh";
 }
 
+// Porter links are pasted by staff and shown to the customer; the server enforces the same rule.
+export function isValidTrackingUrl(value) {
+  return /^https:\/\/\S+$/.test(value) && value.length <= 500;
+}
+
 export function hasProblem(o, jobs = []) {
   return Boolean(
     o.problem || o.process_error || o.status === "rto" || jobs.some((j) => j.status === "failed")

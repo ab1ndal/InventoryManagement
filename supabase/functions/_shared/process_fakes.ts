@@ -28,6 +28,8 @@ export function fakeOrder(over: Partial<OrderRow> = {}): OrderRow {
     order_ref: "WEB-000123",
     status: "paid",
     fulfilment: "ship",
+    courier: null,
+    manual_tracking_url: null,
     contact_name: "Asha Verma",
     contact_phone: "+919876543210",
     contact_email: "asha@example.com",
@@ -187,7 +189,9 @@ export class FakeDb implements OrdersDb {
         const target = action === "process" ? "processing" : "cancelling";
         const res = (claimed: boolean, resumed: boolean, reason?: string) =>
           ({ claimed, resumed, ...(reason ? { reason } : {}), status: o.status, order: structuredClone(o) }) as T;
-        if (o.fulfilment === "pickup" && action !== "cancel") return res(false, false, "status");
+        if ((o.fulfilment === "pickup" || o.courier === "porter") && action !== "cancel") {
+          return res(false, false, "status");
+        }
         if ((action === "send_back" || action === "rebook") && o.op_action === action) {
           if (o.op_key === key) {
             o.op_lease_until = lease();
@@ -405,6 +409,39 @@ export class FakeDb implements OrdersDb {
         if (o.status !== "paid") throw raised(fn, `mark_ready: order must be paid (status ${o.status})`);
         Object.assign(o, { status: "ready_for_pickup", bill_id: 77 });
         return { status: o.status, bill_id: 77, refund_id: null, all_unavailable: false } as T;
+      case "online_order_dispatch_manual": {
+        // Repeat after success: stored result, nothing left for the caller to cancel.
+        if (o.courier === "porter") {
+          return {
+            status: o.status,
+            bill_id: o.bill_id,
+            refund_id: null,
+            all_unavailable: false,
+            changed: false,
+            sr_order_id: null,
+          } as T;
+        }
+        if (o.fulfilment !== "ship") throw raised(fn, `dispatch_manual: order ${o.order_ref} is not a ship order`);
+        if (o.status !== "paid" || o.op_action !== null || o.awb !== null) {
+          throw raised(fn, `dispatch_manual: order must be paid with no action or courier booking in progress`);
+        }
+        const all = this.plan.all_unavailable;
+        Object.assign(o, all ? { status: "cancelled" } : {
+          status: "shipped",
+          courier: "porter",
+          courier_name: "Porter",
+          manual_tracking_url: args.p_tracking_url,
+          bill_id: this.billId,
+        });
+        return {
+          status: o.status,
+          bill_id: all ? null : this.billId,
+          refund_id: all ? "refund-unavailable" : null,
+          all_unavailable: all,
+          changed: true,
+          sr_order_id: o.sr_order_id,
+        } as T;
+      }
       case "online_order_mark_collected":
         if (o.status !== "ready_for_pickup") throw raised(fn, `mark_collected: order must be ready for pickup`);
         Object.assign(o, { status: "delivered", delivered_at: "2026-10-30T10:00:00Z" });

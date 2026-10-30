@@ -55,6 +55,11 @@ test("list selects fulfilment", async () => {
   expect(opsOf("orders").find((o) => o[0] === "select")[1]).toContain("fulfilment");
 });
 
+test("list selects courier (Porter badge)", async () => {
+  await listOrders("all");
+  expect(opsOf("orders").find((o) => o[0] === "select")[1]).toContain(" courier,");
+});
+
 test("problems tab ORs problem, process_error, rto and orders with failed jobs", async () => {
   mockResults.order_jobs = { data: [{ order_id: "o1" }, { order_id: "o1" }, { order_id: "o2" }], error: null };
   await listOrders("problems");

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   delivered,
   type EmailOrder,
@@ -28,7 +28,9 @@ const o: EmailOrder = {
   creditApplied: 500,
   gatewayAmount: 3630,
   awb: null,
+  courier: null,
   courierName: null,
+  manualTrackingUrl: null,
   leftoverVoucher: null,
 };
 
@@ -65,6 +67,17 @@ Deno.test("shipped: AWB and tracking link; delivered", () => {
   assertStringIncludes(m.text, "AWB): AWB123");
   assertStringIncludes(m.text, "https://shiprocket.co/tracking/AWB123");
   assertEquals(delivered(o, SITE).subject, "Order WEB-000042 delivered");
+});
+
+Deno.test("shipped: Porter with a link, Porter without one, Shiprocket without an AWB throws", () => {
+  const porter = { ...o, courier: "porter" as const, courierName: "Porter" };
+  const m = shipped({ ...porter, manualTrackingUrl: "https://porter.in/track/abc" }, SITE);
+  assertStringIncludes(m.text, "on its way with Porter");
+  assertStringIncludes(m.text, "Track it here: https://porter.in/track/abc");
+  const n = shipped(porter, SITE);
+  assertStringIncludes(n.text, "We'll share the delivery details with you on WhatsApp.");
+  assertEquals(n.text.includes("AWB"), false);
+  assertThrows(() => shipped(o, SITE), Error, "no AWB");
 });
 
 const pickup: EmailOrder = { ...o, fulfilment: "pickup", shipping: 0, address: { name: "Asha Gupta", phone: "+919876543210" } };

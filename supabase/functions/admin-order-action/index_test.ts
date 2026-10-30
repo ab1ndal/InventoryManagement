@@ -773,3 +773,100 @@ Deno.test("pickup: retry never books Shiprocket for a paid pickup order", async 
   assertEquals(r.status, 200);
   assertEquals(sr.methods(), []);
 });
+
+// ---------- Porter (dispatched by hand) ----------
+
+const DISPATCH = { action: "dispatch_manual", orderId: ORDER_ID, trackingUrl: " https://porter.in/track/abc " };
+const PORTER_SHIPPED = { status: "shipped", courier: "porter" as const, courier_name: "Porter", bill_id: 9001 };
+
+Deno.test("dispatch_manual → RPC with the trimmed link; shipped; Shiprocket order from payment cancelled", async () => {
+  const { db, sr, call } = setup();
+  const r = await call(DISPATCH);
+  assertEquals(r.status, 200);
+  assertEquals([r.body.order.status, r.body.order.courier, r.body.billId], ["shipped", "porter", 9001]);
+  assertEquals(db.calls[0], {
+    fn: "online_order_dispatch_manual",
+    args: { p_order_id: ORDER_ID, p_actor: ADMIN, p_tracking_url: "https://porter.in/track/abc" },
+  });
+  assertEquals(sr.calls, [{ method: "cancel", args: [[111]] }]);
+  assertEquals(db.order.problem, null);
+});
+
+Deno.test("dispatch_manual: Shiprocket cancel fails → still dispatched, problem recorded for a dashboard cancel", async () => {
+  const { db, sr, call } = setup();
+  sr.failOnce.add("cancel");
+  const r = await call({ action: "dispatch_manual", orderId: ORDER_ID });
+  assertEquals([r.status, r.body.order.status], [200, "shipped"]);
+  assertEquals(db.calls[0].args.p_tracking_url, null);
+  assert(String(db.order.problem).includes("Shiprocket order 111 not cancelled"));
+  assertEquals(db.fns(), ["online_order_dispatch_manual", "online_order_set_problem"]);
+});
+
+Deno.test("dispatch_manual: no Shiprocket order yet → no courier call; repeat → stored result, no second cancel", async () => {
+  const none = setup({ sr_order_id: null, sr_shipment_id: null });
+  assertEquals((await none.call(DISPATCH)).status, 200);
+  assertEquals(none.sr.methods(), []);
+  const { sr, call } = setup();
+  await call(DISPATCH);
+  const again = await call(DISPATCH);
+  assertEquals([again.status, again.body.order.status], [200, "shipped"]);
+  assertEquals(sr.count("cancel"), 1);
+});
+
+Deno.test("dispatch_manual: nothing on the shelf → cancelled with refund; Shiprocket order cancelled", async () => {
+  const { sr, call } = setup({}, { shippable_items: [], all_unavailable: true, refund_id: "refund-unavailable" });
+  const r = await call(DISPATCH);
+  assertEquals(
+    [r.status, r.body.order.status, r.body.refundId, r.body.billId],
+    [200, "cancelled", "refund-unavailable", undefined],
+  );
+  assertEquals(sr.methods(), ["cancel"]);
+});
+
+Deno.test("dispatch_manual: bad link → 400 before any DB call; DB refusal → 409 bad_state", async () => {
+  for (const trackingUrl of ["http://porter.in/x", "javascript:alert(1)", "porter.in/x", "https://porter.in/a b", 5]) {
+    const { db, call } = setup();
+    const r = await call({ action: "dispatch_manual", orderId: ORDER_ID, trackingUrl });
+    assertEquals([r.status, r.body.code], [400, "invalid_request"], String(trackingUrl));
+    assertEquals(db.calls, []);
+  }
+  const long = setup();
+  const tooLong = "https://p.in/" + "a".repeat(500);
+  const r = await long.call({ action: "dispatch_manual", orderId: ORDER_ID, trackingUrl: tooLong });
+  assertEquals(r.status, 400);
+  const pickup = setup(PICKUP);
+  assertEquals((await pickup.call(DISPATCH)).body.code, "bad_state");
+  assertEquals(pickup.sr.methods(), []);
+  assertEquals((await setup({ status: "packed" }).call(DISPATCH)).body.code, "bad_state");
+});
+
+Deno.test("Porter order: process / rebook refused (no Shiprocket); retry never creates a Shiprocket order", async () => {
+  const { db, sr, call } = setup({ ...PORTER_SHIPPED, sr_order_id: null, sr_shipment_id: null });
+  assertEquals((await call(PROCESS)).body.code, "bad_state");
+  const rebook = await call({ action: "rebook", orderId: ORDER_ID, opKey: "rb-1", parcelLost: false, note: "x" });
+  assertEquals(rebook.body.code, "bad_state");
+  assertEquals((await call({ action: "retry", orderId: ORDER_ID })).status, 200);
+  assertEquals([sr.methods(), db.order.status], [[], "shipped"]);
+});
+
+Deno.test("Porter order: ensureSrOrder skips it even while paid (dispatch raced the shiprocket_create job)", async () => {
+  const { sr, call } = setup({ courier: "porter", sr_order_id: null, sr_shipment_id: null });
+  assertEquals((await call({ action: "retry", orderId: ORDER_ID })).status, 200);
+  assertEquals(sr.methods(), []);
+});
+
+Deno.test("mark_delivered: any admin for a Porter order, reason optional; Shiprocket order stays superadmin-only", async () => {
+  const { db, call } = setup(PORTER_SHIPPED);
+  const md = { action: "mark_delivered", orderId: ORDER_ID, deliveredAt: "2026-10-29T10:00:00Z" };
+  const r = await call(md);
+  assertEquals(r.status, 200);
+  assertEquals(db.calls, [{
+    fn: "online_order_mark_delivered",
+    args: { p_order_id: ORDER_ID, p_actor: ADMIN, p_delivered_at: "2026-10-29T10:00:00Z", p_reason: null },
+  }]);
+  const withReason = await call({ ...md, reason: " rider confirmed " });
+  assertEquals([withReason.status, db.calls[1].args.p_reason], [200, "rider confirmed"]);
+  const ship = setup({ status: "shipped", awb: "AWB1" });
+  const denied = await ship.call({ ...md, reason: "x" });
+  assertEquals([denied.status, ship.db.calls.length], [403, 0]);
+});

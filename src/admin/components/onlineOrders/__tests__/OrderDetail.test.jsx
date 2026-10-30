@@ -655,3 +655,96 @@ describe("store pickup", () => {
     expect(screen.queryByText("Store pickup")).not.toBeInTheDocument();
   });
 });
+
+describe("Porter (manual)", () => {
+  const checkedItems = () => [
+    item({ id: "i1", line_no: 1, product_name: "Kurta", unit_price: 1200, paid_value: 1200, available_qty: 1 }),
+    item({ id: "i2", line_no: 2, product_name: "Dupatta", unit_price: 800, paid_value: 800, available_qty: 0 }),
+  ];
+  const openProcess = async () => {
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    fireEvent.click(processButton());
+    return screen.findByRole("dialog");
+  };
+
+  test("Process defaults to Shiprocket; Porter needs a valid link if one is given, then sends dispatch_manual", async () => {
+    mockDetail = detail({ items: checkedItems() });
+    const dialog = await openProcess();
+    expect(within(dialog).getByRole("radio", { name: "Shiprocket" })).toBeChecked();
+    expect(within(dialog).queryByLabelText("Porter tracking link")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Process" })).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Porter (manual)" }));
+    expect(dialog).toHaveTextContent("Book the delivery in the Porter app first.");
+    // same refund preview as Process: the missing Dupatta is refunded
+    expect(within(dialog).getByTestId("refund-total")).toHaveTextContent("₹800.00");
+    const dispatched = within(dialog).getByRole("button", { name: "Dispatched" });
+    expect(dispatched).toBeEnabled(); // the link is optional
+    fireEvent.change(within(dialog).getByLabelText("Porter tracking link"), { target: { value: "porter.in/x" } });
+    expect(dispatched).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText("Porter tracking link"), {
+      target: { value: " https://porter.in/track/abc " },
+    });
+    fireEvent.click(dispatched);
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order dispatched with Porter"]));
+    expect(mockActions).toEqual([{ action: "dispatch_manual", orderId: "o1", trackingUrl: "https://porter.in/track/abc" }]);
+  });
+
+  test("Porter without a link sends trackingUrl null; nothing available → Cancel and refund", async () => {
+    mockDetail = detail({ items: [item({ id: "i1", line_no: 1, product_name: "Kurta", paid_value: 1200, available_qty: 0 })] });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Porter (manual)" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel and refund" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order cancelled and refunded"]));
+    expect(mockActions).toEqual([{ action: "dispatch_manual", orderId: "o1", trackingUrl: null }]);
+  });
+
+  test("closing the dialog resets the choice to Shiprocket", async () => {
+    mockDetail = detail({ items: checkedItems() });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Porter (manual)" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(processButton());
+    expect(within(await screen.findByRole("dialog")).getByRole("radio", { name: "Shiprocket" })).toBeChecked();
+  });
+
+  test("shipped Porter order: badge, link, no Rebook; any admin marks it delivered without a reason", async () => {
+    mockDetail = detail({
+      order: {
+        status: "shipped",
+        courier: "porter",
+        courier_name: "Porter",
+        manual_tracking_url: "https://porter.in/track/abc",
+        bill_id: 42,
+        delivered_at: null,
+      },
+    });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByText("Porter")).toBeInTheDocument();
+    expect(screen.getByText("Courier: Porter")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Porter tracking link" })).toHaveAttribute("href", "https://porter.in/track/abc");
+    expect(screen.queryByRole("button", { name: "Rebook…" })).not.toBeInTheDocument();
+    expect(mockRole).toBe("admin");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Mark delivered…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Reason (optional)");
+    const confirm = within(dialog).getByRole("button", { name: "Mark delivered" });
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mockActions).toHaveLength(1));
+    expect(mockActions[0]).toMatchObject({ action: "mark_delivered", orderId: "o1", reason: "" });
+    expect(typeof mockActions[0].deliveredAt).toBe("string");
+  });
+
+  test("a pickup order's Process is replaced by Ready for pickup, so no Porter choice", async () => {
+    mockDetail = detail({ order: { fulfilment: "pickup", shipping: 0, address: { name: "Asha" } } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.queryByRole("button", { name: "Process" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Porter (manual)")).not.toBeInTheDocument();
+  });
+});
