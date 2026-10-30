@@ -182,8 +182,6 @@ const CREATE_ORDER_MESSAGES = {
   price_changed: "Prices updated, please review",
   out_of_stock: "Some items just sold out. Please review your order.",
   invalid_address: "Please check your address details.",
-  not_up: "We currently deliver within Uttar Pradesh only. WhatsApp us for other locations.",
-  unverifiable_pincode: "We couldn't verify this pincode right now. Please try again or WhatsApp us.",
   invalid_code: "That code isn't valid",
   rate_limited: "Too many attempts, try later",
   gateway_error: "We couldn't start the payment. Please try again.",

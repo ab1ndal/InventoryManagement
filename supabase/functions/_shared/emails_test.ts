@@ -32,6 +32,9 @@ Deno.test("orderConfirmed: items, total paid, ref, link and the UP line", () => 
   assertStringIncludes(m.text, "Total paid: ₹4,130 (₹3,630 paid online)");
   assertStringIncludes(m.text, "Store credit: -₹500");
   assertStringIncludes(m.text, "We deliver within Uttar Pradesh");
+  const out = orderConfirmed({ ...o, address: { ...o.address, state: "Maharashtra", pincode: "400001" } }, SITE);
+  assertStringIncludes(out.text, "We'll confirm delivery to your address on WhatsApp before dispatch.");
+  assert(!out.text.includes("Uttar Pradesh"), "no UP promise outside UP");
   assertStringIncludes(m.text, `${SITE}/order/WEB-000042`);
   assert(!/GST/i.test(m.text), "composition dealer: no GST");
   const v = orderConfirmed({ ...o, leftoverVoucher: { code: "ABCD2345EFGH6789", value: 1250 } }, SITE);

@@ -5,6 +5,7 @@
 --   scripts/test-db.sh up
 --   scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql \
 --     schema/migration_online_orders.sql schema/migration_online_orders_r7.sql \
+--     schema/migration_online_orders_any_state.sql \
 --     schema/migration_online_orders_refunds.sql schema/migration_online_orders_ship.sql \
 --     schema/migration_online_orders_rebook.sql schema/test_online_orders.sql
 -- Concurrency (two real sessions): schema/test_harness/concurrency_test.sh
@@ -496,8 +497,17 @@ begin
       jsonb_build_object('contact', jsonb_build_object('name', 'X', 'phone', '9800000001'),
         'address', jsonb_build_object('pincode', '110001'), 'subtotal', 1000, 'shipping', 99, 'gateway_amount', 1099),
       jsonb_build_array(jsonb_build_object('variant_id', v, 'qty', 1, 'unit_price', 1000)), null);
-    assert false, 'Delhi pincode must be rejected';
-  exception when raise_exception then null;
+  exception when raise_exception then
+    assert false, 'Delhi pincode is accepted (any-state checkout, 2026-10-30): ' || sqlerrm;
+  end;
+  begin
+    perform public.online_order_create(
+      jsonb_build_object('contact', jsonb_build_object('name', 'X', 'phone', '9800000001'),
+        'address', jsonb_build_object('pincode', '012345'), 'subtotal', 1000, 'shipping', 99, 'gateway_amount', 1099),
+      jsonb_build_array(jsonb_build_object('variant_id', v, 'qty', 1, 'unit_price', 1000)), null);
+    assert false, 'malformed pincode must be rejected';
+  exception when raise_exception then
+    assert sqlerrm like '%invalid pincode%', sqlerrm;
   end;
   begin
     perform public.online_order_create(

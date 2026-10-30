@@ -10,6 +10,7 @@ const mockRows = {
       created_at: "2026-10-23T10:00:00Z",
       status: "paid",
       contact_name: "Asha",
+      address: { city: "Lucknow", state: "Uttar Pradesh", pincode: "226001" },
       contact_phone: "+919999999999",
       subtotal: 2000,
       promo_discount: 0,
@@ -29,6 +30,7 @@ const mockRows = {
       created_at: "2026-10-21T10:00:00Z",
       status: "delivered",
       contact_name: "Meera",
+      address: { city: "Mumbai", state: "Maharashtra", pincode: "400001" },
       contact_phone: "+917777777777",
       subtotal: 900,
       promo_discount: 0,
@@ -125,4 +127,13 @@ test("shows a returns badge on a partly returned order", async () => {
   fireEvent.click(screen.getByRole("tab", { name: "All" }));
   const row = await screen.findByRole("row", { name: /WEB-000003/ });
   expect(row).toHaveTextContent("Partly returned");
+});
+
+test("flags an order outside Uttar Pradesh", async () => {
+  render(<OrderList onSelect={() => {}} refreshKey={0} />);
+  const upRow = await screen.findByRole("row", { name: /WEB-000001/ });
+  expect(upRow).not.toHaveTextContent("Outside UP");
+  fireEvent.click(screen.getByRole("tab", { name: "All" }));
+  const row = await screen.findByRole("row", { name: /WEB-000003/ });
+  expect(row).toHaveTextContent("Outside UP");
 });

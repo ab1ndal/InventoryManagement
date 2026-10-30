@@ -81,6 +81,14 @@ Deno.test("create-order: happy path creates the DB order then the Cashfree order
   ]);
 });
 
+Deno.test("create-order: an address outside Uttar Pradesh is accepted", async () => {
+  const outside = { ...address, city: "Mumbai", state: "Maharashtra", pincode: "400001" };
+  const { res, deps } = await call(body({ address: outside }), { shiprocket: fakeShiprocket({ rate: null }).client });
+  assertEquals(res.status, 200);
+  const [create] = deps.store.callsTo("online_order_create");
+  assertEquals((create.p_order as Record<string, unknown>).shipping, 250, "national fallback slab");
+});
+
 Deno.test("create-order: signed-in user id goes to online_order_create (R8)", async () => {
   const { json, deps } = await call(body(), {}, { authorization: "Bearer user.jwt" });
   assertEquals(json.paid, false);
@@ -180,18 +188,14 @@ Deno.test("create-order: every contract error code", async () => {
   await expectError(body({ address: { ...address, line1: "" } }), 422, "invalid_address");
   await expectError(body({ address: { ...address, phone: "12345" } }), 422, "invalid_address");
   await expectError(body({ address: { ...address, pincode: "2010" } }), 422, "invalid_address");
-  await expectError(body({ address: { ...address, pincode: "263001" } }), 422, "not_up", () => {}, {
-    shiprocket: fakeShiprocket({ state: "Uttarakhand" }).client,
-  });
-  await expectError(body({ address: { ...address, pincode: "247001" } }), 422, "unverifiable_pincode", () => {}, {
-    shiprocket: fakeShiprocket({ state: null }).client,
-  });
+  await expectError(body({ address: { ...address, pincode: "012345" } }), 422, "invalid_address");
   await expectError(body({ code: "NOPE" }), 422, "invalid_code", (s) => (s.impls.online_code_check = () => ({ status: "invalid" })));
   await expectError(body({ code: "NOPE" }), 429, "rate_limited", (s) => (s.impls.online_code_check = () => ({ status: "rate_limited" })));
   await expectError(body({ items: [{ variantId: V1, qty: 9 }] }), 409, "out_of_stock");
   await expectError(body(), 409, "price_changed", (s) => (s.impls.online_order_create = dbRaise("line 1: price changed (1000 vs 1200)")));
   await expectError(body(), 409, "price_changed", (s) => (s.impls.online_order_create = dbRaise("store credit balance is lower than requested")));
   await expectError(body(), 422, "invalid_code", (s) => (s.impls.online_order_create = dbRaise("code not valid")));
+  await expectError(body(), 422, "invalid_address", (s) => (s.impls.online_order_create = dbRaise("invalid pincode 012345")));
   // 502 gateway_error: see the Cashfree failure tests above.
 });
 

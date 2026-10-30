@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "../../../components/ui/dialog";
 import { action, getMyRole, getOrder, newOpKey } from "./onlineOrdersApi";
-import { ReturnBadge, StatusBadge } from "./OrderList";
+import { OutsideUpBadge, ReturnBadge, StatusBadge } from "./OrderList";
 import ReturnsSection from "./ReturnsSection";
 import {
   formatDateTime,
@@ -297,6 +297,7 @@ export default function OrderDetail({ orderId, onChanged }) {
         <div>
           <StatusBadge status={order.status} />
           <ReturnBadge order={{ ...order, order_items: items }} />
+          <OutsideUpBadge address={order.address} />
         </div>
       </div>
 
