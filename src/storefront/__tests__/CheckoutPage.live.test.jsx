@@ -259,10 +259,12 @@ it("navigates to the order page when credit or a voucher covered everything", as
 });
 
 describe("Indian address format", () => {
-  it("orders the address fields pincode first, landmark optional", () => {
+  it("puts contact first, then delivery with the address under Ship to me, pincode first", () => {
     renderPage();
-    const ids = Array.from(document.querySelectorAll("section input, section select")).map((el) => el.id); // eslint-disable-line testing-library/no-node-access
-    expect(ids).toEqual(["name", "phone", "email", "pincode", "line1", "line2", "landmark", "city", "state"]);
+    const fields = "#name, #phone, #email, input[name=fulfilment], #pincode, #city, #state, #line1, #line2, #landmark";
+    const ids = Array.from(document.querySelectorAll(fields)).map((el) => el.id || el.value); // eslint-disable-line testing-library/no-node-access
+    expect(ids).toEqual(["name", "phone", "email", "ship", "pincode", "city", "state", "line1", "line2", "landmark", "pickup"]);
+    expect(screen.getByRole("radio", { name: /pick up at the shop \(no shipping fees\)/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Flat, House no., Building, Apartment")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Area, Street, Sector, Village")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/^Landmark \(optional\)/)).toBeInTheDocument();
@@ -274,9 +276,13 @@ describe("Indian address format", () => {
     );
     renderPage();
     userEvent.type(screen.getByPlaceholderText(/pincode/i), "201001");
-    await waitFor(() => expect(screen.getByPlaceholderText(/^city$/i)).toHaveValue("Ghaziabad"));
+    // Shown read-only once filled ...
+    expect(await screen.findByTestId("pincode-place")).toHaveTextContent("Ghaziabad, Uttar Pradesh");
+    expect(screen.queryByPlaceholderText(/^city$/i)).not.toBeInTheDocument();
+    // ... and editable again behind Edit.
+    userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByPlaceholderText(/^city$/i)).toHaveValue("Ghaziabad");
     expect(screen.getByRole("combobox")).toHaveValue("Uttar Pradesh");
-    // Still editable after the autofill.
     userEvent.clear(screen.getByPlaceholderText(/^city$/i));
     userEvent.type(screen.getByPlaceholderText(/^city$/i), "Modinagar");
     expect(screen.getByPlaceholderText(/^city$/i)).toHaveValue("Modinagar");
@@ -290,14 +296,14 @@ describe("Indian address format", () => {
     });
     renderPage();
     const pincode = screen.getByPlaceholderText(/pincode/i);
-    const city = screen.getByPlaceholderText(/^city$/i);
     userEvent.type(pincode, "201001");
-    await waitFor(() => expect(city).toHaveValue("Ghaziabad"));
+    expect(await screen.findByTestId("pincode-place")).toHaveTextContent("Ghaziabad, Uttar Pradesh");
     userEvent.clear(pincode);
     userEvent.type(pincode, "400001");
-    await waitFor(() => expect(city).toHaveValue("Mumbai"));
-    expect(screen.getByRole("combobox")).toHaveValue("Maharashtra");
+    await waitFor(() => expect(screen.getByTestId("pincode-place")).toHaveTextContent("Mumbai, Maharashtra"));
 
+    userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const city = screen.getByPlaceholderText(/^city$/i);
     userEvent.clear(city);
     userEvent.type(city, "Navi Mumbai");
     userEvent.clear(pincode);
