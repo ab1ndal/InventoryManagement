@@ -181,7 +181,7 @@ export default function StorefrontHeader() {
               <User size={20} />
             </Link>
 
-            <button aria-label="Cart" onClick={openCart} className={ICON_LINK}>
+            <button aria-label="Cart" onClick={openCart} className={ICON_LINK} data-cart-target>
               <ShoppingBag size={20} />
               {itemCount > 0 && (
                 <span className={BADGE}>{itemCount > 99 ? "99+" : itemCount}</span>

@@ -21,6 +21,7 @@ import SizeGuideDialog from "../components/product/SizeGuideDialog";
 import { formatSize, compareSizes } from "../lib/sizes";
 import ImageLightbox from "../components/product/ImageLightbox";
 import StickyAddToCart from "../components/product/StickyAddToCart";
+import { flyToCart } from "../lib/flyToCart";
 import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
@@ -275,8 +276,9 @@ function ProductDetail({ productid }) {
     if (index >= 0) setActiveImage(index);
   }
 
-  function handleAddToCart() {
+  function handleAddToCart(event) {
     if (!canAddToCart) return;
+    const photo = imagePaths[activeImage] ?? imagePaths[0];
     addItem({
       variant_id: selectedVariant.variantid,
       product_id: productid,
@@ -285,9 +287,13 @@ function ProductDetail({ productid }) {
       size: selectedVariant.size,
       color: selectedVariant.color,
       price,
-      image_url: imageUrl(imagePaths[activeImage] ?? imagePaths[0], {
+      image_url: imageUrl(photo, {
         width: 400,
       }),
+    });
+    flyToCart({
+      from: event.currentTarget,
+      image: photo ? imageUrl(photo, { width: 150 }) : null,
     });
     toast.success("Added to cart", {
       action: {
@@ -299,8 +305,8 @@ function ProductDetail({ productid }) {
 
   // The sticky bar can't host the size picker, so until a variant is chosen
   // its button takes the shopper back up to the picker instead.
-  function handleStickyClick() {
-    if (canAddToCart) handleAddToCart();
+  function handleStickyClick(event) {
+    if (canAddToCart) handleAddToCart(event);
     else pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
