@@ -13,6 +13,7 @@ import {
   ORIGIN,
   post,
   testDeps,
+  USER,
   V1,
 } from "../_shared/pay_testing.ts";
 
@@ -231,6 +232,8 @@ Deno.test("create-order: every contract error code", async () => {
   await expectError(body(), 409, "price_changed", (s) => (s.impls.online_order_create = dbRaise("store credit balance is lower than requested")));
   await expectError(body(), 422, "invalid_code", (s) => (s.impls.online_order_create = dbRaise("code not valid")));
   await expectError(body(), 422, "invalid_address", (s) => (s.impls.online_order_create = dbRaise("invalid pincode 012345")));
+  await expectError(body(), 409, "out_of_stock", (s) => (s.impls.online_order_create = dbRaise(`out of stock: variant ${V1}`)));
+  await expectError(body({ holderKey: "u:someone" }), 400, "bad_request");
   // 502 gateway_error: see the Cashfree failure tests above.
 });
 
@@ -242,4 +245,30 @@ Deno.test("create-order: forged JWT → 401, preflight and GET handled", async (
   assertEquals(pre.status, 204);
   const get = await handler(new Request(URL_, { headers: { origin: ORIGIN } }), deps);
   assertEquals(get.status, 405);
+});
+
+Deno.test("create-order: holder key → quote availability and p_order.holder_key (guest key, or u:<uid> from the JWT)", async () => {
+  const g = "g:55555555-5555-4555-8555-555555555555";
+  const guest = await call(body({ holderKey: g }));
+  assertEquals(guest.res.status, 200);
+  assertEquals((guest.deps.store.callsTo("online_order_create")[0].p_order as Record<string, unknown>).holder_key, g);
+  assertEquals(guest.deps.store.callsTo("variant_availability")[0].p_holder_key, g);
+
+  const user = await call(body({ holderKey: g }), {}, { authorization: "Bearer user.jwt" });
+  assertEquals((user.deps.store.callsTo("online_order_create")[0].p_order as Record<string, unknown>).holder_key, `u:${USER}`);
+
+  const none = await call(body());
+  assertEquals((none.deps.store.callsTo("online_order_create")[0].p_order as Record<string, unknown>).holder_key, null);
+});
+
+Deno.test("create-order: units held by others → 409 out_of_stock before any order is created", async () => {
+  const { res, json, deps } = await call(body(), {
+    store: (() => {
+      const s = withCreate(new FakeStore());
+      s.impls.variant_availability = () => [{ variant_id: V1, stock: 5, held_by_others: 5, available: 0, my_held: 0, others_expire_at: null }];
+      return s;
+    })(),
+  });
+  assertEquals([res.status, json.code], [409, "out_of_stock"]);
+  assertEquals(deps.store.callsTo("online_order_create"), []);
 });

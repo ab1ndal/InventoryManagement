@@ -5,6 +5,7 @@ import { useCart } from "../../context/CartContext";
 import { formatSize } from "../../lib/sizes";
 import { maxQuantity } from "../../lib/cartLogic";
 import FreeShippingNudge from "../FreeShippingNudge";
+import HoldCountdown from "./HoldCountdown";
 
 function CartItem({ item }) {
   const { removeItem, updateQty } = useCart();
@@ -76,12 +77,14 @@ function CartItem({ item }) {
 }
 
 export default function CartDrawer() {
-  const { items, itemCount, isOpen, closeCart, revalidateCart } = useCart();
+  const { items, itemCount, isOpen, closeCart, revalidateCart, renewHolds, holdExpiresAt } = useCart();
   const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   useEffect(() => {
-    if (isOpen) revalidateCart();
-  }, [isOpen, revalidateCart]);
+    if (!isOpen) return;
+    renewHolds();
+    revalidateCart();
+  }, [isOpen, revalidateCart, renewHolds]);
 
   return (
     <>
@@ -173,6 +176,7 @@ export default function CartDrawer() {
             <p className="text-[10px] text-storefront-muted font-sans text-center mt-3">
               Shipping calculated at checkout
             </p>
+            <HoldCountdown expiresAt={holdExpiresAt} className="text-center mt-1" />
           </div>
         )}
       </div>

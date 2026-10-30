@@ -1,5 +1,6 @@
 import React from "react";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { CartProvider, useCart } from "../context/CartContext";
 import {
   fetchServerCart, removeServerItem, clearServerCart, fetchLiveVariantData,
@@ -14,8 +15,10 @@ jest.mock("../lib/cartApi", () => ({
   fetchLiveVariantData: jest.fn(async () => ({})),
 }));
 let authCb;
+const mockInvoke = jest.fn();
 jest.mock("lib/supabaseClient", () => ({
   supabase: {
+    functions: { invoke: (...a) => mockInvoke(...a) },
     auth: {
       onAuthStateChange: (cb) => {
         authCb = cb;
@@ -24,7 +27,14 @@ jest.mock("lib/supabaseClient", () => ({
     },
   },
 }));
+jest.mock("sonner", () => ({ toast: { warning: jest.fn() } }));
 
+// jsdom has no Web Crypto; the guest holder key needs getRandomValues.
+beforeAll(() => {
+  Object.defineProperty(window, "crypto", { value: require("crypto").webcrypto, configurable: true });
+});
+
+const NO_HOLDS = { rateLimited: false, items: [], expiresAt: null };
 
 const ITEM_V1 = {
   variant_id: "v1",
@@ -49,10 +59,11 @@ const ITEM_V2 = {
 };
 
 function Harness() {
-  const { items, itemCount, addItem, removeItem, updateQty, clearCart } = useCart();
+  const { items, itemCount, holdExpiresAt, addItem, removeItem, updateQty, clearCart } = useCart();
   return (
     <div>
       <output data-testid="count">{itemCount}</output>
+      <output data-testid="expires">{holdExpiresAt ?? ""}</output>
       <output data-testid="items">{JSON.stringify(items)}</output>
       <button onClick={() => addItem(ITEM_V1)}>add-v1</button>
       <button onClick={() => addItem({ ...ITEM_V1, quantity: 3 })}>add-v1-qty3</button>
@@ -74,7 +85,10 @@ function renderHarness() {
   );
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  mockInvoke.mockResolvedValue({ data: NO_HOLDS, error: null });
+});
 
 describe("CartContext — initial state", () => {
   it("starts with itemCount 0 and empty items", () => {
@@ -298,5 +312,86 @@ describe("CartContext — pending sync on unmount", () => {
     unmount();
     await new Promise((r) => setTimeout(r, 10));
     expect(fetchServerCart).not.toHaveBeenCalled();
+  });
+});
+
+describe("CartContext — stock holds", () => {
+  const holdResponse = (items, expiresAt = "2026-10-30T10:15:00.000Z") => ({
+    data: { rateLimited: false, items, expiresAt },
+    error: null,
+  });
+  const lastHoldBody = () => mockInvoke.mock.calls[mockInvoke.mock.calls.length - 1][1].body;
+
+  it("holds the new line quantity under the guest key", async () => {
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1-qty3" }));
+    await act(async () => {});
+    expect(mockInvoke).toHaveBeenCalledWith("cart-hold", {
+      body: { holderKey: localStorage.getItem("bc_holder"), items: [{ variantId: "v1", qty: 3 }] },
+    });
+    expect(localStorage.getItem("bc_holder")).toMatch(/^g:/);
+  });
+
+  it("cuts the line back when someone else holds the rest, and says so", async () => {
+    mockInvoke.mockResolvedValue(
+      holdResponse([{ variantId: "v1", requested: 3, held: 1, available: 1, reason: "unavailable" }])
+    );
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1-qty3" }));
+    expect(screen.getByTestId("count")).toHaveTextContent("3");
+    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("1"));
+    expect(toast.warning).toHaveBeenCalledWith(
+      "Someone else has this in their cart — only 1 left for you",
+      expect.objectContaining({ description: "Silk Kurta" })
+    );
+  });
+
+  it("keeps the line when only an anti-hoarding cap stopped the hold", async () => {
+    mockInvoke.mockResolvedValue(
+      holdResponse([{ variantId: "v1", requested: 3, held: 0, available: 3, reason: "holder_cap" }])
+    );
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1-qty3" }));
+    await act(async () => {});
+    expect(screen.getByTestId("count")).toHaveTextContent("3");
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  it("keeps the cart as is when the hold call fails", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    mockInvoke.mockRejectedValue(new Error("Failed to fetch"));
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1" }));
+    fireEvent.click(screen.getByRole("button", { name: "add-v1" }));
+    await act(async () => {});
+    expect(screen.getByTestId("count")).toHaveTextContent("2");
+    expect(warn).toHaveBeenCalledWith("cart-hold failed; cart kept as is", expect.anything());
+    warn.mockRestore();
+  });
+
+  it("releases the hold when a line is removed", async () => {
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1" }));
+    fireEvent.click(screen.getByRole("button", { name: "remove-v1" }));
+    await act(async () => {});
+    expect(lastHoldBody().items).toEqual([{ variantId: "v1", qty: 0 }]);
+  });
+
+  it("releases every hold when the cart is cleared", async () => {
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1" }));
+    fireEvent.click(screen.getByRole("button", { name: "clear" }));
+    await act(async () => {});
+    expect(lastHoldBody()).toEqual({ holderKey: expect.stringMatching(/^g:/), items: [], replace: true });
+  });
+
+  it("exposes the hold expiry from the latest response", async () => {
+    mockInvoke.mockResolvedValue(
+      holdResponse([{ variantId: "v1", requested: 1, held: 1, available: 1, reason: null }])
+    );
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1" }));
+    await waitFor(() => expect(screen.getByTestId("expires")).toHaveTextContent("2026-10-30T10:15:00.000Z"));
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
   });
 });

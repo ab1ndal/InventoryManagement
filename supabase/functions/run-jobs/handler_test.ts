@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { authorized, type ClaimedJob, handler, type RunJobsDeps, toOrderJob } from "./handler.ts";
-import { confirmLikeDb, CRON_SECRET, FakeStore, order, SERVICE_KEY, testDeps, testEnv } from "../_shared/pay_testing.ts";
+import { confirmLikeDb, CRON_SECRET, dbRaise, FakeStore, order, SERVICE_KEY, testDeps, testEnv } from "../_shared/pay_testing.ts";
 import type { JobContext, JobHandler, OrderJob } from "../_shared/jobs/types.ts";
 import { handlerFor as realHandlerFor } from "../_shared/jobs/index.ts";
 
@@ -106,6 +106,15 @@ Deno.test("run-jobs expire (R5): PAID â†’ confirm, EXPIRED/TERMINATED/missing â†
   ]);
   assertEquals(store.callsTo("online_order_set_problem").map((a) => a.p_order_ref), ["WEB-000005"]);
   assertEquals(paid.status, "paid");
+  assertEquals(store.callsTo("stock_holds_purge"), [{}]);
+});
+
+Deno.test("run-jobs expire: a failed stock-hold purge doesn't stop the sweep", async () => {
+  const store = new FakeStore();
+  store.impls.stock_holds_purge = dbRaise("purge down");
+  store.impls.online_order_list_stale = () => [];
+  const res = await handler(cron('{"mode":"expire"}'), deps(store));
+  assertEquals(await res.json(), { mode: "expire", checked: 0, confirmed: 0, expired: 0, flagged: 0, errors: 0 });
 });
 
 Deno.test("run-jobs expire: R5 failed attempt then late success still confirms (not failed while ACTIVE)", async () => {

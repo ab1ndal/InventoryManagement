@@ -27,7 +27,7 @@ const ITEM = { variant_id: "v1", product_id: "BC1", quantity: 2, name: "Silk Sar
 
 // CRA sets Jest's `resetMocks: true` — re-arm the mock's return value here.
 beforeEach(() => {
-  mockUseCart.mockReturnValue({ items: [ITEM] });
+  mockUseCart.mockReturnValue({ items: [ITEM], renewHolds: jest.fn() });
   mockGetCheckoutLive.mockResolvedValue(false);
 });
 
@@ -114,7 +114,7 @@ it("passes the item subtotal to the free-shipping nudge", () => {
 });
 
 it("redirects to /cart when the cart is empty", () => {
-  mockUseCart.mockReturnValue({ items: [] });
+  mockUseCart.mockReturnValue({ items: [], renewHolds: jest.fn() });
   render(<MemoryRouter initialEntries={["/checkout"]}><CheckoutPage /></MemoryRouter>);
   expect(screen.queryByText(/checkout/i)).not.toBeInTheDocument();
 });

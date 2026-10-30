@@ -112,10 +112,19 @@ export async function requireAdmin(
 /**
  * SHA-256 hex of the first x-forwarded-for hop + salt, for rate limiting
  * without storing raw IPs (R9). null when the header is absent.
+ * `preferCfConnectingIp`: use Cloudflare's cf-connecting-ip when present. The
+ * first x-forwarded-for hop is whatever the client sent, so a cap keyed on it
+ * can be dodged by sending a fresh value each time; cf-connecting-ip is set by
+ * the edge proxy. Opt-in so the existing code/lookup limits keep their keys.
  */
-export async function hashIp(req: Request, salt: string): Promise<string | null> {
+export async function hashIp(
+  req: Request,
+  salt: string,
+  opts: { preferCfConnectingIp?: boolean } = {},
+): Promise<string | null> {
   if (!salt) throw new Error("hashIp: salt is required");
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim();
+  const cf = opts.preferCfConnectingIp ? req.headers.get("cf-connecting-ip")?.trim() : undefined;
+  const ip = cf || req.headers.get("x-forwarded-for")?.split(",")[0].trim();
   if (!ip) return null;
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${salt}:${ip}`));
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");

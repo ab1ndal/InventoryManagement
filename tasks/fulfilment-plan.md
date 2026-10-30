@@ -1,6 +1,6 @@
 # Fulfilment options: out-of-state orders, store pickup, Porter, shipping quote fixes
 
-Status 2026-10-30: plan APPROVED. Shipped: PR A #101, PR B #102, PR C #103, PR D #104. Next: PR F (address format), then PR E (holds), PR G.
+Status 2026-10-30: plan APPROVED. Shipped: PR A #101, PR B #102, PR C #103, PR D #104, PR F #105. Next: PR E (holds), then PR G.
 
 ## Owner decisions (2026-10-29)
 - Site copy keeps saying "we ship within UP", but checkout **never hard-blocks** an out-of-UP address. The owner
@@ -137,3 +137,16 @@ Design (defaults chosen while running unattended; owner can change):
   longer pay for a held unit; `online_order_fail`/expiry releases the order's holds.
 - In-store POS ignores holds (physical sale wins); the online holder then sees "no longer available" at checkout.
 - Hold expiry shown in the cart: "Held for you for 14:32".
+
+## PR G design — sign-in prompt, phone-only path, follow-ups (2026-10-30)
+Facts: customer login = email magic link only. Guest checkout already works with phone alone (create-order finds or
+creates a guest `customers` row by phone); guests track orders with order ref + phone (TrackOrderPage). No phone
+OTP anywhere. No abandoned-cart concept; guest carts live only in localStorage.
+G1 (build now, no new external account):
+- Sign-in nudge for guests in the cart drawer, cart page and checkout: "Sign in to track orders and get your saved
+  cart and address" → /login, returning to where they were. Never required; guest + phone checkout stays.
+- Admin "Abandoned checkouts" list: unpaid orders (payment_failed / expired, last 30 days, not later paid by the same
+  phone) with name, phone, items, total, and a WhatsApp button opening wa.me with a prefilled reminder; "followed up"
+  mark so the owner doesn't message twice. This gives follow-ups from the phone number alone.
+G2 (needs owner action — not built): phone OTP sign-in. Needs an SMS provider with India DLT registration (sender ID +
+templates) or a WhatsApp Business API number for OTP. Owner to choose; then wire Supabase phone auth.

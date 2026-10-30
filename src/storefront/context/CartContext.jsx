@@ -1,14 +1,22 @@
 import React, {
   createContext, useContext, useState, useEffect, useCallback, useRef,
 } from "react";
+import { toast } from "sonner";
 import { supabase } from "lib/supabaseClient";
-import { mergeCarts, revalidateItems, addToItems, maxQuantity } from "../lib/cartLogic";
+import {
+  mergeCarts, revalidateItems, addToItems, maxQuantity, applyHoldResults,
+} from "../lib/cartLogic";
 import {
   fetchServerCart, upsertItem, removeServerItem, clearServerCart, fetchLiveVariantData,
 } from "../lib/cartApi";
+import { cartHold } from "../lib/ordersApi";
+import { guestHolderKey } from "../lib/holder";
 import { trackEvent } from "../lib/analytics";
 
 const STORAGE_KEY = "bc_cart";
+// cart-hold request limits: per-line quantity and lines per call.
+const MAX_HOLD_QTY = 20;
+const MAX_HOLD_ITEMS = 30;
 
 export const CartContext = createContext(null);
 
@@ -23,6 +31,7 @@ export function CartProvider({ children }) {
   });
   const [isOpen, setIsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [holdExpiresAt, setHoldExpiresAt] = useState(null);
   const userIdRef = useRef(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -30,6 +39,59 @@ export function CartProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
+
+  const persist = useCallback((variant_id, next) => {
+    if (!userIdRef.current) return;
+    if (next) {
+      upsertItem({ variant_id, product_id: next.product_id, quantity: next.quantity }).catch(() => {});
+    } else {
+      removeServerItem(variant_id).catch(() => {});
+    }
+  }, []);
+
+  // Stock holds are best effort: the cart works exactly as before when the
+  // call fails, and the shopper is never kept waiting on it. Built inside the
+  // promise so even a failure to make the guest key lands in the catch.
+  const syncHolds = useCallback(
+    (lines, replace = false) => {
+      const holdItems = lines.map((l) => ({ variantId: l.variant_id, qty: Math.min(l.quantity, MAX_HOLD_QTY) }));
+      Promise.resolve()
+        .then(() => cartHold({ holderKey: guestHolderKey(), items: holdItems, ...(replace && { replace: true }) }))
+        .then((res) => {
+          if (!res || res.rateLimited) return;
+          setHoldExpiresAt(res.expiresAt ?? null);
+          // Compare against the cart as it is now, not as it was when sent.
+          const { items: next, capped } = applyHoldResults(itemsRef.current, res);
+          if (!capped.length) return;
+          itemsRef.current = next;
+          setItems(next);
+          capped.forEach((c) => {
+            persist(c.variant_id, c.quantity > 0 ? { product_id: c.product_id, quantity: c.quantity } : null);
+            toast.warning(
+              c.quantity > 0
+                ? `Someone else has this in their cart — only ${c.quantity} left for you`
+                : "Someone else has the last one in their cart",
+              { description: c.name }
+            );
+          });
+        })
+        .catch((error) =>
+          console.warn("cart-hold failed; cart kept as is", {
+            items: holdItems, replace, code: error.code, status: error.status, message: error.message,
+          })
+        );
+    },
+    [persist]
+  );
+
+  // Renew every line's hold and release holds on anything no longer in the
+  // cart. Past the per-call line limit, renew the first lines without
+  // releasing: the rest simply expire.
+  const renewHolds = useCallback(() => {
+    const current = itemsRef.current;
+    if (!current.length) return;
+    syncHolds(current.slice(0, MAX_HOLD_ITEMS), current.length <= MAX_HOLD_ITEMS);
+  }, [syncHolds]);
 
   // Auth-driven sync. Subscribe directly to supabase.auth for event granularity
   // (merge only on a genuine SIGNED_IN, load-only on session restore).
@@ -41,7 +103,10 @@ export function CartProvider({ children }) {
         if (event === "SIGNED_IN") {
           // Genuine login: union guest + server (max), then persist the merge.
           const merged = mergeCarts(itemsRef.current, server);
+          itemsRef.current = merged;
           setItems(merged);
+          // Runs in the deferred sync, never inside the auth callback.
+          renewHolds();
           await Promise.all(
             merged.map((i) =>
               upsertItem({ variant_id: i.variant_id, product_id: i.product_id, quantity: i.quantity })
@@ -82,16 +147,7 @@ export function CartProvider({ children }) {
       timers.forEach(clearTimeout);
       sub.subscription.unsubscribe();
     };
-  }, []);
-
-  const persist = useCallback((variant_id, next) => {
-    if (!userIdRef.current) return;
-    if (next) {
-      upsertItem({ variant_id, product_id: next.product_id, quantity: next.quantity }).catch(() => {});
-    } else {
-      removeServerItem(variant_id).catch(() => {});
-    }
-  }, []);
+  }, [renewHolds]);
 
   // Returns how many units were added: fewer than asked (or 0) when the cart
   // would otherwise hold more than the known stock.
@@ -105,18 +161,20 @@ export function CartProvider({ children }) {
       setItems(next);
       const row = next.find((i) => i.variant_id === variant_id);
       persist(variant_id, { product_id, quantity: row.quantity });
+      syncHolds([row]);
       trackEvent("add_to_cart", { product_id, variant_id, quantity: added });
       return added;
     },
-    [persist]
+    [persist, syncHolds]
   );
 
   const removeItem = useCallback(
     (variant_id) => {
       setItems((prev) => prev.filter((i) => i.variant_id !== variant_id));
       persist(variant_id, null);
+      syncHolds([{ variant_id, quantity: 0 }]);
     },
-    [persist]
+    [persist, syncHolds]
   );
 
   const updateQty = useCallback(
@@ -124,20 +182,25 @@ export function CartProvider({ children }) {
       if (quantity <= 0) {
         setItems((prev) => prev.filter((i) => i.variant_id !== variant_id));
         persist(variant_id, null);
+        syncHolds([{ variant_id, quantity: 0 }]);
         return;
       }
       const row = itemsRef.current.find((i) => i.variant_id === variant_id);
       const capped = Math.min(quantity, maxQuantity(row));
       setItems((prev) => prev.map((i) => (i.variant_id === variant_id ? { ...i, quantity: capped } : i)));
-      if (row) persist(variant_id, { product_id: row.product_id, quantity: capped });
+      if (row) {
+        persist(variant_id, { product_id: row.product_id, quantity: capped });
+        syncHolds([{ variant_id, quantity: capped }]);
+      }
     },
-    [persist]
+    [persist, syncHolds]
   );
 
   const clearCart = useCallback(() => {
     setItems([]);
     if (userIdRef.current) clearServerCart().catch(() => {});
-  }, []);
+    syncHolds([], true);
+  }, [syncHolds]);
 
   // Reconcile the current cart against live stock/price. Returns the changes so
   // the caller can surface toasts. Persists caps/removals when signed in.
@@ -167,8 +230,8 @@ export function CartProvider({ children }) {
   return (
     <CartContext.Provider
       value={{
-        items, itemCount, isOpen, syncing,
-        openCart, closeCart, addItem, removeItem, updateQty, clearCart, revalidateCart,
+        items, itemCount, isOpen, syncing, holdExpiresAt,
+        openCart, closeCart, addItem, removeItem, updateQty, clearCart, revalidateCart, renewHolds,
       }}
     >
       {children}

@@ -80,8 +80,11 @@ function fillAddress(pincode = "201001", state = "Uttar Pradesh") {
   userEvent.selectOptions(screen.getByRole("combobox"), state);
 }
 
+const HOLDER_KEY = "g:aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+
 beforeEach(() => {
-  mockUseCart.mockReturnValue({ items: [ITEM] });
+  localStorage.setItem("bc_holder", HOLDER_KEY);
+  mockUseCart.mockReturnValue({ items: [ITEM], renewHolds: jest.fn() });
   mockAuth.mockReturnValue({ user: null });
   mockApi.getCheckoutLive.mockResolvedValue(true);
   mockApi.quote.mockImplementation(async () => quoteResponse());
@@ -101,7 +104,7 @@ it("shows server totals and a Pay button with the gateway amount", async () => {
   const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
   expect(screen.queryByText(/We usually deliver within Uttar Pradesh/)).not.toBeInTheDocument();
   await waitFor(() => expect(pay).toBeEnabled());
-  expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship", pincode: "201001" });
+  expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship", holderKey: HOLDER_KEY, pincode: "201001" });
 });
 
 it("shows Calculating… instead of a stale figure while a re-quote is in flight", async () => {
@@ -160,7 +163,7 @@ it("shows code messages and lets an applied code be removed", async () => {
 
   userEvent.click(screen.getByRole("button", { name: "Remove" }));
   expect(screen.queryByText("Code applied")).not.toBeInTheDocument();
-  await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship" }));
+  await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship", holderKey: HOLDER_KEY }));
 });
 
 it("shows the leftover-voucher note the server sends", async () => {
@@ -251,6 +254,7 @@ it("navigates to the order page when credit or a voucher covered everything", as
     items: [{ variantId: "v1", qty: 2 }],
     fulfilment: "ship",
     address: { name: "Priya Sharma", phone: "9810873280", line1: "58", line2: "Sihani Gate Market", city: "Ghaziabad", state: "Uttar Pradesh", pincode: "201001" },
+    holderKey: HOLDER_KEY,
   });
 });
 
@@ -404,11 +408,11 @@ describe("store pickup", () => {
     await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("Free (store pickup)"));
     expect(screen.getByTestId("quote-to-pay")).toHaveTextContent("₹3,000");
     expect(screen.queryByTestId("free-shipping-nudge")).not.toBeInTheDocument();
-    expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "pickup" });
+    expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "pickup", holderKey: HOLDER_KEY });
 
     userEvent.click(screen.getByRole("radio", { name: /ship to me/i }));
     expect(screen.getByPlaceholderText(/flat, house no/i)).toBeInTheDocument();
-    await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship" }));
+    await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship", holderKey: HOLDER_KEY }));
   });
 
   it("enables Pay with only name and phone, and sends no address lines", async () => {
@@ -431,6 +435,7 @@ describe("store pickup", () => {
       items: [{ variantId: "v1", qty: 2 }],
       fulfilment: "pickup",
       address: { name: "Priya Sharma", phone: "9810873280" },
+      holderKey: HOLDER_KEY,
     });
   });
 

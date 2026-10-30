@@ -167,6 +167,7 @@ Deno.test("quote: store pickup → ₹0 shipping, no pincode check or courier ra
     address: { name: "A", phone: "9876543210" },
     accessTokenHash: "h",
     fulfilment: "pickup",
+    holderKey: null,
   });
   assertEquals([p.p_order.fulfilment, p.p_order.shipping, p.p_order.quoted_courier_id], ["pickup", 0, null]);
 });
@@ -191,8 +192,10 @@ Deno.test("orderPayload: online_order_create shape with credit_part = nonGateway
     address: { pincode: "201001" },
     accessTokenHash: "h",
     fulfilment: "ship",
+    holderKey: `u:${USER}`,
   });
   assertEquals(p.p_order.fulfilment, "ship");
+  assertEquals(p.p_order.holder_key, `u:${USER}`);
   assertEquals(p.p_order.credit_applied, 500);
   assertEquals(p.p_order.quoted_courier_id, 12);
   assertEquals(p.p_order.access_token_hash, "h");
@@ -200,4 +203,29 @@ Deno.test("orderPayload: online_order_create shape with credit_part = nonGateway
   const sumCredit = p.p_items.reduce((s, i) => s + Math.round(Number(i.credit_part) * 100), 0);
   assertEquals(sumCredit, 50000);
   assertEquals(p.p_items[1], { variant_id: V2, qty: 3, unit_price: 333.33, promo_share: 0, credit_part: r.quote.lines[1].nonGatewayPart });
+});
+
+Deno.test("quote: units held by other shoppers are unavailable; the holder key is passed to variant_availability", async () => {
+  const { deps: d, store } = deps();
+  store.variantRows = [variant({ stock: 3 }), variant({ variantId: V2, stock: 2 })];
+  store.impls.variant_availability = () => [
+    { variant_id: V1, stock: 3, held_by_others: 2, available: 1, my_held: 0, others_expire_at: null },
+    { variant_id: V2.toUpperCase(), stock: 2, held_by_others: 0, available: 2, my_held: 2, others_expire_at: null },
+  ];
+  const g = "g:55555555-5555-4555-8555-555555555555";
+  const r = await buildQuote(
+    d,
+    req({ items: [{ variantId: V1, qty: 2 }, { variantId: V2, qty: 2 }] }),
+    { ...guest, holderKey: g },
+  );
+  assertEquals(r.response.unavailable, [{ variantId: V1, available: 1 }]);
+  assertEquals(store.callsTo("variant_availability"), [{ p_variant_ids: [V1, V2], p_holder_key: g }]);
+});
+
+Deno.test("quote: no availability rows (no holds data) → raw stock, holder key null", async () => {
+  const { deps: d, store } = deps();
+  store.variantRows = [variant({ stock: 1 })];
+  const r = await buildQuote(d, req({ items: [{ variantId: V1, qty: 2 }] }), guest);
+  assertEquals(r.response.unavailable, [{ variantId: V1, available: 1 }]);
+  assertEquals(store.callsTo("variant_availability")[0].p_holder_key, null);
 });

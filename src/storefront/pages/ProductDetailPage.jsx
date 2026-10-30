@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useProduct } from "../hooks/useProduct";
+import { useVariantAvailability } from "../hooks/useVariantAvailability";
 import { getProductImagePaths, imageUrl, imageColor } from "../lib/productImage";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
@@ -26,7 +27,7 @@ import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { buildProductJsonLd } from "../lib/seo";
-import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote } from "../lib/deliveryEstimate";
+import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote, heldNote } from "../lib/deliveryEstimate";
 import { stripMarkdown, whatsappProductUrl } from "../lib/productText";
 import { isSoldOut } from "../lib/stock";
 
@@ -188,6 +189,7 @@ function ProductDetail({ productid }) {
   const addToCartRef = useRef(null);
   const pickerRef = useRef(null);
   const { addItem, openCart } = useCart();
+  const availability = useVariantAvailability(selectedVariant?.variantid);
 
   const colours = useMemo(() => unique(variants.map((v) => v.color)), [variants]);
   // In-stock sizes for the Details table (stock summed across colours).
@@ -251,9 +253,16 @@ function ProductDetail({ productid }) {
   const ogImage = imagePaths.length
     ? imageUrl(imagePaths[0], { width: 1200 })
     : undefined;
-  const maxQty = selectedVariant?.stock ?? 0;
+  // What this shopper can buy: stock minus other shoppers' cart holds. Raw
+  // stock until that loads (or if it can't be read).
+  const maxQty = availability ? Number(availability.available) : selectedVariant?.stock ?? 0;
+  const heldByOthers = availability !== null && Number(availability.stock) > 0 && maxQty <= 0;
   const canAddToCart = selectedVariant !== null && maxQty > 0;
-  const stockLabel = selectedVariant ? stockNote(selectedVariant.stock) : null;
+  const stockLabel = heldByOthers
+    ? heldNote(availability.others_expire_at)
+    : selectedVariant
+      ? stockNote(maxQty)
+      : null;
   const whatsappHref = whatsappProductUrl({
     name: product.name,
     productid,
@@ -290,13 +299,13 @@ function ProductDetail({ productid }) {
       image_url: imageUrl(photo, {
         width: 400,
       }),
-      stock: selectedVariant.stock,
+      stock: maxQty,
     });
     if (added === 0) {
       const inCart =
-        selectedVariant.stock === 1
+        maxQty === 1
           ? "The last piece is already in your cart"
-          : `All ${selectedVariant.stock} in stock are already in your cart`;
+          : `All ${maxQty} in stock are already in your cart`;
       toast.info(inCart, {
         action: { label: "View cart", onClick: openCart },
       });
@@ -307,7 +316,7 @@ function ProductDetail({ productid }) {
       image: photo ? imageUrl(photo, { width: 150 }) : null,
     });
     const message =
-      added < quantity ? `Only ${selectedVariant.stock} in stock — your cart now has all of them` : "Added to cart";
+      added < quantity ? `Only ${maxQty} in stock — your cart now has all of them` : "Added to cart";
     toast.success(message, {
       action: {
         label: "View cart",
@@ -320,7 +329,7 @@ function ProductDetail({ productid }) {
   // its button takes the shopper back up to the picker instead.
   function handleStickyClick(event) {
     if (canAddToCart) handleAddToCart(event);
-    else pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    else if (!heldByOthers) pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   return (
@@ -434,7 +443,7 @@ function ProductDetail({ productid }) {
               className="w-full flex items-center justify-center gap-2 bg-storefront-gold text-white font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-gold-dark transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ShoppingBag size={15} aria-hidden="true" />
-              {canAddToCart ? "Add to Cart" : "Select Size & Colour"}
+              {canAddToCart ? "Add to Cart" : heldByOthers ? "In someone's cart" : "Select Size & Colour"}
             </button>
             {stockLabel && (
               <p className="text-xs text-center text-storefront-muted font-sans mt-2.5">
@@ -517,7 +526,8 @@ function ProductDetail({ productid }) {
         name={product.name}
         price={price}
         soldOut={soldOut}
-        label={canAddToCart ? "Add to Cart" : "Select size"}
+        label={canAddToCart ? "Add to Cart" : heldByOthers ? "In someone's cart" : "Select size"}
+        disabled={heldByOthers}
         onClick={handleStickyClick}
       />
     </>

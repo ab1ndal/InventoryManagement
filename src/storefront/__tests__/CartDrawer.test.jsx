@@ -45,6 +45,8 @@ function makeCtx(overrides = {}) {
     updateQty: jest.fn(),
     clearCart: jest.fn(),
     revalidateCart: jest.fn(),
+    renewHolds: jest.fn(),
+    holdExpiresAt: null,
     ...overrides,
   };
 }
@@ -152,6 +154,20 @@ describe("CartDrawer — revalidate on open", () => {
   it("does not call revalidateCart when drawer is closed", () => {
     const cart = setupDrawer({ isOpen: false });
     expect(cart.revalidateCart).not.toHaveBeenCalled();
+  });
+});
+
+describe("CartDrawer — stock holds", () => {
+  it("renews holds on open and shows how long the cart is held", () => {
+    const expires = new Date(Date.now() + 10 * 60000 + 30000).toISOString();
+    const cart = setupDrawer({ items: [ITEM_A], itemCount: 2, holdExpiresAt: expires });
+    expect(cart.renewHolds).toHaveBeenCalled();
+    expect(screen.getByText(/held for you for/i)).toHaveTextContent(/10:(30|29)/);
+  });
+
+  it("does not renew holds while closed", () => {
+    const cart = setupDrawer({ isOpen: false });
+    expect(cart.renewHolds).not.toHaveBeenCalled();
   });
 });
 

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import Seo from "../components/Seo";
 import FreeShippingNudge from "../components/FreeShippingNudge";
+import HoldCountdown from "../components/cart/HoldCountdown";
 import { useCart } from "../context/CartContext";
 import { formatSize } from "../lib/sizes";
 import { maxQuantity } from "../lib/cartLogic";
@@ -25,9 +26,10 @@ function whatsappHref(items, subtotal) {
 }
 
 export default function CartPage() {
-  const { items, updateQty, removeItem, revalidateCart } = useCart();
+  const { items, updateQty, removeItem, revalidateCart, renewHolds, holdExpiresAt } = useCart();
 
   useEffect(() => {
+    renewHolds();
     revalidateCart().then((changes) => {
       changes?.forEach((c) => {
         if (c.type === "removed") toast.warning(`${c.name} is no longer available and was removed.`);
@@ -92,6 +94,7 @@ export default function CartPage() {
           Subtotal <span className="font-semibold tabular-nums">₹{subtotal.toLocaleString("en-IN")}</span>
         </p>
         <p className="text-xs text-storefront-muted font-sans">Shipping calculated at checkout.</p>
+        <HoldCountdown expiresAt={holdExpiresAt} />
         <Link
           to="/checkout"
           className="w-full sm:w-auto text-center bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"

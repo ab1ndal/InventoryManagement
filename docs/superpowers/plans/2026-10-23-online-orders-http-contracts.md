@@ -11,8 +11,33 @@ exactly these shapes; UI builders call exactly these. All bodies JSON. Browser c
 ### `storefront_settings` (direct table read, anon)
 `supabase.from("storefront_settings").select("checkout_live").eq("id", 1).single()`
 
+### Holder key (stock holds, 2026-10-30)
+Guests: `g:<uuid v4>`, created once in localStorage `bc_holder`, sent as `holderKey` to `cart-hold`,
+`checkout-quote` and `create-order` (a malformed key → 400 `bad_request`). Signed in: the server uses
+`u:<auth uid>` from the verified JWT and never accepts a `u:` key from the body; a guest key sent with a
+JWT is adopted into the user key by `cart-hold`. "Available" for a shopper = stock − other holders'
+active holds (cart holds 15 min, order holds 45 min), floor 0.
+
+### POST `cart-hold` (`--no-verify-jwt`; optional user JWT verified by the handler)
+Req: `{ holderKey?: "g:<uuid>", items: [{ variantId, qty: 0..20 }] (≤30), replace?: boolean }`
+Sets each listed variant's hold to `qty` (0 releases) and renews it to now + 15 min. `replace: true`
+syncs the whole cart: also releases the holder's holds on variants not listed (`items: []` releases all).
+`holderKey` is required without a JWT. Empty `items` without `replace` → 400.
+Res 200:
+```
+{ rateLimited: boolean,              // >30 calls/min per holder: nothing changed, items []
+  items: [{ variantId, requested, held, available, reason: null|"unavailable"|"holder_cap"|"ip_cap" }],
+  expiresAt: string|null }           // earliest expiry of the holder's cart holds
+```
+Caps never error: 5 held units per holder, 10 active per IP (cf-connecting-ip hash; off without
+IP_HASH_SALT). The storefront shrinks a cart line only when `available` < its quantity.
+
+### RPC `variant_availability(p_variant_ids uuid[], p_holder_key text default null)` (anon, authenticated)
+Rows `{ variant_id, stock, held_by_others, available, my_held, others_expire_at }`. Used by the PDP
+("In someone's cart — may free up in N min") and cart revalidation.
+
 ### POST `checkout-quote`
-Req: `{ items: [{ variantId: string, qty: number }], pincode?: string, code?: string, creditRequested?: number, fulfilment?: "ship"|"pickup" }`
+Req: `{ items: [{ variantId: string, qty: number }], pincode?: string, code?: string, creditRequested?: number, fulfilment?: "ship"|"pickup", holderKey?: "g:<uuid>" }`
 (`fulfilment` defaults to `ship`. `pickup`: shipping 0, freeShippingGap 0, pincode ignored → `pincode: null`, `shippingSource: "pickup"`.)
 Res 200:
 ```
@@ -24,11 +49,13 @@ Res 200:
   shippingSource: "rate"|"flat"|"free"|"pickup",
   code: { status: "ok"|"invalid"|"rate_limited", kind?: "voucher"|"promo", message?: string } | null,
   creditAvailable: number,          // 0 for guests
-  unavailable: [{ variantId, available: number }] }  // stock lower than requested qty
+  unavailable: [{ variantId, available: number }] }  // available (stock − others' holds) lower than qty
 ```
 
 ### POST `create-order`
-Req: `{ attemptKey: string(uuid v4), items, address: { name, phone, email?, line1, line2?, city, state, pincode }, code?, creditRequested?, fulfilment?: "ship"|"pickup" }`
+Req: `{ attemptKey: string(uuid v4), items, address: { name, phone, email?, line1, line2?, city, state, pincode }, code?, creditRequested?, fulfilment?: "ship"|"pickup", holderKey?: "g:<uuid>" }`
+(The holder's cart holds become the order's holds for 45 min; released on payment failure / expiry,
+consumed at confirm. Another holder's units → 409 `out_of_stock`.)
 (`fulfilment: "pickup"`: `address` needs only `{ name, phone, email? }`; the order stores `{ name, phone }` and ₹0 shipping.)
 Res 200: `{ orderRef: "WEB-000123", accessToken: string, paymentSessionId: string|null, cashfreeMode: "sandbox"|"production", paid: boolean }`
 (`paid: true` and `paymentSessionId: null` when credit/voucher covered everything.)
