@@ -59,12 +59,13 @@ const ITEM_V2 = {
 };
 
 function Harness() {
-  const { items, itemCount, holdExpiresAt, addItem, removeItem, updateQty, clearCart } = useCart();
+  const { items, itemCount, holdExpiresAt, holdStatus, addItem, removeItem, updateQty, clearCart, renewHolds } = useCart();
   return (
     <div>
       <output data-testid="count">{itemCount}</output>
       <output data-testid="expires">{holdExpiresAt ?? ""}</output>
       <output data-testid="items">{JSON.stringify(items)}</output>
+      <output data-testid="hold-status">{JSON.stringify(holdStatus)}</output>
       <button onClick={() => addItem(ITEM_V1)}>add-v1</button>
       <button onClick={() => addItem({ ...ITEM_V1, quantity: 3 })}>add-v1-qty3</button>
       <button onClick={() => addItem(ITEM_V2)}>add-v2</button>
@@ -73,6 +74,7 @@ function Harness() {
       <button onClick={() => updateQty("v1", 5)}>update-v1-5</button>
       <button onClick={() => updateQty("v1", 0)}>update-v1-0</button>
       <button onClick={clearCart}>clear</button>
+      <button onClick={renewHolds}>renew</button>
     </div>
   );
 }
@@ -332,18 +334,35 @@ describe("CartContext — stock holds", () => {
     expect(localStorage.getItem("bc_holder")).toMatch(/^g:/);
   });
 
-  it("cuts the line back when someone else holds the rest, and says so", async () => {
+  it("keeps the line when someone else holds the rest, and says so", async () => {
     mockInvoke.mockResolvedValue(
       holdResponse([{ variantId: "v1", requested: 3, held: 1, available: 1, reason: "unavailable" }])
     );
     renderHarness();
     fireEvent.click(screen.getByRole("button", { name: "add-v1-qty3" }));
-    expect(screen.getByTestId("count")).toHaveTextContent("3");
-    await waitFor(() => expect(screen.getByTestId("count")).toHaveTextContent("1"));
-    expect(toast.warning).toHaveBeenCalledWith(
-      "Someone else has this in their cart — only 1 left for you",
-      expect.objectContaining({ description: "Silk Kurta" })
+    await waitFor(() =>
+      expect(toast.warning).toHaveBeenCalledWith(
+        "Only 1 available right now — kept in your cart",
+        expect.objectContaining({ description: "Silk Kurta" })
+      )
     );
+    expect(screen.getByTestId("count")).toHaveTextContent("3");
+    expect(JSON.parse(screen.getByTestId("hold-status").textContent)).toEqual({
+      v1: { held: 1, requested: 3, available: 1, reason: "unavailable" },
+    });
+  });
+
+  it("does not toast on a re-check, only on a fresh add", async () => {
+    renderHarness();
+    fireEvent.click(screen.getByRole("button", { name: "add-v1-qty3" }));
+    await act(async () => {});
+    mockInvoke.mockResolvedValue(
+      holdResponse([{ variantId: "v1", requested: 3, held: 0, available: 3, reason: "cooldown" }], null)
+    );
+    fireEvent.click(screen.getByRole("button", { name: "renew" }));
+    await waitFor(() => expect(screen.getByTestId("hold-status")).toHaveTextContent("cooldown"));
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(screen.getByTestId("count")).toHaveTextContent("3");
   });
 
   it("keeps the line when only an anti-hoarding cap stopped the hold", async () => {

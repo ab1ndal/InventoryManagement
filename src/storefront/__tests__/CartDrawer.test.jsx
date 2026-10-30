@@ -47,6 +47,7 @@ function makeCtx(overrides = {}) {
     revalidateCart: jest.fn(),
     renewHolds: jest.fn(),
     holdExpiresAt: null,
+    holdStatus: {},
     ...overrides,
   };
 }
@@ -163,6 +164,16 @@ describe("CartDrawer — stock holds", () => {
     const cart = setupDrawer({ items: [ITEM_A], itemCount: 2, holdExpiresAt: expires });
     expect(cart.renewHolds).toHaveBeenCalled();
     expect(screen.getByText(/held for you for/i)).toHaveTextContent(/10:(30|29)/);
+  });
+
+  it("keeps a line someone else holds and says why", () => {
+    setupDrawer({
+      items: [ITEM_A],
+      itemCount: 2,
+      holdStatus: { [ITEM_A.variant_id]: { held: 0, requested: ITEM_A.quantity, available: 0, reason: "unavailable" } },
+    });
+    expect(screen.getByText(ITEM_A.name)).toBeInTheDocument();
+    expect(screen.getByText(/^In someone else's cart right now\. Kept in your cart/)).toBeInTheDocument();
   });
 
   it("does not renew holds while closed", () => {

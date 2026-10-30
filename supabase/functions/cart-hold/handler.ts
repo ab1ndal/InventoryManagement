@@ -3,7 +3,9 @@
  * the shopper so nobody else can put them in their cart or pay for them.
  *
  * Body: { holderKey?: "g:<uuid>", items: [{ variantId, qty 0..20 }], replace?: boolean }.
- * Each listed variant's hold is set to qty (0 releases) and renewed to 15 min;
+ * Each listed variant's hold is set to qty (0 releases); a new or changed hold
+ * runs 15 min, re-sending the same qty keeps its expiry, and a hold never runs
+ * past 30 min from its start, then cools down for 10 min (reason "cooldown");
  * `replace` also releases the holder's holds on variants not listed (a whole-cart
  * sync, used to renew all holds). The holder is the JWT user when signed in
  * (a guest key sent alongside is adopted into it), else the guest key.
@@ -19,7 +21,7 @@ export const MAX_HOLD_ITEMS = 30;
 export const MAX_HOLD_QTY = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type HoldReason = "unavailable" | "holder_cap" | "ip_cap";
+export type HoldReason = "unavailable" | "holder_cap" | "ip_cap" | "cooldown";
 
 export type CartHoldResponse = {
   rateLimited: boolean;

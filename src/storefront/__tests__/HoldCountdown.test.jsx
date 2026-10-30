@@ -39,3 +39,25 @@ it("renders nothing without a hold or for one already expired", () => {
   rerender(<HoldCountdown expiresAt="2026-10-30T09:59:00Z" />);
   expect(screen.queryByText(/held for you/i)).not.toBeInTheDocument();
 });
+
+it("calls onExpire once when the hold lapses, so the page can check again", () => {
+  const onExpire = jest.fn();
+  render(<HoldCountdown expiresAt="2026-10-30T10:00:02Z" onExpire={onExpire} />);
+  act(() => {
+    jest.advanceTimersByTime(1000);
+  });
+  expect(onExpire).not.toHaveBeenCalled();
+  act(() => {
+    jest.advanceTimersByTime(5000);
+  });
+  expect(onExpire).toHaveBeenCalledTimes(1);
+});
+
+it("does not call onExpire for a hold that had already lapsed on arrival", () => {
+  const onExpire = jest.fn();
+  render(<HoldCountdown expiresAt="2026-10-30T09:59:00Z" onExpire={onExpire} />);
+  act(() => {
+    jest.advanceTimersByTime(5000);
+  });
+  expect(onExpire).not.toHaveBeenCalled();
+});

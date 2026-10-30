@@ -138,21 +138,22 @@ begin
   res := pg_temp.hold(g1, v, 2);
   assert pg_temp.held(res) = 1 and (res -> 'items' -> 0 ->> 'available')::int = 1, 'renew after expiry capped';
 
-  -- every set renews; qty 0 releases
+  -- the same qty again keeps the expiry (migration_online_orders_hold_cap.sql); qty 0 releases
   update public.stock_holds set expires_at = now() + interval '1 minute' where holder_key = g2;
   perform pg_temp.hold(g2, v, 1);
   select expires_at into v_exp from public.stock_holds where holder_key = g2;
-  assert v_exp > now() + interval '14 minutes', 'set renews';
+  assert v_exp = now() + interval '1 minute', 'same qty keeps the expiry';
   perform pg_temp.hold(g2, v, 0);
-  assert not exists (select 1 from public.stock_holds where holder_key = g2), 'qty 0 releases';
+  assert not exists (select 1 from public.stock_holds where holder_key = g2 and expires_at > now()), 'qty 0 releases';
 
   -- replace = sync the whole cart: unlisted variants released, listed renewed
   perform pg_temp.hold(g2, w, 2);
   res := public.stock_hold_set(g2, jsonb_build_array(jsonb_build_object('variant_id', v, 'qty', 1)), null, true);
   assert pg_temp.held(res) = 1, 'sync holds listed';
-  assert not exists (select 1 from public.stock_holds where holder_key = g2 and variant_id = w), 'sync released unlisted';
+  assert not exists (select 1 from public.stock_holds where holder_key = g2 and variant_id = w and expires_at > now()),
+    'sync released unlisted';
   res := public.stock_hold_set(g2, '[]'::jsonb, null, true);
-  assert not exists (select 1 from public.stock_holds where holder_key = g2), 'empty sync releases all';
+  assert not exists (select 1 from public.stock_holds where holder_key = g2 and expires_at > now()), 'empty sync releases all';
   assert res ->> 'expires_at' is null, 'no holds → no expiry';
 end $$;
 rollback;

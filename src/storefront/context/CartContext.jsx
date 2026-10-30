@@ -4,7 +4,7 @@ import React, {
 import { toast } from "sonner";
 import { supabase } from "lib/supabaseClient";
 import {
-  mergeCarts, revalidateItems, addToItems, maxQuantity, applyHoldResults,
+  mergeCarts, revalidateItems, addToItems, maxQuantity, holdStatusFrom,
 } from "../lib/cartLogic";
 import {
   fetchServerCart, upsertItem, removeServerItem, clearServerCart, fetchLiveVariantData,
@@ -32,6 +32,7 @@ export function CartProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [holdExpiresAt, setHoldExpiresAt] = useState(null);
+  const [holdStatus, setHoldStatus] = useState({});
   const userIdRef = useRef(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -52,37 +53,35 @@ export function CartProvider({ children }) {
   // Stock holds are best effort: the cart works exactly as before when the
   // call fails, and the shopper is never kept waiting on it. Built inside the
   // promise so even a failure to make the guest key lands in the catch.
-  const syncHolds = useCallback(
-    (lines, replace = false) => {
-      const holdItems = lines.map((l) => ({ variantId: l.variant_id, qty: Math.min(l.quantity, MAX_HOLD_QTY) }));
-      Promise.resolve()
-        .then(() => cartHold({ holderKey: guestHolderKey(), items: holdItems, ...(replace && { replace: true }) }))
-        .then((res) => {
-          if (!res || res.rateLimited) return;
-          setHoldExpiresAt(res.expiresAt ?? null);
-          // Compare against the cart as it is now, not as it was when sent.
-          const { items: next, capped } = applyHoldResults(itemsRef.current, res);
-          if (!capped.length) return;
-          itemsRef.current = next;
-          setItems(next);
-          capped.forEach((c) => {
-            persist(c.variant_id, c.quantity > 0 ? { product_id: c.product_id, quantity: c.quantity } : null);
-            toast.warning(
-              c.quantity > 0
-                ? `Someone else has this in their cart — only ${c.quantity} left for you`
-                : "Someone else has the last one in their cart",
-              { description: c.name }
-            );
-          });
+  // A hold never removes or shrinks a line (owner 2026-10-30): the line stays,
+  // shows its hold status, and checkout checks the stock again. `notify` (a
+  // fresh add) also says so in a toast.
+  const syncHolds = useCallback((lines, replace = false, notify = false) => {
+    const holdItems = lines.map((l) => ({ variantId: l.variant_id, qty: Math.min(l.quantity, MAX_HOLD_QTY) }));
+    Promise.resolve()
+      .then(() => cartHold({ holderKey: guestHolderKey(), items: holdItems, ...(replace && { replace: true }) }))
+      .then((res) => {
+        if (!res || res.rateLimited) return;
+        setHoldExpiresAt(res.expiresAt ?? null);
+        setHoldStatus((prev) => holdStatusFrom(prev, res, replace));
+        if (!notify) return;
+        lines.forEach((l) => {
+          const h = res.items?.find((i) => i.variantId === l.variant_id);
+          if (!h || h.reason !== "unavailable" || h.held >= h.requested) return;
+          toast.warning(
+            h.available > 0
+              ? `Only ${h.available} available right now — kept in your cart`
+              : "Someone else has the last one in their cart — kept in your cart",
+            { description: l.name }
+          );
+        });
+      })
+      .catch((error) =>
+        console.warn("cart-hold failed; cart kept as is", {
+          items: holdItems, replace, code: error.code, status: error.status, message: error.message,
         })
-        .catch((error) =>
-          console.warn("cart-hold failed; cart kept as is", {
-            items: holdItems, replace, code: error.code, status: error.status, message: error.message,
-          })
-        );
-    },
-    [persist]
-  );
+      );
+  }, []);
 
   // Renew every line's hold and release holds on anything no longer in the
   // cart. Past the per-call line limit, renew the first lines without
@@ -161,7 +160,7 @@ export function CartProvider({ children }) {
       setItems(next);
       const row = next.find((i) => i.variant_id === variant_id);
       persist(variant_id, { product_id, quantity: row.quantity });
-      syncHolds([row]);
+      syncHolds([row], false, true);
       trackEvent("add_to_cart", { product_id, variant_id, quantity: added });
       return added;
     },
@@ -230,7 +229,7 @@ export function CartProvider({ children }) {
   return (
     <CartContext.Provider
       value={{
-        items, itemCount, isOpen, syncing, holdExpiresAt,
+        items, itemCount, isOpen, syncing, holdExpiresAt, holdStatus,
         openCart, closeCart, addItem, removeItem, updateQty, clearCart, revalidateCart, renewHolds,
       }}
     >

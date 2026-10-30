@@ -64,28 +64,25 @@ export function revalidateItems(items, liveByVariant) {
   return { items: out, changes };
 }
 
-// Apply a cart-hold response. A line is cut back only when other shoppers'
-// holds (or a stock drop) leave fewer units than it asks for; a holder_cap /
-// ip_cap reason just means the unit isn't reserved, and checkout still sells
-// it, so those never shrink the cart. `capped` lists the lines that changed,
-// with their new quantity (0 = removed). A rate-limited response changed
-// nothing on the server, so it changes nothing here either.
-export function applyHoldResults(items, response) {
-  if (!response || response.rateLimited) return { items, capped: [] };
-  const availableById = new Map();
+// Per-variant result of a cart-hold call ({ held, requested, available, reason }).
+// Holds never change the cart: a line that isn't fully held stays, shows why,
+// and checkout checks the stock again. `replace` (a whole-cart sync) starts over.
+export function holdStatusFrom(prev, response, replace = false) {
+  if (!response || response.rateLimited) return prev;
+  const next = replace ? {} : { ...prev };
   for (const h of response.items ?? []) {
-    if (Number.isFinite(h.available)) availableById.set(h.variantId, Math.max(0, h.available));
+    next[h.variantId] = { held: h.held, requested: h.requested, available: h.available, reason: h.reason ?? null };
   }
-  const out = [];
-  const capped = [];
-  for (const it of items) {
-    const available = availableById.get(it.variant_id);
-    if (available === undefined || available >= it.quantity) {
-      out.push(it);
-      continue;
-    }
-    capped.push({ variant_id: it.variant_id, product_id: it.product_id, name: it.name, quantity: available });
-    if (available > 0) out.push({ ...it, quantity: available, stock: available });
-  }
-  return { items: capped.length ? out : items, capped };
+  return next;
+}
+
+// Shopper-facing note for a cart line whose units aren't all held, or null.
+// Hoarding caps (holder_cap / ip_cap) leave the units free, so they say nothing.
+export function holdNote(status, quantity) {
+  if (!status || status.held >= Math.min(quantity, status.requested)) return null;
+  if (status.reason === "cooldown") return "No longer reserved for you. Still in your cart; check out soon.";
+  if (status.reason !== "unavailable") return null;
+  return status.available > 0
+    ? `Only ${status.available} available right now. Kept in your cart; we'll check again at checkout.`
+    : "In someone else's cart right now. Kept in your cart; we'll check again at checkout.";
 }

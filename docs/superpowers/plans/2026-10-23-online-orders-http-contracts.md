@@ -20,13 +20,16 @@ active holds (cart holds 15 min, order holds 45 min), floor 0.
 
 ### POST `cart-hold` (`--no-verify-jwt`; optional user JWT verified by the handler)
 Req: `{ holderKey?: "g:<uuid>", items: [{ variantId, qty: 0..20 }] (≤30), replace?: boolean }`
-Sets each listed variant's hold to `qty` (0 releases) and renews it to now + 15 min. `replace: true`
+Sets each listed variant's hold to `qty` (0 releases). A new or changed hold runs to now + 15 min; the
+same `qty` again (reload, cart open) keeps its expiry. Hold session cap (`migration_online_orders_hold_cap.sql`):
+a hold never runs past 30 min from its start, then the holder gets none on that variant for 10 min
+(`reason: "cooldown"`); releasing keeps the session clock. The cart line is never removed. `replace: true`
 syncs the whole cart: also releases the holder's holds on variants not listed (`items: []` releases all).
 `holderKey` is required without a JWT. Empty `items` without `replace` → 400.
 Res 200:
 ```
 { rateLimited: boolean,              // >30 calls/min per holder: nothing changed, items []
-  items: [{ variantId, requested, held, available, reason: null|"unavailable"|"holder_cap"|"ip_cap" }],
+  items: [{ variantId, requested, held, available, reason: null|"unavailable"|"holder_cap"|"ip_cap"|"cooldown" }],
   expiresAt: string|null }           // earliest expiry of the holder's cart holds
 ```
 Caps never error: 5 held units per holder, 10 active per IP (cf-connecting-ip hash; off without

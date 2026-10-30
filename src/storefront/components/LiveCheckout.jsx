@@ -69,7 +69,7 @@ function unavailableText(entry, items) {
   const label = item ? `${item.name} (${formatSize(item.size)}/${item.color})` : "An item";
   return entry.available > 0
     ? `Only ${entry.available} left of ${label}. Please reduce the quantity in your cart.`
-    : `${label} is sold out. Please remove it from your cart.`;
+    : `${label} isn't available right now (sold out, or in someone else's cart). Remove it, or try again in a few minutes.`;
 }
 
 // Online checkout (checkout_live = true): every total comes from the
