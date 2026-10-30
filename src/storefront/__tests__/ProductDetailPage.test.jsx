@@ -6,6 +6,8 @@ import { useProduct } from "../hooks/useProduct";
 import { getProductImagePaths } from "../lib/productImage";
 import ProductDetailPage from "../pages/ProductDetailPage";
 import { MEASURE_INTRO } from "../pages/sizeGuideContent";
+import { toast } from "sonner";
+import { flyToCart } from "../lib/flyToCart";
 
 jest.mock("lib/supabaseClient", () => ({
   supabase: { from: jest.fn() },
@@ -16,9 +18,12 @@ jest.mock("../lib/productImage", () => ({
   imageUrl: (path) => path,
   imageColor: (path) => ({ "green.png": "Green", "peach.png": "Peach" })[path] ?? null,
 }));
+const mockAddItem = jest.fn();
 jest.mock("../context/CartContext", () => ({
-  useCart: () => ({ addItem: jest.fn(), openCart: jest.fn() }),
+  useCart: () => ({ addItem: mockAddItem, openCart: jest.fn() }),
 }));
+jest.mock("sonner", () => ({ toast: { success: jest.fn(), info: jest.fn() } }));
+jest.mock("../lib/flyToCart", () => ({ flyToCart: jest.fn() }));
 jest.mock("../components/ProductCard", () => (props) => (
   <div data-testid="product-card">{props.product.name}</div>
 ));
@@ -235,5 +240,28 @@ describe("ProductDetailPage — colour photos", () => {
     await screen.findByRole("button", { name: /enlarge image/i });
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     expect(mainImageSrc()).toContain("green.png");
+  });
+});
+
+describe("ProductDetailPage — stock limit", () => {
+  function addPeach() {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    fireEvent.click(screen.getByRole("button", { name: /add to cart/i }));
+  }
+
+  it("passes the variant's stock to the cart and animates a real add", () => {
+    mockAddItem.mockReturnValue(1);
+    addPeach();
+    expect(mockAddItem).toHaveBeenCalledWith(expect.objectContaining({ variant_id: "v2", stock: 1 }));
+    expect(flyToCart).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith("Added to cart", expect.anything());
+  });
+
+  it("says so, without the animation, when the cart already holds all the stock", () => {
+    mockAddItem.mockReturnValue(0);
+    addPeach();
+    expect(flyToCart).not.toHaveBeenCalled();
+    expect(toast.info).toHaveBeenCalledWith("The last piece is already in your cart", expect.anything());
   });
 });

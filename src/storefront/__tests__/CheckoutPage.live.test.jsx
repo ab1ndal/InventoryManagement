@@ -91,6 +91,8 @@ beforeEach(() => {
 it("shows server totals and a Pay button with the gateway amount", async () => {
   renderPage();
   expect(await screen.findByTestId("quote-shipping")).toHaveTextContent("Enter your pincode");
+  // No hidden shipping: without a pincode the total is unknown too.
+  expect(screen.getByTestId("quote-to-pay")).toHaveTextContent("Enter your pincode");
   expect(screen.queryByRole("link", { name: /whatsapp/i })).not.toBeInTheDocument();
   fillAddress();
   await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("₹80"));
@@ -98,6 +100,20 @@ it("shows server totals and a Pay button with the gateway amount", async () => {
   const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
   await waitFor(() => expect(pay).toBeEnabled());
   expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], pincode: "201001" });
+});
+
+it("shows Calculating… instead of a stale figure while a re-quote is in flight", async () => {
+  renderPage();
+  await screen.findByTestId("quote-shipping");
+  let release;
+  mockApi.quote.mockImplementation(() => new Promise((resolve) => { release = () => resolve(quoteResponse()); }));
+  fillAddress();
+  await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("Calculating…"));
+  expect(screen.getByTestId("quote-to-pay")).toHaveTextContent("Calculating…");
+  await waitFor(() => expect(release).toBeDefined());
+  release();
+  await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("₹80"));
+  expect(screen.getByTestId("quote-to-pay")).toHaveTextContent("₹3,080");
 });
 
 it("labels flat-rate shipping as the standard rate", async () => {

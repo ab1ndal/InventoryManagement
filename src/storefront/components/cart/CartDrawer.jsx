@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { useCart } from "../../context/CartContext";
 import { formatSize } from "../../lib/sizes";
+import { maxQuantity } from "../../lib/cartLogic";
 import FreeShippingNudge from "../FreeShippingNudge";
 
 function CartItem({ item }) {
@@ -51,7 +52,8 @@ function CartItem({ item }) {
             <button
               aria-label="Increase quantity"
               onClick={() => updateQty(item.variant_id, item.quantity + 1)}
-              className="w-6 h-6 flex items-center justify-center text-storefront-charcoal hover:bg-storefront-cream text-xs"
+              disabled={item.quantity >= maxQuantity(item)}
+              className="w-6 h-6 flex items-center justify-center text-storefront-charcoal hover:bg-storefront-cream disabled:opacity-30 disabled:cursor-not-allowed text-xs"
             >
               +
             </button>

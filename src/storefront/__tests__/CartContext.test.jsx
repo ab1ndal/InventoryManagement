@@ -57,6 +57,7 @@ function Harness() {
       <button onClick={() => addItem(ITEM_V1)}>add-v1</button>
       <button onClick={() => addItem({ ...ITEM_V1, quantity: 3 })}>add-v1-qty3</button>
       <button onClick={() => addItem(ITEM_V2)}>add-v2</button>
+      <button onClick={() => addItem({ ...ITEM_V1, stock: 1 })}>add-v1-last-piece</button>
       <button onClick={() => removeItem("v1")}>remove-v1</button>
       <button onClick={() => updateQty("v1", 5)}>update-v1-5</button>
       <button onClick={() => updateQty("v1", 0)}>update-v1-0</button>
@@ -107,6 +108,17 @@ describe("CartContext — addItem", () => {
     const items = JSON.parse(screen.getByTestId("items").textContent);
     expect(items).toHaveLength(1);
     expect(items[0].quantity).toBe(4);
+  });
+
+  it("never holds more than the known stock, even on rapid repeat clicks", () => {
+    renderHarness();
+    const add = screen.getByRole("button", { name: "add-v1-last-piece" });
+    fireEvent.click(add);
+    fireEvent.click(add);
+    fireEvent.click(add);
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
+    fireEvent.click(screen.getByRole("button", { name: "update-v1-5" }));
+    expect(screen.getByTestId("count")).toHaveTextContent("1");
   });
 
   it("adds a separate item for a different variant_id", () => {

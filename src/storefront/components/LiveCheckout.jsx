@@ -212,7 +212,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
     <div>
       <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Order summary</h2>
       {q ? (
-        <CheckoutSummary response={response} hasPincode={Boolean(pincode)} />
+        <CheckoutSummary response={response} hasPincode={Boolean(pincode)} calculating={quoting} />
       ) : (
         <p className="text-sm font-sans text-storefront-muted py-3">{quoteError ? "" : "Calculating your total…"}</p>
       )}
