@@ -126,7 +126,9 @@ Design (defaults chosen while running unattended; owner can change):
   (no sweeper needed for correctness; a daily purge for tidiness). holder_key = auth user id when signed in,
   else a random id kept in localStorage (`bc_holder`).
 - Edge function `cart-hold` (service role): set/replace the holder's hold for a variant to the cart quantity,
-  capped at stock − others' active holds; renews to 15 min on every cart change. Caps against hoarding: max 5 units
+  capped at stock − others' active holds; 15 min, renewed only when the qty changes, never past 30 min from the
+  hold's start, then a 10-min cooldown (2026-10-30, after "clock restarts on reload"); cart lines are never removed
+  by a hold, they show why they aren't reserved and checkout re-checks. Caps against hoarding: max 5 units
   per holder across all variants, max 10 active units per IP hash, at most 1 hold create per variant per holder per
   minute.
 - Availability = stock − active holds by others. PDP (selected variant), cart revalidate and checkout quote use

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import Seo from "../components/Seo";
 import FreeShippingNudge from "../components/FreeShippingNudge";
 import HoldCountdown from "../components/cart/HoldCountdown";
+import HoldNote from "../components/cart/HoldNote";
 import { useCart } from "../context/CartContext";
 import { formatSize } from "../lib/sizes";
 import { maxQuantity } from "../lib/cartLogic";
@@ -68,6 +69,7 @@ export default function CartPage() {
             <div className="flex-1 min-w-0">
               <p className="font-sans text-sm text-storefront-charcoal">{i.name}</p>
               <p className="text-xs text-storefront-muted font-sans">{formatSize(i.size)} · {i.color}</p>
+              <HoldNote item={i} className="text-xs mt-1" />
               <div className="flex items-center gap-3 mt-2">
                 <div className="flex items-center border border-storefront-border">
                   <button aria-label="Decrease" onClick={() => updateQty(i.variant_id, i.quantity - 1)} className="w-8 h-8">−</button>
@@ -94,7 +96,7 @@ export default function CartPage() {
           Subtotal <span className="font-semibold tabular-nums">₹{subtotal.toLocaleString("en-IN")}</span>
         </p>
         <p className="text-xs text-storefront-muted font-sans">Shipping calculated at checkout.</p>
-        <HoldCountdown expiresAt={holdExpiresAt} />
+        <HoldCountdown expiresAt={holdExpiresAt} onExpire={renewHolds} />
         <Link
           to="/checkout"
           className="w-full sm:w-auto text-center bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 function formatRemaining(ms) {
   const total = Math.ceil(ms / 1000);
@@ -8,17 +8,24 @@ function formatRemaining(ms) {
 }
 
 // How long the cart's stock stays reserved (earliest hold expiry). Hidden once
-// it lapses: the units are then open to other shoppers again.
-export default function HoldCountdown({ expiresAt, className = "" }) {
+// it lapses: the units are then open to other shoppers again. `onExpire` runs
+// once at that moment so the page can check the stock again (the cart keeps
+// its items either way).
+export default function HoldCountdown({ expiresAt, onExpire, className = "" }) {
   const [, setTick] = useState(0);
   const end = expiresAt ? Date.parse(expiresAt) : NaN;
   const remaining = end - Date.now();
+  const onExpireRef = useRef(onExpire);
+  onExpireRef.current = onExpire;
 
   useEffect(() => {
-    if (!Number.isFinite(end)) return;
+    if (!Number.isFinite(end) || Date.now() >= end) return;
     const id = setInterval(() => {
       setTick((t) => t + 1);
-      if (Date.now() >= end) clearInterval(id);
+      if (Date.now() >= end) {
+        clearInterval(id);
+        onExpireRef.current?.();
+      }
     }, 1000);
     return () => clearInterval(id);
   }, [end]);

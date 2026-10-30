@@ -6,6 +6,7 @@ import { formatSize } from "../../lib/sizes";
 import { maxQuantity } from "../../lib/cartLogic";
 import FreeShippingNudge from "../FreeShippingNudge";
 import HoldCountdown from "./HoldCountdown";
+import HoldNote from "./HoldNote";
 
 function CartItem({ item }) {
   const { removeItem, updateQty } = useCart();
@@ -37,6 +38,7 @@ function CartItem({ item }) {
         <p className="text-[10px] text-storefront-muted font-sans mb-2">
           {formatSize(item.size)} · {item.color}
         </p>
+        <HoldNote item={item} className="text-[10px] mb-2" />
         <div className="flex items-center justify-between">
           <div className="flex items-center border border-storefront-border">
             <button
@@ -176,7 +178,7 @@ export default function CartDrawer() {
             <p className="text-[10px] text-storefront-muted font-sans text-center mt-3">
               Shipping calculated at checkout
             </p>
-            <HoldCountdown expiresAt={holdExpiresAt} className="text-center mt-1" />
+            <HoldCountdown expiresAt={holdExpiresAt} onExpire={isOpen ? renewHolds : undefined} className="text-center mt-1" />
           </div>
         )}
       </div>

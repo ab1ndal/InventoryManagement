@@ -1,4 +1,4 @@
-import { mergeCarts, revalidateItems, addToItems, maxQuantity, applyHoldResults } from "../lib/cartLogic";
+import { mergeCarts, revalidateItems, addToItems, maxQuantity, holdStatusFrom, holdNote } from "../lib/cartLogic";
 
 const item = (variant_id, quantity, extra = {}) => ({
   variant_id, product_id: "BC1", quantity, name: "Saree",
@@ -72,38 +72,53 @@ describe("revalidateItems stock", () => {
   });
 });
 
-describe("applyHoldResults", () => {
-  const hold = (variantId, available, reason = null) => ({ variantId, requested: 0, held: 0, available, reason });
+describe("holdStatusFrom", () => {
+  const hold = (variantId, held, available, reason = null) => ({ variantId, requested: 2, held, available, reason });
   const res = (items, extra = {}) => ({ rateLimited: false, items, expiresAt: null, ...extra });
 
-  it("cuts a line back to what other shoppers' holds leave", () => {
-    const { items, capped } = applyHoldResults([item("v1", 3), item("v2", 1)], res([hold("v1", 2), hold("v2", 1)]));
-    expect(items).toEqual([item("v1", 2, { stock: 2 }), item("v2", 1)]);
-    expect(capped).toEqual([{ variant_id: "v1", product_id: "BC1", name: "Saree", quantity: 2 }]);
+  it("records each listed variant and keeps the others", () => {
+    const prev = { v0: { held: 1, requested: 1, available: 1, reason: null } };
+    expect(holdStatusFrom(prev, res([hold("v1", 0, 0, "unavailable")]))).toEqual({
+      v0: prev.v0,
+      v1: { held: 0, requested: 2, available: 0, reason: "unavailable" },
+    });
   });
 
-  it("removes a line when nothing is left for this shopper", () => {
-    const { items, capped } = applyHoldResults([item("v1", 1)], res([hold("v1", 0, "unavailable")]));
-    expect(items).toEqual([]);
-    expect(capped).toEqual([{ variant_id: "v1", product_id: "BC1", name: "Saree", quantity: 0 }]);
-  });
-
-  it("leaves the cart alone on anti-hoarding caps when the units are still free", () => {
-    const cart = [item("v1", 3), item("v2", 2)];
-    const { items, capped } = applyHoldResults(cart, res([hold("v1", 3, "holder_cap"), hold("v2", 5, "ip_cap")]));
-    expect(items).toBe(cart);
-    expect(capped).toEqual([]);
+  it("starts over on a whole-cart sync", () => {
+    const prev = { v0: { held: 1, requested: 1, available: 1, reason: null } };
+    expect(Object.keys(holdStatusFrom(prev, res([hold("v1", 2, 3)]), true))).toEqual(["v1"]);
   });
 
   it("ignores a rate-limited response", () => {
-    const cart = [item("v1", 3)];
-    const { items, capped } = applyHoldResults(cart, res([hold("v1", 0)], { rateLimited: true }));
-    expect(items).toBe(cart);
-    expect(capped).toEqual([]);
-  });
-
-  it("ignores results for variants no longer in the cart", () => {
-    const cart = [item("v1", 1)];
-    expect(applyHoldResults(cart, res([hold("v9", 0)])).items).toBe(cart);
+    const prev = {};
+    expect(holdStatusFrom(prev, res([hold("v1", 0, 0)], { rateLimited: true }))).toBe(prev);
   });
 });
+
+describe("holdNote", () => {
+  const st = (held, available, reason, requested = 2) => ({ held, requested, available, reason });
+
+  it("says nothing when the line is fully held or unknown", () => {
+    expect(holdNote(st(2, 5, null), 2)).toBeNull();
+    expect(holdNote(undefined, 2)).toBeNull();
+  });
+
+  it("says nothing for hoarding caps: the units are still free", () => {
+    expect(holdNote(st(0, 5, "holder_cap"), 2)).toBeNull();
+    expect(holdNote(st(1, 5, "ip_cap"), 2)).toBeNull();
+  });
+
+  it("explains a line someone else holds, keeping it in the cart", () => {
+    expect(holdNote(st(0, 0, "unavailable"), 2)).toMatch(/^In someone else's cart right now\. Kept in your cart/);
+    expect(holdNote(st(1, 1, "unavailable"), 2)).toMatch(/^Only 1 available right now\. Kept in your cart/);
+  });
+
+  it("explains the cooldown after the 30-minute reservation", () => {
+    expect(holdNote(st(0, 1, "cooldown"), 2)).toMatch(/^No longer reserved for you/);
+  });
+
+  it("judges a stale result against what was asked, not a newer quantity", () => {
+    expect(holdNote(st(1, 5, null, 1), 3)).toBeNull();
+  });
+});
+
