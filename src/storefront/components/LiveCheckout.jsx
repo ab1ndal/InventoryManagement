@@ -45,8 +45,12 @@ function toAddress(values) {
 // Fills City and State from the quote's pincode lookup (Shiprocket, server
 // side) once per pincode. A field is filled only while empty or still holding
 // the previous autofill, so whatever the shopper typed is never overwritten.
+// Returns the looked-up place (state mapped to our list, else null).
 function autofillFromPincode(pincode, lookup, last, getValues, setValue) {
-  if (last.pincode === pincode) return;
+  // The State select only takes our listed names; an unknown spelling is left for the shopper.
+  const stateName = typeof lookup.state === "string" ? lookup.state.trim().toLowerCase() : "";
+  const place = { pincode, city: lookup.city || null, state: INDIAN_STATES.find((s) => s.toLowerCase() === stateName) || null };
+  if (last.pincode === pincode) return place;
   last.pincode = pincode;
   const fill = (field, value) => {
     if (!value) return;
@@ -55,10 +59,9 @@ function autofillFromPincode(pincode, lookup, last, getValues, setValue) {
     last[field] = value;
     if (current !== value) setValue(field, value, { shouldValidate: true });
   };
-  fill("city", lookup.city);
-  // The State select only takes our listed names; an unknown spelling is left for the shopper.
-  const state = typeof lookup.state === "string" ? lookup.state.trim().toLowerCase() : "";
-  fill("state", INDIAN_STATES.find((s) => s.toLowerCase() === state));
+  fill("city", place.city);
+  fill("state", place.state);
+  return place;
 }
 
 function unavailableText(entry, items) {
@@ -71,7 +74,7 @@ function unavailableText(entry, items) {
 
 // Online checkout (checkout_live = true): every total comes from the
 // checkout-quote function; create-order re-prices on the server again.
-export default function LiveCheckout({ items, form, onCheckoutOff }) {
+export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlace }) {
   const { user } = useStorefrontAuth();
   const navigate = useNavigate();
   const { watch, setValue, getValues, handleSubmit, formState } = form;
@@ -141,7 +144,9 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
         }
         setResponse(res);
         setQuoteError(false);
-        if (pincode && res.pincode?.ok) autofillFromPincode(pincode, res.pincode, autofilled.current, getValues, setValue);
+        if (pincode && res.pincode?.ok) {
+          onPincodePlace?.(autofillFromPincode(pincode, res.pincode, autofilled.current, getValues, setValue));
+        }
         if (appliedCode) {
           const status = res.code?.status ?? "invalid";
           setCodeNotice({ ok: status === "ok", text: CODE_MESSAGES[status] ?? CODE_MESSAGES.invalid, detail: status === "ok" ? res.code?.message : null });
@@ -160,7 +165,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff }) {
       active = false;
       clearTimeout(timer);
     };
-  }, [lineItems, fulfilment, pincode, appliedCode, creditRequested, requoteTick, onCheckoutOff, getValues, setValue]);
+  }, [lineItems, fulfilment, pincode, appliedCode, creditRequested, requoteTick, onCheckoutOff, onPincodePlace, getValues, setValue]);
 
   function applyCode() {
     const code = codeInput.trim();

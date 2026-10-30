@@ -75,6 +75,11 @@ export default function CheckoutPage() {
 
   const goOffline = useCallback(() => setLive(false), []);
 
+  // City/State from the live quote's pincode lookup. Shown as a read-only line
+  // while the form still holds exactly those values, until the shopper picks Edit.
+  const [place, setPlace] = useState(null);
+  const [editPlace, setEditPlace] = useState(false);
+
   const form = useForm({
     resolver: zodResolver(checkoutSchema),
     // Errors appear once a field has been visited, not while the shopper is
@@ -97,8 +102,13 @@ export default function CheckoutPage() {
     register,
     handleSubmit,
     watch,
+    setFocus,
     formState: { errors, isValid },
   } = form;
+
+  useEffect(() => {
+    if (editPlace) setFocus("city");
+  }, [editPlace, setFocus]);
 
   if (!items.length) {
     return <Navigate to="/cart" replace />;
@@ -109,6 +119,12 @@ export default function CheckoutPage() {
   const subtotal = subtotalOf(items);
   const shipping = pickup ? 0 : shippingFee(subtotal);
   const total = subtotal + shipping;
+  const placeLocked =
+    !editPlace &&
+    Boolean(place?.city && place?.state) &&
+    place.pincode === (address.pincode || "").trim() &&
+    address.city === place.city &&
+    address.state === place.state;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
@@ -117,34 +133,6 @@ export default function CheckoutPage() {
 
       <form onSubmit={handleSubmit(() => {})} className="grid grid-cols-1 md:grid-cols-2 gap-10">
         <div className="space-y-8">
-          <fieldset>
-            <legend className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Delivery</legend>
-            <div className="space-y-3">
-              <label
-                className={`flex items-start gap-3 border px-3 py-3 text-sm font-sans text-storefront-charcoal cursor-pointer ${
-                  pickup ? "border-storefront-border" : "border-storefront-charcoal"
-                }`}
-              >
-                <input type="radio" value="ship" {...register("fulfilment")} className="mt-0.5" />
-                <span>Ship to me</span>
-              </label>
-              <label
-                className={`flex items-start gap-3 border px-3 py-3 text-sm font-sans text-storefront-charcoal cursor-pointer ${
-                  pickup ? "border-storefront-charcoal" : "border-storefront-border"
-                }`}
-              >
-                <input type="radio" value="pickup" {...register("fulfilment")} className="mt-0.5" />
-                <span>
-                  Pick up at the shop (free)
-                  <span className="block text-xs text-storefront-muted mt-1">{SHOP_ADDRESS}</span>
-                  <span className="block text-xs text-storefront-muted">
-                    We'll message you when it's ready (usually 1–2 days).
-                  </span>
-                </span>
-              </label>
-            </div>
-          </fieldset>
-
           <section>
             <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Contact</h2>
             <div className="space-y-3">
@@ -182,85 +170,122 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          {!pickup && (
-            <section>
-              <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Shipping address</h2>
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="pincode" className="sr-only">Pincode</label>
-                  <input
-                    id="pincode"
-                    {...register("pincode")}
-                    placeholder="Pincode"
-                    inputMode="numeric"
-                    autoComplete="postal-code"
-                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                  />
-                  {errors.pincode && <p className="text-xs text-red-600 mt-1">{errors.pincode.message}</p>}
-                </div>
-                <div>
-                  <label htmlFor="line1" className="sr-only">Flat, House no., Building, Apartment</label>
-                  <input
-                    id="line1"
-                    {...register("line1")}
-                    placeholder="Flat, House no., Building, Apartment"
-                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                  />
-                  {errors.line1 && <p className="text-xs text-red-600 mt-1">{errors.line1.message}</p>}
-                </div>
-                <div>
-                  <label htmlFor="line2" className="sr-only">Area, Street, Sector, Village</label>
-                  <input
-                    id="line2"
-                    {...register("line2")}
-                    placeholder="Area, Street, Sector, Village"
-                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                  />
-                  {errors.line2 && <p className="text-xs text-red-600 mt-1">{errors.line2.message}</p>}
-                </div>
-                <div>
-                  <label htmlFor="landmark" className="sr-only">Landmark (optional)</label>
-                  <input
-                    id="landmark"
-                    {...register("landmark")}
-                    placeholder="Landmark (optional), e.g. Near Durga Bhabhi Chowk"
-                    className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                  />
-                  {errors.landmark && <p className="text-xs text-red-600 mt-1">{errors.landmark.message}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="city" className="sr-only">City</label>
-                    <input
-                      id="city"
-                      {...register("city")}
-                      placeholder="City"
-                      className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
-                    />
-                    {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
+          <fieldset>
+            <legend className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Delivery</legend>
+            <div className="space-y-3">
+              <div className={`border ${pickup ? "border-storefront-border" : "border-storefront-charcoal"}`}>
+                <label className="flex items-start gap-3 px-3 py-3 text-sm font-sans text-storefront-charcoal cursor-pointer">
+                  <input type="radio" value="ship" {...register("fulfilment")} className="mt-0.5" />
+                  <span>Ship to me</span>
+                </label>
+                {!pickup && (
+                  <div className="space-y-3 px-3 pb-4">
+                    <div>
+                      <label htmlFor="pincode" className="sr-only">Pincode</label>
+                      <input
+                        id="pincode"
+                        {...register("pincode")}
+                        placeholder="Pincode"
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                        className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                      />
+                      {errors.pincode && <p className="text-xs text-red-600 mt-1">{errors.pincode.message}</p>}
+                    </div>
+                    {placeLocked ? (
+                      <div className="flex items-center justify-between gap-3 text-sm font-sans text-storefront-charcoal">
+                        <span data-testid="pincode-place">
+                          {address.city}, {address.state}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditPlace(true)}
+                          className="text-xs text-storefront-muted hover:text-storefront-charcoal underline underline-offset-2"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="city" className="sr-only">City</label>
+                          <input
+                            id="city"
+                            {...register("city")}
+                            placeholder="City"
+                            className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                          />
+                          {errors.city && <p className="text-xs text-red-600 mt-1">{errors.city.message}</p>}
+                        </div>
+                        <div>
+                          <label htmlFor="state" className="sr-only">State</label>
+                          <select
+                            id="state"
+                            {...register("state")}
+                            className="w-full border border-storefront-border px-3 py-2 text-sm font-sans bg-white"
+                          >
+                            <option value="">Select state</option>
+                            {INDIAN_STATES.map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                          {errors.state && <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <label htmlFor="line1" className="sr-only">Flat, House no., Building, Apartment</label>
+                      <input
+                        id="line1"
+                        {...register("line1")}
+                        placeholder="Flat, House no., Building, Apartment"
+                        className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                      />
+                      {errors.line1 && <p className="text-xs text-red-600 mt-1">{errors.line1.message}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="line2" className="sr-only">Area, Street, Sector, Village</label>
+                      <input
+                        id="line2"
+                        {...register("line2")}
+                        placeholder="Area, Street, Sector, Village"
+                        className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                      />
+                      {errors.line2 && <p className="text-xs text-red-600 mt-1">{errors.line2.message}</p>}
+                    </div>
+                    <div>
+                      <label htmlFor="landmark" className="sr-only">Landmark (optional)</label>
+                      <input
+                        id="landmark"
+                        {...register("landmark")}
+                        placeholder="Landmark (optional), e.g. Near Durga Bhabhi Chowk"
+                        className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
+                      />
+                      {errors.landmark && <p className="text-xs text-red-600 mt-1">{errors.landmark.message}</p>}
+                    </div>
                   </div>
-                  <div>
-                    <label htmlFor="state" className="sr-only">State</label>
-                    <select
-                      id="state"
-                      {...register("state")}
-                      className="w-full border border-storefront-border px-3 py-2 text-sm font-sans bg-white"
-                    >
-                      <option value="">Select state</option>
-                      {INDIAN_STATES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    {errors.state && <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>}
-                  </div>
-                </div>
+                )}
               </div>
-            </section>
-          )}
+              <label
+                className={`flex items-start gap-3 border px-3 py-3 text-sm font-sans text-storefront-charcoal cursor-pointer ${
+                  pickup ? "border-storefront-charcoal" : "border-storefront-border"
+                }`}
+              >
+                <input type="radio" value="pickup" {...register("fulfilment")} className="mt-0.5" />
+                <span>
+                  Pick up at the shop (No Shipping fees)
+                  <span className="block text-xs text-storefront-muted mt-1">{SHOP_ADDRESS}</span>
+                  <span className="block text-xs text-storefront-muted">
+                    We'll message you when it's ready (usually 1–2 days).
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
         </div>
 
         {live ? (
-          <LiveCheckout items={items} form={form} onCheckoutOff={goOffline} />
+          <LiveCheckout items={items} form={form} onCheckoutOff={goOffline} onPincodePlace={setPlace} />
         ) : (
           <div>
             <h2 className="font-sans text-xs tracking-widest uppercase text-storefront-muted mb-4">Order summary</h2>
