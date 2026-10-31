@@ -5,6 +5,7 @@ import {
   outsideReturnWindow,
   returnBadge,
   returnableUnits,
+  timelineRows,
   windowLabel,
 } from "../orderHelpers";
 
@@ -73,4 +74,38 @@ test("isValidTrackingUrl: https only, no spaces, at most 500 chars", () => {
   expect(isValidTrackingUrl("javascript:alert(1)")).toBe(false);
   expect(isValidTrackingUrl("https://porter.in/a b")).toBe(false);
   expect(isValidTrackingUrl("https://p.in/" + "a".repeat(500))).toBe(false);
+});
+
+// WEB-000006 (2026-10-30): raw kinds and same-status arrows, with nine identical retries.
+test("timelineRows: readable labels, status changes, details, repeats collapsed", () => {
+  const err = { step: "sr_create_failed", data: { error: "/orders/create/adhoc: Oops! Invalid Data." } };
+  const ev = (id, kind, from, to, data, minute) => ({
+    id, kind, from_status: from, to_status: to, data, created_at: `2026-10-30T17:${minute}:00Z`,
+  });
+  const rows = timelineRows([
+    ev(1, "created", null, "pending_payment", {}, "04"),
+    ev(2, "checkpoint", "pending_payment", "pending_payment", { step: "cf_order", data: { cf_order_id: "7" } }, "04"),
+    ev(3, "paid", "pending_payment", "paid", { amount: 110 }, "05"),
+    ev(4, "checkpoint", "processing", "processing", err, "14"),
+    ev(5, "checkpoint", "processing", "processing", err, "24"),
+    ev(6, "checkpoint", "processing", "processing", err, "42"),
+    ev(7, "job_failed", null, null, { kind: "shiprocket_create", error: "sr_create: boom" }, "50"),
+  ]);
+  expect(rows.map((r) => [r.label, r.detail, r.status, r.count])).toEqual([
+    ["Order placed", "", "Awaiting payment", 1],
+    ["Payment page created", "", "", 1],
+    ["Payment received", "₹110.00", "To check", 1],
+    ["Shiprocket order failed", "/orders/create/adhoc: Oops! Invalid Data.", "", 3],
+    ["Background task gave up", "Create Shiprocket order: sr_create: boom", "", 1],
+  ]);
+  expect(rows[3].lastAt).toBe("2026-10-30T17:42:00Z");
+});
+
+test("timelineRows: unknown kinds and steps fall back to readable text", () => {
+  const rows = timelineRows([
+    { id: 1, kind: "some_new_kind", data: null, created_at: D },
+    { id: 2, kind: "checkpoint", data: { step: "new_step" }, created_at: D },
+    { id: 3, kind: "refund_leg_processing", data: {}, created_at: D },
+  ]);
+  expect(rows.map((r) => r.label)).toEqual(["Some new kind", "New step", "Refund processing"]);
 });

@@ -273,7 +273,8 @@ test("rto order offers Parcel received back; shows shipment links and refunds", 
   expect(screen.getByRole("link", { name: "Manifest" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Bill of Supply #42" })).toBeInTheDocument();
   expect(screen.getByText(/gateway ₹800.00 → original · processing/)).toBeInTheDocument();
-  expect(screen.getByText("paid (pending_payment → paid)")).toBeInTheDocument();
+  expect(screen.getByText("Payment received")).toBeInTheDocument();
+  expect(screen.getByText("· now To check")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Process" })).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Parcel received back" }));
