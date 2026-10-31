@@ -297,14 +297,15 @@ Deno.test("runProcess: takeover during a courier call that then fails → no err
   for (const c of db.calls.filter((c) => c.fn === "online_order_checkpoint")) assertEquals(c.args.p_op_key, "op-1");
 });
 
-Deno.test("runProcess: quoted courier refused → AWB from Shiprocket's default courier", async () => {
+Deno.test("runProcess: quoted courier refused → courier_error, no other courier tried", async () => {
   const db = new FakeDb();
   const sr = new FakeShiprocket();
   sr.failOnce.add("assignAwb");
   const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
-  assertEquals(out.kind, "packed");
-  assertEquals(sr.calls.filter((c) => c.method === "assignAwb").map((c) => c.args), [[222, 10], [222, undefined]]);
-  assertEquals(db.order.awb, "AWB1");
+  assertEquals(out.kind, "courier_error");
+  assertEquals(sr.calls.filter((c) => c.method === "assignAwb").map((c) => c.args), [[222, 10]]);
+  assert(String(db.order.process_error).includes("quoted courier 10 not booked"));
+  assertEquals(db.order.awb, null);
 });
 
 Deno.test("runProcess: AWB call timed out → no second courier (an AWB may exist)", async () => {
@@ -317,27 +318,50 @@ Deno.test("runProcess: AWB call timed out → no second courier (an AWB may exis
   assertEquals(sr.count("assignAwb"), 1);
 });
 
-Deno.test("runProcess: default courier refused too (empty wallet) → courier_error", async () => {
-  class RefusingShiprocket extends FakeShiprocket {
-    override async assignAwb(shipmentId: number, courierId?: number) {
-      this.failOnce.add("assignAwb");
-      return await super.assignAwb(shipmentId, courierId);
-    }
+class RatedShiprocket extends FakeShiprocket {
+  constructor(private quote: { rate: number; courierId: number } | null) {
+    super();
   }
-  const db = new FakeDb();
-  const sr = new RefusingShiprocket();
-  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
-  assertEquals(out.kind, "courier_error");
-  assertEquals(sr.count("assignAwb"), 2);
-  assertEquals(db.order.awb, null);
-});
+  override async rate(input: { deliveryPincode: string; weightKg: number; declaredValue: number }) {
+    await super.rate(input);
+    return this.quote && { ...this.quote, courierName: "Xpressbees", etdDays: 2 };
+  }
+}
 
-Deno.test("runProcess: no quoted courier → one AWB call without a courier id", async () => {
-  const db = new FakeDb({ quoted_courier_id: null });
-  const sr = new FakeShiprocket();
+Deno.test("runProcess: no quoted courier → cheapest courier when its rate fits the shipping paid", async () => {
+  const db = new FakeDb({ quoted_courier_id: null, shipping: "150.00" });
+  const sr = new RatedShiprocket({ rate: 140, courierId: 33 });
   const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
   assertEquals(out.kind, "packed");
-  assertEquals(sr.calls.filter((c) => c.method === "assignAwb").map((c) => c.args), [[222, undefined]]);
+  const rateArgs = sr.calls.find((c) => c.method === "rate")!.args[0] as Record<string, unknown>;
+  assertEquals(rateArgs.deliveryPincode, "201001");
+  assertEquals(rateArgs.declaredValue, 4000);
+  assertEquals(sr.calls.filter((c) => c.method === "assignAwb").map((c) => c.args), [[222, 33]]);
+});
+
+Deno.test("runProcess: no quoted courier, cheapest costs more than shipping paid → courier_error, nothing booked", async () => {
+  const db = new FakeDb({ quoted_courier_id: null, shipping: "150.00" });
+  const sr = new RatedShiprocket({ rate: 160, courierId: 33 });
+  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  assertEquals(out.kind, "courier_error");
+  assertEquals(sr.count("assignAwb"), 0);
+  assert(String(db.order.process_error).includes("costs ₹160, more than the ₹150 shipping paid"));
+});
+
+Deno.test("runProcess: no quoted courier and no rate → courier_error, nothing booked", async () => {
+  const db = new FakeDb({ quoted_courier_id: null, shipping: "150.00" });
+  const sr = new RatedShiprocket(null);
+  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  assertEquals(out.kind, "courier_error");
+  assertEquals(sr.count("assignAwb"), 0);
+});
+
+Deno.test("runProcess: free shipping (no quote, ₹0 paid) → cheapest courier, no cap", async () => {
+  const db = new FakeDb({ quoted_courier_id: null, shipping: 0 });
+  const sr = new RatedShiprocket({ rate: 190, courierId: 33 });
+  const out = await runProcess({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID, "admin-1", "op-1");
+  assertEquals(out.kind, "packed");
+  assertEquals(sr.calls.filter((c) => c.method === "assignAwb").map((c) => c.args), [[222, 33]]);
 });
 
 Deno.test("runProcess: inline Shiprocket create checkpoints with the op key", async () => {

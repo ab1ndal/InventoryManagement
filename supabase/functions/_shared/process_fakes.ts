@@ -11,6 +11,7 @@ import { DbError, type OrderItemRow, type OrderRow, type OrdersDb, type ProcessP
 import {
   type AwbResult,
   type PickupResult,
+  type RateQuote,
   type ShiprocketClient,
   ShiprocketError,
   type SrOrderIds,
@@ -510,7 +511,7 @@ export class FakeShiprocket implements ShiprocketClient {
     await this.hit("postcodeDetails", [pincode]);
     return { state: "Uttar Pradesh", city: "Ghaziabad" };
   }
-  async rate(input: { deliveryPincode: string; weightKg: number; declaredValue: number }) {
+  async rate(input: { deliveryPincode: string; weightKg: number; declaredValue: number }): Promise<RateQuote | null> {
     await this.hit("rate", [input]);
     return null;
   }
