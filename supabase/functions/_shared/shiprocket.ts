@@ -278,6 +278,9 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
       order_date: srOrderDate(input.orderDate),
       pickup_location: PICKUP_LOCATION,
       billing_customer_name: b.name,
+      // create/adhoc refuses the order unless the key is present ("validation.present", WEB-000006);
+      // empty is accepted, and the full name already rides in billing_customer_name.
+      billing_last_name: b.lastName ?? "",
       billing_address: b.address,
       billing_city: b.city.slice(0, BILLING_CITY_MAX),
       billing_pincode: b.pincode,
@@ -299,7 +302,6 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
       height: input.heightCm,
       weight: input.weightKg,
     };
-    if (b.lastName) body.billing_last_name = b.lastName;
     if (b.address2) body.billing_address_2 = b.address2;
     if (input.shippingCharges !== undefined) body.shipping_charges = input.shippingCharges;
     if (input.totalDiscount) body.total_discount = input.totalDiscount;

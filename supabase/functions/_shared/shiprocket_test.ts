@@ -310,6 +310,7 @@ Deno.test("createOrder: payload fields and ids", async () => {
   assertEquals(b.shipping_is_billing, true);
   assertEquals(b.billing_country, "India");
   assertEquals(b.billing_email, "asha@example.com");
+  assertEquals(b.billing_last_name, "");
   assertEquals((b.billing_city as string).length, 30);
   assertEquals(b.order_items, [{ name: "Silk Saree", sku: "BC25001-RED-FREE", units: 1, selling_price: 2499 }]);
   assertEquals([b.sub_total, b.length, b.breadth, b.height, b.weight], [2499, 32, 28, 5, 1]);
