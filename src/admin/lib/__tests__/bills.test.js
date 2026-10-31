@@ -1,4 +1,4 @@
-import { parseBillSpec, prepareBill, createBill, getBill, BillInputError } from "../bills";
+import { parseBillSpec, prepareBill, createBill, getBill, findBills, BillInputError } from "../bills";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
 const VID = "29c3daa8-5483-4c84-8959-1c930b8d1bb4";
@@ -279,5 +279,58 @@ describe("getBill", () => {
 
   it("needs an id or number", async () => {
     await expect(getBill(fakeSupabase(), {})).rejects.toThrow(BillInputError);
+  });
+});
+
+describe("findBills", () => {
+  const bills = [{ billid: 900, bill_number: "FY26-000336", orderdate: "2026-10-22T00:00:00", customerid: 453, totalamount: 1800 }];
+  const base = {
+    "bills.select": { data: bills, error: null },
+    "bill_items.select": (call) =>
+      call.filters.some((f) => f[0] === "in")
+        ? { data: [{ billid: 900, product_code: "BC252051", product_name: "Georgette-Saree", quantity: 1, mrp: 2395, total: 1800 }], error: null }
+        : { data: [{ billid: 900 }], error: null },
+    "customers.select": (call) =>
+      call.filters.some((f) => f[1] === "phone")
+        ? { data: [{ customerid: 453 }], error: null }
+        : { data: [{ customerid: 453, first_name: "Test", last_name: "Customer", phone: "+919000000001" }], error: null },
+  };
+
+  it("finds a customer's bills by phone in a date range, with their lines", async () => {
+    const client = fakeSupabase(base);
+    const out = await findBills(client, { phone: "9000000001", from: "2026-10-01", to: "2026-10-31" });
+    expect(out).toEqual([
+      expect.objectContaining({
+        bill_number: "FY26-000336",
+        customer: expect.objectContaining({ first_name: "Test" }),
+        items: [{ product_code: "BC252051", product_name: "Georgette-Saree", quantity: 1, mrp: 2395, total: 1800 }],
+      }),
+    ]);
+    const billQuery = client.calls.find((c) => c.table === "bills");
+    expect(billQuery.filters).toEqual([
+      ["eq", "customerid", 453],
+      ["gte", "orderdate", "2026-10-01"],
+      ["lte", "orderdate", "2026-10-31T23:59:59"],
+    ]);
+  });
+
+  it("narrows to bills containing a product code", async () => {
+    const client = fakeSupabase(base);
+    await findBills(client, { productCode: "bc-252051" });
+    expect(client.calls[0]).toMatchObject({ table: "bill_items", filters: [["eq", "product_code", "BC252051"]] });
+    expect(client.calls.find((c) => c.table === "bills").filters).toEqual([["in", "billid", [900]]]);
+  });
+
+  it("returns [] for an unknown phone without querying bills", async () => {
+    const client = fakeSupabase({ ...base, "customers.select": { data: [], error: null } });
+    await expect(findBills(client, { phone: "9999999999" })).resolves.toEqual([]);
+    expect(client.calls.some((c) => c.table === "bills")).toBe(false);
+  });
+
+  it.each([
+    [{}, /at least one filter/],
+    [{ from: "22/10/2026" }, /from: expected YYYY-MM-DD/],
+  ])("rejects bad filters %#", async (f, msg) => {
+    await expect(findBills(fakeSupabase(base), f)).rejects.toThrow(msg);
   });
 });

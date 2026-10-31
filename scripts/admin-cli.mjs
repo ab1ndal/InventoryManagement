@@ -24,14 +24,16 @@ process.removeAllListeners("warning");
 process.on("warning", (w) => {
   if (w.code !== "MODULE_TYPELESS_PACKAGE_JSON") console.error(w);
 });
-const { findCustomerByPhone, createCustomer, CustomerInputError } = await import(
+const { findCustomerByPhone, findCustomersByName, createCustomer, CustomerInputError } = await import(
   "../src/admin/lib/customers.js"
 );
-const { findProducts, listCategories } = await import("../src/admin/lib/products.js");
+const { findProducts, searchProducts, listCategories, ProductInputError } = await import(
+  "../src/admin/lib/products.js"
+);
 const { findManualItems, createManualItem, ManualItemInputError } = await import(
   "../src/admin/lib/manualItems.js"
 );
-const { prepareBill, createBill, getBill, BillInputError } = await import(
+const { prepareBill, createBill, getBill, findBills, BillInputError } = await import(
   "../src/admin/lib/bills.js"
 );
 
@@ -71,11 +73,11 @@ class UsageError extends Error {
 const COMMANDS = {
   customer: {
     find: {
-      usage: "customer find --phone <phone>",
-      options: { phone: { type: "string" } },
+      usage: "customer find (--phone <phone> | --name <words>)",
+      options: { phone: { type: "string" }, name: { type: "string" } },
       run: (client, o) => {
-        if (!o.phone) throw new UsageError("--phone is required");
-        return findCustomerByPhone(client, o.phone);
+        if (!o.phone === !o.name) throw new UsageError("Give exactly one of --phone or --name");
+        return o.phone ? findCustomerByPhone(client, o.phone) : findCustomersByName(client, o.name);
       },
     },
     create: {
@@ -115,6 +117,27 @@ const COMMANDS = {
         if (!o.code) throw new UsageError("--code is required");
         return findProducts(client, o.code);
       },
+    },
+    search: {
+      usage:
+        "product search [--name <text>] [--category <id>] [--cost <Z-code|amount>] [--mrp <amount>] [--color <text>] [--in-stock]",
+      options: {
+        name: { type: "string" },
+        category: { type: "string" },
+        cost: { type: "string" },
+        mrp: { type: "string" },
+        color: { type: "string" },
+        "in-stock": { type: "boolean" },
+      },
+      run: (client, o) =>
+        searchProducts(client, {
+          name: o.name,
+          categoryid: o.category,
+          cost: o.cost,
+          mrp: o.mrp,
+          color: o.color,
+          inStock: Boolean(o["in-stock"]),
+        }),
     },
   },
   category: {
@@ -173,6 +196,25 @@ const COMMANDS = {
       options: { spec: { type: "string" }, json: { type: "string" }, "dry-run": { type: "boolean" } },
       run: (client, o) => createBill(client, readSpec(o), { dryRun: Boolean(o["dry-run"]) }),
     },
+    find: {
+      usage:
+        "bill find [--customer <id>] [--phone <phone>] [--from <YYYY-MM-DD>] [--to <YYYY-MM-DD>] [--product <code>]",
+      options: {
+        customer: { type: "string" },
+        phone: { type: "string" },
+        from: { type: "string" },
+        to: { type: "string" },
+        product: { type: "string" },
+      },
+      run: (client, o) =>
+        findBills(client, {
+          customerid: o.customer,
+          phone: o.phone,
+          from: o.from,
+          to: o.to,
+          productCode: o.product,
+        }),
+    },
     get: {
       usage: "bill get (--number <FY26-000NNN> | --id <billid>)",
       options: { number: { type: "string" }, id: { type: "string" } },
@@ -222,6 +264,7 @@ main(process.argv.slice(2)).catch((err) => {
     err instanceof UsageError ||
     err instanceof CustomerInputError ||
     err instanceof ManualItemInputError ||
+    err instanceof ProductInputError ||
     err instanceof BillInputError;
   process.stderr.write(
     JSON.stringify({ error: err.message, type: err.name || "Error", ...(err.code && { code: err.code }) }) + "\n",

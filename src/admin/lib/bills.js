@@ -13,6 +13,8 @@ import {
 } from "../components/billing/billUtils.js";
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
 import { customerName, money } from "../../utility/activitySummary.js";
+import { findCustomerByPhone } from "./customers.js";
+import { normalizeProductCode } from "./products.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -396,4 +398,64 @@ export async function getBill(client, { billid, billNumber }) {
     }),
     payments: payments ?? [],
   };
+}
+
+const FIND_LIMIT = 50;
+
+/**
+ * Bills matching all given filters, newest first (max 50), each with a short
+ * line list — for spotting a slip that is already in the system. Filters:
+ * customerid or phone, date range (from/to, YYYY-MM-DD, inclusive), and a
+ * product code that must appear on the bill.
+ */
+export async function findBills(client, { customerid, phone, from, to, productCode } = {}) {
+  const has = (v) => v != null && String(v).trim() !== "";
+  if (![customerid, phone, from, to, productCode].some(has)) {
+    throw new BillInputError("Give at least one filter: customer, phone, from, to or product");
+  }
+  for (const [k, v] of [["from", from], ["to", to]]) {
+    if (has(v) && !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new BillInputError(`${k}: expected YYYY-MM-DD, got "${v}"`);
+  }
+
+  let custId = has(customerid) ? Number(customerid) : null;
+  if (has(phone)) {
+    const c = await findCustomerByPhone(client, phone);
+    if (!c) return [];
+    if (custId != null && custId !== c.customerid) return [];
+    custId = c.customerid;
+  }
+
+  let billIds = null;
+  if (has(productCode)) {
+    const lines = await one(
+      client.from("bill_items").select("billid").eq("product_code", normalizeProductCode(productCode)),
+    );
+    billIds = [...new Set((lines ?? []).map((l) => l.billid))];
+    if (billIds.length === 0) return [];
+  }
+
+  let q = client
+    .from("bills")
+    .select("billid, bill_number, orderdate, customerid, totalamount, payment_amount, paymentstatus, finalized, document_type");
+  if (custId != null) q = q.eq("customerid", custId);
+  if (has(from)) q = q.gte("orderdate", from);
+  if (has(to)) q = q.lte("orderdate", `${to}T23:59:59`);
+  if (billIds) q = q.in("billid", billIds);
+  const bills = (await one(q.order("orderdate", { ascending: false }).limit(FIND_LIMIT))) ?? [];
+  if (bills.length === 0) return [];
+
+  const ids = bills.map((b) => b.billid);
+  const custIds = [...new Set(bills.map((b) => b.customerid).filter((v) => v != null))];
+  const [items, customers] = await Promise.all([
+    one(client.from("bill_items").select("billid, product_code, product_name, quantity, mrp, total").in("billid", ids).order("bill_item_id")),
+    custIds.length
+      ? one(client.from("customers").select("customerid, first_name, last_name, phone").in("customerid", custIds))
+      : [],
+  ]);
+  const custById = Object.fromEntries((customers ?? []).map((c) => [c.customerid, c]));
+  return bills.map((b) => ({
+    ...b,
+    customer: custById[b.customerid] ?? null,
+    items: (items ?? []).filter((i) => i.billid === b.billid).map(({ billid, ...i }) => i),
+  }));
 }

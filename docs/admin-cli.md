@@ -11,7 +11,7 @@ node scripts/admin-cli.mjs            # lists all commands
 
 - **Output:** success → JSON on stdout, exit `0`. Failure → one JSON line on
   stderr, `{"error": "...", "type": "..."}`, exit `2` for bad input
-  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `BillInputError`), `1` for anything else (database,
+  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`), `1` for anything else (database,
   network).
 - **Dry run:** every write accepts `--dry-run`: it runs all checks and prints
   `{"dry_run": true, "would_insert": {...}}` without writing. Use it to review
@@ -32,13 +32,17 @@ one phone, one customer.
 
 ## customer find
 
-Look up a customer by phone. Read-only.
+Look up a customer by phone, or by name. Read-only.
 
 ```bash
 node scripts/admin-cli.mjs customer find --phone 9000000001
+node scripts/admin-cli.mjs customer find --name "test customer"
 ```
 
-Output: the full `customers` row, or `null` if no customer has that phone.
+`--phone`: the full `customers` row, or `null` if no customer has that phone.
+`--name`: up to 20 rows where every word appears in the first or last name
+(case-insensitive; punctuation ignored), `[]` if none. Use it to check a slip
+without a phone before creating a new (guest) customer.
 
 ```json
 {
@@ -52,7 +56,7 @@ Output: the full `customers` row, or `null` if no customer has that phone.
 }
 ```
 
-Errors: `--phone is required`; `Invalid phone "123": expected 10 digits or
+Errors: `Give exactly one of --phone or --name`; `Name is required`; `Invalid phone "123": expected 10 digits or
 +<country code><number>` (exit 2).
 
 ## customer create
@@ -137,6 +141,30 @@ node scripts/admin-cli.mjs product find --code BC-252051
 `cost_zcode` is the purchase price in the price-tag cipher
 (`src/utility/zCode.js`: Z, then A=1 … I=9, Z=0), so it can be matched
 against the code written on a slip. Variants are in the app's size order.
+
+## product search
+
+Find inventory products when a slip has no usable code. Read-only. At least
+one of `--name`, `--category`, `--cost`, `--mrp` is required; all filters
+combine.
+
+```bash
+node scripts/admin-cli.mjs product search --category SA --cost ZAAGB --mrp 2395 --in-stock
+```
+
+| Option | Notes |
+|---|---|
+| `--name` | substring of the product name (e.g. `saree`, `georgette`) |
+| `--category` | exact category id (`category list`) |
+| `--cost` | purchase price as on the slip's price code (`ZAAGB` = 1172) or a number |
+| `--mrp` | exact retail price |
+| `--color` | substring of a variant colour; keeps only matching variants |
+| `--in-stock` | keeps only variants with stock > 0 |
+
+Output: up to 25 products in the same shape as `product find`. With
+`--color` / `--in-stock`, products left with no matching variant are dropped.
+A cost code alone is rarely unique (three sarees share `ZAAGB` at ₹2395), so
+combine it with category, MRP and colour.
 
 ## category list
 
@@ -301,6 +329,29 @@ activity-log entry `Finalized bill #… for … — ₹…, N items (via CLI)`.
 
 A failed stock update does not undo the bill (as on the screen); it is listed
 in `stock_failures` with the error. Fix stock by hand for those.
+
+### bill find
+
+Find existing bills, e.g. to check a slip isn't already entered. Read-only.
+At least one filter; all combine.
+
+```bash
+node scripts/admin-cli.mjs bill find --phone 9000000001 --from 2026-10-01 --to 2026-10-31
+node scripts/admin-cli.mjs bill find --product BC-252051
+```
+
+| Option | Notes |
+|---|---|
+| `--customer` | customer id |
+| `--phone` | customer phone (unknown phone → `[]`) |
+| `--from`, `--to` | bill date range, `YYYY-MM-DD`, inclusive |
+| `--product` | a product / manual item code that must appear on the bill |
+
+Output: up to 50 bills, newest first: `billid`, `bill_number`, `orderdate`,
+`customerid`, `totalamount`, `payment_amount`, `paymentstatus`, `finalized`,
+`document_type`, `customer` (name, phone) and `items` (code, name, qty, MRP,
+total). Same customer with similar items near the slip date = likely already
+entered; decide before `bill create`.
 
 ### bill get
 

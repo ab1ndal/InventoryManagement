@@ -56,8 +56,13 @@ It is a new way to enter bills, not a backfill: bills get the normal next
    rather than separate steps; the audit trail is the spec + preview output.
    Pricing reuses `billUtils` (balance-forcing rule extracted from
    BillingForm into `computeBalanceAdjustedTotals`, owner-approved).
-4. Next candidates: drafts / editing a bill, partial payment + add payment,
-   salespersons, customer edit.
+4. **Slip-entry lookups** — `product search` (category / cost Z-code / MRP /
+   colour, for lines without a readable code), `bill find` (duplicate check:
+   customer / phone, date range, product), `customer find --name` (slips
+   without a phone). Done, read-only.
+5. Next candidates (all writes; owner to decide): `stock adjust` to fix a
+   reported `stock_failures` entry, drafts / editing a bill, partial payment +
+   add payment, salespersons, customer edit.
 
 ## Slice 1: customers
 

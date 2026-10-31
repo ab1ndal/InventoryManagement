@@ -4,6 +4,7 @@ import {
   findCustomerByPhone,
   createCustomer,
   CustomerInputError,
+  findCustomersByName,
 } from "../customers";
 import { fakeSupabase as fakeClient } from "../testing/fakeSupabase";
 
@@ -147,5 +148,20 @@ describe("createCustomer", () => {
     await expect(createCustomer(client, { first_name: "A" }, { newUlid: () => "U" })).resolves.toEqual(saved);
     expect(warn).toHaveBeenCalledWith("[activityLog] insert failed:", "log down");
     warn.mockRestore();
+  });
+});
+
+describe("findCustomersByName", () => {
+  it("requires every word to match a first or last name, stripping filter syntax", async () => {
+    const client = fakeClient({ "customers.select": { data: [{ customerid: 1 }], error: null } });
+    await expect(findCustomersByName(client, "Test, Customer.")).resolves.toEqual([{ customerid: 1 }]);
+    expect(client.calls[0].filters).toEqual([
+      ["or", "first_name.ilike.%Test%,last_name.ilike.%Test%"],
+      ["or", "first_name.ilike.%Customer%,last_name.ilike.%Customer%"],
+    ]);
+  });
+
+  it("requires a name", async () => {
+    await expect(findCustomersByName(fakeClient(), " (), ")).rejects.toThrow(CustomerInputError);
   });
 });

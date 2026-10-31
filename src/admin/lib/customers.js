@@ -78,6 +78,25 @@ export async function findCustomerByPhone(client, rawPhone) {
   return data?.[0] ?? null;
 }
 
+/**
+ * Customers whose first or last name contains every word of `name`
+ * (case-insensitive), max 20, oldest first. For slips without a phone.
+ */
+export async function findCustomersByName(client, name) {
+  // Letters and digits only: punctuation (commas, dots, parens) is PostgREST
+  // filter syntax inside or().
+  const words = String(name ?? "")
+    .replace(/[^\p{L}\p{N}]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length === 0) throw new CustomerInputError("Name is required");
+  let query = client.from("customers").select("*");
+  for (const w of words) query = query.or(`first_name.ilike.%${w}%,last_name.ilike.%${w}%`);
+  const { data, error } = await query.order("customerid").limit(20);
+  if (error) throw error;
+  return data ?? [];
+}
+
 // Same shape as src/lib/activityLog.js, but on the caller's client. The CLI
 // runs as the service role, so there is no actor; the suffix says where the
 // change came from. Like logActivity, a failed log write never fails the action.

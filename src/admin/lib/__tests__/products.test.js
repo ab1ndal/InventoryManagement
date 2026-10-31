@@ -1,4 +1,4 @@
-import { normalizeProductCode, findProducts, listCategories } from "../products";
+import { normalizeProductCode, findProducts, listCategories, searchProducts, ProductInputError } from "../products";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
 const saree = {
@@ -72,5 +72,49 @@ describe("listCategories", () => {
     const rows = [{ categoryid: "SA", name: "Saree" }];
     const client = fakeSupabase({ "categories.select": { data: rows, error: null } });
     await expect(listCategories(client)).resolves.toEqual(rows);
+  });
+});
+
+describe("searchProducts", () => {
+  const rows = [
+    { ...saree, productid: "BC1", purchaseprice: "2516.00" },
+    { ...saree, productid: "BC2", purchaseprice: "2516.00" },
+  ];
+  const variants = [
+    { variantid: "a", productid: "BC1", size: "FREE-SIZE", color: "Mustard", stock: 0 },
+    { variantid: "b", productid: "BC2", size: "FREE-SIZE", color: "Yellow", stock: 1 },
+  ];
+  const client = () =>
+    fakeSupabase({
+      "products.select": { data: rows, error: null },
+      "productsizecolors.select": { data: variants, error: null },
+      "categories.select": { data: [{ categoryid: "SA", name: "Saree" }], error: null },
+    });
+
+  it("decodes a cost Z-code and filters by category and MRP", async () => {
+    const c = client();
+    const out = await searchProducts(c, { categoryid: "SA", cost: "ZBEAF", mrp: "5395" });
+    expect(out.map((p) => p.productid)).toEqual(["BC1", "BC2"]);
+    expect(c.calls[0].filters).toEqual([
+      ["eq", "categoryid", "SA"],
+      ["eq", "purchaseprice", 2516],
+      ["eq", "retailprice", 5395],
+    ]);
+  });
+
+  it("keeps only matching variants and drops products left with none", async () => {
+    const out = await searchProducts(client(), { cost: "ZBEAF", color: "yell", inStock: true });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ productid: "BC2", variants: [{ variantid: "b" }] });
+  });
+
+  it.each([
+    [{}, /at least one of name, category, cost or MRP/],
+    [{ color: "red" }, /at least one of/],
+    [{ cost: "ZZ" }, /Invalid cost "ZZ"/],
+    [{ mrp: "abc" }, /Invalid MRP/],
+  ])("rejects bad filters %#", async (f, msg) => {
+    await expect(searchProducts(client(), f)).rejects.toThrow(ProductInputError);
+    await expect(searchProducts(client(), f)).rejects.toThrow(msg);
   });
 });
