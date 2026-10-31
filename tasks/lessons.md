@@ -37,3 +37,8 @@
 
 - Cart/Wishlist defer auth-callback work with `setTimeout(0)` (never await Supabase inside the callback). Every such timer must be cleared on unmount: CartContext didn't (fixed 2026-10-25), so a timer from one test fired during the next and called the shared `upsertItem` mock, which made "does not write through as a guest" flaky under full-suite load. In tests that assert nothing runs before unmount, fire the auth event with a synchronous `act(() => authCb(...))`: an async `act` can yield long enough for the timer to run.
 - `jest.mock` calls are hoisted above imports by babel-jest, so putting imports first (ESLint `import/first`) is behaviour-neutral.
+
+## Testing writes without touching prod
+
+- To test a supabase-js write path with zero prod changes: (1) run the real code with `createClient(..., { global: { fetch: fakeFetch } })` to capture the exact PostgREST requests, then (2) replay the captured row on prod inside `begin; set local role service_role; ...; rollback;` via `supabase db query --linked -f`. Pass explicit ids (`customerid: -1`, `overriding system value` for identity columns) — a rolled-back `nextval` still advances the sequence. Replay with an explicit column list: `json_populate_record` turns omitted keys into NULL instead of column defaults, unlike PostgREST (NOT NULL defaults like `marketing_opt_in` then fail).
+- Node ESM can't resolve extensionless imports, so `src/` modules shared with a Node CLI use `./x.js` import paths (CRA/jest accept both). Don't add `"type": "module"` to `src/` — webpack would then demand fully specified imports app-wide.
