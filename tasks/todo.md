@@ -14,6 +14,12 @@ Removes the biggest go-live risk without shipping anything. Owner at /admin/onli
 5. Checkout OFF again (or stay on if all passed).
 Option: ship that order instead of cancelling (covers the test parcel too, minus the refund test).
 
+**Progress 2026-10-30:** first real order WEB-000006 paid on production (₹110 = shipping; WEB500 zeroed the
+kurti). Webhook, paid status, shop + customer confirmation emails all worked; Cashfree shows ₹110 unsettled, T+1,
+due 31 Oct 8 PM. Shiprocket create failed (missing `billing_last_name` key) → fixed PRs #107/#109, deployed.
+Owner retries Process on 2026-10-31. PR #110 (no automatic default courier) open: merge + deploy BEFORE that retry.
+Refund leg of this test not exercised (order is being shipped instead).
+
 ## ONLINE ORDERS: go-live
 
 State 2026-10-29: everything built, deployed, configured. Cashfree on PRODUCTION keys (+ prod webhook, domain
@@ -53,7 +59,8 @@ Untested against real services: payment on production keys (task above) and Proc
 
 **Follow-ups (non-blocking)**
 - [ ] "Send back to To-check" for an order stuck in processing after AWB.
-- [ ] Watch `awb_quoted_courier_refused` logs: the default courier may cost more than the quote.
+- [ ] After PR #110: a courier refusal stops Process with no way to pick another courier in admin (Porter or cancel
+  only). Add a "choose courier" admin action if this happens in practice.
 - [ ] Deferred returns polish: customer order page Returned badge; customer self-service return request; hide the
   Shipping line in ExchangePage for online bills; edge sortReturns compares timestamps as strings.
 - [ ] Owner question: manual (non-catalogue) items never restock on in-store exchange — switch on?
@@ -118,6 +125,12 @@ Owner chose UP-only sales from the composition shop. Revive only for India-wide 
 (GSTIN 09AFKFS5575H1ZC) needs an LLP current account, gateway/courier KYC in the LLP's name, GST tax invoices,
 and CA answers on stock transfer and related-party pricing. CA doc:
 https://claude.ai/code/artifact/342df0ee-b022-4959-86c6-dc0367787dfa
+
+## ROADMAP (not scheduled)
+
+- WhatsApp notifications for the shop (new order) and customers (milestones, covers phone-only customers):
+  `tasks/future-whatsapp-notifications.md`.
+- Catalogue tagging with Jev: `tasks/future-jev-catalogue-tagging.md`.
 
 ## Other
 
