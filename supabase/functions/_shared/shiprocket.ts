@@ -63,7 +63,10 @@ export type SrOrderInput = {
     email: string | null;
   };
   items: { name: string; sku: string; units: number; sellingPrice: number }[];
+  /** Sum of list price × units, before totalDiscount. */
   subTotal: number;
+  /** Promo off the list prices; sent as total_discount when > 0. */
+  totalDiscount?: number;
   lengthCm: number;
   breadthCm: number;
   heightCm: number;
@@ -247,8 +250,14 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
   }
 
   function fail(path: string, status: number, data: unknown): never {
-    const msg = typeof (data as Json | null)?.message === "string" ? (data as Json).message : `HTTP ${status}`;
-    throw new ShiprocketError(status, `${path}: ${msg}`);
+    const d = data as Json | null;
+    const msg = typeof d?.message === "string" ? d.message : `HTTP ${status}`;
+    // The bare message ("Oops! Invalid Data.") doesn't say which field; errors does.
+    const errors = d?.errors;
+    const detail = errors && typeof errors === "object" && Object.keys(errors).length > 0
+      ? ` ${JSON.stringify(errors)}`
+      : "";
+    throw new ShiprocketError(status, `${path}: ${msg}${detail}`);
   }
 
   /** Throws unless HTTP 2xx; returns the parsed body. */
@@ -293,6 +302,7 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
     if (b.lastName) body.billing_last_name = b.lastName;
     if (b.address2) body.billing_address_2 = b.address2;
     if (input.shippingCharges !== undefined) body.shipping_charges = input.shippingCharges;
+    if (input.totalDiscount) body.total_discount = input.totalDiscount;
     return body;
   }
 

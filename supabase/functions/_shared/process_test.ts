@@ -41,6 +41,22 @@ Deno.test("buildSrInput: paid values, sub_total, package dims, weight by categor
   assertEquals(input.billing.state, "Uttar Pradesh");
 });
 
+Deno.test("buildSrInput: fully discounted item goes at list price with total_discount and paid shipping", () => {
+  // WEB-000006: ₹500 kurti, WEB500 promo took ₹500, shopper paid ₹110 shipping.
+  const items = [{ ...fakeItems()[1], qty: 1, stock_taken: 1, paid_value: 0 }];
+  const input = buildSrInput(fakeOrder({ shipping: "110.00" }), createLines(items));
+  assertEquals(input.items, [{ name: "Kurti / L / Blue", sku: "BC25002-L-Blue", units: 1, sellingPrice: 500 }]);
+  assertEquals(input.subTotal, 500);
+  assertEquals(input.totalDiscount, 500);
+  assertEquals(input.shippingCharges, 110);
+});
+
+Deno.test("buildSrInput: no promo and free shipping → no total_discount or shipping_charges", () => {
+  const input = buildSrInput(fakeOrder(), createLines(fakeItems()));
+  assertEquals("totalDiscount" in input, false);
+  assertEquals("shippingCharges" in input, false);
+});
+
 Deno.test("buildSrInput: landmark joins address_2; landmark alone; neither → no address2", () => {
   const lines = createLines(fakeItems());
   const withAddress = (a: Record<string, unknown>) => buildSrInput(fakeOrder({ address: { ...fakeOrder().address, ...a } }), lines);

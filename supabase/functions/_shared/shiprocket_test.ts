@@ -313,6 +313,7 @@ Deno.test("createOrder: payload fields and ids", async () => {
   assertEquals((b.billing_city as string).length, 30);
   assertEquals(b.order_items, [{ name: "Silk Saree", sku: "BC25001-RED-FREE", units: 1, selling_price: 2499 }]);
   assertEquals([b.sub_total, b.length, b.breadth, b.height, b.weight], [2499, 32, 28, 5, 1]);
+  assertEquals("total_discount" in b, false);
 });
 
 Deno.test("R17: no shopper email → billing_email = fallback; both empty → refused before calling", async () => {
@@ -334,6 +335,13 @@ Deno.test("createOrder: 422 and 200-without-ids throw ShiprocketError", async ()
     ShiprocketError,
   );
   assertEquals(e1.status, 422);
+  const e3 = await assertRejects(
+    () =>
+      setup(() => jsonResponse(422, { message: "Oops! Invalid Data.", errors: { sub_total: ["The sub total field is required."] } }))
+        .sr.createOrder(orderInput, "s@x"),
+    ShiprocketError,
+  );
+  assertEquals(e3.message, '/orders/create/adhoc: Oops! Invalid Data. {"sub_total":["The sub total field is required."]}');
   const e2 = await assertRejects(
     () => setup(() => jsonResponse(200, { message: "weird" })).sr.createOrder(orderInput, "s@x"),
     ShiprocketError,
