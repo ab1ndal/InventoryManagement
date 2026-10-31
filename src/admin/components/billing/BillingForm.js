@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
-import { computeBillTotals, computePreTaxBalanceDiscount, priceItem, computeAlterationDeposit } from "./billUtils";
+import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
 import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
@@ -623,41 +623,23 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     [items, selectedCodes, allDiscounts, appliedVoucher, docType],
   );
 
-  // When payment is less than the effective total, compute a pre-tax balance discount
-  // so the final bill total exactly matches what the customer paid. Nothing else ever
-  // adjusts the total: the honest `computed` figure stands unless staff explicitly enter
-  // a finalAmount or a short paymentAmount.
+  // Total forced to what the customer paid (see computeBalanceAdjustedTotals).
   const balanceAdjustedComputed = useMemo(() => {
-    const hasFinalAmount = Number(finalAmount) > 0;
-    const targetAmt = hasFinalAmount ? Number(finalAmount) : Number(paymentAmount);
-    if (!targetAmt || targetAmt <= 0 || computed.grandTotal <= 0) return computed;
     const { effectiveTotal: effectiveGrandTotal } = computeCreditsApplied(
       computed.grandTotal,
       appliedStoreCredit,
       exchangeCredit?.amount,
     );
-    if (targetAmt >= effectiveGrandTotal) return computed;
-    // In partial scenario (shortfall > ₹100) without explicit finalAmount, don't auto-discount
-    if (!hasFinalAmount && effectiveGrandTotal - targetAmt > 100) return computed;
-    const shortfall = effectiveGrandTotal - targetAmt;
-    const preDisc = computePreTaxBalanceDiscount(
-      computed,
-      computed.grandTotal - shortfall,
+    return computeBalanceAdjustedTotals(computed, {
+      finalAmount,
+      paymentAmount,
+      effectiveGrandTotal,
       items,
       selectedCodes,
       allDiscounts,
-      Number(appliedVoucher?.value ?? 0),
+      voucherPreTax: Number(appliedVoucher?.value ?? 0),
       docType,
-    );
-    if (preDisc <= 0) return computed;
-    return computeBillTotals(
-      items,
-      selectedCodes,
-      allDiscounts,
-      preDisc,
-      Number(appliedVoucher?.value ?? 0),
-      docType,
-    );
+    });
   }, [
     computed,
     finalAmount,

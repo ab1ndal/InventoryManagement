@@ -84,6 +84,42 @@ export function computePreTaxBalanceDiscount(computed, targetGrandTotal, items =
   return round2(Math.max(0, hi));
 }
 
+// When payment is less than the effective total, compute a pre-tax balance discount
+// so the final bill total exactly matches what the customer paid. Nothing else ever
+// adjusts the total: the honest `computed` figure stands unless staff explicitly enter
+// a finalAmount or a short paymentAmount. `effectiveGrandTotal` is computed.grandTotal
+// after store/exchange credit (exchangeHelpers.computeCreditsApplied); the caller passes
+// it in so this file stays import-free and loadable from the admin CLI.
+export function computeBalanceAdjustedTotals(computed, {
+  finalAmount,
+  paymentAmount,
+  effectiveGrandTotal,
+  items,
+  selectedCodes,
+  allDiscounts,
+  voucherPreTax = 0,
+  docType = 'invoice',
+}) {
+  const hasFinalAmount = Number(finalAmount) > 0;
+  const targetAmt = hasFinalAmount ? Number(finalAmount) : Number(paymentAmount);
+  if (!targetAmt || targetAmt <= 0 || computed.grandTotal <= 0) return computed;
+  if (targetAmt >= effectiveGrandTotal) return computed;
+  // In partial scenario (shortfall > ₹100) without explicit finalAmount, don't auto-discount
+  if (!hasFinalAmount && effectiveGrandTotal - targetAmt > 100) return computed;
+  const shortfall = effectiveGrandTotal - targetAmt;
+  const preDisc = computePreTaxBalanceDiscount(
+    computed,
+    computed.grandTotal - shortfall,
+    items,
+    selectedCodes,
+    allDiscounts,
+    voucherPreTax,
+    docType,
+  );
+  if (preDisc <= 0) return computed;
+  return computeBillTotals(items, selectedCodes, allDiscounts, preDisc, voucherPreTax, docType);
+}
+
 export function computeBillTotals(items, selectedCodes, allDiscounts, extraPreTaxDiscount = 0, voucherPreTax = 0, docType = 'invoice') {
   const pricedItems = items.map(priceItem);
 
