@@ -27,6 +27,10 @@ export function fakeSupabase(results = {}) {
         call.row = row;
         return builder;
       },
+      delete: () => {
+        call.op = "delete";
+        return builder;
+      },
       eq: filter("eq"),
       ilike: filter("ilike"),
       in: filter("in"),

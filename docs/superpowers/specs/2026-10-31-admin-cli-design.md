@@ -42,20 +42,22 @@ It is a new way to enter bills, not a backfill: bills get the normal next
   entries have no actor, so their summary is suffixed "(via CLI)".
 - **Form:** JS shared modules + Node CLI, not new DB functions, unless a step
   needs atomicity across tables (then a DB function, as with `stock_adjust`).
-- **Pricing (later slice):** bill pricing exists in `billUtils.js` and in
-  `supabase/functions/_shared/pricing.ts`; the line-item slice must reuse, not
-  add a third copy. Decide how when that slice starts.
+- **Pricing:** the CLI reuses `billUtils.js` / `stockHelpers.js` directly
+  (no third copy). Line discount ₹→% is rounded down, not to nearest, so the
+  balance discount can trim to the exact amount paid.
 
 ## Slices (in order)
 
-1. **Customers** — `customer find`, `customer create`. (this change)
-2. Product lookup (product + variants + stock; manual items).
-3. Bill header (draft bill).
-4. Line items (inventory + manual items, discounts, alteration).
-5. Payment.
-6. Stock adjustment.
-7. Finalize (number, totals; PDF/SMS out of scope for now).
-8. Read-back `bill get` (full bill + items + payments + customer + stock).
+1. **Customers** — `customer find`, `customer create`. Done.
+2. **Lookups** — `product find`, `category list`, `manual-item find/create`. Done.
+3. **Bills** — `bill preview`, `bill create`, `bill get`. Done. Header, lines,
+   payment, stock and finalize turned out to be one atomic-ish operation in
+   the app (direct Finalize), so they are one command over a JSON bill spec
+   rather than separate steps; the audit trail is the spec + preview output.
+   Pricing reuses `billUtils` (balance-forcing rule extracted from
+   BillingForm into `computeBalanceAdjustedTotals`, owner-approved).
+4. Next candidates: drafts / editing a bill, partial payment + add payment,
+   salespersons, customer edit.
 
 ## Slice 1: customers
 

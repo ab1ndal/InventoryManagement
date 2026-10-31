@@ -31,6 +31,9 @@ const { findProducts, listCategories } = await import("../src/admin/lib/products
 const { findManualItems, createManualItem, ManualItemInputError } = await import(
   "../src/admin/lib/manualItems.js"
 );
+const { prepareBill, createBill, getBill, BillInputError } = await import(
+  "../src/admin/lib/bills.js"
+);
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -159,7 +162,38 @@ const COMMANDS = {
         ),
     },
   },
+  bill: {
+    preview: {
+      usage: "bill preview (--spec <file.json> | --json '<spec>')",
+      options: { spec: { type: "string" }, json: { type: "string" } },
+      run: (client, o) => prepareBill(client, readSpec(o)),
+    },
+    create: {
+      usage: "bill create (--spec <file.json> | --json '<spec>') [--dry-run]",
+      options: { spec: { type: "string" }, json: { type: "string" }, "dry-run": { type: "boolean" } },
+      run: (client, o) => createBill(client, readSpec(o), { dryRun: Boolean(o["dry-run"]) }),
+    },
+    get: {
+      usage: "bill get (--number <FY26-000NNN> | --id <billid>)",
+      options: { number: { type: "string" }, id: { type: "string" } },
+      run: (client, o) => {
+        if (!o.number === !o.id) throw new UsageError("Give exactly one of --number or --id");
+        return getBill(client, { billNumber: o.number, billid: o.id });
+      },
+    },
+  },
 };
+
+// A bill spec comes from a JSON file (--spec) or inline (--json).
+function readSpec(o) {
+  if (!o.spec === !o.json) throw new UsageError("Give exactly one of --spec <file> or --json '<spec>'");
+  const text = o.spec ? fs.readFileSync(path.resolve(o.spec), "utf8") : o.json;
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new UsageError(`Bill spec is not valid JSON: ${e.message}`);
+  }
+}
 
 function usage() {
   return Object.values(COMMANDS)
@@ -187,7 +221,8 @@ main(process.argv.slice(2)).catch((err) => {
   const inputError =
     err instanceof UsageError ||
     err instanceof CustomerInputError ||
-    err instanceof ManualItemInputError;
+    err instanceof ManualItemInputError ||
+    err instanceof BillInputError;
   process.stderr.write(
     JSON.stringify({ error: err.message, type: err.name || "Error", ...(err.code && { code: err.code }) }) + "\n",
   );
