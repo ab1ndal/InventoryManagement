@@ -73,6 +73,8 @@ export type OrderRow = {
   address: Record<string, unknown> | null;
   created_at: string;
   paid_at: string | null;
+  /** Shipping the shopper paid; refunded only when the whole order is. */
+  shipping: number | string;
   quoted_courier_id: number | null;
   sr_order_id: string | null;
   sr_shipment_id: string | null;
@@ -104,6 +106,7 @@ export type OrderItemRow = {
   category_id: string | null;
   category_name: string | null;
   qty: number;
+  unit_price: number | string;
   paid_value: number | string;
   stock_taken: number;
   refunded_qty: number;
@@ -293,12 +296,17 @@ export function srOrderRef(o: OrderRow): string {
 export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   const a = (o.address ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
-  const items = lines.map(({ item, units, value }) => ({
+  // List price per unit with the promo as total_discount: a fully discounted item would
+  // otherwise go as selling_price 0 / sub_total 0, which create/adhoc refuses (WEB-000006).
+  const items = lines.map(({ item, units }) => ({
     name: [item.product_name, item.size, item.color].filter(Boolean).join(" / "),
     sku: [item.productid, item.size, item.color].filter(Boolean).join("-"),
     units,
-    sellingPrice: round2(value / units),
+    sellingPrice: Number(item.unit_price),
   }));
+  const subTotal = round2(items.reduce((s, i) => s + i.sellingPrice * i.units, 0));
+  const totalDiscount = round2(subTotal - lines.reduce((s, l) => s + l.value, 0));
+  const shipping = Number(o.shipping);
   const categories = lines.flatMap(({ item, units }) =>
     Array.from({ length: units }, () => item.category_name ?? item.category_id)
   );
@@ -320,7 +328,9 @@ export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
       email: o.contact_email,
     },
     items,
-    subTotal: round2(items.reduce((s, i) => s + i.sellingPrice * i.units, 0)),
+    subTotal,
+    ...(totalDiscount > 0 ? { totalDiscount } : {}),
+    ...(shipping > 0 ? { shippingCharges: shipping } : {}),
     ...parcelPackage(categories),
     weightKg: parcelWeightKg(categories),
   };
