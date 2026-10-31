@@ -21,6 +21,7 @@ import {
   localInputToIso,
   processRefundPreview,
   ceilToMinute,
+  timelineRows,
   toLocalInputValue,
 } from "./orderHelpers";
 
@@ -617,12 +618,19 @@ export default function OrderDetail({ orderId, onChanged }) {
       <section className="text-sm">
         <h4 className="mb-2 font-medium">Timeline</h4>
         <ol className="space-y-1">
-          {events.map((e) => (
-            <li key={e.id} className="flex gap-3">
-              <span className="w-32 shrink-0 text-muted-foreground">{formatDateTime(e.created_at)}</span>
+          {timelineRows(events).map((r) => (
+            <li key={r.id} className="flex gap-3">
+              <span className="w-32 shrink-0 text-muted-foreground">{formatDateTime(r.at)}</span>
               <span>
-                {e.kind}
-                {e.from_status || e.to_status ? ` (${e.from_status || "—"} → ${e.to_status || "—"})` : ""}
+                <span className="font-medium">{r.label}</span>
+                {r.count > 1 && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    ×{r.count}, last {formatDateTime(r.lastAt)}
+                  </span>
+                )}
+                {r.status && <span className="text-muted-foreground"> · now {r.status}</span>}
+                {r.detail && <span className="block text-xs text-muted-foreground">{r.detail}</span>}
               </span>
             </li>
           ))}

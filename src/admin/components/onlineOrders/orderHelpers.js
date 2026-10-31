@@ -195,3 +195,108 @@ export function localInputToIso(value) {
   const d = new Date(value);
   return value && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
 }
+
+// ---------- timeline ----------
+
+const EVENT_LABELS = {
+  created: "Order placed",
+  paid: "Payment received",
+  payment_attempt_failed: "Payment attempt failed",
+  duplicate_payment: "Duplicate payment",
+  availability: "Availability checked",
+  claimed: "Processing started",
+  claim_takeover: "Processing taken over",
+  process_prepared: "Items to ship confirmed",
+  op_released: "Processing stopped",
+  packed: "Packed",
+  ready_for_pickup: "Ready for pickup",
+  bill_created: "Bill of Supply created",
+  shipped: "Shipped",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+  manual_cancel_confirmed: "Courier cancellation confirmed by staff",
+  courier_cancelled: "Courier booking cancelled",
+  courier_problem: "Courier problem",
+  tracking_held: "Tracking update held",
+  rebooked: "Courier rebooked",
+  sent_back: "Sent back",
+  rto_received: "Returned parcel received",
+  problem: "Problem flagged",
+  refund_required: "Refund needed",
+  refund_choice: "Refund method chosen",
+  refund_created: "Refund created",
+  return_opened: "Return opened",
+  return_cancelled: "Return cancelled",
+  return_rejected: "Return rejected",
+  return_refunded: "Return refunded",
+  jobs_retry: "Retry requested",
+  job_failed: "Background task gave up",
+};
+
+const CHECKPOINT_LABELS = {
+  cf_order: "Payment page created",
+  sr_create: "Shiprocket order created",
+  sr_create_failed: "Shiprocket order failed",
+  sr_update: "Shiprocket order updated",
+  sr_cancelled: "Shiprocket order cancelled",
+  awb: "Courier assigned",
+  pickup: "Pickup requested",
+  manifest: "Manifest generated",
+  label: "Label generated",
+  error: "Processing failed",
+};
+
+const JOB_LABELS = {
+  shiprocket_create: "Create Shiprocket order",
+  email_confirmed: "Order confirmation email",
+  email_shop: "Shop new-order email",
+  email_shipped: "Shipped email",
+  email_delivered: "Delivered email",
+  email_ready_for_pickup: "Ready-for-pickup email",
+};
+
+function humanize(code) {
+  const s = String(code || "").replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// One readable line per event: what happened, plus the useful bit of its data.
+export function describeEvent(e) {
+  const d = e.data || {};
+  let label;
+  let detail = "";
+  if (e.kind === "checkpoint") {
+    label = CHECKPOINT_LABELS[d.step] || humanize(d.step);
+    const cp = d.data || {};
+    if (cp.error) detail = cp.error;
+    else if (d.step === "awb") detail = [cp.courier_name, cp.awb && `AWB ${cp.awb}`].filter(Boolean).join(", ");
+    else if (d.step === "pickup" && cp.scheduled_date) detail = `scheduled ${cp.scheduled_date}`;
+  } else if (e.kind.startsWith("refund_leg_")) {
+    label = `Refund ${e.kind.slice("refund_leg_".length)}`;
+  } else {
+    label = EVENT_LABELS[e.kind] || humanize(e.kind);
+    if (e.kind === "paid" && d.amount != null) detail = formatRupees(d.amount);
+    else if (e.kind === "availability" && d.of != null) detail = `${d.available_qty} of ${d.of} on shelf`;
+    else if (e.kind === "job_failed") detail = [JOB_LABELS[d.kind] || humanize(d.kind), d.error].filter(Boolean).join(": ");
+    else if (d.error) detail = d.error;
+  }
+  const status =
+    e.to_status && e.to_status !== e.from_status ? STATUS_LABELS[e.to_status] || humanize(e.to_status) : "";
+  return { label, detail, status };
+}
+
+// Consecutive identical lines (background retries) collapse into one with a count.
+export function timelineRows(events) {
+  const rows = [];
+  for (const e of events) {
+    const line = describeEvent(e);
+    const prev = rows[rows.length - 1];
+    if (prev && prev.label === line.label && prev.detail === line.detail && !line.status && !prev.status) {
+      prev.count += 1;
+      prev.lastAt = e.created_at;
+      continue;
+    }
+    rows.push({ id: e.id, ...line, at: e.created_at, lastAt: e.created_at, count: 1 });
+  }
+  return rows;
+}
