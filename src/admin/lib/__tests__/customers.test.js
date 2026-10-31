@@ -5,37 +5,7 @@ import {
   createCustomer,
   CustomerInputError,
 } from "../customers";
-
-// Minimal stand-in for the supabase-js query builder: records each call and
-// resolves with the canned result for that table + operation.
-function fakeClient(results) {
-  const calls = [];
-  const from = (table) => {
-    const call = { table, op: "select", filters: [], row: null };
-    calls.push(call);
-    const builder = {
-      select: () => builder,
-      insert: (row) => {
-        call.op = "insert";
-        call.row = row;
-        return builder;
-      },
-      eq: (col, val) => {
-        call.filters.push([col, val]);
-        return builder;
-      },
-      order: () => builder,
-      single: () => builder,
-      then: (resolve, reject) =>
-        Promise.resolve(results[`${table}.${call.op}`] ?? { data: null, error: null }).then(
-          resolve,
-          reject,
-        ),
-    };
-    return builder;
-  };
-  return { from, calls };
-}
+import { fakeSupabase as fakeClient } from "../testing/fakeSupabase";
 
 describe("normalizePhone", () => {
   it("returns null for empty input", () => {
@@ -99,7 +69,7 @@ describe("findCustomerByPhone", () => {
     const row = { customerid: 7, phone: "+919000000001" };
     const client = fakeClient({ "customers.select": { data: [row], error: null } });
     await expect(findCustomerByPhone(client, "9000000001")).resolves.toEqual(row);
-    expect(client.calls[0].filters).toEqual([["phone", "+919000000001"]]);
+    expect(client.calls[0].filters).toEqual([["eq", "phone", "+919000000001"]]);
   });
   it("returns null when nobody has that phone", async () => {
     const client = fakeClient({ "customers.select": { data: [], error: null } });

@@ -11,7 +11,7 @@ node scripts/admin-cli.mjs            # lists all commands
 
 - **Output:** success → JSON on stdout, exit `0`. Failure → one JSON line on
   stderr, `{"error": "...", "type": "..."}`, exit `2` for bad input
-  (`UsageError`, `CustomerInputError`), `1` for anything else (database,
+  (`UsageError`, `CustomerInputError`, `ManualItemInputError`), `1` for anything else (database,
   network).
 - **Dry run:** every write accepts `--dry-run`: it runs all checks and prints
   `{"dry_run": true, "would_insert": {...}}` without writing. Use it to review
@@ -103,3 +103,101 @@ phone; `Phone +919000000002 already belongs to customer 6 (Test Customer)` —
 use `customer find` and bill that customer instead.
 
 Not yet supported: editing a customer, store credit, marketing consent.
+
+## product find
+
+Look up inventory products by code. Read-only. The code is normalised
+(`bc-25 2051` → `BC252051`). An exact product id returns just that product;
+otherwise up to 10 products whose id contains the code (like the billing
+screen's picker). `[]` when nothing matches.
+
+```bash
+node scripts/admin-cli.mjs product find --code BC-252051
+```
+
+```json
+[
+  {
+    "productid": "BC252051",
+    "name": "Georgette-Saree",
+    "categoryid": "SA",
+    "category_name": "Saree",
+    "fabric": "Georgette",
+    "purchaseprice": 1172,
+    "cost_zcode": "ZAAGB",
+    "retailprice": 2395,
+    "unit_type": "piece",
+    "variants": [
+      { "variantid": "29c3daa8-…", "size": "FREE-SIZE", "color": "Mustard", "stock": 1 }
+    ]
+  }
+]
+```
+
+`cost_zcode` is the purchase price in the price-tag cipher
+(`src/utility/zCode.js`: Z, then A=1 … I=9, Z=0), so it can be matched
+against the code written on a slip. Variants are in the app's size order.
+
+## category list
+
+All categories (`categoryid`, `name`), by name. Read-only. Use it to pick
+`--category` for `manual-item create`.
+
+## manual-item find
+
+Search manual (non-inventory) items. Read-only. At least one of `--code` /
+`--name` is required; filters combine.
+
+```bash
+node scripts/admin-cli.mjs manual-item find --name dupatta --in-stock
+```
+
+| Option | Notes |
+|---|---|
+| `--code` | exact id, e.g. `BCX26125` (case-insensitive) |
+| `--name` | substring of the name |
+| `--in-stock` | only `stock > 0` |
+
+Returns up to 20 rows, newest first, each with `cost_zcode`. Caution: the app
+never reduces manual-item stock when one is sold, so `stock: 1` does not prove
+the piece is unsold.
+
+## manual-item create
+
+Create a manual item, with the billing screen's manual item form rules.
+
+```bash
+node scripts/admin-cli.mjs manual-item create --name Fall --category ACC --mrp 150 --cost ZEZ --dry-run
+```
+
+| Option | Required | Notes |
+|---|---|---|
+| `--name` | yes | |
+| `--category` | yes | must exist (`category list`) |
+| `--mrp` | yes | number ≥ 0 |
+| `--cost` | yes | purchase price as Z-code (`ZEZ` = 50) or a number; must be > 0 |
+| `--size`, `--color` | no | |
+| `--dry-run` | no | shows the row, including the id it would get |
+
+The id is the next `BCX{YY}{NNN}` for the current year (from
+`get_max_manual_item_suffix`), as in the app. Output: the saved row with
+`cost_zcode`, or the dry-run preview:
+
+```json
+{
+  "dry_run": true,
+  "would_insert": {
+    "manual_item_id": "BCX26129",
+    "name": "Fall",
+    "categoryid": "ACC",
+    "size": null,
+    "color": null,
+    "purchase_price": 50,
+    "mrp": 150
+  }
+}
+```
+
+Errors (exit 2): `Name is required`, `Category is required`,
+`Invalid MRP "…"`, `A valid cost is required …`, `Unknown category "…"`.
+Like the app, no activity-log entry is written for a new manual item.

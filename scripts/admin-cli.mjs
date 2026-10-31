@@ -27,6 +27,10 @@ process.on("warning", (w) => {
 const { findCustomerByPhone, createCustomer, CustomerInputError } = await import(
   "../src/admin/lib/customers.js"
 );
+const { findProducts, listCategories } = await import("../src/admin/lib/products.js");
+const { findManualItems, createManualItem, ManualItemInputError } = await import(
+  "../src/admin/lib/manualItems.js"
+);
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -100,6 +104,61 @@ const COMMANDS = {
         ),
     },
   },
+  product: {
+    find: {
+      usage: "product find --code <product code>",
+      options: { code: { type: "string" } },
+      run: (client, o) => {
+        if (!o.code) throw new UsageError("--code is required");
+        return findProducts(client, o.code);
+      },
+    },
+  },
+  category: {
+    list: {
+      usage: "category list",
+      options: {},
+      run: (client) => listCategories(client),
+    },
+  },
+  "manual-item": {
+    find: {
+      usage: "manual-item find [--code <BCX id>] [--name <text>] [--in-stock]",
+      options: {
+        code: { type: "string" },
+        name: { type: "string" },
+        "in-stock": { type: "boolean" },
+      },
+      run: (client, o) =>
+        findManualItems(client, { code: o.code, name: o.name, inStock: Boolean(o["in-stock"]) }),
+    },
+    create: {
+      usage:
+        "manual-item create --name <text> --category <id> --mrp <amount> --cost <Z-code|amount> [--size <text>] [--color <text>] [--dry-run]",
+      options: {
+        name: { type: "string" },
+        category: { type: "string" },
+        mrp: { type: "string" },
+        cost: { type: "string" },
+        size: { type: "string" },
+        color: { type: "string" },
+        "dry-run": { type: "boolean" },
+      },
+      run: (client, o) =>
+        createManualItem(
+          client,
+          {
+            name: o.name,
+            categoryid: o.category,
+            mrp: o.mrp,
+            cost: o.cost,
+            size: o.size,
+            color: o.color,
+          },
+          { dryRun: Boolean(o["dry-run"]) },
+        ),
+    },
+  },
 };
 
 function usage() {
@@ -125,7 +184,10 @@ async function main(argv) {
 }
 
 main(process.argv.slice(2)).catch((err) => {
-  const inputError = err instanceof UsageError || err instanceof CustomerInputError;
+  const inputError =
+    err instanceof UsageError ||
+    err instanceof CustomerInputError ||
+    err instanceof ManualItemInputError;
   process.stderr.write(
     JSON.stringify({ error: err.message, type: err.name || "Error", ...(err.code && { code: err.code }) }) + "\n",
   );
