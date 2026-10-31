@@ -18,10 +18,9 @@ import {
   type AwbResult,
   createShiprocket,
   type ShiprocketClient,
-  ShiprocketError,
   type SrOrderInput,
 } from "./shiprocket.ts";
-import { parcelPackage, parcelWeightKg } from "./shipping.ts";
+import { chargeableWeightKg, parcelPackage, parcelWeightKg } from "./shipping.ts";
 
 const DEFAULT_STATE = "Uttar Pradesh";
 /** Error text stored on the order (sr_last_error, process_error) is capped. */
@@ -220,34 +219,45 @@ async function ext<T>(step: string, call: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Statuses where Shiprocket answered and refused the assignment, so no AWB exists yet.
- * A timeout (0), auth or 5xx failure might have assigned one: never re-assign after those.
- */
-const AWB_REFUSED_STATUSES = new Set([200, 400, 422]);
-
-/**
- * Quoted courier first. If Shiprocket refuses it (courier dropped the pincode, weight limit),
- * let Shiprocket pick its default so Retry doesn't hit the same refusal forever; that
- * courier's rate can differ from what the shopper paid. An empty wallet refuses both calls.
+ * Owner rule (2026-10-30): never let Shiprocket pick its default courier. The quoted
+ * courier only; if it refuses, Process stops so staff decide (dearer courier, Porter,
+ * cancel). No quote (weight-slab fallback or free shipping): the cheapest courier now,
+ * and only within the shipping the shopper paid, so freight is never undercharged.
+ * Free shipping has no cap: the ₹5,000 threshold is meant to cover it.
  */
 async function assignAwb(
   sr: ShiprocketClient,
   shipmentId: number,
-  quotedCourierId: number | null,
-  orderRef: string,
+  o: OrderRow,
+  lines: SrLine[],
 ): Promise<AwbResult> {
-  if (quotedCourierId === null) return await sr.assignAwb(shipmentId);
-  try {
-    return await sr.assignAwb(shipmentId, quotedCourierId);
-  } catch (err) {
-    if (!(err instanceof ShiprocketError) || !AWB_REFUSED_STATUSES.has(err.status)) throw err;
-    logEvent("warn", "awb_quoted_courier_refused", {
-      order_ref: orderRef,
-      courier_id: quotedCourierId,
-      error: errorText(err),
-    });
-    return await sr.assignAwb(shipmentId);
+  if (o.quoted_courier_id !== null) {
+    try {
+      return await sr.assignAwb(shipmentId, o.quoted_courier_id);
+    } catch (err) {
+      throw new Error(`quoted courier ${o.quoted_courier_id} not booked (${errorText(err)}); no other courier is tried`);
+    }
   }
+  const deliveryPincode = String((o.address ?? {}).pincode ?? "").trim();
+  const quote = await sr.rate({
+    deliveryPincode,
+    weightKg: chargeableWeightKg(lineCategories(lines)),
+    declaredValue: round2(lines.reduce((s, l) => s + l.value, 0)),
+  });
+  if (!quote) throw new Error(`no courier rate for pincode ${deliveryPincode}; not booking a courier`);
+  const paid = Number(o.shipping);
+  if (paid > 0 && quote.rate > paid) {
+    throw new Error(
+      `cheapest courier ${quote.courierName} (${quote.courierId}) costs ₹${quote.rate}, more than the ₹${paid} shipping paid; not booked`,
+    );
+  }
+  logEvent("info", "awb_cheapest_courier", {
+    order_ref: o.order_ref,
+    courier_id: quote.courierId,
+    rate: quote.rate,
+    shipping_paid: paid,
+  });
+  return await sr.assignAwb(shipmentId, quote.courierId);
 }
 
 type SrLine = { item: OrderItemRow; units: number; value: number };
@@ -293,6 +303,11 @@ export function srOrderRef(o: OrderRow): string {
   return attempt > 1 ? `${o.order_ref}-${attempt}` : o.order_ref;
 }
 
+/** One category per shipped unit, the input the parcel size and weight rules take. */
+function lineCategories(lines: SrLine[]): (string | null)[] {
+  return lines.flatMap(({ item, units }) => Array.from({ length: units }, () => item.category_name ?? item.category_id));
+}
+
 export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   const a = (o.address ?? {}) as Record<string, unknown>;
   const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
@@ -307,9 +322,7 @@ export function buildSrInput(o: OrderRow, lines: SrLine[]): SrOrderInput {
   const subTotal = round2(items.reduce((s, i) => s + i.sellingPrice * i.units, 0));
   const totalDiscount = round2(subTotal - lines.reduce((s, l) => s + l.value, 0));
   const shipping = Number(o.shipping);
-  const categories = lines.flatMap(({ item, units }) =>
-    Array.from({ length: units }, () => item.category_name ?? item.category_id)
-  );
+  const categories = lineCategories(lines);
   // Shiprocket adhoc has no landmark field; it rides on address_2 so the courier sees it.
   const landmark = str(a.landmark);
   const address2 = [str(a.line2), landmark ? `Landmark: ${landmark}` : ""].filter(Boolean).join(", ");
@@ -556,7 +569,7 @@ export async function runProcess(
 
     let { awb, courier_id: courierId, courier_name: courierName, manifest_url: manifestUrl, label_url: labelUrl } = o;
     if (!awb) {
-      const r = await courier("awb", () => assignAwb(sr, shipmentId, o.quoted_courier_id, o.order_ref));
+      const r = await courier("awb", () => assignAwb(sr, shipmentId, o, shippableLines(items, plan)));
       courierId = Number.isFinite(r.courierId) ? r.courierId : null;
       courierName = r.courierName || null;
       awb = r.awb;
