@@ -165,3 +165,16 @@ describe("findCustomersByName", () => {
     await expect(findCustomersByName(fakeClient(), " (), ")).rejects.toThrow(CustomerInputError);
   });
 });
+
+describe("activity log actor", () => {
+  it("records the signed-in admin as the actor", async () => {
+    const saved = { customerid: 12, first_name: "A", last_name: null, phone: null };
+    const client = fakeClient({
+      session: { user: { id: "admin-uuid" } },
+      "customers.insert": { data: saved, error: null },
+      "activity_log.insert": { data: null, error: null },
+    });
+    await createCustomer(client, { first_name: "A" }, { newUlid: () => "U" });
+    expect(client.calls.find((c) => c.table === "activity_log").row.actor_id).toBe("admin-uuid");
+  });
+});

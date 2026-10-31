@@ -1,21 +1,24 @@
 #!/usr/bin/env node
 /**
- * Command-line access to admin features (customers today; bills next), for
+ * Command-line access to admin features (customers, products, bills), for
  * entering and auditing data without the admin screens. Thin wrapper: all
  * rules live in the shared modules under src/admin/lib/.
  *
+ *   node scripts/admin-cli.mjs login --email <you>     (once, in a terminal)
  *   node scripts/admin-cli.mjs <area> <action> [--options]
  *
  * Success: JSON on stdout, exit 0. Failure: {"error","type"} JSON on stderr,
- * exit 2 for bad input, 1 for anything else. Every write accepts --dry-run.
- * Runs with SUPABASE_SERVICE_ROLE_KEY from .env, so it bypasses RLS: local,
- * developer-only. Guide: docs/admin-cli.md
+ * exit 2 for bad input, 3 for not logged in / not an admin, 1 for anything
+ * else. Every write accepts --dry-run.
+ * Security: no service-role key. Commands run as the logged-in admin with the
+ * public anon key, under the same RLS and admin-role check as the admin app
+ * (see scripts/admin-cli/session.mjs). Guide: docs/admin-cli.md
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { createClient } from "@supabase/supabase-js";
+import { authedClient, login, logout, promptHidden, AuthError } from "./admin-cli/session.mjs";
 
 // src/ is untyped ESM shared with CRA; marking it "type": "module" would force
 // extensionful imports on the whole app. Node warns when loading it, so drop
@@ -53,15 +56,34 @@ function loadEnv() {
   return out;
 }
 
-function makeClient() {
+// Only the public project URL and anon key are read from .env.
+function supabaseConfig() {
   const env = { ...loadEnv(), ...process.env };
-  const url = env.REACT_APP_SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new UsageError("Missing REACT_APP_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
-  }
-  return createClient(url, key, { auth: { persistSession: false } });
+  return { url: env.REACT_APP_SUPABASE_URL, anonKey: env.REACT_APP_SUPABASE_ANON_KEY };
 }
+
+// Session commands: no admin client needed (login creates the session).
+const SESSION_COMMANDS = {
+  login: {
+    usage: "login --email <email>   (prompts for the password; run in your own terminal)",
+    options: { email: { type: "string" } },
+    run: async (o) => {
+      if (!o.email) throw new UsageError("--email is required");
+      const password = await promptHidden(`Password for ${o.email}: `);
+      return login({ ...supabaseConfig(), email: o.email, password });
+    },
+  },
+  logout: {
+    usage: "logout",
+    options: {},
+    run: () => logout(supabaseConfig()),
+  },
+  whoami: {
+    usage: "whoami",
+    options: {},
+    run: async () => (await authedClient(supabaseConfig())).user,
+  },
+};
 
 class UsageError extends Error {
   constructor(message) {
@@ -238,25 +260,35 @@ function readSpec(o) {
 }
 
 function usage() {
-  return Object.values(COMMANDS)
-    .flatMap((actions) => Object.values(actions).map((a) => `  ${a.usage}`))
-    .join("\n");
+  return [
+    ...Object.values(SESSION_COMMANDS).map((c) => `  ${c.usage}`),
+    ...Object.values(COMMANDS).flatMap((actions) => Object.values(actions).map((a) => `  ${a.usage}`)),
+  ].join("\n");
+}
+
+function parseOptions(command, args) {
+  try {
+    return parseArgs({ args, options: command.options, strict: true }).values;
+  } catch (e) {
+    throw new UsageError(`${e.message}\nUsage: ${command.usage}`);
+  }
 }
 
 async function main(argv) {
   const [area, action, ...rest] = argv;
-  const command = COMMANDS[area]?.[action];
+  const print = (result) => process.stdout.write(JSON.stringify(result ?? null, null, 2) + "\n");
+
+  const sessionCommand = Object.hasOwn(SESSION_COMMANDS, area) ? SESSION_COMMANDS[area] : null;
+  if (sessionCommand) {
+    return print(await sessionCommand.run(parseOptions(sessionCommand, argv.slice(1))));
+  }
+  const command = Object.hasOwn(COMMANDS, area) && Object.hasOwn(COMMANDS[area], action) ? COMMANDS[area][action] : null;
   if (!command) {
     throw new UsageError(`Unknown command "${[area, action].filter(Boolean).join(" ")}". Commands:\n${usage()}`);
   }
-  let values;
-  try {
-    ({ values } = parseArgs({ args: rest, options: command.options, strict: true }));
-  } catch (e) {
-    throw new UsageError(`${e.message}\nUsage: ${command.usage}`);
-  }
-  const result = await command.run(makeClient(), values);
-  process.stdout.write(JSON.stringify(result ?? null, null, 2) + "\n");
+  const values = parseOptions(command, rest);
+  const { client } = await authedClient(supabaseConfig());
+  print(await command.run(client, values));
 }
 
 main(process.argv.slice(2)).catch((err) => {
@@ -269,5 +301,5 @@ main(process.argv.slice(2)).catch((err) => {
   process.stderr.write(
     JSON.stringify({ error: err.message, type: err.name || "Error", ...(err.code && { code: err.code }) }) + "\n",
   );
-  process.exit(inputError ? 2 : 1);
+  process.exit(err instanceof AuthError ? 3 : inputError ? 2 : 1);
 });

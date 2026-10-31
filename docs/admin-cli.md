@@ -5,23 +5,52 @@ the admin screens (e.g. entering paper bills through Claude Code). Design:
 `docs/superpowers/specs/2026-10-31-admin-cli-design.md`.
 
 ```bash
+node scripts/admin-cli.mjs login --email you@example.com   # once, in your own terminal
 node scripts/admin-cli.mjs <area> <action> [--options]
-node scripts/admin-cli.mjs            # lists all commands
+node scripts/admin-cli.mjs                                   # lists all commands
 ```
 
 - **Output:** success → JSON on stdout, exit `0`. Failure → one JSON line on
   stderr, `{"error": "...", "type": "..."}`, exit `2` for bad input
-  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`), `1` for anything else (database,
-  network).
+  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`), `3` for not logged in /
+  not an admin (`AuthError`), `1` for anything else (database, network).
 - **Dry run:** every write accepts `--dry-run`: it runs all checks and prints
   `{"dry_run": true, "would_insert": {...}}` without writing. Use it to review
   a change before running it for real.
-- **Access:** uses `SUPABASE_SERVICE_ROLE_KEY` from `.env`, which bypasses RLS.
-  Local, developer-only; never ship it or run it on a shared machine.
+- **Access:** only an active admin can run commands — see
+  [Login and security](#login-and-security).
 - **Same rules as the app:** commands call the shared modules in
   `src/admin/lib/`, which follow the admin screens' behaviour.
-- **Activity log:** writes add the usual activity-log entry, with no actor and
-  the summary ending `(via CLI)`.
+- **Activity log:** writes add the usual activity-log entry, with the
+  logged-in admin as actor and the summary ending `(via CLI)`.
+
+## Login and security
+
+The CLI holds no secret key. It uses only the public project URL and anon key
+from `.env` and signs in as an admin user, so every command runs under the
+same database access rules (RLS) and admin check as the admin app: the
+account's `profiles.role` must be `admin` or `superadmin` and not inactive.
+With the anon key alone (no login) the tables return nothing and
+`stock_adjust` is refused — checked against prod 2026-10-31.
+
+```bash
+node scripts/admin-cli.mjs login --email you@example.com   # prompts for the password, hidden
+node scripts/admin-cli.mjs whoami                           # { email, user_id, role }
+node scripts/admin-cli.mjs logout                           # revokes the session, deletes the file
+```
+
+- `login` must be run in an interactive terminal (your own, not through
+  Claude): the password is typed at a hidden prompt and is never accepted as
+  an argument, from a file or from a pipe, and is not stored.
+- It uses email + password. An admin who only signs in with Google first sets
+  a password via the admin app's "Forgot password" page.
+- The session (access + refresh token, no password) is saved to
+  `~/.config/bindals-admin-cli/session.json`, readable only by your OS user
+  (the CLI refuses a session file others can read). Override the path with
+  `ADMIN_CLI_SESSION`.
+- Every command re-checks the admin role, so removing someone's admin role
+  stops their CLI on the next command. `logout` revokes the session server-side.
+- Not logged in, session expired, or not an admin → exit `3`; log in again.
 
 ## Phone numbers
 

@@ -20,6 +20,7 @@ import { customerName, money } from "../../utility/activitySummary.js";
 import { findCustomerByPhone, createCustomer } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
+import { logActivityWith } from "./activity.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -560,14 +561,12 @@ async function insertBill(client, prepared, source) {
     if (error) stockFailures.push({ variantid: s.variantid, change: s.change, error: error.message });
   }
 
-  const { error: logErr } = await client.from("activity_log").insert({
-    actor_id: null,
+  await logActivityWith(client, {
     action: "create",
-    entity_type: "bill",
-    entity_id: String(saved.bill_number || saved.billid),
+    entityType: "bill",
+    entityId: saved.bill_number || saved.billid,
     summary: `Finalized bill #${saved.bill_number || "(no number)"} for ${customerName(prepared.customer)} — ${money(prepared.totals.grand_total)}, ${rows.length} items (${source})`,
   });
-  if (logErr) console.error("[activityLog] insert failed:", logErr.message);
 
   return {
     billid: saved.billid,

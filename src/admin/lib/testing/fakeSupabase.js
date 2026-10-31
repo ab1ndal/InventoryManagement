@@ -51,5 +51,7 @@ export function fakeSupabase(results = {}) {
     calls.push(call);
     return resolve(`rpc.${fn}`, call);
   };
-  return { from, rpc, calls };
+  // The signed-in user, if the test sets results.session.
+  const auth = { getSession: async () => ({ data: { session: results.session ?? null }, error: null }) };
+  return { from, rpc, auth, calls };
 }

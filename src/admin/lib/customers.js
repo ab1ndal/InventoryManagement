@@ -6,6 +6,7 @@
 // Imports carry the .js extension because Node's ESM loader (used by the CLI)
 // does not resolve extensionless paths; CRA/jest accept either.
 import { customerName } from "../../utility/activitySummary.js";
+import { logActivityWith } from "./activity.js";
 
 export class CustomerInputError extends Error {
   constructor(message) {
@@ -97,19 +98,14 @@ export async function findCustomersByName(client, name) {
   return data ?? [];
 }
 
-// Same shape as src/lib/activityLog.js, but on the caller's client. The CLI
-// runs as the service role, so there is no actor; the suffix says where the
-// change came from. Like logActivity, a failed log write never fails the action.
-async function logCustomerCreated(client, saved, source) {
-  const { error } = await client.from("activity_log").insert({
-    actor_id: null,
+// The suffix says where the change came from (the screen's entry has none).
+const logCustomerCreated = (client, saved, source) =>
+  logActivityWith(client, {
     action: "create",
-    entity_type: "customer",
-    entity_id: String(saved.customerid),
+    entityType: "customer",
+    entityId: saved.customerid,
     summary: `Added customer ${customerName(saved)} (${saved.phone || "no phone"}) (${source})`,
   });
-  if (error) console.error("[activityLog] insert failed:", error.message);
-}
 
 const newCustomerUlid = () =>
   crypto.randomUUID().replace(/-/g, "").slice(0, 26);
