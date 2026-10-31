@@ -1,6 +1,12 @@
 import { parseBillSpec, prepareBill, createBill, getBill, findBills, BillInputError } from "../bills";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
+// jsdom (CRA's jest env) has no crypto.randomUUID, which createCustomer uses
+// for customer_ulid; browsers and Node do.
+if (!global.crypto?.randomUUID) {
+  Object.defineProperty(global, "crypto", { value: require("crypto").webcrypto, configurable: true });
+}
+
 const VID = "29c3daa8-5483-4c84-8959-1c930b8d1bb4";
 
 // Paper slip 387: Test Customer, Mustard georgette saree BC252051, MRP 2395, sold 1800 cash.
@@ -44,7 +50,7 @@ describe("parseBillSpec", () => {
     [{ ...slip387, payment: { amount: 1800 } }, /payment.method is required/],
     [{ ...slip387, payment: { method: "Cash", amount: 0 } }, /payment.amount must be > 0/],
     [{ ...slip387, items: [] }, /at least one item/],
-    [{ ...slip387, items: [{ qty: 1 }] }, /exactly one of variantid or manual_item_id/],
+    [{ ...slip387, items: [{ qty: 1 }] }, /exactly one of product, variantid, manual_item_id or manual_item/],
     [{ ...slip387, items: [{ variantid: VID, manual_item_id: "BCX1", qty: 1 }] }, /exactly one of/],
     [{ ...slip387, items: [{ variantid: VID, qty: 0 }] }, /qty must be > 0/],
     [{ ...slip387, items: [{ variantid: VID, qty: 1, stitch_type: "half" }] }, /stitch_type/],
@@ -332,5 +338,161 @@ describe("findBills", () => {
     [{ from: "22/10/2026" }, /from: expected YYYY-MM-DD/],
   ])("rejects bad filters %#", async (f, msg) => {
     await expect(findBills(fakeSupabase(base), f)).rejects.toThrow(msg);
+  });
+});
+
+describe("readable bill spec", () => {
+  const MAROON = { variantid: "m1", productid: "BC25051", size: "FREE-SIZE", color: "Maroon", stock: 1 };
+  const GOLDEN = { variantid: "g1", productid: "BC25051", size: "FREE-SIZE", color: "Golden", stock: 1 };
+  const MUSTARD = { variantid: VID, productid: "BC252051", size: "FREE-SIZE", color: "Mustard", stock: 1 };
+  const test = { customerid: 453, first_name: "Test", last_name: "Customer", phone: "+919000000001" };
+  const spec = (o = {}) => ({
+    customer: { phone: "9000000001" },
+    date: "2026-10-22",
+    payment: { method: "Cash", amount: 1800 },
+    items: [{ product: "BC-252051", qty: 1, amount: 1800 }],
+    ...o,
+  });
+  const rdb = (o = {}) =>
+    db({
+      "customers.select": (call) =>
+        call.filters.some((f) => f[1] === "phone") ? { data: [test], error: null } : { data: test, error: null },
+      "productsizecolors.select": { data: [MUSTARD, MAROON, GOLDEN], error: null },
+      "products.select": {
+        data: [
+          { productid: "BC252051", name: "Georgette-Saree", categoryid: "SA", retailprice: 2395, unit_type: "piece" },
+          { productid: "BC25051", name: "Sambhalpuri Cotton-Saree", categoryid: "SA", retailprice: 2395, unit_type: "piece" },
+        ],
+        error: null,
+      },
+      "categories.select": { data: { categoryid: "ACC" }, error: null },
+      "rpc.get_max_manual_item_suffix": { data: 26128, error: null },
+      ...o,
+    });
+  const noPhoneMatch = {
+    "customers.select": (call) => (call.filters.some((f) => f[1] === "phone") ? { data: [], error: null } : { data: null, error: null }),
+  };
+
+  it("finds the customer by phone and the variant by product code", async () => {
+    const p = await prepareBill(fakeSupabase(rdb()), spec());
+    expect(p.bill.customerid).toBe(453);
+    expect(p.bill_items[0]).toMatchObject({ variantid: VID, product_code: "BC252051" });
+    expect(p.creates).toEqual({ customer: null, manual_items: [] });
+  });
+
+  it("picks the variant by colour, case-insensitively", async () => {
+    const p = await prepareBill(fakeSupabase(rdb()), spec({ items: [{ product: "BC25051", color: "maroon", qty: 1, amount: 1800 }] }));
+    expect(p.bill_items[0].variantid).toBe("m1");
+  });
+
+  it.each([
+    [{ product: "BC25051", qty: 1 }, /BC25051 has 2 matching variants, add color\/size; variants: Maroon\/FREE-SIZE \(stock 1\), Golden/],
+    [{ product: "BC25051", color: "Pink", qty: 1 }, /BC25051 has no variant Pink; variants:/],
+    [{ product: "BC999", qty: 1 }, /no product BC999/],
+    [{ variantid: VID, color: "Mustard", qty: 1 }, /color\/size only go with product/],
+    [{ product: "BC252051", colour: "Mustard", qty: 1 }, /unknown field\(s\) colour/],
+  ])("refuses an unclear or misspelt line %#", async (item, msg) => {
+    await expect(prepareBill(fakeSupabase(rdb()), spec({ items: [item] }))).rejects.toThrow(msg);
+  });
+
+  it("refuses an unknown phone unless asked to create the customer", async () => {
+    await expect(prepareBill(fakeSupabase(rdb(noPhoneMatch)), spec())).rejects.toThrow(
+      /No customer with phone 9000000001; add customer.create_if_missing/,
+    );
+  });
+
+  it("plans a new customer for an unknown phone with create_if_missing", async () => {
+    const p = await prepareBill(
+      fakeSupabase(rdb(noPhoneMatch)),
+      spec({ customer: { phone: "9000000001", create_if_missing: { first: "Test", last: "Customer" } } }),
+    );
+    expect(p.bill.customerid).toBeNull();
+    expect(p.creates.customer).toMatchObject({ first_name: "Test", last_name: "Customer", phone: "+919000000001", is_guest: false });
+  });
+
+  it("warns when the phone belongs to someone with another name", async () => {
+    const p = await prepareBill(fakeSupabase(rdb()), spec({ customer: { phone: "9000000001", create_if_missing: { first: "Asha" } } }));
+    expect(p.bill.customerid).toBe(453);
+    expect(p.warnings).toEqual([expect.stringMatching(/is customer 453 \(Test Customer\), not "Asha"/)]);
+  });
+
+  it("plans a guest customer and consecutive ids for new manual items", async () => {
+    const p = await prepareBill(
+      fakeSupabase(rdb()),
+      spec({
+        customer: { create: { first: "Walk", last: "In" } },
+        payment: { method: "Cash", amount: 250 },
+        items: [
+          { manual_item: { create: { name: "Fall", category: "ACC", mrp: 150, cost: "ZEZ" } }, qty: 1 },
+          { manual_item: { create: { name: "Pico", category: "ACC", mrp: 100, cost: "ZDZ" } }, qty: 1 },
+        ],
+      }),
+    );
+    expect(p.creates.customer).toMatchObject({ first_name: "Walk", phone: null, is_guest: true });
+    expect(p.creates.manual_items.map((m) => m.manual_item_id)).toEqual(["BCX26129", "BCX26130"]);
+    expect(p.bill_items.map((i) => [i.product_code, i.cost_price, i.total])).toEqual([
+      ["BCX26129", 50, 150],
+      ["BCX26130", 40, 100],
+    ]);
+  });
+
+  it("reports a bad inline manual item against its line", async () => {
+    await expect(
+      prepareBill(fakeSupabase(rdb()), spec({ items: [{ manual_item: { create: { name: "Fall", category: "ACC", mrp: 150 } }, qty: 1 }] })),
+    ).rejects.toThrow(/items\[0\].manual_item.create: A valid cost is required/);
+  });
+
+  it("creates the customer and manual item first, then bills them by id", async () => {
+    const client = fakeSupabase(
+      rdb({
+        ...noPhoneMatch,
+        "customers.select": (call) =>
+          call.filters.some((f) => f[1] === "phone")
+            ? { data: [], error: null }
+            : { data: { customerid: 500, first_name: "Test", last_name: "Customer", phone: "+919000000001" }, error: null },
+        "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
+        "manual_items.select": (call) => ({
+          data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150 }],
+          error: null,
+        }),
+        "manual_items.insert": (call) => ({ data: { ...call.row, stock: 1 }, error: null }),
+        "bills.insert": { data: { billid: 901, bill_number: "FY26-000337" }, error: null },
+        "bill_items.insert": { data: null, error: null },
+        "rpc.stock_adjust": { data: 0, error: null },
+        "activity_log.insert": { data: null, error: null },
+      }),
+    );
+    const out = await createBill(
+      client,
+      spec({
+        customer: { phone: "9000000001", create_if_missing: { first: "Test", last: "Customer" } },
+        payment: { method: "Cash", amount: 1950 },
+        items: [
+          { product: "BC252051", qty: 1, amount: 1800 },
+          { manual_item: { create: { name: "Fall", category: "ACC", mrp: 150, cost: "ZEZ" } }, qty: 1 },
+        ],
+      }),
+    );
+    const writes = client.calls.filter((c) => !["select", "rpc"].includes(c.op) || c.fn === "stock_adjust").map((c) => c.fn ?? `${c.table}.${c.op}`);
+    expect(writes).toEqual([
+      "customers.insert", "activity_log.insert", "manual_items.insert",
+      "bills.insert", "bill_items.insert", "stock_adjust", "activity_log.insert",
+    ]);
+    expect(client.calls.find((c) => c.table === "bills" && c.op === "insert").row.customerid).toBe(500);
+    expect(client.calls.find((c) => c.table === "bill_items").row.map((r) => r.product_code)).toEqual(["BC252051", "BCX26129"]);
+    expect(out).toMatchObject({ bill_number: "FY26-000337", created: { customer: { customerid: 500 }, manual_items: [{ manual_item_id: "BCX26129" }] } });
+  });
+
+  it("says what was already created when the bill then fails", async () => {
+    const client = fakeSupabase(
+      rdb({
+        "customers.select": (call) => (call.filters.some((f) => f[1] === "phone") ? { data: [], error: null } : { data: { customerid: 500, first_name: "W" }, error: null }),
+        "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
+        "bills.insert": { data: null, error: new Error("db down") },
+      }),
+    );
+    await expect(createBill(client, spec({ customer: { create: { first: "W" } } }))).rejects.toThrow(
+      /Failed to save bill: db down — NOTE: customer 500 were already created; re-run with customer \{ id \}/,
+    );
   });
 });

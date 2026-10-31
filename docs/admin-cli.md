@@ -239,35 +239,58 @@ vouchers, store credit, exchanges, partial payment, salespersons, PDF, SMS.
 
 ### Bill spec
 
-Both commands take the bill as JSON, from a file (`--spec bill.json`) or
-inline (`--json '{...}'`):
+One JSON per bill, from a file (`--spec bill.json`) or inline
+(`--json '{...}'`). A whole paper slip is one spec, written with readable
+references so it can be audited before it runs:
 
 ```json
 {
-  "customerid": 453,
+  "customer": { "phone": "9000000001", "create_if_missing": { "first": "Test", "last": "Customer" } },
   "date": "2026-10-22",
-  "payment": { "method": "Cash", "amount": 1800 },
+  "payment": { "method": "Cash", "amount": 1950 },
+  "notes": "Paper bill 387",
   "items": [
-    { "variantid": "29c3daa8-5483-4c84-8959-1c930b8d1bb4", "qty": 1, "amount": 1800 },
-    { "manual_item_id": "BCX26129", "qty": 1, "alteration_charge": 150 }
+    { "product": "BC-252051", "color": "Mustard", "qty": 1, "amount": 1800 },
+    { "manual_item": { "create": { "name": "Fall", "category": "ACC", "mrp": 150, "cost": "ZEZ" } }, "qty": 1 }
   ]
 }
 ```
 
+Unknown fields are refused (a typo like `"colour"` fails the preview).
+
+**Customer** — exactly one of:
+
+| Form | Meaning |
+|---|---|
+| `"customer": { "id": 453 }` (or top-level `"customerid": 453`) | an existing customer |
+| `"customer": { "phone": "…" }` | the customer with that phone; refused if none |
+| `"customer": { "phone": "…", "create_if_missing": { "first": "…", "last": "…" } }` | that customer, or create them with this name. If the phone already belongs to someone with a different name, the existing customer is billed and a warning is shown |
+| `"customer": { "create": { "first": "…" } }` | a new guest customer (no phone) |
+
+Customer fields for `create` / `create_if_missing`: `first` (required),
+`last`, `email`, `address`, `gender`, `notes` — same rules as
+`customer create`.
+
+**Line** — exactly one item reference:
+
+| Form | Meaning |
+|---|---|
+| `"product": "BC-252051"` (+ `"color"`, `"size"`) | the product's variant; colour/size (case-insensitive) must narrow it to exactly one, else it is refused with the variants listed |
+| `"variantid": "…"` | a variant by id |
+| `"manual_item_id": "BCX26125"` or `"manual_item": { "id": "BCX26125" }` | an existing manual item |
+| `"manual_item": { "create": { "name", "category", "mrp", "cost"[, "size", "color"] } }` | a new manual item, same rules as `manual-item create` (`cost` as Z-code or number) |
+
 | Field | Required | Notes |
 |---|---|---|
-| `customerid` | yes | from `customer find` / `customer create` |
 | `date` | yes | `YYYY-MM-DD`, stored as the bill date; the FY of the bill number follows it |
-| `payment.method` | yes | a sales method name (Cash, UPI, Card, Paytm, GPay, Mixed); not Website |
-| `payment.amount` | yes | what the customer paid |
+| `payment.method` | yes | a sales method name (Cash, UPI, Card, Paytm, GPay, Mixed); not Website. Split payments: one combined amount, method `Mixed`, the split in `notes` |
+| `payment.amount` | yes | what the customer paid (the slip's net amount) |
 | `location` | no | sales location name, default `Walk-In` |
-| `notes` | no | |
+| `notes` | no | e.g. `"Paper bill 387; Cash 1000 + UPI 950"` |
 | `skip_stock` | no | `true` = don't touch stock (the screen's "backdated" checkbox); default reduces stock |
-| `items[]` | yes | one or more lines |
-| `items[].variantid` / `items[].manual_item_id` | one of | from `product find` / `manual-item find` |
 | `items[].qty` | yes | > 0; decimals for meter items |
 | `items[].amount` | no | what the line sold for (goods only, excluding alteration); default MRP × qty |
-| `items[].alteration_charge` | no | added on top of `amount` |
+| `items[].alteration_charge` | no | added on top of `amount` (e.g. fall/pico charged with the item) |
 | `items[].stitch_type` | no | `unstitched` (default) or `stitched` |
 | `items[].unit_type` | no | `piece` / `meter`; default the product's unit, or meter for a `FAB-` manual item |
 
@@ -297,9 +320,11 @@ How amounts become a bill, as on the screen:
 node scripts/admin-cli.mjs bill preview --spec bill.json
 ```
 
-Read-only. Output: `customer`, `payment_method`, `location`, the exact `bill`
-row and `bill_items` rows that would be inserted (bill number and ids are
-assigned on create), `stock` (per variant: `stock_before`, `change`,
+Read-only. Output: `customer`, `creates` (the customer row and manual item
+rows that would be created first, with the ids the manual items will get;
+`customer` there means `bill.customerid` is filled in on create),
+`payment_method`, `location`, the exact `bill` row and `bill_items` rows that
+would be inserted (bill number and ids are assigned on create), `stock` (per variant: `stock_before`, `change`,
 `stock_after`), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
 `grand_total`, `paid`) and `warnings`.
 
@@ -310,7 +335,8 @@ node scripts/admin-cli.mjs bill create --spec bill.json --dry-run   # same as pr
 node scripts/admin-cli.mjs bill create --spec bill.json
 ```
 
-Writes, in the screen's order: the bill (the database assigns the next
+Writes, in order: the customer and manual items from `creates` (if any), then
+as the screen does: the bill (the database assigns the next
 `FY26-000NNN`), its items (if this fails the bill row is deleted again),
 `stock_adjust` per inventory variant (reason `bill_finalize`), and an
 activity-log entry `Finalized bill #… for … — ₹…, N items (via CLI)`.
@@ -327,8 +353,12 @@ activity-log entry `Finalized bill #… for … — ₹…, N items (via CLI)`.
 }
 ```
 
-A failed stock update does not undo the bill (as on the screen); it is listed
-in `stock_failures` with the error. Fix stock by hand for those.
+The output also has `created` (`customer`, `manual_items`). A failed stock
+update does not undo the bill (as on the screen); it is listed in
+`stock_failures` with the error. Fix stock by hand for those. If the bill
+fails after a customer or manual item was created, the error ends with
+`NOTE: … were already created` — re-run with `customer { id }` /
+`manual_item { id }` so they aren't created twice.
 
 ### bill find
 

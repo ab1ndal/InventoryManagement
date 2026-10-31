@@ -5,6 +5,10 @@
 // manual items, per-line discount and alteration, fully paid by one method.
 // Out of scope: drafts, discount codes, vouchers, store credit, exchanges,
 // partial payment, salespersons, PDF/SMS.
+// A bill spec is one readable JSON per bill (see docs/admin-cli.md): customer
+// by id, by phone (optionally created if missing) or as a new guest; lines by
+// product code + colour/size, variant id, manual item id, or a manual item
+// created inline. So a whole paper slip is one auditable command.
 // Functions take the Supabase client; imports carry .js for Node ESM.
 import {
   computeBillTotals,
@@ -13,8 +17,9 @@ import {
 } from "../components/billing/billUtils.js";
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
 import { customerName, money } from "../../utility/activitySummary.js";
-import { findCustomerByPhone } from "./customers.js";
+import { findCustomerByPhone, createCustomer } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
+import { createManualItem } from "./manualItems.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -42,24 +47,98 @@ const num = (v, what) => {
   return n;
 };
 
+// Unknown keys are refused so a typo ("colour") fails the preview instead of
+// being silently ignored.
+function checkKeys(obj, allowed, at) {
+  const extra = Object.keys(obj).filter((k) => !allowed.includes(k));
+  if (extra.length) fail(`${at}: unknown field(s) ${extra.join(", ")} (allowed: ${allowed.join(", ")})`);
+}
+const isObj = (v) => v != null && typeof v === "object" && !Array.isArray(v);
+
+const CUSTOMER_FIELDS = ["first", "last", "email", "address", "gender", "notes"];
+const toCustomerInput = (c, phone) => ({
+  first_name: c.first,
+  last_name: c.last,
+  phone,
+  email: c.email,
+  address: c.address,
+  gender: c.gender,
+  customer_notes: c.notes,
+});
+
+function parseCustomer(spec) {
+  if (spec.customerid != null && spec.customer != null) fail("give customerid or customer, not both");
+  if (spec.customerid != null) return { kind: "id", customerid: num(spec.customerid, "customerid") };
+  const c = spec.customer;
+  if (!isObj(c)) fail("customer is required: { id } | { phone[, create_if_missing] } | { create }");
+  checkKeys(c, ["id", "phone", "create_if_missing", "create"], "customer");
+  const forms = ["id", "phone", "create"].filter((k) => c[k] != null);
+  if (forms.length !== 1) fail("customer: give exactly one of id, phone or create");
+  if (c.id != null) return { kind: "id", customerid: num(c.id, "customer.id") };
+  if (c.phone != null) {
+    if (c.create_if_missing != null) {
+      if (!isObj(c.create_if_missing)) fail("customer.create_if_missing must be an object");
+      checkKeys(c.create_if_missing, CUSTOMER_FIELDS, "customer.create_if_missing");
+    }
+    return { kind: "phone", phone: String(c.phone), createIfMissing: c.create_if_missing ?? null };
+  }
+  if (c.create_if_missing != null) fail("customer.create_if_missing needs customer.phone");
+  if (!isObj(c.create)) fail("customer.create must be an object");
+  checkKeys(c.create, CUSTOMER_FIELDS, "customer.create");
+  return { kind: "new", create: c.create };
+}
+
+const ITEM_FIELDS = [
+  "product", "color", "size", "variantid", "manual_item_id", "manual_item",
+  "qty", "amount", "alteration_charge", "stitch_type", "unit_type",
+];
+const MANUAL_CREATE_FIELDS = ["name", "category", "mrp", "cost", "size", "color"];
+
+function parseItemRef(it, at) {
+  const forms = ["product", "variantid", "manual_item_id", "manual_item"].filter((k) => it[k] != null);
+  if (forms.length !== 1) fail(`${at}: give exactly one of product, variantid, manual_item_id or manual_item`);
+  if ((it.color != null || it.size != null) && it.product == null) fail(`${at}: color/size only go with product`);
+  if (it.product != null) {
+    return {
+      kind: "product",
+      code: normalizeProductCode(it.product),
+      color: it.color != null ? String(it.color).trim() : null,
+      size: it.size != null ? String(it.size).trim() : null,
+    };
+  }
+  if (it.variantid != null) return { kind: "variant", variantid: String(it.variantid) };
+  if (it.manual_item_id != null) return { kind: "manual", id: String(it.manual_item_id).toUpperCase() };
+  const m = it.manual_item;
+  if (!isObj(m)) fail(`${at}.manual_item must be { id } or { create }`);
+  checkKeys(m, ["id", "create"], `${at}.manual_item`);
+  if ((m.id != null) === (m.create != null)) fail(`${at}.manual_item: give exactly one of id or create`);
+  if (m.id != null) return { kind: "manual", id: String(m.id).toUpperCase() };
+  if (!isObj(m.create)) fail(`${at}.manual_item.create must be an object`);
+  checkKeys(m.create, MANUAL_CREATE_FIELDS, `${at}.manual_item.create`);
+  return { kind: "manual_new", create: m.create };
+}
+
 /** Validates the bill spec's shape (not its references). Returns a clean copy. */
 export function parseBillSpec(spec) {
-  if (!spec || typeof spec !== "object") fail("Bill spec must be a JSON object");
-  const customerid = num(spec.customerid, "customerid");
+  if (!isObj(spec)) fail("Bill spec must be a JSON object");
+  checkKeys(spec, ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "items"], "spec");
+  const customer = parseCustomer(spec);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(spec.date ?? "") || Number.isNaN(Date.parse(spec.date))) {
     fail(`date: expected YYYY-MM-DD, got "${spec.date ?? ""}"`);
   }
-  const method = String(spec.payment?.method ?? "").trim();
+  if (!isObj(spec.payment)) fail("payment is required: { method, amount }");
+  checkKeys(spec.payment, ["method", "amount"], "payment");
+  const method = String(spec.payment.method ?? "").trim();
   if (!method) fail("payment.method is required (e.g. Cash, UPI)");
-  const paid = num(spec.payment?.amount, "payment.amount");
+  const paid = num(spec.payment.amount, "payment.amount");
   if (paid <= 0) fail("payment.amount must be > 0");
   if (!Array.isArray(spec.items) || spec.items.length === 0) fail("items: at least one item is required");
 
   const items = spec.items.map((it, i) => {
     const at = `items[${i}]`;
-    const hasVariant = Boolean(it?.variantid);
-    const hasManual = Boolean(it?.manual_item_id);
-    if (hasVariant === hasManual) fail(`${at}: give exactly one of variantid or manual_item_id`);
+    if (!isObj(it)) fail(`${at} must be an object`);
+    checkKeys(it, ITEM_FIELDS, at);
+    const ref = parseItemRef(it, at);
     const qty = num(it.qty, `${at}.qty`);
     if (qty <= 0) fail(`${at}.qty must be > 0`);
     const stitch = it.stitch_type ?? "unstitched";
@@ -71,8 +150,7 @@ export function parseBillSpec(spec) {
     const amount = it.amount == null ? null : num(it.amount, `${at}.amount`);
     if (amount != null && amount < 0) fail(`${at}.amount must be >= 0`);
     return {
-      variantid: hasVariant ? String(it.variantid) : null,
-      manual_item_id: hasManual ? String(it.manual_item_id).toUpperCase() : null,
+      ref,
       qty,
       amount,
       alteration_charge: alteration,
@@ -82,7 +160,7 @@ export function parseBillSpec(spec) {
   });
 
   return {
-    customerid,
+    customer,
     date: spec.date,
     location: String(spec.location ?? DEFAULT_LOCATION).trim(),
     payment: { method, amount: paid },
@@ -101,6 +179,95 @@ async function one(query) {
 const byName = (rows, col, name) =>
   rows.find((r) => String(r[col]).toLowerCase() === name.toLowerCase());
 
+// Customer for the bill. A customer still to be created comes back with
+// customerid null and its insert row in creates.customer.
+async function resolveCustomer(client, ref, creates, warnings) {
+  if (ref.kind === "id") {
+    const c = await one(
+      client.from("customers").select("customerid, first_name, last_name, phone").eq("customerid", ref.customerid).maybeSingle(),
+    );
+    if (!c) fail(`Customer ${ref.customerid} not found`);
+    return c;
+  }
+  if (ref.kind === "phone") {
+    const c = await findCustomerByPhone(client, ref.phone);
+    if (c) {
+      const want = ref.createIfMissing;
+      if (want && customerName({ first_name: want.first, last_name: want.last }).toLowerCase() !== customerName(c).toLowerCase()) {
+        warnings.push(`Phone ${c.phone} is customer ${c.customerid} (${customerName(c)}), not "${customerName({ first_name: want.first, last_name: want.last })}" as on the slip; billing the existing customer`);
+      }
+      return { customerid: c.customerid, first_name: c.first_name, last_name: c.last_name, phone: c.phone };
+    }
+    if (!ref.createIfMissing) {
+      fail(`No customer with phone ${ref.phone}; add customer.create_if_missing { first, last } to create one`);
+    }
+    return planCustomer(client, toCustomerInput(ref.createIfMissing, ref.phone), creates);
+  }
+  return planCustomer(client, toCustomerInput(ref.create, null), creates);
+}
+
+async function planCustomer(client, input, creates) {
+  const { would_insert: row } = await createCustomer(client, input, { dryRun: true });
+  creates.customer = row;
+  return { customerid: null, first_name: row.first_name, last_name: row.last_name, phone: row.phone };
+}
+
+// product + colour/size → the one matching variant; anything else is refused
+// with the options listed, so the slip line can be corrected.
+async function resolveProductRefs(client, items) {
+  const codes = [...new Set(items.filter((i) => i.ref.kind === "product").map((i) => i.ref.code))];
+  const variants = codes.length
+    ? await one(client.from("productsizecolors").select("variantid, productid, size, color, stock").in("productid", codes))
+    : [];
+  const eqi = (a, b) => String(a ?? "").toLowerCase() === String(b ?? "").toLowerCase();
+  return items.map((it, i) => {
+    const at = `items[${i}]`;
+    const { ref } = it;
+    if (ref.kind === "variant") return { ...it, variantid: ref.variantid };
+    if (ref.kind === "manual") return { ...it, manual_item_id: ref.id };
+    if (ref.kind === "manual_new") return { ...it, newManual: ref.create };
+    const all = (variants ?? []).filter((v) => v.productid === ref.code);
+    if (all.length === 0) fail(`${at}: no product ${ref.code} (or it has no variants); try product search`);
+    const hits = all.filter((v) => (ref.color == null || eqi(v.color, ref.color)) && (ref.size == null || eqi(v.size, ref.size)));
+    if (hits.length === 1) return { ...it, variantid: hits[0].variantid };
+    const options = all.map((v) => `${v.color}/${v.size} (stock ${Number(v.stock)})`).join(", ");
+    fail(
+      hits.length === 0
+        ? `${at}: ${ref.code} has no variant ${[ref.color, ref.size].filter(Boolean).join("/")}; variants: ${options}`
+        : `${at}: ${ref.code} has ${hits.length} matching variants, add color/size; variants: ${options}`,
+    );
+    return null;
+  });
+}
+
+// Manual items to create: validated with the form's rules and given the ids
+// they will get (consecutive BCX numbers, in line order).
+async function planManualItems(client, items, creates) {
+  for (const [i, it] of items.entries()) {
+    if (!it.newManual) continue;
+    const c = it.newManual;
+    let row;
+    try {
+      ({ would_insert: row } = await createManualItem(
+        client,
+        { name: c.name, categoryid: c.category, mrp: c.mrp, cost: c.cost, size: c.size, color: c.color },
+        { dryRun: true },
+      ));
+    } catch (e) {
+      if (e.name === "ManualItemInputError") fail(`items[${i}].manual_item.create: ${e.message}`);
+      throw e;
+    }
+    const k = creates.manual_items.length;
+    if (k > 0) {
+      const prefix = row.manual_item_id.slice(0, 5);
+      const next = Number(row.manual_item_id.slice(5)) + k;
+      row = { ...row, manual_item_id: `${prefix}${String(next).padStart(3, "0")}` };
+    }
+    creates.manual_items.push(row);
+    it.manual_item_id = row.manual_item_id;
+  }
+}
+
 /**
  * Resolves a spec against the database and computes everything createBill
  * would write. Read-only. Throws BillInputError for anything the billing
@@ -110,14 +277,16 @@ const byName = (rows, col, name) =>
 export async function prepareBill(client, rawSpec) {
   const spec = parseBillSpec(rawSpec);
   const warnings = [];
+  const creates = { customer: null, manual_items: [] };
 
-  const variantIds = spec.items.filter((i) => i.variantid).map((i) => i.variantid);
-  const manualIds = spec.items.filter((i) => i.manual_item_id).map((i) => i.manual_item_id);
+  const customer = await resolveCustomer(client, spec.customer, creates, warnings);
+  const items0 = await resolveProductRefs(client, spec.items);
+  await planManualItems(client, items0, creates);
 
-  const [customer, methods, locations, variants, manuals] = await Promise.all([
-    one(
-      client.from("customers").select("customerid, first_name, last_name, phone").eq("customerid", spec.customerid).maybeSingle(),
-    ),
+  const variantIds = items0.filter((i) => i.variantid).map((i) => i.variantid);
+  const manualIds = items0.filter((i) => i.manual_item_id && !i.newManual).map((i) => i.manual_item_id);
+
+  const [methods, locations, variants, manuals] = await Promise.all([
     one(client.from("salesmethods").select("salesmethodid, methodname")),
     one(client.from("saleslocations").select("saleslocationid, locationname")),
     variantIds.length
@@ -127,7 +296,6 @@ export async function prepareBill(client, rawSpec) {
       ? one(client.from("manual_items").select("manual_item_id, name, categoryid, size, color, purchase_price, mrp").in("manual_item_id", manualIds))
       : [],
   ]);
-  if (!customer) fail(`Customer ${spec.customerid} not found`);
 
   const method = byName(methods ?? [], "methodname", spec.payment.method);
   // "Website" is reserved for online orders; the billing screen hides it.
@@ -141,7 +309,9 @@ export async function prepareBill(client, rawSpec) {
   }
 
   const variantById = Object.fromEntries((variants ?? []).map((v) => [v.variantid, v]));
-  const manualById = Object.fromEntries((manuals ?? []).map((m) => [m.manual_item_id, m]));
+  const manualById = Object.fromEntries(
+    [...(manuals ?? []), ...creates.manual_items].map((m) => [m.manual_item_id, m]),
+  );
   const productIds = [...new Set((variants ?? []).map((v) => v.productid))];
   const products = productIds.length
     ? await one(client.from("products").select("productid, name, categoryid, retailprice, unit_type").in("productid", productIds))
@@ -150,7 +320,7 @@ export async function prepareBill(client, rawSpec) {
 
   // Item objects in the exact shape the billing screen's pickers build
   // (InventoryPicker / ManualItemForm), so billUtils prices them identically.
-  const items = spec.items.map((it, i) => {
+  const items = items0.map((it, i) => {
     const at = `items[${i}]`;
     let base;
     if (it.variantid) {
@@ -260,7 +430,7 @@ export async function prepareBill(client, rawSpec) {
   if (diff > 0) warnings.push(`Customer paid ₹${diff} more than the bill total ${totals.grandTotal} (the screen records it as is)`);
 
   const bill = {
-    customerid: spec.customerid,
+    customerid: customer.customerid,
     notes: spec.notes,
     document_type: DOC_TYPE,
     totalamount: totals.grandTotal,
@@ -283,6 +453,7 @@ export async function prepareBill(client, rawSpec) {
 
   return {
     customer,
+    creates,
     payment_method: method.methodname,
     location: location.locationname,
     bill,
@@ -308,9 +479,58 @@ export async function prepareBill(client, rawSpec) {
  * undo the bill (as in the screen); they are returned in stock_failures.
  */
 export async function createBill(client, rawSpec, { dryRun = false, source = "via CLI" } = {}) {
-  const prepared = await prepareBill(client, rawSpec);
-  if (dryRun) return { dry_run: true, ...prepared };
+  const planned = await prepareBill(client, rawSpec);
+  if (dryRun) return { dry_run: true, ...planned };
 
+  const created = { customer: null, manual_items: [] };
+  try {
+    const resolved = await createReferenced(client, rawSpec, planned, created, source);
+    // Re-resolve against the real rows (ids actually assigned) before writing.
+    const prepared = resolved === rawSpec ? planned : await prepareBill(client, resolved);
+    return { ...(await insertBill(client, prepared, source)), created };
+  } catch (e) {
+    if (!created.customer && created.manual_items.length === 0) throw e;
+    const what = [
+      created.customer && `customer ${created.customer.customerid}`,
+      created.manual_items.length && `manual items ${created.manual_items.map((m) => m.manual_item_id).join(", ")}`,
+    ].filter(Boolean).join(" and ");
+    // Keep the type so input errors still exit 2; say what already exists so a
+    // re-run uses it instead of creating duplicates.
+    e.message = `${e.message} — NOTE: ${what} were already created; re-run with customer { id } / manual_item { id }`;
+    throw e;
+  }
+}
+
+// Creates the customer and manual items the spec asks for, returning the spec
+// rewritten to reference them by id (or the same spec if nothing to create).
+async function createReferenced(client, rawSpec, planned, created, source) {
+  if (!planned.creates.customer && planned.creates.manual_items.length === 0) return rawSpec;
+  const spec = parseBillSpec(rawSpec);
+  const out = { ...rawSpec };
+  if (planned.creates.customer) {
+    const ref = spec.customer;
+    const input = ref.kind === "phone" ? toCustomerInput(ref.createIfMissing, ref.phone) : toCustomerInput(ref.create, null);
+    created.customer = await createCustomer(client, input, { source });
+    delete out.customerid;
+    out.customer = { id: created.customer.customerid };
+  }
+  out.items = [...rawSpec.items];
+  // Sequential: each new item takes the next BCX number.
+  for (const [i, it] of rawSpec.items.entries()) {
+    const ref = spec.items[i].ref;
+    if (ref.kind !== "manual_new") continue;
+    const c = ref.create;
+    const saved = await createManualItem(client, {
+      name: c.name, categoryid: c.category, mrp: c.mrp, cost: c.cost, size: c.size, color: c.color,
+    });
+    created.manual_items.push(saved);
+    const { manual_item, ...rest } = it;
+    out.items[i] = { ...rest, manual_item_id: saved.manual_item_id };
+  }
+  return out;
+}
+
+async function insertBill(client, prepared, source) {
   const { data: saved, error: billErr } = await client
     .from("bills")
     .insert(prepared.bill)
