@@ -35,7 +35,7 @@ const today = new Date().toISOString().split("T")[0];
 const formSchema = z.object({
   type: z.enum(["bill", "payment", "advance", "return"]),
   amount: z.coerce
-    .number({ invalid_type_error: "Amount must be a number" })
+    .number({ error: "Amount must be a number" })
     .positive("Amount must be greater than 0"),
   transaction_date: z.string().min(1, "Date is required"),
   notes: z.string().optional().transform((v) => (v?.trim() === "" ? undefined : v)),
