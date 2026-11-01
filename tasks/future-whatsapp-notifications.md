@@ -31,6 +31,8 @@ Written 2026-10-30. Status: roadmap, not scheduled.
 ## Owner steps before build
 
 - Create/verify Meta Business, add the WhatsApp number, submit templates (Claude drafts the wording).
+- Sender number decided 2026-10-31: a separate SIM, never the shop number 98108 73280 (see `tasks/todo.md` →
+  ROADMAP for the coexistence findings and the WhatsApp Manager check to run first).
 
 ## Interim (no code)
 

@@ -15,9 +15,9 @@ Removes the biggest go-live risk without shipping anything. Owner at /admin/onli
 Option: ship that order instead of cancelling (covers the test parcel too, minus the refund test).
 
 **Progress 2026-10-30:** first real order WEB-000006 paid on production (₹110 = shipping; WEB500 zeroed the
-kurti). Webhook, paid status, shop + customer confirmation emails all worked; Cashfree shows ₹110 unsettled, T+1,
-due 31 Oct 8 PM. Shiprocket create failed (missing `billing_last_name` key) → fixed PRs #107/#109, deployed.
-Owner retries Process on 2026-10-31. PR #110 (no automatic default courier) open: merge + deploy BEFORE that retry.
+kurti). Webhook, paid status, shop + customer confirmation emails all worked. ₹110 settled to the bank account
+2026-10-31 21:03:05 IST (first production settlement, T+1; dashboard said "due 8 PM", landed ~1 h later). Shiprocket create failed (missing `billing_last_name` key) → fixed PRs #107/#109, deployed.
+Owner retries Process on 2026-10-31.
 Refund leg of this test not exercised (order is being shipped instead).
 
 ## ONLINE ORDERS: go-live
@@ -130,6 +130,22 @@ https://claude.ai/code/artifact/342df0ee-b022-4959-86c6-dc0367787dfa
 
 - WhatsApp notifications for the shop (new order) and customers (milestones, covers phone-only customers):
   `tasks/future-whatsapp-notifications.md`.
+  **Sender number (findings 2026-10-31):**
+  - Do NOT put the shop number +91 98108 73280 on the API. It is the owner's personal + business WhatsApp; direct
+    Cloud API registration removes it from the app. "Coexistence" (app + API on one number) needs the WhatsApp
+    Business app ≥ 2.24.17, a paid BSP (Interakt/AiSensy/DoubleTick; Meta allows it only via a Solution Partner/Tech
+    Provider), India support is contested (DoubleTick says yes; 360dialog/Woztell list India unsupported), and it
+    turns off broadcast lists, disappearing/view-once/live location, group sync. Rejected.
+  - Chosen: a separate sender SIM (an old number is fine). Needs one-time SMS/voice OTP and must not be on the
+    WhatsApp app at registration (delete the account first). Set a 6-digit PIN; keep the SIM recharged. One-way:
+    the number can't go back to the app while on the API. 98108 73280 stays as is: it receives the shop alerts,
+    and customer templates carry a "Chat with us" wa.me/919810873280 button so replies reach the owner.
+  - Prior setup: a Cloud API bill sender (`send-bill-sms`, template `bindals_invoice`, "alternate number") was
+    removed 2026-07-09 in `e99227f` (function undeployed, secrets unset; bills now use wa.me links). Prod has no
+    `WHATSAPP_*` secrets. Meta-side assets may still exist; may only ever have been Meta's free US test number.
+  - [ ] Owner: business.facebook.com → WhatsApp Manager → Phone numbers. +91 "Connected" → reuse (send Phone
+    Number ID + display-name status). Only a +1 test number, or nothing → register the old SIM. Also check whether
+    `bindals_invoice` is still an approved template.
 - Catalogue tagging with Jev: `tasks/future-jev-catalogue-tagging.md`.
 
 ## Other
