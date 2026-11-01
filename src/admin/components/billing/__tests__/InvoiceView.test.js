@@ -26,6 +26,13 @@ test("invoice: keeps tax columns, no declaration", () => {
   expect(screen.queryByText(/Composition taxable person/i)).not.toBeInTheDocument();
 });
 
+test("partial bill with nothing paid: shows the balance due, no payment method", () => {
+  render(<InvoiceView {...base} paymentStatus="partial" paymentMethod="Cash" paymentAmount={0} billPayments={[]} />);
+  expect(screen.getByText(/Partial — Balance Due/)).toBeInTheDocument();
+  expect(screen.getByText(/Balance Due:/).parentElement).toHaveTextContent("₹1105.00");
+  expect(screen.queryByText(/Payment Method:/)).not.toBeInTheDocument();
+});
+
 describe("WhatsApp Community QR footer", () => {
   const { QRCodeSVG } = require("qrcode.react");
   const { WHATSAPP_COMMUNITY_INVITE_URL } = require("../communityInvite");

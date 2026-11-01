@@ -625,7 +625,19 @@ const InvoiceView = forwardRef(function InvoiceView(
           marginBottom: "8px",
         }}
       >
-        {billPayments.length === 0 ? (
+        {billPayments.length === 0 && paymentStatus === "partial" ? (
+          <>
+            <div>
+              <strong>Payment Status:</strong> Partial — Balance Due
+            </div>
+            <div>
+              <strong>Amount Received:</strong> ₹{paidAmt.toFixed(2)}
+            </div>
+            <div style={{ color: "#dc2626", fontWeight: 700 }}>
+              <strong>Balance Due:</strong> ₹{Math.max(0, effectiveTotal - paidAmt).toFixed(2)}
+            </div>
+          </>
+        ) : billPayments.length === 0 ? (
           <>
             <div>
               <strong>Payment Method:</strong> {paymentMethod}

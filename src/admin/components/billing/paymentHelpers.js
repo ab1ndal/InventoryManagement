@@ -35,6 +35,15 @@ export function tallyPayment(existingPayments, newAmount, netAmount) {
 }
 
 /**
+ * Bill fields to write with a payment. A bill finalized with nothing paid has no
+ * payment method until its first payment; later payments keep the bill's method,
+ * since each one's own method is on its bill_payments row.
+ */
+export function firstPaymentMethodFields(existingPayments, methodId) {
+  return existingPayments?.length ? {} : { salesmethodid: methodId };
+}
+
+/**
  * Store-credit change that deducts `deduction` from `balance` without taking it
  * below zero (a negative `deduction` adds credit back). Billing has always floored
  * the balance at 0 when it moved since the form loaded it; the atomic

@@ -1,4 +1,4 @@
-import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod } from "../paymentHelpers";
+import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields } from "../paymentHelpers";
 
 describe("storeCreditDeductionDelta", () => {
   test("deducts the full amount when the balance covers it", () => {
@@ -77,5 +77,15 @@ describe("isWebsiteMethod", () => {
     expect(isWebsiteMethod({ methodname: "UPI" })).toBe(false);
     expect(isWebsiteMethod(null)).toBe(false);
     expect(isWebsiteMethod({})).toBe(false);
+  });
+});
+
+describe("firstPaymentMethodFields", () => {
+  test("first payment on a bill finalized unpaid sets the bill's method", () => {
+    expect(firstPaymentMethodFields([], 3)).toEqual({ salesmethodid: 3 });
+  });
+
+  test("later payments leave the bill's method alone", () => {
+    expect(firstPaymentMethodFields([{ amount: 100 }], 3)).toEqual({});
   });
 });
