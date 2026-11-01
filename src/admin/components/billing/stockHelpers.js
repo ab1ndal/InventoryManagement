@@ -1,6 +1,6 @@
 // Pure helper functions for stock delta computation and bill item payload building
 
-import { priceItem, round2 } from "./billUtils";
+import { priceItem, round2 } from "./billUtils.js";
 
 /**
  * Compute a stock delta map between existing bill items and new inventory items.

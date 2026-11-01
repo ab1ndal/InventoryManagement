@@ -20,6 +20,10 @@ const STORE = {
 // quiet zone), above the ~25mm minimum for reliable phone scanning off paper.
 const COMMUNITY_QR_SIZE_PX = 132;
 
+// Matches the height of the five-line shop info block, as before the QR moved
+// into the header (the logo used to stretch to the header's full height).
+const LOGO_HEIGHT_PX = 90;
+
 function formatDate(d) {
   return new Date(d).toLocaleDateString("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -233,7 +237,10 @@ const InvoiceView = forwardRef(function InvoiceView(
       {/* 1. Store Header */}
       <div
         style={{
-          position: "relative",
+          display: "grid",
+          // Equal side columns keep the shop info centred on the page.
+          gridTemplateColumns: "1fr auto 1fr",
+          alignItems: "center",
           textAlign: "center",
           borderBottom: "1px solid #e5e7eb",
           paddingBottom: "12px",
@@ -244,10 +251,8 @@ const InvoiceView = forwardRef(function InvoiceView(
           src={logo}
           alt="Bindals Creation"
           style={{
-            position: "absolute",
-            left: 0,
-            top: 0,
-            height: "100%",
+            justifySelf: "start",
+            height: `${LOGO_HEIGHT_PX}px`,
             width: "auto",
             objectFit: "contain",
           }}
@@ -270,6 +275,27 @@ const InvoiceView = forwardRef(function InvoiceView(
           <div>{STORE.phone}</div>
           <div>
             <span style={{ fontWeight: 600 }}>GSTIN:</span> {STORE.gstin}
+          </div>
+        </div>
+        <div
+          data-testid="community-qr"
+          style={{
+            justifySelf: "end",
+            textAlign: "center",
+            width: `${COMMUNITY_QR_SIZE_PX + 16}px`,
+          }}
+        >
+          <QRCodeSVG
+            value={WHATSAPP_COMMUNITY_INVITE_URL}
+            size={COMMUNITY_QR_SIZE_PX}
+            level="M"
+            marginSize={4}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            title={WHATSAPP_COMMUNITY_QR_CAPTION}
+          />
+          <div style={{ fontSize: "10px", color: "#111827", lineHeight: 1.3 }}>
+            {WHATSAPP_COMMUNITY_QR_CAPTION}
           </div>
         </div>
       </div>
@@ -659,23 +685,6 @@ const InvoiceView = forwardRef(function InvoiceView(
             <li>Color of products is not guaranteed.</li>
             <li>Any damage must be reported within 24 hours of purchase.</li>
           </ul>
-        </div>
-        <div
-          data-testid="community-qr"
-          style={{ textAlign: "center", width: `${COMMUNITY_QR_SIZE_PX + 16}px` }}
-        >
-          <QRCodeSVG
-            value={WHATSAPP_COMMUNITY_INVITE_URL}
-            size={COMMUNITY_QR_SIZE_PX}
-            level="M"
-            marginSize={4}
-            bgColor="#ffffff"
-            fgColor="#000000"
-            title={WHATSAPP_COMMUNITY_QR_CAPTION}
-          />
-          <div style={{ fontSize: "10px", color: "#111827", lineHeight: 1.3 }}>
-            {WHATSAPP_COMMUNITY_QR_CAPTION}
-          </div>
         </div>
         <div style={{ textAlign: "center" }}>
           <div style={{ height: "60px" }} />

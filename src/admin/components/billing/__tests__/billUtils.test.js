@@ -1,4 +1,4 @@
-import { priceItem, normalizeItem, computeBillTotals, computeAlterationDeposit, computePreTaxBalanceDiscount, round2 } from "../billUtils";
+import { priceItem, normalizeItem, computeBillTotals, computeAlterationDeposit, computePreTaxBalanceDiscount, computeBalanceAdjustedTotals, round2 } from "../billUtils";
 import { backCalcDiscountPct } from "../stockHelpers";
 
 describe("normalizeItem", () => {
@@ -213,5 +213,43 @@ describe("computePreTaxBalanceDiscount — forcing the grand total to an agreed 
     expect(
       computePreTaxBalanceDiscount(base, base.grandTotal, items, [], [], 0, "bos"),
     ).toBe(0);
+  });
+});
+
+describe("computeBalanceAdjustedTotals — total follows what the customer paid", () => {
+  // Paper slip 387: saree MRP 2395 sold at 1800 → 24.84% line discount.
+  const items = [{ mrp: 2395, quantity: 1, quickDiscountPct: 24.84, stitchType: "unstitched", gstRate: 5 }];
+  const computed = computeBillTotals(items, [], [], 0, 0, "bos");
+  const opts = (o) => ({ items, selectedCodes: [], allDiscounts: [], docType: "bos", effectiveGrandTotal: computed.grandTotal, ...o });
+
+  it("rounds the % discount's leftover paisa down to the amount paid", () => {
+    expect(computed.grandTotal).toBe(1800.08);
+    const adj = computeBalanceAdjustedTotals(computed, opts({ paymentAmount: 1800 }));
+    expect(adj.grandTotal).toBe(1800);
+    expect(adj.balanceDiscount).toBe(0.08);
+  });
+
+  it("leaves the total alone when paid in full or more", () => {
+    expect(computeBalanceAdjustedTotals(computed, opts({ paymentAmount: 1800.08 }))).toBe(computed);
+    expect(computeBalanceAdjustedTotals(computed, opts({ paymentAmount: 2000 }))).toBe(computed);
+  });
+
+  it("leaves the total alone with no amount entered", () => {
+    expect(computeBalanceAdjustedTotals(computed, opts({ paymentAmount: "" }))).toBe(computed);
+  });
+
+  it("treats a shortfall over ₹100 as a partial payment, not a discount", () => {
+    expect(computeBalanceAdjustedTotals(computed, opts({ paymentAmount: 1600 }))).toBe(computed);
+  });
+
+  it("forces any shortfall when a final amount is entered explicitly", () => {
+    const adj = computeBalanceAdjustedTotals(computed, opts({ finalAmount: 1600, paymentAmount: 1600 }));
+    expect(adj.grandTotal).toBe(1600);
+  });
+
+  it("measures the shortfall against the total after store/exchange credit", () => {
+    // 500 credit: customer owes 1300.08, pays 1300 → total drops by 0.08 only
+    const adj = computeBalanceAdjustedTotals(computed, opts({ paymentAmount: 1300, effectiveGrandTotal: 1300.08 }));
+    expect(adj.grandTotal).toBe(1800);
   });
 });
