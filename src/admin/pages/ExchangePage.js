@@ -3,6 +3,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { flushSync } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import { logActivity } from "../../lib/activityLog";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -42,23 +43,7 @@ export default function ExchangePage() {
   const [receiptReadyItems, setReceiptReadyItems] = useState([]);
   const [receiptReadyCredit, setReceiptReadyCredit] = useState(0);
   const [pendingCredit, setPendingCredit] = useState(null); // { amount, exchangeIds, customerId, sourceBillNumber, items[] }
-  const [role, setRole] = useState(null);
-  const isSuperAdmin = role === "superadmin";
-
-  useEffect(() => {
-    const loadRole = async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth?.user?.id;
-      if (!uid) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", uid)
-        .single();
-      setRole(profile?.role || null);
-    };
-    loadRole();
-  }, []);
+  const [windowOverride, setWindowOverride] = useState(null); // { bill, ageText, windowStart } while the warning is open
 
   // history
   const [history, setHistory] = useState([]);
@@ -189,24 +174,32 @@ export default function ExchangePage() {
     const ageText = deliveredAt ? `${billLabel} was delivered ${days} days ago` : `${billLabel} is ${days} days old`;
     const withinWindow = isWithinExchangeWindow(bill.orderdate, deliveredAt);
 
-    // No override, superadmin included: an in-transit exchange plus a later RTO would
-    // restock and offset the same unit twice (exchange_record refuses it too).
+    // No override: an in-transit exchange plus a later RTO would restock and offset
+    // the same unit twice (exchange_record refuses it too).
     if (notDelivered) {
       toast.error("Exchange window closed", { description: "This online order hasn't been delivered yet." });
       return;
     }
-    if (!isSuperAdmin && !withinWindow) {
-      toast.error("Exchange window closed", {
-        description: `${ageText}. Exchanges accepted within ${EXCHANGE_WINDOW_DAYS} days of ${deliveredAt ? "delivery" : "purchase"} only.`,
-      });
+    if (!withinWindow) {
+      setWindowOverride({ bill, ageText, windowStart: deliveredAt ? "delivery" : "purchase" });
       return;
     }
-    if (isSuperAdmin && !withinWindow) {
-      toast.warning("Exchange window override", {
-        description: `${ageText} (window: ${EXCHANGE_WINDOW_DAYS} days). Proceeding as superadmin.`,
-      });
-    }
+    await loadBillItems(bill);
+  }
 
+  async function handleAllowOverride() {
+    const { bill, ageText } = windowOverride;
+    setWindowOverride(null);
+    logActivity({
+      action: "update",
+      entityType: "bill",
+      entityId: bill.bill_number || bill.billid,
+      summary: `Allowed exchange outside the ${EXCHANGE_WINDOW_DAYS}-day window: ${ageText}`,
+    });
+    await loadBillItems(bill);
+  }
+
+  async function loadBillItems(bill) {
     try {
       const { data: items, error: e1 } = await supabase
         .from("bill_items")
@@ -740,6 +733,27 @@ export default function ExchangePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Past-window warning: the admin must actively allow the exchange */}
+      <Dialog open={!!windowOverride} onOpenChange={(open) => { if (!open) setWindowOverride(null); }}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exchange window closed</DialogTitle>
+            <DialogDescription>
+              {windowOverride?.ageText}. Exchanges are accepted within {EXCHANGE_WINDOW_DAYS} days of {windowOverride?.windowStart}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-3 py-2">
+            Allowing this bypasses the exchange policy for this bill. It will be recorded in the activity log.
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setWindowOverride(null)}>
+              Keep Closed
+            </Button>
+            <Button onClick={handleAllowOverride}>Allow Exchange</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Hidden DOM for return receipt PDF */}
       <div

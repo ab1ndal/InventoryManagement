@@ -10,6 +10,7 @@ const mockDb = {
   rpcResult: () => ({ data: null, error: null }),
   customerCredit: 0,
   voucherRow: null,
+  alterationCharge: 0,
 };
 
 const mockResolve = (s) => {
@@ -103,7 +104,7 @@ jest.mock("../AddItemDialog", () => (props) =>
           quantity: 2,
           unit_type: "piece",
           mrp: 150,
-          alteration_charge: 0,
+          alteration_charge: mockDb.alterationCharge,
           quickDiscountPct: 0,
           gstRate: 5,
           stitchType: "unstitched",
@@ -125,6 +126,7 @@ beforeEach(() => {
     fn === "voucher_redeem" ? { data: true, error: null } : { data: 0, error: null };
   mockDb.customerCredit = 0;
   mockDb.voucherRow = null;
+  mockDb.alterationCharge = 0;
   mockToast.success = [];
   mockToast.error = [];
   window.open = () => null;
@@ -236,4 +238,45 @@ test("a voucher held for an online order shows the reserved message and is not a
   await applyVoucher("HELD1");
   expect(await screen.findByText("This voucher is reserved for an online order")).toBeInTheDocument();
   expect(screen.queryByText(/Voucher #HELD1/)).not.toBeInTheDocument();
+});
+
+async function renderUnpaidBill(onSubmit = () => {}) {
+  render(<BillingForm open onOpenChange={() => {}} onSubmit={onSubmit} prefilledCustomerId={7} />);
+  fireEvent.click(screen.getByRole("button", { name: "Stub add item" }));
+  await screen.findAllByText("Kurti");
+}
+
+test("a bill with nothing paid finalizes as partial: no method, no payment row, stock still moves", async () => {
+  const onSubmit = jest.fn();
+  await renderUnpaidBill(onSubmit);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
+  await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+
+  const billInsert = mockDb.calls.find((c) => c.table === "bills" && c.op === "insert");
+  expect(billInsert.payload).toMatchObject({
+    paymentstatus: "partial",
+    finalized: true,
+    payment_amount: 0,
+    salesmethodid: null,
+  });
+  expect(billInsert.payload.net_amount).toBeGreaterThan(0);
+  // bill_payments.amount must be > 0, and no money has moved yet
+  expect(mockDb.calls.some((c) => c.table === "bill_payments" && c.op === "insert")).toBe(false);
+  expect(rpcs("stock_adjust")).toEqual([
+    { p_variant: "v1", p_delta: -2, p_reason: "bill_partial_finalize", p_ref: "42" },
+  ]);
+});
+
+test("altered items still need their deposit, so a bill with nothing paid is refused", async () => {
+  mockDb.alterationCharge = 100;
+  await renderUnpaidBill();
+
+  fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
+
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+  expect(mockToast.error[0][0]).toBe("Insufficient initial payment");
+  expect(screen.queryByRole("button", { name: "Confirm Partial Payment" })).not.toBeInTheDocument();
+  expect(mockDb.calls.some((c) => c.table === "bills" && c.op === "insert")).toBe(false);
 });

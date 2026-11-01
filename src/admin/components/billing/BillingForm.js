@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
-import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod } from "./paymentHelpers";
+import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -663,7 +663,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const showPartialButton = useMemo(() => {
     if (isFinalizedBill) return false;
     if (billPaymentStatus === "partial") return false;
-    if (!paymentAmount || Number(paymentAmount) <= 0) return false;
     const { effectiveTotal } = computeCreditsApplied(
       computed.grandTotal,
       appliedStoreCredit,
@@ -1141,15 +1140,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       });
       return;
     }
-    if (!salesMethodId || !paymentAmount) {
-      toast.error("Payment required", {
-        description: "Select a payment method and enter the amount received.",
-      });
+    const paidAmt = Number(paymentAmount);
+    if (paidAmt < 0) {
+      toast.error("Amount cannot be negative");
       return;
     }
-    const paidAmt = Number(paymentAmount);
-    if (paidAmt <= 0) {
-      toast.error("Amount must be greater than zero");
+    if (paidAmt > 0 && !salesMethodId) {
+      toast.error("Payment required", {
+        description: "Select a payment method for the amount received.",
+      });
       return;
     }
     if (Number(finalAmount) > 0) {
@@ -1567,6 +1566,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       exchangeCredit?.amount,
     );
     const isNewBill = !billId;
+    const hasInitialPayment = Number(paymentAmount) > 0;
     const stockFailures = [];
     try {
       if (items.length === 0) {
@@ -1624,7 +1624,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             exchange_credit_used: exchangeCreditUsed,
             exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
             saleslocationid: salesLocationId || null,
-            salesmethodid: salesMethodId || null,
+            salesmethodid: hasInitialPayment ? salesMethodId : null,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
           .select("billid, bill_number")
@@ -1751,7 +1751,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             exchange_credit_used: exchangeCreditUsed,
             exchange_source_bill: exchangeCredit?.sourceBillNumber || null,
             saleslocationid: salesLocationId || null,
-            salesmethodid: salesMethodId || null,
+            salesmethodid: hasInitialPayment ? salesMethodId : null,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
           .eq("billid", activeBillId);
@@ -1794,24 +1794,29 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
       }
 
-      // Insert initial payment record
-      const { data: paymentRecord, error: payErr } = await supabase
-        .from("bill_payments")
-        .insert({
-          billid: activeBillId,
-          amount: Number(paymentAmount),
-          salesmethodid: salesMethodId,
-        })
-        .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
-        .single();
-      if (payErr) {
-        if (isNewBill) {
-          if (appliedVoucher?.voucher_id) {
-            await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
+      // Insert initial payment record. A bill finalized with nothing paid has no ledger
+      // row yet: bill_payments.amount must be > 0.
+      let paymentRecord = null;
+      if (hasInitialPayment) {
+        const { data, error: payErr } = await supabase
+          .from("bill_payments")
+          .insert({
+            billid: activeBillId,
+            amount: Number(paymentAmount),
+            salesmethodid: salesMethodId,
+          })
+          .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
+          .single();
+        if (payErr) {
+          if (isNewBill) {
+            if (appliedVoucher?.voucher_id) {
+              await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
+            }
+            await supabase.from("bills").delete().eq("billid", activeBillId);
           }
-          await supabase.from("bills").delete().eq("billid", activeBillId);
+          throw new Error("Failed to record payment: " + payErr.message);
         }
-        throw new Error("Failed to record payment: " + payErr.message);
+        paymentRecord = data;
       }
 
       // Discount usage rows
@@ -1834,7 +1839,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
       // Flush all payment state into InvoiceView before PDF capture
       flushSync(() => {
-        setBillPayments([paymentRecord]);
+        setBillPayments(paymentRecord ? [paymentRecord] : []);
         setBillPaymentStatus("partial");
         setEffectiveBillId(activeBillId);
       });
@@ -1926,10 +1931,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       // payment_amount is the running total received, so it moves with every payment
       const { error: updErr } = await supabase
         .from("bills")
-        .update({ payment_amount: totalPaid, paymentstatus: paymentStatus })
+        .update({
+          payment_amount: totalPaid,
+          paymentstatus: paymentStatus,
+          ...firstPaymentMethodFields(billPayments, addPaymentMethodId),
+        })
         .eq("billid", billId);
       if (updErr) throw updErr;
       setPaymentAmount(String(totalPaid));
+      // A later save writes salesMethodId back to the bill, so keep it in step
+      if (billPayments.length === 0) setSalesMethodId(addPaymentMethodId);
 
       if (isFullyPaid) {
         // Flush finalized state into InvoiceView before PDF capture
