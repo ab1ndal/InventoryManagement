@@ -241,48 +241,48 @@ const InvoiceView = forwardRef(function InvoiceView(
       {/* 1. Store Header */}
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
+          display: "grid",
+          // Equal side columns keep the shop info centred on the page.
+          gridTemplateColumns: "1fr auto 1fr",
           alignItems: "center",
           borderBottom: "1px solid #e5e7eb",
           paddingBottom: "12px",
           marginBottom: "12px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <img
-            src={logo}
-            alt="Bindals Creation"
+        <img
+          src={logo}
+          alt="Bindals Creation"
+          style={{
+            justifySelf: "start",
+            height: `${LOGO_HEIGHT_PX}px`,
+            width: "auto",
+            objectFit: "contain",
+          }}
+        />
+        <div style={{ textAlign: "center" }}>
+          <div
             style={{
-              height: `${LOGO_HEIGHT_PX}px`,
-              width: "auto",
-              objectFit: "contain",
+              fontSize: "20px",
+              fontWeight: 600,
+              letterSpacing: "2px",
+              textTransform: "uppercase",
             }}
-          />
+          >
+            {STORE.name}
+          </div>
+          <div style={{ fontSize: "11px", color: "#6b7280" }}>
+            {STORE.tagline}
+          </div>
+          <div>{STORE.address}</div>
+          <div>{STORE.phone}</div>
           <div>
-            <div
-              style={{
-                fontSize: "20px",
-                fontWeight: 600,
-                letterSpacing: "2px",
-                textTransform: "uppercase",
-              }}
-            >
-              {STORE.name}
-            </div>
-            <div style={{ fontSize: "11px", color: "#6b7280" }}>
-              {STORE.tagline}
-            </div>
-            <div>{STORE.address}</div>
-            <div>{STORE.phone}</div>
-            <div>
-              <span style={{ fontWeight: 600 }}>GSTIN:</span> {STORE.gstin}
-            </div>
+            <span style={{ fontWeight: 600 }}>GSTIN:</span> {STORE.gstin}
           </div>
         </div>
         <div
           data-testid="community-qr"
-          style={{ display: "flex", alignItems: "center" }}
+          style={{ justifySelf: "end", display: "flex", alignItems: "center" }}
         >
           <div
             style={{
