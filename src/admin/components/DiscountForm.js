@@ -38,14 +38,14 @@ const discountSchema = z
         "conditional",
         "bundled_pricing",
       ],
-      { required_error: "Type is required" },
+      { error: "Type is required" },
     ),
     value: optionalNumeric,
     max_discount: optionalNumeric,
     // categories_selected replaces the old single-category text field
     categories_selected: z.array(z.string()).default([]),
     min_total: z
-      .number({ invalid_type_error: "Must be a number" })
+      .number({ error: "Must be a number" })
       .min(0, "Must be ≥ 0"),
     start_date: z.string().nullable().optional(),
     end_date: z.string().nullable().optional(),

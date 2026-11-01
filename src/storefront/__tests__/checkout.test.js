@@ -87,3 +87,44 @@ describe("checkoutSchema", () => {
     expect(result.error.issues.map((i) => i.path[0])).toEqual(expect.arrayContaining(["line1", "line2", "city", "state", "pincode"]));
   });
 });
+
+// Checkout's field errors reach the shopper through this resolver, so run the real one.
+describe("addressSchema through zodResolver", () => {
+  const { zodResolver } = require("@hookform/resolvers/zod");
+  const validAddress = {
+    name: "Asha K",
+    phone: "9876543210",
+    email: "",
+    line1: "12",
+    line2: "MG Road",
+    landmark: "",
+    city: "Lucknow",
+    state: "Uttar Pradesh",
+    pincode: "226001",
+  };
+  const resolve = (values) =>
+    zodResolver(addressSchema)(values, undefined, { fields: {}, shouldUseNativeValidation: false });
+
+  test("a missing state shows 'Select a state' on the state field", async () => {
+    const { errors } = await resolve({ ...validAddress, state: undefined });
+    expect(errors.state.message).toBe("Select a state");
+  });
+
+  test("an unknown state shows 'Select a state' too", async () => {
+    const { errors } = await resolve({ ...validAddress, state: "Atlantis" });
+    expect(errors.state.message).toBe("Select a state");
+  });
+
+  test("custom messages from other fields come through", async () => {
+    const { errors } = await resolve({ ...validAddress, phone: "123", pincode: "1", email: "nope" });
+    expect(errors.phone.message).toBe("Enter a valid 10-digit Indian mobile number");
+    expect(errors.pincode.message).toBe("Enter a valid 6-digit pincode");
+    expect(errors.email.message).toBe("Invalid email");
+  });
+
+  test("valid details pass with their values intact", async () => {
+    const { errors, values } = await resolve(validAddress);
+    expect(errors).toEqual({});
+    expect(values.state).toBe("Uttar Pradesh");
+  });
+});

@@ -70,7 +70,7 @@ const formSchema = z.object({
     ),
   address: z.string().optional().transform((v) => (v?.trim() === "" ? null : v)),
   opening_balance: z.coerce
-    .number({ invalid_type_error: "Must be a number" })
+    .number({ error: "Must be a number" })
     .default(0),
   opening_balance_date: z.string().optional().nullable(),
 });
