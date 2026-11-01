@@ -58,7 +58,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
         .from("products")
         .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
         .ilike("productid", `%${query}%`)
-        .limit(10);
+        .order("productid");
       if (!error) setResults(data || []);
     };
     const t = setTimeout(run, 300);
@@ -151,7 +151,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
 
       {/* Product ID dropdown */}
       {results.length > 0 && (
-        <div className="border rounded bg-white">
+        <div className="border rounded bg-white max-h-60 overflow-y-auto">
           {results.map((p) => (
             <div
               key={p.productid}
