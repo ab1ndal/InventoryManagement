@@ -16,12 +16,16 @@ const STORE = {
   gstin: "09ABVPB4203A1Z4",
 };
 
-// 132px of the 794px-wide view prints ~33mm wide on A4 (symbol ~26mm + 4-module
-// quiet zone), above the ~25mm minimum for reliable phone scanning off paper.
-const COMMUNITY_QR_SIZE_PX = 132;
+// 125px of the 794px-wide view prints ~31mm wide on A4 (symbol ~25mm + 4-module
+// quiet zone), at the ~25mm minimum for reliable phone scanning off paper.
+const COMMUNITY_QR_SIZE_PX = 125;
 
-// Matches the height of the five-line shop info block, as before the QR moved
-// into the header (the logo used to stretch to the header's full height).
+// The 4-module quiet zone inside the SVG (of 41 modules across). Pulled into the
+// page padding so the visible symbol lines up with the logo and shop info; it
+// still prints as blank paper, so the scanner keeps its quiet zone.
+const COMMUNITY_QR_QUIET_ZONE_PX = 12;
+
+// Matches the height of the five-line shop info block.
 const LOGO_HEIGHT_PX = 90;
 
 function formatDate(d) {
@@ -226,7 +230,7 @@ const InvoiceView = forwardRef(function InvoiceView(
       style={{
         width: "794px",
         backgroundColor: "#ffffff",
-        padding: "24px",
+        padding: "16px",
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: "#111827",
@@ -237,65 +241,78 @@ const InvoiceView = forwardRef(function InvoiceView(
       {/* 1. Store Header */}
       <div
         style={{
-          display: "grid",
-          // Equal side columns keep the shop info centred on the page.
-          gridTemplateColumns: "1fr auto 1fr",
+          display: "flex",
+          justifyContent: "space-between",
           alignItems: "center",
-          textAlign: "center",
           borderBottom: "1px solid #e5e7eb",
           paddingBottom: "12px",
           marginBottom: "12px",
         }}
       >
-        <img
-          src={logo}
-          alt="Bindals Creation"
-          style={{
-            justifySelf: "start",
-            height: `${LOGO_HEIGHT_PX}px`,
-            width: "auto",
-            objectFit: "contain",
-          }}
-        />
-        <div>
-          <div
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <img
+            src={logo}
+            alt="Bindals Creation"
             style={{
-              fontSize: "20px",
-              fontWeight: 600,
-              letterSpacing: "2px",
-              textTransform: "uppercase",
+              height: `${LOGO_HEIGHT_PX}px`,
+              width: "auto",
+              objectFit: "contain",
             }}
-          >
-            {STORE.name}
-          </div>
-          <div style={{ fontSize: "11px", color: "#6b7280" }}>
-            {STORE.tagline}
-          </div>
-          <div>{STORE.address}</div>
-          <div>{STORE.phone}</div>
+          />
           <div>
-            <span style={{ fontWeight: 600 }}>GSTIN:</span> {STORE.gstin}
+            <div
+              style={{
+                fontSize: "20px",
+                fontWeight: 600,
+                letterSpacing: "2px",
+                textTransform: "uppercase",
+              }}
+            >
+              {STORE.name}
+            </div>
+            <div style={{ fontSize: "11px", color: "#6b7280" }}>
+              {STORE.tagline}
+            </div>
+            <div>{STORE.address}</div>
+            <div>{STORE.phone}</div>
+            <div>
+              <span style={{ fontWeight: 600 }}>GSTIN:</span> {STORE.gstin}
+            </div>
           </div>
         </div>
         <div
           data-testid="community-qr"
-          style={{
-            justifySelf: "end",
-            textAlign: "center",
-            width: `${COMMUNITY_QR_SIZE_PX + 16}px`,
-          }}
+          style={{ display: "flex", alignItems: "center" }}
         >
-          <QRCodeSVG
-            value={WHATSAPP_COMMUNITY_INVITE_URL}
-            size={COMMUNITY_QR_SIZE_PX}
-            level="M"
-            marginSize={4}
-            bgColor="#ffffff"
-            fgColor="#000000"
-            title={WHATSAPP_COMMUNITY_QR_CAPTION}
-          />
-          <div style={{ fontSize: "10px", color: "#111827", lineHeight: 1.3 }}>
+          <div
+            style={{
+              width: "108px",
+              fontSize: "10px",
+              color: "#6b7280",
+              lineHeight: 1.3,
+              textAlign: "right",
+              textWrap: "balance",
+            }}
+          >
             {WHATSAPP_COMMUNITY_QR_CAPTION}
+          </div>
+          {/* Margin sits on a wrapper: html2canvas serializes the SVG with its
+              inline styles, so a margin on the SVG shifts it inside its own image. */}
+          <div
+            style={{
+              margin: `-${COMMUNITY_QR_QUIET_ZONE_PX}px -${COMMUNITY_QR_QUIET_ZONE_PX}px -${COMMUNITY_QR_QUIET_ZONE_PX}px 0`,
+            }}
+          >
+            <QRCodeSVG
+              value={WHATSAPP_COMMUNITY_INVITE_URL}
+              size={COMMUNITY_QR_SIZE_PX}
+              level="M"
+              marginSize={4}
+              bgColor="#ffffff"
+              fgColor="#000000"
+              title={WHATSAPP_COMMUNITY_QR_CAPTION}
+              style={{ display: "block" }}
+            />
           </div>
         </div>
       </div>

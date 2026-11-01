@@ -10,6 +10,7 @@
 - CRA CI build treats `react-hooks/exhaustive-deps` as an error. When threading a new value (e.g. `docType`) into a call inside a `useMemo`/`useEffect`, add it to that hook's dependency array or `npm run build` fails even though `npm test` passes.
 - Tests: use `CI=true npx react-scripts test <path> --watchAll=false` (jest via react-scripts), not bare `npx jest`.
 - Pre-existing failing suites (baseline, NOT from your change): `App.test.js` (stale CRA "learn react link"), `dashboardData`, `RevenueChart`, `BillTable` — 6 tests. Confirm a failure is yours by diffing against baseline before assuming your change broke something.
+- html2canvas serializes an inline `<svg>` with its inline styles, so a margin on the SVG shifts the drawing inside its own image (browser layout looks right, PDF is wrong). Put the margin on a wrapper div. Check bill layout changes in the generated PDF, not just the DOM.
 - CRA ESLint (`no-undef`) rejects `globalThis` in source. For a fetch wrapper use `(...args) => fetch(...args)`, not `fetch.bind(globalThis)`.
 
 ## Tooling: Playwright / Vercel
