@@ -10,8 +10,10 @@ jest.mock("../../components/billing/generateInvoicePdf", () => ({
   generateInvoicePdf: jest.fn(async () => new Blob(["pdf"])),
 }));
 jest.mock("../../../lib/supabaseClient", () => ({
-  supabase: { auth: { getUser: jest.fn() }, from: jest.fn(), rpc: jest.fn() },
+  supabase: { from: jest.fn(), rpc: jest.fn() },
 }));
+const mockActivity = [];
+jest.mock("../../../lib/activityLog", () => ({ logActivity: (entry) => mockActivity.push(entry) }));
 
 const { supabase } = require("../../../lib/supabaseClient");
 const { toast } = require("sonner");
@@ -42,6 +44,7 @@ function builder(table) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockActivity.length = 0;
   window.open = jest.fn();
   URL.createObjectURL = jest.fn(() => "blob:x");
   mockBill = {
@@ -50,7 +53,6 @@ beforeEach(() => {
   };
   mockOrder = null;
   mockTables = {
-    profiles: { data: { role: "admin" }, error: null },
     bills: { data: [mockBill], error: null },
     exchanges: { data: [], error: null, count: 0 },
     bill_items: {
@@ -63,7 +65,6 @@ beforeEach(() => {
     },
     productsizecolors: { data: [{ variantid: "v-1", size: "M", color: "Red" }], error: null },
   };
-  supabase.auth.getUser.mockResolvedValue({ data: { user: { id: "u-admin" } } });
   supabase.from.mockImplementation((table) => {
     if (table === "orders") mockTables.orders = { data: mockOrder, error: null };
     return builder(table);
@@ -73,8 +74,6 @@ beforeEach(() => {
 
 async function loadBill() {
   render(<ExchangePage />);
-  // role must be loaded before the window check reads it
-  await waitFor(() => expect(supabase.from).toHaveBeenCalledWith("profiles"));
   fireEvent.change(screen.getByPlaceholderText(/Bill number/), { target: { value: "FY26-000501" } });
   fireEvent.click(screen.getByRole("button", { name: "Search" }));
   fireEvent.click(await screen.findByRole("button", { name: /#FY26-000501/ }));
@@ -88,42 +87,59 @@ test("nine-day-old online bill delivered three days ago loads", async () => {
   expect(toast.error).not.toHaveBeenCalled();
 });
 
-test("nine-day-old in-store bill is outside the window", async () => {
+test("old in-store bill stays closed until the admin actively allows it", async () => {
+  mockBill.orderdate = daysAgo(400);
+  await loadBill();
+
+  expect(await screen.findByText(/is 400 days old/)).toBeInTheDocument();
+  expect(screen.queryByText(/Return items from Bill/)).not.toBeInTheDocument();
+  expect(supabase.from).not.toHaveBeenCalledWith("bill_items");
+  expect(mockActivity).toEqual([]);
+
+  fireEvent.click(screen.getByRole("button", { name: "Allow Exchange" }));
+
+  expect(await screen.findByText(/Return items from Bill #FY26-000501/)).toBeInTheDocument();
+  expect(mockActivity).toHaveLength(1);
+  expect(mockActivity[0].summary).toMatch(/FY26-000501.*400 days old/);
+});
+
+test("cancelling the warning leaves the bill unloaded and logs nothing", async () => {
   mockBill.orderdate = daysAgo(9);
   await loadBill();
-  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Exchange window closed", expect.anything()));
+
+  fireEvent.click(await screen.findByRole("button", { name: "Keep Closed" }));
+
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Allow Exchange" })).not.toBeInTheDocument());
   expect(screen.queryByText(/Return items from Bill/)).not.toBeInTheDocument();
+  expect(supabase.from).not.toHaveBeenCalledWith("bill_items");
+  expect(mockActivity).toEqual([]);
 });
 
-test("online bill not yet delivered is outside the window", async () => {
+test("bill exactly at the window limit loads without a warning", async () => {
+  mockBill.orderdate = daysAgo(7);
+  await loadBill();
+  expect(await screen.findByText(/Return items from Bill #FY26-000501/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Allow Exchange" })).not.toBeInTheDocument();
+});
+
+test("online bill not yet delivered is refused with no way to allow it", async () => {
   mockOrder = { delivered_at: null };
   await loadBill();
   await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Exchange window closed", {
     description: "This online order hasn't been delivered yet.",
   }));
+  expect(screen.queryByRole("button", { name: "Allow Exchange" })).not.toBeInTheDocument();
   expect(screen.queryByText(/Return items from Bill/)).not.toBeInTheDocument();
-});
-
-test("superadmin cannot load an undelivered online bill", async () => {
-  mockTables.profiles = { data: { role: "superadmin" }, error: null };
-  mockOrder = { delivered_at: null };
-  await loadBill();
-  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Exchange window closed", {
-    description: "This online order hasn't been delivered yet.",
-  }));
-  expect(toast.warning).not.toHaveBeenCalled();
-  expect(screen.queryByText(/Return items from Bill/)).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Review & Confirm" })).not.toBeInTheDocument();
   expect(supabase.rpc).not.toHaveBeenCalled();
 });
 
-test("superadmin still overrides a delivered online bill outside the window", async () => {
-  mockTables.profiles = { data: { role: "superadmin" }, error: null };
+test("delivered online bill past the window can be allowed, counted from delivery", async () => {
   mockBill.orderdate = daysAgo(20);
   mockOrder = { delivered_at: daysAgo(10) };
   await loadBill();
+  expect(await screen.findByText(/was delivered 10 days ago/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Allow Exchange" }));
   expect(await screen.findByText(/Return items from Bill #FY26-000501/)).toBeInTheDocument();
-  expect(toast.warning).toHaveBeenCalledWith("Exchange window override", expect.anything());
 });
 
 test("confirm calls exchange_record once and links the returned ids", async () => {
