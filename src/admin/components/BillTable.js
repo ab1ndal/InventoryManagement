@@ -10,10 +10,9 @@ import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import ReturnReceiptView from "./billing/ReturnReceiptView";
-import InvoiceView from "./billing/InvoiceView";
 import { generateInvoicePdf } from "./billing/generateInvoicePdf";
-import { rehydrateBillTotals } from "./billing/rehydrateBill";
-import { backCalcDiscountPct } from "./billing/stockHelpers";
+import { useBillPdf } from "./billing/useBillPdf";
+import { openBillPdf } from "./billing/billPdf";
 import { formatDate } from "../../utility/dateFormat";
 import { formatINR } from "../../utility/formatCurrency";
 import { logActivity } from "../../lib/activityLog";
@@ -48,188 +47,31 @@ export default function BillTable({ onEdit }) {
   const [cancelSaving, setCancelSaving] = useState(false);
   const [receiptBill, setReceiptBill] = useState(null);
   const receiptRef = useRef(null);
-  const [regenBillData, setRegenBillData] = useState(null);
-  const regenRef = useRef(null);
+  const { generate: generateBillPdf, offscreen: billPdfOffscreen } = useBillPdf();
   const [regeningBills, setRegeningBills] = useState(new Set());
 
   const handleRegenPdf = async (bill) => {
     const { billid: billId } = bill;
     setRegeningBills((prev) => new Set(prev).add(billId));
     try {
-      // Fetch bill core data
-      const { data: billRow, error: billErr } = await supabase
-        .from("bills")
-        .select("applied_codes, payment_amount, net_amount, paymentstatus, saleslocationid, salesmethodid, store_credit_used, exchange_credit_used, exchange_source_bill, orderdate, customerid, bill_number, document_type, totalamount, gst_total, discount_total, taxable_total")
-        .eq("billid", billId)
-        .single();
-      if (billErr) throw billErr;
-
-      // Fetch bill items
-      // Stable order so the reprint lines up with what was printed originally
-      const { data: billItems } = await supabase.from("bill_items").select("*").eq("billid", billId).order("bill_item_id");
-
-      // Fetch variants
-      const inventoryItems = (billItems || []).filter(bi => bi.variantid);
-      let variantMap = {};
-      if (inventoryItems.length > 0) {
-        const { data: variants } = await supabase
-          .from("productsizecolors").select("variantid, size, color")
-          .in("variantid", inventoryItems.map(bi => bi.variantid));
-        variantMap = Object.fromEntries((variants || []).map(v => [v.variantid, v]));
-      }
-
-      // Fetch manual items
-      const manualItems = (billItems || []).filter(bi => !bi.variantid && bi.product_code);
-      let manualMap = {};
-      if (manualItems.length > 0) {
-        const { data: manuals } = await supabase
-          .from("manual_items").select("manual_item_id, size, color")
-          .in("manual_item_id", manualItems.map(bi => bi.product_code));
-        manualMap = Object.fromEntries((manuals || []).map(m => [m.manual_item_id, m]));
-      }
-
-      const items = (billItems || []).map(bi => ({
-        _id: String(bi.bill_item_id),
-        source: bi.variantid ? "inventory" : "manual",
-        variantid: bi.variantid || null,
-        productid: bi.product_code || null,
-        product_name: bi.product_name || "",
-        category: bi.category || null,
-        quantity: bi.quantity,
-        mrp: bi.mrp,
-        alteration_charge: bi.alteration_charge || 0,
-        quickDiscountPct: backCalcDiscountPct(bi.discount_total, bi.mrp, bi.quantity),
-        gstRate: bi.gst_rate ?? 18,
-        stitchType: bi.stitch_type || 'unstitched',
-        size: variantMap[bi.variantid]?.size || manualMap[bi.product_code]?.size || null,
-        color: variantMap[bi.variantid]?.color || manualMap[bi.product_code]?.color || null,
-      }));
-
-      // Fetch discounts matching applied codes
-      const appliedCodes = billRow.applied_codes || [];
-      let allDiscounts = [];
-      if (appliedCodes.length > 0) {
-        const { data: discData } = await supabase
-          .from("discounts").select("id, code, type, value, max_discount, category, exclusive, auto_apply, min_total, start_date, end_date, active, rules")
-          .in("code", appliedCodes);
-        allDiscounts = discData || [];
-      }
-
-      // Customer name
-      let customerName = "";
-      if (billRow.customerid) {
-        const { data: cust } = await supabase
-          .from("customers").select("first_name, last_name").eq("customerid", billRow.customerid).single();
-        if (cust)
-          customerName = `${cust.first_name} ${cust.last_name || ""}`.trim();
-      }
-
-      // Salesperson names
-      const { data: spData } = await supabase
-        .from("bill_salespersons").select("salesperson_id").eq("billid", billId);
-      let salespersonNames = [];
-      if (spData?.length) {
-        const { data: spNames } = await supabase
-          .from("salespersons").select("name").in("salesperson_id", spData.map(r => r.salesperson_id));
-        salespersonNames = (spNames || []).map(r => r.name);
-      }
-
-      // Payment method name
-      let paymentMethod = "";
-      if (billRow.salesmethodid) {
-        const { data: meth } = await supabase
-          .from("salesmethods").select("methodname").eq("salesmethodid", billRow.salesmethodid).single();
-        paymentMethod = meth?.methodname || "";
-      }
-
-      // Voucher (if any)
-      let appliedVoucher = null;
-      const { data: voucherRow } = await supabase
-        .from("vouchers").select("voucher_id, value").eq("redeemed_billid", billId).maybeSingle();
-      if (voucherRow) appliedVoucher = { voucher_id: voucherRow.voucher_id, value: Number(voucherRow.value ?? 0) };
-
-      // Payment history (needed for partial bill PDF)
-      let billPayments = [];
-      const { data: paymentsData } = await supabase
-        .from("bill_payments")
-        .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
-        .eq("billid", billId)
-        .order("recorded_at", { ascending: true });
-      if (paymentsData) billPayments = paymentsData;
-
-      // Exchange credit (if any)
-      const exchangeCredit = billRow.exchange_credit_used > 0
-        ? { amount: Number(billRow.exchange_credit_used), sourceBillNumber: billRow.exchange_source_bill }
-        : null;
-
-      // A reprint must reproduce what the customer was charged, so read the stored
-      // numbers rather than re-pricing the items (see rehydrateBill.js).
-      const { computed, lines, discountLines } = rehydrateBillTotals(
-        billRow,
-        billItems || [],
-        allDiscounts,
-        items,
-      );
-
-      flushSync(() => setRegenBillData({
-        lines,
-        discountLines,
-        billId,
-        billNumber: billRow.bill_number || null,
-        billDate: new Date(billRow.orderdate),
-        customerName,
-        salespersonNames,
-        items,
-        computed,
-        paymentMethod,
-        paymentAmount: billRow.payment_amount ?? 0,
-        appliedCodes,
-        allDiscounts,
-        appliedVoucher,
-        appliedStoreCredit: Number(billRow.store_credit_used ?? 0),
-        exchangeCredit,
-        billPayments,
-        paymentStatus: billRow.paymentstatus || "finalized",
-        docType: billRow.document_type || 'bos',
-      }));
-
-      if (!regenRef.current) throw new Error("Invoice ref missing");
-      const blob = await generateInvoicePdf(regenRef.current);
-      // Use versioned filename so each regen gets a guaranteed-fresh URL (no CDN/browser cache)
-      const billLabel = billRow.bill_number || billId;
-      const newPath = `bill-${billLabel}-v${Date.now()}.pdf`;
-      // Delete legacy path and any previous versioned file stored in pdf_url
-      const oldPaths = [`bill-${billLabel}.pdf`, `bill-${billId}.pdf`];
-      if (bill.pdf_url) {
-        const stored = bill.pdf_url.includes('/invoices/')
-          ? decodeURIComponent(bill.pdf_url.split('/invoices/')[1]?.split('?')[0] || '')
-          : bill.pdf_url;
-        if (stored && !oldPaths.includes(stored)) oldPaths.push(stored);
-      }
-      await supabase.storage.from("invoices").remove(oldPaths);
-      const { error: upErr } = await supabase.storage
-        .from("invoices").upload(newPath, blob, { contentType: "application/pdf" });
-      if (upErr) throw upErr;
-      await supabase.from("bills").update({ pdf_url: newPath }).eq("billid", billId);
+      const newPath = await generateBillPdf(billId);
       setBills((prev) => prev.map((b) => b.billid === billId ? { ...b, pdf_url: newPath } : b));
-      const { data: signedData } = await supabase.storage.from("invoices").createSignedUrl(newPath, 3600);
-      if (signedData?.signedUrl) window.open(signedData.signedUrl, "_blank");
+      await openBillPdf(newPath);
       toast({ title: `PDF regenerated for Bill #${billId}` });
     } catch (e) {
       toast({ title: "PDF generation failed", description: e.message, variant: "destructive" });
     } finally {
-      setRegenBillData(null);
       setRegeningBills((prev) => { const s = new Set(prev); s.delete(billId); return s; });
     }
   };
 
   const handleViewPdf = async (bill) => {
     if (!bill.pdf_url) return;
-    const path = bill.pdf_url.includes('/invoices/')
-      ? decodeURIComponent(bill.pdf_url.split('/invoices/')[1]?.split('?')[0] || '')
-      : bill.pdf_url;
-    const { data } = await supabase.storage.from("invoices").createSignedUrl(path, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+    try {
+      await openBillPdf(bill.pdf_url);
+    } catch (e) {
+      toast({ title: "Could not open PDF", description: e.message, variant: "destructive" });
+    }
   };
 
   const [sendingSms, setSendingSms] = useState(new Set());
@@ -1154,41 +996,7 @@ export default function BillTable({ onEdit }) {
         </DialogContent>
       </Dialog>
 
-      {/* Off-screen InvoiceView for PDF regen */}
-      {regenBillData && (
-        <div
-          style={{
-            position: "fixed",
-            top: "-9999px",
-            left: "-9999px",
-            pointerEvents: "none",
-          }}
-          aria-hidden="true"
-        >
-          <InvoiceView
-            ref={regenRef}
-            billId={regenBillData.billId}
-            billNumber={regenBillData.billNumber}
-            billDate={regenBillData.billDate}
-            customerName={regenBillData.customerName}
-            salespersonNames={regenBillData.salespersonNames}
-            items={regenBillData.items}
-            computed={regenBillData.computed}
-            paymentMethod={regenBillData.paymentMethod}
-            paymentAmount={regenBillData.paymentAmount}
-            appliedCodes={regenBillData.appliedCodes}
-            allDiscounts={regenBillData.allDiscounts}
-            appliedVoucher={regenBillData.appliedVoucher}
-            appliedStoreCredit={regenBillData.appliedStoreCredit}
-            exchangeCredit={regenBillData.exchangeCredit}
-            billPayments={regenBillData.billPayments}
-            paymentStatus={regenBillData.paymentStatus}
-            docType={regenBillData.docType}
-            lines={regenBillData.lines}
-            discountLines={regenBillData.discountLines}
-          />
-        </div>
-      )}
+      {billPdfOffscreen}
 
       {/* Off-screen ReturnReceiptView for PDF capture */}
       {receiptBill && (

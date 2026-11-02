@@ -9,7 +9,22 @@ let mockActionImpl = null;
 let mockToasts = [];
 let mockKeyCounter = 0;
 let mockRole = "admin";
+let mockGenerated = [];
+let mockGenerateImpl = null;
+let mockOpened = [];
 
+jest.mock("../../billing/useBillPdf", () => ({
+  useBillPdf: () => ({
+    generate: async (billId) => {
+      mockGenerated.push(billId);
+      return mockGenerateImpl ? mockGenerateImpl(billId) : "bill-new.pdf";
+    },
+    offscreen: null,
+  }),
+}));
+jest.mock("../../billing/billPdf", () => ({
+  openBillPdf: async (path) => mockOpened.push(path),
+}));
 jest.mock("../onlineOrdersApi", () => ({
   getOrder: async () => {
     if (mockNextDetail && mockDetail.__loaded) return mockNextDetail;
@@ -62,9 +77,10 @@ const item = (over) => ({
   ...over,
 });
 
-function detail({ order = {}, items, refunds = [], legs = [], jobs = [], events = [] } = {}) {
+function detail({ order = {}, bill = null, items, refunds = [], legs = [], jobs = [], events = [] } = {}) {
   return {
     order: { ...baseOrder, ...order },
+    bill,
     items: items || [
       item({ id: "i1", line_no: 1, product_name: "Kurta", unit_price: 1200, paid_value: 1200 }),
       item({ id: "i2", line_no: 2, product_name: "Dupatta", unit_price: 800, paid_value: 800 }),
@@ -271,7 +287,7 @@ test("rto order offers Parcel received back; shows shipment links and refunds", 
   render(<OrderDetail orderId="o1" />);
   expect(await screen.findByRole("link", { name: "Shipping label" })).toHaveAttribute("href", "https://x/label.pdf");
   expect(screen.getByRole("link", { name: "Manifest" })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Bill of Supply #42" })).toBeInTheDocument();
+  expect(screen.getByText("Bill of Supply #42")).toBeInTheDocument();
   expect(screen.getByText(/gateway ₹800.00 → original · processing/)).toBeInTheDocument();
   expect(screen.getByText("Payment received")).toBeInTheDocument();
   expect(screen.getByText("· now To check")).toBeInTheDocument();
@@ -757,5 +773,55 @@ describe("Porter (manual)", () => {
     await screen.findByText("Kurta");
     expect(screen.queryByRole("button", { name: "Process" })).not.toBeInTheDocument();
     expect(screen.queryByText("Porter (manual)")).not.toBeInTheDocument();
+  });
+});
+
+describe("bill PDF", () => {
+  const packed = (bill) => detail({ order: { status: "packed", bill_id: 407 }, bill });
+  const unsaved = { billid: 407, bill_number: "FY26-000390", pdf_url: null, finalized: true, paymentstatus: "finalized" };
+
+  beforeEach(() => {
+    mockGenerated = [];
+    mockGenerateImpl = null;
+    mockOpened = [];
+  });
+
+  test("a bill with no PDF gets one on its own, once, and the order links to it", async () => {
+    mockDetail = packed(unsaved);
+    render(<OrderDetail orderId="o1" />);
+    const link = await screen.findByRole("button", { name: "Bill of Supply FY26-000390" });
+    expect(mockGenerated).toEqual([407]);
+    fireEvent.click(link);
+    await waitFor(() => expect(mockOpened).toEqual(["bill-new.pdf"]));
+  });
+
+  test("an existing PDF is opened, not regenerated", async () => {
+    mockDetail = packed({ ...unsaved, pdf_url: "bill-old.pdf" });
+    render(<OrderDetail orderId="o1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Bill of Supply FY26-000390" }));
+    await waitFor(() => expect(mockOpened).toEqual(["bill-old.pdf"]));
+    expect(mockGenerated).toEqual([]);
+  });
+
+  test("a failure says why and Try again recovers", async () => {
+    mockGenerateImpl = () => {
+      throw new Error("storage down");
+    };
+    mockDetail = packed(unsaved);
+    render(<OrderDetail orderId="o1" />);
+    expect(await screen.findByText(/storage down/)).toBeInTheDocument();
+    expect(mockGenerated).toEqual([407]);
+
+    mockGenerateImpl = null;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "Bill of Supply FY26-000390" })).toBeInTheDocument();
+    expect(mockGenerated).toEqual([407, 407]);
+  });
+
+  test("a cancelled bill gets no PDF", async () => {
+    mockDetail = packed({ ...unsaved, paymentstatus: "cancelled" });
+    render(<OrderDetail orderId="o1" />);
+    expect(await screen.findByText("Bill of Supply FY26-000390")).toBeInTheDocument();
+    expect(mockGenerated).toEqual([]);
   });
 });

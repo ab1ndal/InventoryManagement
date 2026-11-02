@@ -65,3 +65,37 @@ describe("WhatsApp Community QR footer", () => {
     expect(WHATSAPP_COMMUNITY_INVITE_URL).toBe("https://chat.whatsapp.com/ErIgYB8O2Cq6z8DXYG1iCg");
   });
 });
+
+describe("online order bill", () => {
+  const onlineBill = {
+    ...base,
+    items: [
+      { _id: "a", product_name: "Kurti", variantid: "v1", mrp: 500, quantity: 1 },
+      { _id: "b", product_name: "Shipping", variantid: null, mrp: 110, quantity: 1 },
+    ],
+    computed: { ...base.computed, itemsSubtotal: 610, discountTotal: 500, grandTotal: 110 },
+    lines: [],
+    discountLines: [],
+    paymentAmount: 110,
+    docType: "bos",
+  };
+
+  test("savings percentage leaves shipping out of the MRP", () => {
+    render(<InvoiceView {...onlineBill} />);
+    expect(screen.getByText(/You saved/)).toHaveTextContent("You saved ₹500.00 today (100.0% off MRP)!");
+  });
+
+  test("terms follow the website's online policy", () => {
+    render(<InvoiceView {...onlineBill} isOnlineOrder />);
+    expect(screen.queryByText(/No returns/)).not.toBeInTheDocument();
+    expect(screen.getByText(/within 48 hours of delivery/)).toBeInTheDocument();
+    expect(screen.getByText(/within 7 days of delivery, unused/)).toBeInTheDocument();
+    expect(screen.queryByText(/of purchase/)).not.toBeInTheDocument();
+  });
+
+  test("a shop bill keeps the shop terms", () => {
+    render(<InvoiceView {...base} />);
+    expect(screen.getByText(/No returns/)).toBeInTheDocument();
+    expect(screen.getByText(/within 24 hours of purchase/)).toBeInTheDocument();
+  });
+});

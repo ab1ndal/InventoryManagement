@@ -14,6 +14,8 @@ import {
 import { action, getMyRole, getOrder, newOpKey } from "./onlineOrdersApi";
 import { OutsideUpBadge, PickupBadge, PorterBadge, ReturnBadge, StatusBadge } from "./OrderList";
 import ReturnsSection from "./ReturnsSection";
+import { useBillPdf } from "../billing/useBillPdf";
+import { openBillPdf } from "../billing/billPdf";
 import {
   formatDateTime,
   formatRupees,
@@ -99,6 +101,10 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [release, setRelease] = useState(null);
   // One op key per Process/Cancel click; reused if that click's request is retried.
   const opRef = useRef(null);
+  const { generate: generateBillPdf, offscreen: billPdfOffscreen } = useBillPdf();
+  const [billPdf, setBillPdf] = useState({ state: "idle" }); // idle | generating | failed (+ message)
+  // Once per bill per view: a failure waits for Try again instead of looping.
+  const billPdfAttempted = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -122,8 +128,34 @@ export default function OrderDetail({ orderId, onChanged }) {
     setDetail(null);
     setCourierError(null);
     opRef.current = null;
+    setBillPdf({ state: "idle" });
     load();
   }, [load]);
+
+  const makeBillPdf = useCallback(
+    async (billId) => {
+      billPdfAttempted.current = billId;
+      setBillPdf({ state: "generating" });
+      try {
+        const path = await generateBillPdf(billId);
+        setDetail((d) => (d?.bill?.billid === billId ? { ...d, bill: { ...d.bill, pdf_url: path } } : d));
+        setBillPdf({ state: "idle" });
+      } catch (err) {
+        setBillPdf({ state: "failed", message: err.message });
+      }
+    },
+    [generateBillPdf],
+  );
+
+  // A bill is created when staff act on the order, so this covers every path that makes
+  // one (Process, Porter, ready for pickup) and repairs older bills when they are opened.
+  const billToDraw = detail?.bill;
+  useEffect(() => {
+    if (!billToDraw || billToDraw.pdf_url || !billToDraw.finalized) return;
+    if (billToDraw.paymentstatus === "cancelled") return;
+    if (billPdfAttempted.current === billToDraw.billid) return;
+    makeBillPdf(billToDraw.billid);
+  }, [billToDraw, makeBillPdf]);
 
   useEffect(() => {
     getMyRole()
@@ -254,7 +286,8 @@ export default function OrderDetail({ orderId, onChanged }) {
     return <div className="p-6 text-sm text-muted-foreground">Loading order…</div>;
   }
 
-  const { order, items, events, refunds, legs, jobs } = detail;
+  const { order, bill, items, events, refunds, legs, jobs } = detail;
+  const billLabel = `Bill of Supply ${bill?.bill_number ?? `#${order.bill_id}`}`;
   const isPaid = order.status === "paid";
   const isPickup = order.fulfilment === "pickup";
   const isReadyForPickup = order.status === "ready_for_pickup";
@@ -484,9 +517,31 @@ export default function OrderDetail({ orderId, onChanged }) {
             )}
             {order.bill_id && (
               <li>
-                <a className="text-blue-600 underline" href="/admin/bills">
-                  Bill of Supply #{order.bill_id}
-                </a>
+                {bill?.pdf_url ? (
+                  <button
+                    type="button"
+                    className="text-blue-600 underline"
+                    onClick={() =>
+                      openBillPdf(bill.pdf_url).catch((err) =>
+                        toast.error("Could not open bill PDF", { description: err.message }),
+                      )
+                    }
+                  >
+                    {billLabel}
+                  </button>
+                ) : (
+                  <span>{billLabel}</span>
+                )}
+                {billPdf.state === "generating" && <span> (creating PDF…)</span>}
+                {billPdf.state === "failed" && (
+                  <span className="text-red-700">
+                    {" "}
+                    PDF not created: {billPdf.message}.{" "}
+                    <button type="button" className="underline" onClick={() => makeBillPdf(bill.billid)}>
+                      Try again
+                    </button>
+                  </span>
+                )}
               </li>
             )}
             {order.tracking_label && (
@@ -920,6 +975,7 @@ export default function OrderDetail({ orderId, onChanged }) {
         onClose={closeDialog}
         onConfirm={() => run({ action: "rto_received", orderId }, "Return recorded and refund started")}
       />
+      {billPdfOffscreen}
     </div>
   );
 }

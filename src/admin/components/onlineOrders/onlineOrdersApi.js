@@ -113,8 +113,20 @@ export async function getOrder(id) {
     legs = res.data || [];
   }
 
+  let bill = null;
+  if (order.data.bill_id) {
+    const res = await supabase
+      .from("bills")
+      .select("billid, bill_number, pdf_url, finalized, paymentstatus")
+      .eq("billid", order.data.bill_id)
+      .maybeSingle();
+    if (res.error) raise("Loading bill", res.error);
+    bill = res.data;
+  }
+
   return {
     order: { ...order.data, returns: sortReturns(returns.data || []) },
+    bill,
     items: items.data || [],
     events: events.data || [],
     refunds: refunds.data || [],
