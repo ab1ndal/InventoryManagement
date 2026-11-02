@@ -24,6 +24,20 @@ export function billDisplayData(customer, order) {
   return { customerName: `${customer.first_name} ${customer.last_name || ""}`.trim(), isOnlineOrder: false };
 }
 
+/**
+ * Bills list row: an online bill shows and contacts the person the order is for, not the
+ * linked account (see billDisplayData), on every screen that reads `customers`.
+ */
+export function withOrderContact(bill) {
+  const order = bill.orders?.[0];
+  if (!order) return bill;
+  return {
+    ...bill,
+    customers: { first_name: order.contact_name, last_name: null },
+    contact_phone: order.contact_phone,
+  };
+}
+
 /** Versioned name so each save gets a guaranteed-fresh URL (no CDN or browser cache). */
 export function savePdfPaths({ billId, billNumber, previousPdfUrl, now }) {
   const label = billNumber || billId;

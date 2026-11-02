@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import ReturnReceiptView from "./billing/ReturnReceiptView";
 import { generateInvoicePdf } from "./billing/generateInvoicePdf";
 import { useBillPdf } from "./billing/useBillPdf";
-import { openBillPdf } from "./billing/billPdf";
+import { openBillPdf, withOrderContact } from "./billing/billPdf";
 import { formatDate } from "../../utility/dateFormat";
 import { formatINR } from "../../utility/formatCurrency";
 import { logActivity } from "../../lib/activityLog";
@@ -87,13 +87,17 @@ export default function BillTable({ onEdit }) {
       // Customer phone — fetch only what we need
       let customerName = customers ? `${customers.first_name} ${customers.last_name || ""}`.trim() : "";
       let customerPhone = "";
-      const { data: cust } = await supabase
-        .from("customers")
-        .select("phone")
-        .eq("customerid", bill.customerid)
-        .single();
-      if (cust?.phone) {
-        const digits = cust.phone.replace(/\D/g, "");
+      let rawPhone = bill.contact_phone;
+      if (!rawPhone) {
+        const { data: cust } = await supabase
+          .from("customers")
+          .select("phone")
+          .eq("customerid", bill.customerid)
+          .single();
+        rawPhone = cust?.phone;
+      }
+      if (rawPhone) {
+        const digits = rawPhone.replace(/\D/g, "");
         // Bare 10-digit number = Indian mobile, prepend country code
         customerPhone = digits.length === 10 ? `91${digits}` : digits;
       }
@@ -171,7 +175,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type, salesmethods(methodname)"
+          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type, salesmethods(methodname)"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
@@ -205,9 +209,23 @@ export default function BillTable({ onEdit }) {
           for (const c of fullNameMatches || []) customerIds.add(c.customerid);
         }
 
+        // Online bills are also found by who the order is for.
+        const { data: orderMatches, error: orderMatchErr } = await supabase
+          .from("orders")
+          .select("bill_id")
+          .ilike("contact_name", `%${safeTerm}%`);
+        if (superseded) return;
+        if (orderMatchErr) {
+          toast({ title: "Error loading bills", description: orderMatchErr.message, variant: "destructive" });
+          setLoading(false);
+          return;
+        }
+        const orderBillIds = (orderMatches || []).map((o) => o.bill_id).filter(Boolean);
+
         const orParts = [`bill_number.ilike.%${safeTerm}%`];
         if (/^\d+$/.test(safeTerm)) orParts.push(`billid.eq.${safeTerm}`);
         if (customerIds.size > 0) orParts.push(`customerid.in.(${[...customerIds].join(",")})`);
+        if (orderBillIds.length > 0) orParts.push(`billid.in.(${orderBillIds.join(",")})`);
         query = query.or(orParts.join(","));
       }
 
@@ -245,7 +263,7 @@ export default function BillTable({ onEdit }) {
 
         setBills(
           pageBills.map((b) => ({
-            ...b,
+            ...withOrderContact(b),
             amount_received: receivedByBill.has(b.billid)
               ? receivedByBill.get(b.billid)
               : b.payment_amount != null
