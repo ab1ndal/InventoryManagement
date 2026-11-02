@@ -43,12 +43,12 @@ const variantSchema = z.object({
 
 const formSchema = z.object({
   name: z.string().min(1),
-  categoryid: z.string().optional(),
-  fabric: z.string().optional(),
+  categoryid: z.string().nullable().optional(),
+  fabric: z.string().nullable().optional(),
   purchaseprice: z.coerce.number().nonnegative(),
   retailprice: z.coerce.number().nonnegative(),
-  description: z.string().optional(),
-  producturl: z.string().url().optional(),
+  description: z.string().nullable().optional(),
+  producturl: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
   unit_type: z.enum(["piece", "meter"]).default("piece"),
   variants: z.array(variantSchema).optional(),
 });
@@ -77,6 +77,9 @@ export default function ProductEditDialog({
     },
   });
 
+  const { isSubmitting } = form.formState;
+  const [saveError, setSaveError] = useState("");
+  const wasOpenRef = React.useRef(false);
   const originalVariantsRef = React.useRef([]);
   const originalNamePartsRef = React.useRef({ fabric: "", categoryid: "" });
 
@@ -148,7 +151,16 @@ export default function ProductEditDialog({
   const fabricOptions = fabrics.map((f) => ({ value: f.code, label: f.code }));
   const colorOptions = colors.map((c) => ({ value: c.code, label: c.code }));
 
+  // Load the form once per opening. Callers pass new product/variants objects on
+  // every render, so resetting on those alone would wipe edits in progress.
   useEffect(() => {
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+    setSaveError("");
     if (product) {
       hasEditedNameRef.current = false; // Reset manual edit tracking
       const mappedVariants = sortVariantsBySizeColor(variants).map((variant) => ({
@@ -168,7 +180,7 @@ export default function ProductEditDialog({
         categoryid: product.categoryid || "",
       };
     }
-  }, [form, product, variants]);
+  }, [form, open, product, variants]);
 
   // Recompose the (hidden) name field from fabric + category, but only when it
   // should change — for an existing product that means fabric/category were
@@ -208,8 +220,13 @@ export default function ProductEditDialog({
         productid: product.productid,
       })),
     };
-    onClose();
-    await onSave(updated, deletedVariants);
+    setSaveError("");
+    try {
+      await onSave(updated, deletedVariants);
+      onClose();
+    } catch (error) {
+      setSaveError(error.message || "Save failed");
+    }
   };
 
   const { fields, append, remove } = useFieldArray({
@@ -232,7 +249,7 @@ export default function ProductEditDialog({
   }, [form]);
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={() => { if (!isSubmitting) onClose(); }}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
@@ -242,7 +259,9 @@ export default function ProductEditDialog({
 
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(handleSubmit)}
+            onSubmit={form.handleSubmit(handleSubmit, (errors) =>
+              setSaveError(`check ${Object.keys(errors).join(", ")}`)
+            )}
             className="space-y-4"
           >
             {product?.productid && (
@@ -252,10 +271,12 @@ export default function ProductEditDialog({
                   <span className="font-semibold">{product.productid}</span>
                 </span>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={onClose}>
+                  <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
                     Close
                   </Button>
-                  <Button type="submit">Save</Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Saving..." : "Save"}
+                  </Button>
                 </div>
               </div>
             )}
@@ -654,11 +675,18 @@ export default function ProductEditDialog({
               })}
             </div>
 
+            {saveError && (
+              <p role="alert" className="text-sm text-destructive text-right">
+                Not saved: {saveError}
+              </p>
+            )}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
                 Close
               </Button>
-              <Button type="submit">Save</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Saving..." : "Save"}
+              </Button>
             </div>
           </form>
         </Form>

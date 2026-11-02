@@ -4,7 +4,6 @@ import { supabase } from "../../lib/supabaseClient";
 import ProductTable from "../components/ProductTable";
 import ProductEditDialog from "../components/ProductEditDialog";
 import { Button } from "../../components/ui/button";
-import { Toaster } from "../../components/ui/toaster";
 import { useToast } from "../../components/hooks/use-toast";
 import { useTableFilters } from "../hooks/useTableFilters";
 import { logActivity } from "../../lib/activityLog";
@@ -150,6 +149,7 @@ const InventoryPage = () => {
         title: "Adding Product Failed",
         description: err.message,
       });
+      throw err; // Keeps the dialog open with what was entered.
     }
   };
 
@@ -174,7 +174,6 @@ const InventoryPage = () => {
           console.log("Added product: ", productid);
         }}
       />
-      <Toaster />
       <ProductEditDialog
         open={addDialogOpen}
         onClose={() => setAddDialogOpen(false)}

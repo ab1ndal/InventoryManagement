@@ -38,6 +38,7 @@ export default function BillTable({ onEdit }) {
   const [bills, setBills] = useState([]);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState({ search: "" });
   const [typeFilter, setTypeFilter] = useState("all"); // 'all' | 'bos' | 'invoice'
   const [sort, setSort] = useState({ key: "bill_number", dir: "desc" });
@@ -311,7 +312,18 @@ export default function BillTable({ onEdit }) {
     }
   };
 
+  // A new search always starts at page 1: matches may not reach the current page.
   useEffect(() => {
+    if (searchInput === filters.search) return;
+    const t = setTimeout(() => {
+      setPage(1);
+      setFilters({ search: searchInput });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, filters.search]);
+
+  useEffect(() => {
+    let superseded = false;
     const loadBills = async () => {
       setLoading(true);
       let query = supabase
@@ -358,6 +370,7 @@ export default function BillTable({ onEdit }) {
       }
 
       const { data, error } = await query;
+      if (superseded) return;
       if (error) {
         toast({
           title: "Error loading bills",
@@ -379,6 +392,7 @@ export default function BillTable({ onEdit }) {
             .from("bill_payments")
             .select("billid, amount")
             .in("billid", billIds);
+          if (superseded) return;
           for (const p of payRows || []) {
             receivedByBill.set(
               p.billid,
@@ -403,6 +417,9 @@ export default function BillTable({ onEdit }) {
     };
 
     loadBills();
+    return () => {
+      superseded = true;
+    };
   }, [page, filters, sort, toast, typeFilter]);
 
   // Cycle a column header through ascending → descending → no-sort (back to default: Bill Number desc).
@@ -724,13 +741,10 @@ export default function BillTable({ onEdit }) {
       <div className="flex gap-2 items-center">
         <Input
           placeholder="Search by bill #, customer name, or phone"
-          value={filters.search}
-          onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="max-w-xs"
         />
-        <Button variant="outline" onClick={() => setPage(1)}>
-          Apply
-        </Button>
         <select
           value={typeFilter}
           onChange={(e) => { setPage(1); setTypeFilter(e.target.value); }}

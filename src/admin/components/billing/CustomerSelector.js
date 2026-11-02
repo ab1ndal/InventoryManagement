@@ -4,6 +4,9 @@ import { Input } from "../../../components/ui/input";
 import CustomerForm from "../CustomerForm";
 import { supabase } from "../../../lib/supabaseClient";
 
+const customerLabel = (c) =>
+  `${`${c.first_name} ${c.last_name || ""}`.trim()} | ${c.phone || "No Phone"}`;
+
 export default function CustomerSelector({
   selectedCustomerId,
   setSelectedCustomerId,
@@ -38,7 +41,7 @@ export default function CustomerSelector({
 
   const handleSelect = (cust) => {
     setSelectedCustomerId(cust.customerid);
-    setCustomerQuery(`${cust.first_name} ${cust.last_name} | ${cust.phone}`);
+    setCustomerQuery(customerLabel(cust));
     setShowDropdown(false);
   };
 
@@ -51,23 +54,21 @@ export default function CustomerSelector({
           onChange={(e) => {
             setCustomerQuery(e.target.value);
             setShowDropdown(true);
+            // The text no longer names the selected customer, so the bill must not stay linked to them.
+            if (selectedCustomerId) setSelectedCustomerId(null);
           }}
         />
         {showDropdown && customerOptions.length > 0 && (
           <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow">
-            {customerOptions.map((c) => {
-              const name = `${c.first_name} ${c.last_name || ""}`.trim();
-              const phoneDisplay = `${c.phone || "No Phone"}`;
-              return (
-                <div
-                  key={c.customerid}
-                  className="px-3 py-2 cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSelect(c)}
-                >
-                  {name} | {phoneDisplay}
-                </div>
-              );
-            })}
+            {customerOptions.map((c) => (
+              <div
+                key={c.customerid}
+                className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                onClick={() => handleSelect(c)}
+              >
+                {customerLabel(c)}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -75,9 +76,7 @@ export default function CustomerSelector({
         triggerLabel="Add Customer"
         onSubmit={(cust) => {
           setSelectedCustomerId(cust.customerid);
-          setCustomerQuery(
-            `${cust.first_name} ${cust.last_name} | ${cust.phone}`,
-          );
+          setCustomerQuery(customerLabel(cust));
           setShowDropdown(false);
         }}
       />

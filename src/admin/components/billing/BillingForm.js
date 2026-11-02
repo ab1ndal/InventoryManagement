@@ -25,6 +25,7 @@ import { supabase } from "../../../lib/supabaseClient";
 import { toast } from "sonner";
 import { logActivity } from "../../../lib/activityLog";
 import { money, customerName as activityCustomerName } from "../../../utility/activitySummary";
+import { todayIST } from "../../../utility/dateFormat";
 
 import CustomerSelector from "./CustomerSelector";
 import ItemTable from "./ItemTable";
@@ -148,7 +149,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
   const [isBackdated, setIsBackdated] = useState(false);
   const [backdatedDate, setBackdatedDate] = useState(
-    () => new Date().toISOString().split("T")[0],
+    () => todayIST(),
   );
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
   const [exchangeCredit, setExchangeCredit] = useState(null); // { amount: number, label: string, exchangeIds: number[] }
@@ -211,7 +212,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setVoucherLoading(false);
       setSalesLocationId(null);
       setSalesMethodId(null);
-      setBackdatedDate(new Date().toISOString().split("T")[0]);
+      setBackdatedDate(todayIST());
       setBillPaymentStatus("draft");
       setBillPayments([]);
       setAddPaymentAmount("");
@@ -253,7 +254,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     if (!open) return;
 
     const loadDiscounts = async () => {
-      const today = new Date().toISOString().split("T")[0];
+      const today = todayIST();
       const { data, error } = await supabase
         .from("discounts")
         .select(
@@ -499,12 +500,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setCustomerDisplayText("");
       return;
     }
+    let superseded = false;
     supabase
       .from("customers")
       .select("first_name, last_name, phone")
       .eq("customerid", selectedCustomerId)
       .single()
       .then(({ data }) => {
+        if (superseded) return;
         const name = data
           ? `${data.first_name} ${data.last_name || ""}`.trim()
           : "";
@@ -512,6 +515,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setCustomerName(name);
         setCustomerDisplayText(displayText);
       });
+    return () => {
+      superseded = true;
+    };
   }, [selectedCustomerId]);
 
   // D-16: Auto-apply store credit when customer changes
@@ -682,7 +688,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     setVoucherLoading(true);
     setVoucherError("");
     try {
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const today = todayIST();
       const { data, error } = await supabase
         .from("vouchers")
         .select("voucher_id, customerid, expiry_date, value, redeemed, held_order_id")
@@ -1981,7 +1987,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto bg-white">
+        {/* Closing resets the whole bill, so it takes the X or Cancel, never a stray click or Esc. */}
+        <DialogContent
+          className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto bg-white"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>
               {billId ? `Edit Bill #${billId}` : "New Bill"}
@@ -2049,7 +2060,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   <Input
                     type="date"
                     value={backdatedDate}
-                    max={new Date().toISOString().split("T")[0]}
+                    max={todayIST()}
                     onChange={(e) => setBackdatedDate(e.target.value)}
                     className="w-48"
                   />
@@ -2089,6 +2100,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   }
                   salespersonMap={salespersonMap}
                   docType={docType}
+                  isBackdated={isBackdated}
                 />
               </section>
 

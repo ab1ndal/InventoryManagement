@@ -11,9 +11,12 @@ import { Button } from "../../../components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { priceItem, money, round2 } from "./billUtils";
 
-export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {}, docType = 'bos' }) {
+export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {}, docType = 'bos', isBackdated = false }) {
   const pricing = priceItem(item);
   const isBos = docType === 'bos';
+  const isMeter = item.unit_type === "meter";
+  const overStock = !isBackdated && item.stock != null && Number(item.quantity) > item.stock;
+  const [qtyRaw, setQtyRaw] = useState(null); // text while typing, so the field can sit empty
   const [discountRaw, setDiscountRaw] = useState(null);
   const [discountUnit, setDiscountUnit] = useState("amt"); // "pct" | "amt" — defaults to ₹ at entry time, per-item toggle stays available
   const base = Number(item.mrp || 0) * Number(item.quantity || 1);
@@ -47,23 +50,28 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
         <div className="flex items-center justify-center gap-1">
           <Input
             type="number"
-            min={item.unit_type === "meter" ? 0.01 : 1}
-            step={item.unit_type === "meter" ? 0.01 : 1}
-            value={item.quantity}
-            onChange={(e) =>
-              onUpdate(item._id, {
-                quantity:
-                  item.unit_type === "meter"
-                    ? parseFloat(e.target.value || "0.01")
-                    : parseInt(e.target.value || "1", 10),
-              })
-            }
+            min={isMeter ? 0.01 : 1}
+            step={isMeter ? 0.01 : 1}
+            value={qtyRaw ?? item.quantity}
+            onChange={(e) => {
+              setQtyRaw(e.target.value);
+              const qty = isMeter
+                ? parseFloat(e.target.value)
+                : parseInt(e.target.value, 10);
+              if (qty > 0) onUpdate(item._id, { quantity: qty });
+            }}
+            onBlur={() => setQtyRaw(null)}
             className="h-7 w-20 text-center"
           />
-          {item.unit_type === "meter" && (
+          {isMeter && (
             <span className="text-xs text-muted-foreground">m</span>
           )}
         </div>
+        {overStock && (
+          <div className="mt-0.5 text-xs text-destructive">
+            Only {item.stock}{isMeter ? " m" : ""} left
+          </div>
+        )}
       </td>
       <td className="px-2 py-1 text-s text-center tabular-nums">
         {money(item.mrp)}{item.unit_type === "meter" && <span className="text-xs text-muted-foreground">/m</span>}

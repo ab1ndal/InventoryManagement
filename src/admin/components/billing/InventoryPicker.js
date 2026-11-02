@@ -288,7 +288,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
                 category: selected.categoryid || null,
                 size: chosenVariant?.size || null,
                 color: chosenVariant?.color || null,
-                stock: chosenVariant?.stock ?? null,
+                stock: chosenVariant ? effectiveStock(chosenVariant) : null,
                 quantity: Number(qty),
                 mrp: Number(selected.retailprice || 0),
                 quickDiscountPct: Number(discount) || 0,
