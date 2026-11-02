@@ -385,8 +385,14 @@ export function createShiprocket(config: ShiprocketConfig): ShiprocketClient {
 
     async pickup(shipmentId) {
       const path = "/courier/generate/pickup";
-      const d = await ok("POST", path, { shipment_id: [shipmentId] });
-      if (num(d.pickup_status) !== 1) fail(path, 200, d);
+      const { status, data } = await api("POST", path, { shipment_id: [shipmentId] });
+      const d = (data ?? {}) as Json;
+      // Shiprocket can queue the pickup itself when the AWB is assigned (WEB-000006: the first
+      // call, 2 s after the AWB, got this). The pickup is requested, so Process carries on.
+      if (typeof d.message === "string" && /already in pickup queue/i.test(d.message)) {
+        return { scheduledDate: null, tokenNumber: null };
+      }
+      if (status < 200 || status >= 300 || num(d.pickup_status) !== 1) fail(path, status, d);
       const r = (d.response ?? {}) as Json;
       return {
         scheduledDate: typeof r.pickup_scheduled_date === "string" ? r.pickup_scheduled_date : null,

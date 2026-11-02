@@ -386,6 +386,13 @@ Deno.test("pickup: array shipment id; pickup_status must be 1", async () => {
   await assertRejects(() => setup(() => jsonResponse(400, { message: "Invalid shipment id" })).sr.pickup(5), ShiprocketError);
 });
 
+Deno.test("pickup: already queued by Shiprocket counts as requested, at any HTTP status", async () => {
+  const none = { scheduledDate: null, tokenNumber: null };
+  const message = "Already in Pickup Queue.";
+  assertEquals(await setup(() => jsonResponse(400, { message })).sr.pickup(5), none);
+  assertEquals(await setup(() => jsonResponse(200, { pickup_status: 0, message })).sr.pickup(5), none);
+});
+
 // ---------- manifest / label (R19) ----------
 
 Deno.test("manifest: status 1 + url → url", async () => {
