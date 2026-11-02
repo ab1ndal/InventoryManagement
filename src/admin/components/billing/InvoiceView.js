@@ -28,6 +28,28 @@ const COMMUNITY_QR_QUIET_ZONE_PX = 12;
 // Matches the height of the five-line shop info block.
 const LOGO_HEIGHT_PX = 90;
 
+const SHOP_TERMS = [
+  "No returns. Exchange only within 7 days with original bill, accepted after 12 PM.",
+  "Exchanged items must be unused, unwashed and in original condition.",
+  "Exchange/store credit will be limited to the amount paid as per the bill.",
+  "Color of products is not guaranteed.",
+  "Any damage must be reported within 24 hours of purchase.",
+];
+
+// Short form of the website's policy page (storefront policyContent.js); keep the two in step.
+const ONLINE_TERMS = [
+  "Damaged or wrong item: report within 48 hours of delivery.",
+  "Change of mind: return within 7 days of delivery, unused, with tags and original packaging. Shipping charge is not refunded.",
+  "Exchange in store only, within 7 days of delivery, with this bill; unworn, unwashed, tags intact.",
+  "Exchange/store credit is limited to the amount paid on this bill.",
+  "Colours may vary slightly from the website and are not guaranteed.",
+  "To start a return: WhatsApp +91 98108 73280 or bindalscreations@gmail.com.",
+];
+
+function isShippingLine(item) {
+  return item.product_name === "Shipping" && !item.variantid;
+}
+
 function formatDate(d) {
   return new Date(d).toLocaleDateString("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -57,6 +79,7 @@ const InvoiceView = forwardRef(function InvoiceView(
     billPayments = [],
     paymentStatus = "finalized",
     docType = "invoice",
+    isOnlineOrder = false,
     // Reprint of a finalized bill: per-line numbers and discount breakdown come
     // from what was persisted (see rehydrateBill.js) instead of being re-derived.
     lines: storedLines = null,
@@ -204,7 +227,12 @@ const InvoiceView = forwardRef(function InvoiceView(
         effectiveVoucher +
         additionalDiscount
       : 0;
-  const savingsPct = itemsSubtotal > 0 ? (totalSaved / itemsSubtotal) * 100 : 0;
+  // Shipping has no MRP to save on; counting it understates the discount on the goods.
+  const shippingCharge = (items || [])
+    .filter(isShippingLine)
+    .reduce((s, i) => s + Number(i.mrp || 0) * Number(i.quantity || 0), 0);
+  const savingsBase = itemsSubtotal - shippingCharge;
+  const savingsPct = savingsBase > 0 ? (totalSaved / savingsBase) * 100 : 0;
 
   const thStyle = {
     padding: "6px 4px",
@@ -699,20 +727,9 @@ const InvoiceView = forwardRef(function InvoiceView(
             Terms & Conditions:
           </div>
           <ul style={{ margin: 0, paddingLeft: "14px", lineHeight: 1.6 }}>
-            <li>
-              No returns. Exchange only within 7 days with original bill,
-              accepted after 12 PM.
-            </li>
-            <li>
-              Exchanged items must be unused, unwashed and in original
-              condition.
-            </li>
-            <li>
-              Exchange/store credit will be limited to the amount paid as per
-              the bill.
-            </li>
-            <li>Color of products is not guaranteed.</li>
-            <li>Any damage must be reported within 24 hours of purchase.</li>
+            {(isOnlineOrder ? ONLINE_TERMS : SHOP_TERMS).map((term) => (
+              <li key={term}>{term}</li>
+            ))}
           </ul>
         </div>
         <div style={{ textAlign: "center" }}>

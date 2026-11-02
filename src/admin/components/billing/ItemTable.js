@@ -1,6 +1,6 @@
 import ItemRow from "./ItemRow";
 
-export default function ItemTable({ items, setItems, onEdit, salespersonMap = {}, docType = 'bos' }) {
+export default function ItemTable({ items, setItems, onEdit, salespersonMap = {}, docType = 'bos', isBackdated = false }) {
   const isBos = docType === 'bos';
   const updateItem = (id, patch) => {
     setItems((prev) =>
@@ -44,6 +44,7 @@ export default function ItemTable({ items, setItems, onEdit, salespersonMap = {}
                 onEdit={onEdit}
                 salespersonMap={salespersonMap}
                 docType={docType}
+                isBackdated={isBackdated}
               />
             ))}
             {items.length === 0 && (

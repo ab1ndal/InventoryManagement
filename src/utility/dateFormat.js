@@ -13,6 +13,16 @@ export const formatDate = (dateStr) => {
     return format(new Date(dateStr), "dd/MM/yyyy");
 };
 
+// Calendar day at the shop, as YYYY-MM-DD. Bills store this day with a +05:30
+// offset, so it must not follow UTC or the browser's timezone.
+export const todayIST = (now = new Date()) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+
 // Always render activity-log timestamps in Indian Standard Time.
 export const formatDateTimeIST = (value) => {
   if (!value) return "-";

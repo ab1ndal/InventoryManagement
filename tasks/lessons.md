@@ -11,6 +11,8 @@
 - Tests: use `CI=true npx react-scripts test <path> --watchAll=false` (jest via react-scripts), not bare `npx jest`.
 - Pre-existing failing suites (baseline, NOT from your change): `App.test.js` (stale CRA "learn react link"), `dashboardData`, `RevenueChart`, `BillTable` — 6 tests. Confirm a failure is yours by diffing against baseline before assuming your change broke something.
 - html2canvas serializes an inline `<svg>` with its inline styles, so a margin on the SVG shifts the drawing inside its own image (browser layout looks right, PDF is wrong). Put the margin on a wrapper div. Check bill layout changes in the generated PDF, not just the DOM.
+- A running dev server shares `node_modules/.cache/.eslintcache` with `npm run build`, so a mid-edit lint result can fail the build with an error the code no longer has (2026-11-01: "`setSearchInput` never used" while it was used). If a lint error contradicts the file, delete that cache file and rebuild.
+- `ProductEditDialog` callers pass new `product`/`variants` objects every render, so its form load must stay guarded to once per opening. Removing the guard wipes edits on any parent re-render, including the failure toast.
 - CRA ESLint (`no-undef`) rejects `globalThis` in source. For a fetch wrapper use `(...args) => fetch(...args)`, not `fetch.bind(globalThis)`.
 
 ## Tooling: Playwright / Vercel

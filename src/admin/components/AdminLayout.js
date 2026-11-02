@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 import { countOrdersToCheck } from "./onlineOrders/onlineOrdersApi";
+import { Toaster } from "../../components/ui/toaster";
 
 const navItems = [
   { label: "Dashboard", path: "/admin/dashboard", superadminOnly: true },
@@ -129,6 +130,7 @@ export default function AdminLayout() {
       <main className="flex-1 p-6">
         <Outlet />
       </main>
+      <Toaster />
     </div>
   );
 }

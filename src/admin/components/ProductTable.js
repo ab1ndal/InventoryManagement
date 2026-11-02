@@ -333,6 +333,14 @@ const ProductTable = forwardRef(
             p_ref: productData.productid,
           });
           if (stockError) throw new Error(stockError.message);
+          // Recorded straight away: a retry after a later failure must not apply this delta twice.
+          setVariants((prev) =>
+            prev.map((v) =>
+              v.variantid === variantid
+                ? { ...v, stock: Number(v.stock ?? 0) + delta }
+                : v
+            )
+          );
         }
 
         upserts.forEach((u) => {
@@ -404,6 +412,7 @@ const ProductTable = forwardRef(
           title: "Update Failed",
           description: error.message,
         });
+        throw error; // Keeps the edit dialog open with what was entered.
       }
     };
 

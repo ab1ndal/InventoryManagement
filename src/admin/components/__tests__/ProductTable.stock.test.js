@@ -6,6 +6,7 @@ let mockOps = [];
 let mockRpcs = [];
 let mockToasts = [];
 let mockRpcError = null;
+let mockRpcFailsFor = null;
 let mockEdit = null;
 
 const mockProduct = {
@@ -53,7 +54,8 @@ jest.mock("../../../lib/supabaseClient", () => ({
     from: (t) => mockChain(t),
     rpc: async (name, args) => {
       mockRpcs.push({ name, args });
-      return { data: null, error: mockRpcError };
+      const failed = mockRpcFailsFor ? args.p_variant === mockRpcFailsFor : mockRpcError;
+      return { data: null, error: failed ? mockRpcError : null };
     },
   },
 }));
@@ -66,7 +68,8 @@ jest.mock("../../../components/hooks/use-toast", () => ({
 jest.mock("../ProductRow", () => (props) => (
   <tr>
     <td>
-      <button onClick={() => props.onEdit(...mockEdit(props))}>
+      {/* The real dialog catches a rejected save and stays open. */}
+      <button onClick={() => props.onEdit(...mockEdit(props)).catch(() => {})}>
         save {props.product.productid}
       </button>
     </td>
@@ -85,6 +88,7 @@ beforeEach(() => {
   mockRpcs = [];
   mockToasts = [];
   mockRpcError = null;
+  mockRpcFailsFor = null;
 });
 
 const saveWith = async (variantsFor, productChanges = {}) => {
@@ -162,6 +166,26 @@ test("a stock_adjust failure shows the update-failed toast", async () => {
     title: "Update Failed",
     description: "stock would go negative",
   });
+});
+
+test("retrying after a partial stock failure does not apply the first delta twice", async () => {
+  mockRpcError = { message: "stock would go negative" };
+  mockRpcFailsFor = "v2";
+  await saveWith((vs) =>
+    vs.map((v) => ({ ...v, stock: v.variantid === "v1" ? 3 : 9 }))
+  );
+
+  mockRpcFailsFor = null;
+  mockRpcError = null;
+  fireEvent.click(screen.getByRole("button", { name: "save BC25001" }));
+  await waitFor(() => expect(mockToasts.length).toBe(2));
+
+  expect(mockToasts[1].title).toBe("Product Updated");
+  expect(mockRpcs.map((r) => [r.args.p_variant, r.args.p_delta])).toEqual([
+    ["v1", -2], // first attempt
+    ["v2", 2], // first attempt, failed
+    ["v2", 2], // retry: v1 already applied
+  ]);
 });
 
 const productUpdate = () =>
