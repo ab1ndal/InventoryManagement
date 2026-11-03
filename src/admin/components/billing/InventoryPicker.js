@@ -37,7 +37,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
   useEffect(() => {
     if (!initialVal?.productid) return;
     supabase
-      .from("products")
+      .from("products_admin")
       .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
       .eq("productid", initialVal.productid)
       .single()
@@ -55,7 +55,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
         return;
       }
       const { data, error } = await supabase
-        .from("products")
+        .from("products_admin")
         .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
         .ilike("productid", `%${query}%`)
         .order("productid");

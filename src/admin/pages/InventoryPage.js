@@ -96,9 +96,7 @@ const InventoryPage = () => {
       const fullProduct = { ...productFields, productid: newProductId };
       const { error: insertErr } = await supabase
         .from("products")
-        .insert([fullProduct])
-        .select()
-        .single();
+        .insert([fullProduct]);
 
       if (insertErr) throw new Error("Product insert failed");
 

@@ -78,7 +78,7 @@ async function fetchPeriod({ start, end }) {
       ? supabase.from("manual_items").select("manual_item_id, purchase_price").in("manual_item_id", manualCodes)
       : { data: [], error: null },
     variantIds.length > 0
-      ? supabase.from("productsizecolors").select("variantid, products(purchaseprice)").in("variantid", variantIds)
+      ? supabase.from("variant_costs").select("variantid, purchaseprice").in("variantid", variantIds)
       : { data: [], error: null },
   ]);
   if (manualRes.error) throw manualRes.error;
@@ -88,7 +88,7 @@ async function fetchPeriod({ start, end }) {
     (manualRes.data || []).map((r) => [r.manual_item_id, r.purchase_price || 0])
   );
   const variantPriceMap = Object.fromEntries(
-    (variantRes.data || []).map((r) => [r.variantid, r.products?.purchaseprice || 0])
+    (variantRes.data || []).map((r) => [r.variantid, r.purchaseprice || 0])
   );
 
   const items = rawItems.map((i) => {
