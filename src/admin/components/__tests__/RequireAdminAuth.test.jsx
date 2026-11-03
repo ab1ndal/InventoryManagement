@@ -19,6 +19,7 @@ jest.mock("../../../lib/supabaseClient", () => ({
       },
       signOut: () => mockSignOut(),
     },
+    rpc: () => Promise.resolve({ error: null }),
     from: () => ({
       select: () => ({ eq: () => ({ single: () => Promise.resolve(mockProfile) }) }),
     }),

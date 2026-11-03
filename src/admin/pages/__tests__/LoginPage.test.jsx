@@ -8,6 +8,7 @@ let mockSignIn;
 const mockSignOut = jest.fn();
 const mockOAuth = jest.fn();
 const mockToast = jest.fn();
+const mockRpc = jest.fn();
 
 jest.mock("sonner", () => ({ toast: (...args) => mockToast(...args) }));
 jest.mock("../../../lib/supabaseClient", () => ({
@@ -17,6 +18,7 @@ jest.mock("../../../lib/supabaseClient", () => ({
       signInWithOAuth: (args) => mockOAuth(args),
       signOut: () => mockSignOut(),
     },
+    rpc: (...args) => mockRpc(...args),
     from: () => ({
       select: () => ({ eq: () => ({ single: () => Promise.resolve(mockProfile) }) }),
     }),
@@ -42,6 +44,8 @@ function submit() {
 
 beforeEach(() => {
   sessionStorage.clear();
+  mockRpc.mockReset();
+  mockRpc.mockResolvedValue({ error: null });
   mockToast.mockReset();
   mockSignOut.mockReset();
   mockSignOut.mockResolvedValue({});

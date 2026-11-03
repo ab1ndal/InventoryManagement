@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabaseClient";
 import CategoriesPage from "./CategoriesPage";
 import SalespersonsPage from "./SalespersonsPage";
 import AttributesTab from "../components/attributes/AttributesTab";
+import AdminInvites from "../components/AdminInvites";
 import {
   Table,
   TableBody,
@@ -299,6 +300,8 @@ function UsersTab({ isSuperAdmin }) {
   }
 
   return (
+    <div className="space-y-4">
+    {isSuperAdmin && <AdminInvites />}
     <div className="rounded-md border">
       <Table>
         <TableHeader>
@@ -369,6 +372,7 @@ function UsersTab({ isSuperAdmin }) {
           })}
         </TableBody>
       </Table>
+    </div>
     </div>
   );
 }
