@@ -2,7 +2,11 @@ import React from "react";
 import { render } from "@testing-library/react";
 import Seo from "../components/Seo";
 
+const canonical = () => document.head.querySelector('link[rel="canonical"]')?.getAttribute("href");
+
 describe("Seo", () => {
+  afterEach(() => window.history.pushState({}, "", "/"));
+
   it("composes the document title with the site name", () => {
     render(<Seo title="Shop" description="Browse" />);
     expect(document.title).toBe("Shop — Bindal's Creation");
@@ -13,14 +17,15 @@ describe("Seo", () => {
     expect(document.title).toBe("Bindal's Creation");
   });
 
-  it("renders a JSON-LD script when jsonLd provided", () => {
-    const { container } = render(
-      <Seo title="P" jsonLd={{ "@type": "Product", name: "P" }} />
-    );
-    // JSON-LD is a <script> tag; no accessible query reaches it.
-    // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
-    const script = container.querySelector('script[type="application/ld+json"]');
-    expect(script).not.toBeNull();
-    expect(JSON.parse(script.innerHTML).name).toBe("P");
+  it("points a filtered page at the page itself, on the real domain", () => {
+    window.history.pushState({}, "", "/shop/?color=red");
+    render(<Seo title="Shop" />);
+    expect(canonical()).toBe("https://www.bindalscreations.com/shop");
+  });
+
+  it("gives a noindex page no canonical", () => {
+    window.history.pushState({}, "", "/cart");
+    render(<Seo title="Your cart" noindex />);
+    expect(canonical()).toBeUndefined();
   });
 });

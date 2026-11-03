@@ -205,6 +205,8 @@ const STATIC_PAGES = {
     ),
 };
 
+export const STATIC_PATHS = Object.keys(STATIC_PAGES);
+
 const NOT_FOUND = {
   status: 404,
   title: "Page not found",
@@ -257,21 +259,19 @@ async function shopPage(rest) {
   };
 }
 
-function collectionFilter(collection) {
-  if (collection.productIds) return `productid=in.(${collection.productIds.join(",")})`;
-  if (collection.categoryIds) return `categoryid=in.(${collection.categoryIds.join(",")})`;
-  return null;
+function collectionQuery(collection) {
+  if (collection.productIds) return `select=${LIST_FIELDS}&productid=in.(${collection.productIds.join(",")})`;
+  if (collection.categoryIds) return `select=${LIST_FIELDS}&categoryid=in.(${collection.categoryIds.join(",")})`;
+  // Size lives on variant rows, so this matches them the way the shop page does. Codes hold "|".
+  const sizes = collection.sizes.map((s) => `"${s}"`).join(",");
+  return `select=${LIST_FIELDS},match:productsizecolors!inner(productid)&match.size=in.(${encodeURIComponent(sizes)})`;
 }
 
 async function collectionPage(slug, rest) {
   const collection = getCollection(slug);
   if (!collection) return NOT_FOUND;
   const path = `/collections/${slug}`;
-  const filter = collectionFilter(collection);
-  // A size-based collection has no simple filter here; its links stay in the sitemap.
-  const products = filter
-    ? await rest(`products?select=${LIST_FIELDS}&${filter}&order=productid.desc&limit=${LISTED_PRODUCTS}`)
-    : [];
+  const products = await rest(`products?${collectionQuery(collection)}&order=productid.desc&limit=${LISTED_PRODUCTS}`);
   return {
     status: 200,
     title: collection.title,

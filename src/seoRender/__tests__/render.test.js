@@ -3,6 +3,7 @@ import path from "path";
 import { CACHE_DEGRADED, CACHE_RENDERED, renderResponse } from "../handler";
 import { renderHtml } from "../html";
 import { describePage } from "../pages";
+import { buildSitemap, sitemapResponse } from "../sitemap";
 
 const shell = fs.readFileSync(path.join(__dirname, "../../../public/index.html"), "utf8");
 const IMG = "https://x.supabase.co/storage/v1/object/public/mockups/BC1/a.webp";
@@ -75,6 +76,45 @@ describe("describePage", () => {
     expect(q.mock.calls[0][0]).toContain("categoryid=in.(SA)");
     expect(page.canonical).toBe("/collections/sarees");
     expect(page.bodyHtml).toContain('href="/product/BC1"');
+  });
+
+  test("a size collection lists its products, with size codes safely encoded", async () => {
+    const q = rest();
+    const page = await describePage("collections/plus-size", q);
+    expect(q.mock.calls[0][0]).toContain("match:productsizecolors!inner(productid)");
+    expect(decodeURIComponent(q.mock.calls[0][0])).toContain('match.size=in.("3XL|46",');
+    expect(q.mock.calls[0][0]).not.toContain("|");
+    expect(page.bodyHtml).toContain('href="/product/BC1"');
+  });
+});
+
+describe("sitemap", () => {
+  const log = jest.fn();
+
+  test("lists static pages, every collection and every product, and nothing private", async () => {
+    const xml = await buildSitemap(rest([{ productid: "BC1" }, { productid: "BC2" }]));
+    expect(xml).toContain("<loc>https://www.bindalscreations.com/</loc>");
+    expect(xml).toContain("<loc>https://www.bindalscreations.com/customize</loc>");
+    expect(xml).toContain("<loc>https://www.bindalscreations.com/collections/plus-size</loc>");
+    expect(xml).toContain("<loc>https://www.bindalscreations.com/product/BC2</loc>");
+    expect(xml).not.toMatch(/\/(admin|cart|checkout|account|login|search|track)/);
+  });
+
+  test("pages past the database's row cap", async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => ({ productid: `A${i}` }));
+    const q = jest.fn().mockResolvedValueOnce(full).mockResolvedValueOnce([{ productid: "LAST" }]);
+    const xml = await buildSitemap(q);
+    expect(q.mock.calls[1][0]).toContain("offset=1000");
+    expect(xml).toContain("/product/A999<");
+    expect(xml).toContain("/product/LAST<");
+  });
+
+  test("an outage is a 503 and logged, never an empty sitemap", async () => {
+    const down = jest.fn(() => Promise.reject(new Error("timeout")));
+    const r = await sitemapResponse({ rest: down, log });
+    expect(r.status).toBe(503);
+    expect(r.body).not.toContain("<urlset");
+    expect(log).toHaveBeenCalledWith("seo_sitemap_failed", { error: "timeout" });
   });
 });
 
