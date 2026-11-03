@@ -41,6 +41,44 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+// The main photo's frame, shared with the loading state so the page holds the
+// same space before and after the product arrives. Beside the thumbnail rail
+// (sm+) self-start stops the row stretching it to the rail's height. Stacked on
+// phones it must keep the default stretch: self-start there sizes the frame
+// from its contents, so it stays collapsed until the photo has downloaded.
+const GALLERY_FRAME =
+  "flex-1 sm:self-start aspect-[3/4] md:max-w-[calc((100svh-182px)*0.75)] bg-storefront-cream";
+
+function BackToShopLink() {
+  return (
+    <Link
+      to="/shop"
+      className="inline-flex items-center gap-1.5 text-[10px] font-sans tracking-[0.15em] uppercase text-storefront-muted hover:text-storefront-charcoal transition-colors mb-8"
+    >
+      <ArrowLeft size={11} />
+      Shop
+    </Link>
+  );
+}
+
+// Holds the product page's layout so nothing moves when the content arrives:
+// the photo frame keeps its place and the footer stays below the fold.
+function ProductLoading() {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 min-h-svh">
+      <BackToShopLink />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16">
+        <div className="flex flex-col-reverse sm:flex-row gap-3">
+          <div className="hidden sm:block sm:w-[72px] flex-shrink-0" />
+          <div data-testid="product-loading-frame" className={`${GALLERY_FRAME} flex items-center justify-center`}>
+            <div className="w-7 h-7 border-2 border-storefront-charcoal border-t-transparent rounded-full animate-spin" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GalleryPlaceholder({ name }) {
   const initials = name
     ? name
@@ -111,10 +149,9 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
 
       {/* Main image. On md+ the width is capped so the 3:4 frame fits the
           screen below the sticky header (166px) with 16px to spare;
-          otherwise landscape screens cut off the top and bottom. self-start
-          stops the row stretching it to the thumbnail rail's height. */}
+          otherwise landscape screens cut off the top and bottom. */}
       <div
-        className="group relative flex-1 self-start aspect-[3/4] md:max-w-[calc((100svh-182px)*0.75)] overflow-hidden bg-storefront-cream"
+        className={`group relative overflow-hidden ${GALLERY_FRAME}`}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
@@ -182,7 +219,9 @@ function ProductDetail({ productid }) {
   const { product, variants, loading, error } = useProduct(productid);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [imagePaths, setImagePaths] = useState([]);
+  // null until known: the thumbnail rail sits above the info column on phones,
+  // so the page waits for it rather than pushing the content down when it lands.
+  const [imagePaths, setImagePaths] = useState(null);
   const [activeImage, setActiveImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const addToCartRef = useRef(null);
@@ -213,17 +252,13 @@ function ProductDetail({ productid }) {
     };
   }, [productid]);
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 flex justify-center">
-        <div className="w-7 h-7 border-2 border-storefront-charcoal border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+  if (loading || (product && !imagePaths)) {
+    return <ProductLoading />;
   }
 
   if (error || !product) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 min-h-svh text-center">
         <Seo title="Product not found" noindex />
         <p className="font-sans text-storefront-muted text-sm mb-4">
           Product not found.
@@ -338,13 +373,7 @@ function ProductDetail({ productid }) {
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28">
         {/* Breadcrumb */}
-        <Link
-          to="/shop"
-          className="inline-flex items-center gap-1.5 text-[10px] font-sans tracking-[0.15em] uppercase text-storefront-muted hover:text-storefront-charcoal transition-colors mb-8"
-        >
-          <ArrowLeft size={11} />
-          Shop
-        </Link>
+        <BackToShopLink />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16">
           {/* Gallery — stays in view on desktop while the info column scrolls.
