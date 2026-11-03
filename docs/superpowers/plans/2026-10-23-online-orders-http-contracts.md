@@ -66,12 +66,12 @@ Errors: 403 `checkout_off`; 409 `price_changed` (re-quote); 409 `out_of_stock`; 
 
 ### POST `order-status`
 Req: `{ orderRef, accessToken }` (or no token with a signed-in owner's JWT)
-Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"processed"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", courier: "shiprocket"|"porter"|"self"|null, items: [{ name, size, color, qty, status }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
+Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"processed"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", courier: "shiprocket"|"porter"|"self"|null, courierName: string|null, statusTimes: { [status]: iso }|null, deliveryCity: string|null, deliveryPincode: string|null, items: [{ name, size, color, qty, status, imageUrl: string|null }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
 (`courier: null` = the default Shiprocket flow. `trackingUrl`: the Shiprocket link when there is an AWB; for a Porter order the link staff pasted, or null.)
 404 for unknown ref or bad token (identical).
 
 ### RPC `online_order_lookup` (anon, for /track)
-`supabase.rpc("online_order_lookup", { p_order_ref, p_phone })` → same shape as order-status `Res` but snake_case from SQL, or `null`. UI normalises. (`courier`, `tracking_url` as above.)
+`supabase.rpc("online_order_lookup", { p_order_ref, p_phone })` → same shape as order-status `Res` but snake_case from SQL, or `null`. UI normalises. (`courier`, `tracking_url`, `courier_name`, `status_times`, `delivery_city`, `delivery_pincode`, `items[].image_url` as above.)
 
 ### RPC `my_online_orders` (authenticated, for /account/orders) → array of order summaries (see migration).
 

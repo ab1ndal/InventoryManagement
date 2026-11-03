@@ -118,3 +118,54 @@ describe("store pickup", () => {
     expect(screen.getByText(/This order was cancelled/)).toBeInTheDocument();
   });
 });
+
+describe("step times", () => {
+  const row = (name) =>
+    within(screen.getByRole("list", { name: /order progress/i }))
+      .getAllByRole("listitem")
+      .find((li) => li.textContent.includes(name));
+  const TIMES = {
+    paid: "2026-11-01T17:03:00Z",
+    processed: "2026-11-02T04:00:00Z",
+    packed: "2026-11-02T06:00:00Z",
+    shipped: "2026-11-03T06:00:00Z",
+  };
+
+  it("shows India time under each completed step", () => {
+    render(<OrderTimeline status="packed" statusTimes={TIMES} />);
+    expect(row("Order placed").querySelector("time")).toHaveTextContent("1 Nov, 10:33 pm");
+    expect(row("Order placed").querySelector("time")).toHaveAttribute("datetime", TIMES.paid);
+    expect(row("Processed").querySelector("time")).toHaveTextContent("2 Nov, 9:30 am");
+    expect(row("Packed").querySelector("time")).toHaveTextContent("2 Nov, 11:30 am");
+  });
+
+  it("shows no time on a pending step, even if one is recorded", () => {
+    render(<OrderTimeline status="packed" statusTimes={TIMES} />);
+    expect(row("Picked up").querySelector("time")).toBeNull();
+  });
+
+  it("shows no time on a completed step with none recorded", () => {
+    const { paid, processed, shipped } = TIMES;
+    render(<OrderTimeline status="shipped" statusTimes={{ paid, processed, shipped }} />);
+    expect(row("Packed").getAttribute("data-complete")).toBe("true");
+    expect(row("Packed").querySelector("time")).toBeNull();
+  });
+
+  it("shows times on the steps a cancelled order reached", () => {
+    render(<OrderTimeline status="cancelled" statusTimes={TIMES} />);
+    expect(row("Order placed").querySelector("time")).toHaveTextContent("1 Nov, 10:33 pm");
+    expect(row("Processed").querySelector("time")).toBeNull();
+  });
+
+  it("maps pickup steps", () => {
+    render(<OrderTimeline status="ready_for_pickup" fulfilment="pickup" statusTimes={{ paid: TIMES.paid, ready_for_pickup: TIMES.processed }} />);
+    expect(row("Paid").querySelector("time")).toHaveTextContent("1 Nov, 10:33 pm");
+    expect(row("Ready for pickup").querySelector("time")).toHaveTextContent("2 Nov, 9:30 am");
+    expect(row("Collected").querySelector("time")).toBeNull();
+  });
+
+  it("renders without times when the field is absent", () => {
+    render(<OrderTimeline status="delivered" />);
+    expect(document.querySelector("time")).toBeNull();
+  });
+});

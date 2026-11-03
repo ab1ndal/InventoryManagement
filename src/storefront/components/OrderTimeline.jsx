@@ -1,5 +1,5 @@
 import React from "react";
-import { completedStep, statusMessage, timelineSteps } from "../lib/orderStatus";
+import { completedStep, formatStepTime, statusMessage, stepTimes, timelineSteps } from "../lib/orderStatus";
 import { SHOP_ADDRESS } from "../lib/siteConfig";
 
 const OFF_PATH = {
@@ -11,10 +11,11 @@ const OFF_PATH = {
 // Order placed → Processed → Packed → Picked up → Out for delivery → Delivered
 // for every courier (store pickup: Paid → Ready for pickup → Collected), with
 // the cancelled / returned-to-origin exits shown as a note under the steps.
-export default function OrderTimeline({ status, fulfilment }) {
+export default function OrderTimeline({ status, fulfilment, statusTimes }) {
   const done = completedStep(status, fulfilment);
   if (done < 0) return null;
   const steps = timelineSteps(fulfilment);
+  const times = stepTimes(statusTimes, fulfilment);
   const message = statusMessage(status, fulfilment);
   return (
     <div className="font-sans text-sm text-storefront-charcoal">
@@ -26,6 +27,7 @@ export default function OrderTimeline({ status, fulfilment }) {
           const complete = index <= done;
           // A cancelled or returning order has stopped, so no step is where it is "now".
           const current = index === done && !OFF_PATH[status];
+          const time = complete ? formatStepTime(times[index]) : null;
           return (
             <li
               key={step}
@@ -55,6 +57,11 @@ export default function OrderTimeline({ status, fulfilment }) {
               <span className={`leading-6 ${current ? "font-semibold" : complete ? "" : "text-storefront-muted"}`}>
                 {step}
                 <span className="sr-only">{complete ? " (done)" : " (pending)"}</span>
+                {time && (
+                  <time dateTime={times[index]} className="block text-xs font-normal leading-4 text-storefront-muted">
+                    {time}
+                  </time>
+                )}
               </span>
             </li>
           );

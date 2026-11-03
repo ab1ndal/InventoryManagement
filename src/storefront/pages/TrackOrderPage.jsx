@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Seo from "../components/Seo";
+import OrderDelivery from "../components/OrderDelivery";
 import OrderDetails from "../components/OrderDetails";
 import OrderHelp from "../components/OrderHelp";
 import OrderTimeline from "../components/OrderTimeline";
@@ -37,7 +38,14 @@ export default function TrackOrderPage() {
             <p className="text-xs tracking-widest uppercase text-storefront-muted">Order {result.order.orderRef}</p>
             <p className="text-lg font-semibold mt-1">{statusLabel(result.order.status, result.order.fulfilment)}</p>
           </div>
-          <OrderTimeline status={result.order.status} fulfilment={result.order.fulfilment} />
+          <OrderTimeline status={result.order.status} fulfilment={result.order.fulfilment} statusTimes={result.order.statusTimes} />
+          <OrderDelivery
+            status={result.order.status}
+            fulfilment={result.order.fulfilment}
+            courierName={result.order.courierName}
+            city={result.order.deliveryCity}
+            pincode={result.order.deliveryPincode}
+          />
           {result.order.fulfilment !== "pickup" && result.order.trackingUrl && (
             <a href={result.order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
               See detailed tracking on Shiprocket

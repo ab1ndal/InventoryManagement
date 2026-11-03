@@ -165,3 +165,29 @@ it("a processed order is confirmed, stops polling and clears the cart", async ()
   expect(mockClearCart).toHaveBeenCalledTimes(1);
   expect(mockOrderStatus).toHaveBeenCalledTimes(1);
 });
+
+it("shows step times, courier, destination and photo from the order-status response", async () => {
+  mockOrderStatus.mockReset();
+  mockOrderStatus.mockResolvedValue(order("shipped", {
+    fulfilment: "ship",
+    courierName: "Amazon Shipping Surface 1kg",
+    deliveryCity: "Ghaziabad",
+    deliveryPincode: "201001",
+    statusTimes: { paid: "2026-11-01T17:03:00+00:00" },
+    items: [{ name: "Silk Saree", size: "FREE", color: "Red", qty: 2, status: "ordered", imageUrl: "https://img.test/a.webp" }],
+  }));
+  renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByText("1 Nov, 10:33 pm")).toBeInTheDocument();
+  expect(screen.getByText("Delivery by Amazon Shipping Surface")).toBeInTheDocument();
+  expect(screen.getByText("Delivering to Ghaziabad, 201001")).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: "Silk Saree" })).toHaveAttribute("src", "https://img.test/a.webp");
+});
+
+it("still renders an order from a handler that has no tracking fields yet", async () => {
+  mockOrderStatus.mockReset();
+  mockOrderStatus.mockResolvedValue(order("shipped"));
+  renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByText("Payment received — order confirmed")).toBeInTheDocument();
+  expect(screen.queryByText(/Delivery by|Delivering to/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("img", { name: "Silk Saree" })).not.toBeInTheDocument();
+});

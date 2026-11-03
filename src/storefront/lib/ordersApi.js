@@ -107,6 +107,7 @@ export function normalizeOrder(row) {
       qty: i.qty,
       status: i.status,
       refundedQty: i.refunded_qty ?? 0,
+      imageUrl: i.image_url ?? null,
     })),
     totals: {
       subtotal: Number(row.subtotal ?? 0),
@@ -120,6 +121,9 @@ export function normalizeOrder(row) {
     courier: row.courier ?? null,
     courierName: row.courier_name ?? null,
     awb: row.awb ?? null,
+    statusTimes: row.status_times ?? null,
+    deliveryCity: row.delivery_city ?? null,
+    deliveryPincode: row.delivery_pincode ?? null,
     leftoverVoucher: null,
   };
 }

@@ -39,6 +39,8 @@
 
 - `o.courier in (...)` is NULL when courier is NULL, so inside `not (...)` it lets NULL-courier (Shiprocket) orders through. Use `coalesce(o.courier, '')` in status guards.
 
+- `order_events.to_status = 'paid'` does not mean payment: `sent_back` and `rebooked` write it too, and every same-status event (`availability`) repeats it. Reading when something happened: payment is `kind = 'paid'`, ignore events before the latest `sent_back`/`rebooked`, and delivery is `orders.delivered_at` (staff can backdate it, the event holds the click).
+
 - **plpgsql `RETURNS TABLE (email, ...)` makes `email` an OUT variable.** An unqualified `email` in the body's SQL then errors `42702 ambiguous`, but only on the code path that reaches it, so it hides until a fresh user calls it. Put `#variable_conflict use_column` right after `as $$`, or qualify columns with aliases. Test SECURITY DEFINER customer functions in `begin; insert into auth.users ...; set_config('request.jwt.claims', ...); set local role authenticated; ...; rollback;`.
 - `_migrations` was backfilled 2026-10-21, so `npm run migrate` is safe again. Never put `BEGIN`/`COMMIT` in a new migration (`exec_sql` gives `0A000`).
 - Never chain `git stash pop` after `;` when the `git stash` may not have run: it pops an older unrelated stash (this repo keeps `stash@{0}` "Added Free-Size").
