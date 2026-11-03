@@ -45,6 +45,7 @@ begin
   assert (select count(*) from public.products_admin) = 0, 'products_admin is empty for a customer';
   assert (select count(*) from public.variant_costs) = 0, 'variant_costs is empty for a customer';
   assert (select count(*) from public.mockups_view) = 0, 'mockups_view is empty for a customer';
+  assert (select count(*) from public.inventory_stats_by_category()) = 0, 'stats are empty for a customer';
 end $$;
 reset role;
 
@@ -56,6 +57,7 @@ begin
   assert (select purchaseprice from public.products_admin where productid = 'BC2599') = 500, 'admin reads cost';
   assert (select count(*) from public.variant_costs where purchaseprice = 500) >= 1, 'admin reads variant cost';
   assert (select count(*) from public.mockups_view where productid = 'BC2599') = 1, 'admin reads mockups_view';
+  assert (select total_purchase_value from public.inventory_stats_by_category() where category = 'Saree') = 500, 'admin reads stats';
   update public.products set purchaseprice = 600 where productid = 'BC2599';
   assert (select purchaseprice from public.products_admin where productid = 'BC2599') = 600, 'admin writes cost';
 end $$;
