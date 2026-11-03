@@ -4,6 +4,7 @@
  * shop is a composition dealer (Bill of Supply).
  */
 
+import { UP_STATE } from "./pincode.ts";
 
 export type EmailItem = { name: string; size: string | null; color: string | null; qty: number; status: string };
 
@@ -70,10 +71,16 @@ function addressLines(a: Record<string, unknown>): string[] {
 }
 
 // Out-of-UP orders are accepted but fulfilled case by case (owner 2026-10-30).
+function inUp(a: Record<string, unknown>): boolean {
+  return typeof a.state === "string" && a.state.trim().toLowerCase() === UP_STATE.toLowerCase();
+}
+
 export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
   const next = o.fulfilment === "pickup"
     ? `You chose store pickup at ${SHOP_ADDRESS}. We'll email you when your order is ready to collect (usually 1–2 days).`
-    : "We'll email you again when your parcel ships.";
+    : `${
+      inUp(o.address) ? "" : "We'll confirm delivery to your address on WhatsApp before dispatch. "
+    }We'll email you again when your parcel ships.`;
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",

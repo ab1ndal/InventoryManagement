@@ -12,7 +12,7 @@ const SIGNALS = [
   { icon: Ruler, title: "Plus sizes up to 6XL", desc: "Hard to find in stores; we keep 2XL to 6XL" },
   { icon: RefreshCw, title: "7-day returns & exchange", desc: "Within 7 days of delivery or purchase" },
   { icon: MessageCircle, title: "WhatsApp help", desc: "Ask us about size, fabric or fit", href: WHATSAPP_URL },
-  { icon: Truck, title: "Free shipping over ₹5,000", desc: "Delivered across India" },
+  { icon: Truck, title: "Free shipping over ₹5,000", desc: "Delivered to your door" },
 ];
 
 function Signal({ icon: Icon, title, desc }) {

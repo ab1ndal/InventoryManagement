@@ -3,8 +3,8 @@
 // COD is not mentioned at all.
 export const FAQ_ITEMS = [
   {
-    q: "How long does delivery take, and where do you deliver?",
-    a: "We dispatch within 2 working days. Delivery typically takes 5–7 days after dispatch. We deliver anywhere in India.",
+    q: "How long does delivery take?",
+    a: "We dispatch within 2 working days. Delivery typically takes 5–7 days after dispatch.",
   },
   {
     q: "What payment methods do you accept?",
