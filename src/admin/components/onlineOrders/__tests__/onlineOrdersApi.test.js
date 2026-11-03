@@ -182,6 +182,14 @@ test("the phone clause uses only the digits of the term", () => {
   expect(parseClauses(orderSearchFilter("99999 99999"))[2]).toEqual(["contact_phone.ilike.", "%9999999999%"]);
 });
 
+test("a full number typed with a leading 0 still finds the phone", () => {
+  expect(parseClauses(orderSearchFilter("09999 999999"))[2]).toEqual(["contact_phone.ilike.", "%9999999999%"]);
+});
+
+test("an order number keeps its zeros, so it does not match every phone with that digit", () => {
+  expect(parseClauses(orderSearchFilter("WEB-000006"))[2]).toEqual(["contact_phone.ilike.", "%000006%"]);
+});
+
 test("a term without digits has no phone clause", () => {
   expect(orderSearchFilter("Asha")).not.toContain("contact_phone");
 });

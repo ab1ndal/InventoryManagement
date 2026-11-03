@@ -66,6 +66,17 @@ it("reads the live switch and fails closed on error", async () => {
   await expect(getCheckoutLive()).resolves.toBe(false);
 });
 
+it.each([
+  ["09810873280", "9810873280"],
+  ["098108 73280", "9810873280"],
+  ["+91 98108 73280", "+91 98108 73280"],
+  ["9810873280", "9810873280"],
+])("lookup sends %s as %s", async (typed, sent) => {
+  supabase.rpc.mockResolvedValue({ data: null, error: null });
+  await lookupOrder("WEB-000001", typed);
+  expect(supabase.rpc).toHaveBeenCalledWith("online_order_lookup", { p_order_ref: "WEB-000001", p_phone: sent });
+});
+
 it("normalises the lookup RPC to the order-status shape, null when not found", async () => {
   supabase.rpc.mockResolvedValue({ data: ROW, error: null });
   const order = await lookupOrder("web-000001", "9810873280");

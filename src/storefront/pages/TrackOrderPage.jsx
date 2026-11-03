@@ -58,7 +58,7 @@ export default function TrackOrderPage() {
               className="block text-xs font-sans tracking-wide text-storefront-charcoal mb-2"
               htmlFor="orderRef"
             >
-              Order Reference
+              Order number
             </label>
             <input
               id="orderRef"
@@ -66,8 +66,12 @@ export default function TrackOrderPage() {
               value={orderRef}
               onChange={(e) => setOrderRef(e.target.value)}
               placeholder="WEB-000123"
+              aria-describedby="orderRefHint"
               className="w-full border border-storefront-border bg-white px-3 py-3 text-sm font-sans focus:outline-none focus:border-storefront-gold"
             />
+            <p id="orderRefHint" className="mt-1 text-xs font-sans text-storefront-muted">
+              Find it in your confirmation email or on your order page.
+            </p>
           </div>
 
           <div>
@@ -75,13 +79,14 @@ export default function TrackOrderPage() {
               className="block text-xs font-sans tracking-wide text-storefront-charcoal mb-2"
               htmlFor="phone"
             >
-              Phone
+              Phone number used at checkout
             </label>
             <input
               id="phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              placeholder="10-digit mobile number"
               className="w-full border border-storefront-border bg-white px-3 py-3 text-sm font-sans focus:outline-none focus:border-storefront-gold"
             />
           </div>

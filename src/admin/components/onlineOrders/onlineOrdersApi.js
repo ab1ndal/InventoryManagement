@@ -111,11 +111,12 @@ function likeContains(term) {
 }
 
 // contact_phone is stored as +91XXXXXXXXXX (public._normalize_phone), so only the digits of a
-// typed number can match. A term without digits skips the phone clause.
+// typed number can match. A term without digits skips the phone clause. Only a full 11-digit
+// number loses its leading 0: stripping zeros from "WEB-000006" would match any phone with a 6.
 export function orderSearchFilter(term) {
   const pattern = likeContains(term);
   const clauses = [`order_ref.ilike.${pattern}`, `contact_name.ilike.${pattern}`];
-  const digits = term.replace(/\D/g, "");
+  const digits = term.replace(/\D/g, "").replace(/^0(\d{10})$/, "$1");
   if (digits) clauses.push(`contact_phone.ilike.${likeContains(digits)}`);
   return clauses.join(",");
 }
