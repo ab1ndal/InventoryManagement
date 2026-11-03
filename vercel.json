@@ -30,8 +30,12 @@
       "destination": "/shell.html"
     },
     {
-      "source": "/:path*",
-      "destination": "/api/render?ssr_path=:path*"
+      "source": "/",
+      "destination": "/api/render"
+    },
+    {
+      "source": "/:path+",
+      "destination": "/api/render?ssr_path=:path+"
     }
   ]
 }
