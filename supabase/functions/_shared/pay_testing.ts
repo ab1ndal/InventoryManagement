@@ -280,6 +280,10 @@ export function testDeps(
     kickJobs: () => {
       kicks.n++;
     },
+    photoStorage: {
+      createViewUrl: (path, seconds) =>
+        Promise.resolve(path.startsWith("gone/") ? null : `https://storage.test/view/${path}?ttl=${seconds}`),
+    },
     ...over,
     store,
     cashfree,

@@ -141,3 +141,6 @@ export function statusLabel(status, fulfilment = "ship") {
   if (fulfilment === "pickup" && PICKUP_LABELS[status]) return PICKUP_LABELS[status];
   return STATUS_LABELS[status] ?? status;
 }
+
+// Matches online_order_packed_photo_paths; the server has the final say.
+export const PACKED_PHOTO_STATUSES = ["packed", "shipped", "out_for_delivery", "delivered"];

@@ -15,6 +15,7 @@
  * owner's accounts exist (checkout_live stays false until then).
  */
 
+import { type ReturnsStorage, supabaseReturnsStorage } from "./returns.ts";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { type CashfreeClient, type CashfreeEnv, createCashfree } from "./cashfree.ts";
 import { createShiprocket, type ShiprocketClient, type TokenStore } from "./shiprocket.ts";
@@ -376,6 +377,7 @@ export type AppDeps = {
   now: () => Date;
   /** Fire-and-forget POST to run-jobs (R2: drain the outbox right after a confirm). */
   kickJobs: () => void;
+  photoStorage: Pick<ReturnsStorage, "createViewUrl">;
 };
 
 type EnvGet = (name: string) => string | undefined;
@@ -458,6 +460,7 @@ export function appDeps(get: EnvGet = (n) => Deno.env.get(n)): AppDeps & { db: S
     env,
     now: () => new Date(),
     kickJobs: jobKicker(env),
+    photoStorage: supabaseReturnsStorage(db),
   };
 }
 

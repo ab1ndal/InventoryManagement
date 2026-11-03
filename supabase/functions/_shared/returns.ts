@@ -25,6 +25,7 @@ export type ReturnsStorage = {
   createUploadUrl(path: string): Promise<{ uploadUrl: string; token: string }>;
   /** null when the object is gone from Storage. */
   createViewUrl(path: string, expiresInSeconds: number): Promise<string | null>;
+  removeObject(path: string): Promise<void>;
 };
 
 export const RETURN_PHOTO_BUCKET = "order-returns";
@@ -53,6 +54,10 @@ export function supabaseReturnsStorage(client: SupabaseClient): ReturnsStorage {
         );
       }
       return data.signedUrl;
+    },
+    async removeObject(path) {
+      const { error } = await bucket().remove([path]);
+      if (error) throw new Error(`remove failed for ${path}: ${error.message}`);
     },
   };
 }

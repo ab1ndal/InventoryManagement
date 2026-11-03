@@ -157,6 +157,7 @@ export type OrdersDb = {
   getOrder(id: string): Promise<OrderRow | null>;
   /** getOrder plus the order's returns (items, photo ids): only for staff responses, never internal reads. */
   getOrderWithReturns(id: string): Promise<OrderRow | null>;
+  getPackedPhotoPath(photoId: string): Promise<string | null>;
   /** Stored storage path of a return photo; staff view it through a signed URL only. */
   getReturnPhotoPath(photoId: string): Promise<string | null>;
   getReturnOrderId(returnId: string): Promise<string | null>;
@@ -185,6 +186,11 @@ export function supabaseOrdersDb(client: SupabaseClient): OrdersDb {
     async getReturnPhotoPath(photoId) {
       const { data, error } = await client.from("order_return_photos").select("path").eq("id", photoId).maybeSingle();
       if (error) throw new DbError("order_return_photos", error.code ?? null, error.message);
+      return (data?.path as string | undefined) ?? null;
+    },
+    async getPackedPhotoPath(photoId) {
+      const { data, error } = await client.from("order_packed_photos").select("path").eq("id", photoId).maybeSingle();
+      if (error) throw new DbError("order_packed_photos", error.code ?? null, error.message);
       return (data?.path as string | undefined) ?? null;
     },
     async getReturnOrderId(returnId) {

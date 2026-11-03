@@ -5,6 +5,7 @@ import OrderDelivery from "../components/OrderDelivery";
 import OrderDetails from "../components/OrderDetails";
 import OrderHelp from "../components/OrderHelp";
 import OrderTimeline from "../components/OrderTimeline";
+import PackedPhotos from "../components/PackedPhotos";
 import { useCart } from "../context/CartContext";
 import { useStorefrontAuth } from "../context/StorefrontAuthContext";
 import { WHATSAPP_URL, formatRupees, orderStatus } from "../lib/ordersApi";
@@ -166,6 +167,7 @@ export default function OrderPage() {
         city={order.deliveryCity}
         pincode={order.deliveryPincode}
       />
+      <PackedPhotos photos={order.packedPhotos} />
       {order.fulfilment !== "pickup" && order.trackingUrl && (
         <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
           See detailed tracking on Shiprocket

@@ -7,6 +7,7 @@ import TrackOrderPage from "../pages/TrackOrderPage";
 jest.mock("lib/supabaseClient", () => ({
   supabase: {
     rpc: jest.fn(),
+    functions: { invoke: jest.fn() },
   },
 }));
 
@@ -33,6 +34,31 @@ function submit(ref, phone) {
 }
 
 describe("TrackOrderPage", () => {
+  it("adds packed photos once found, asking with the same order and phone", async () => {
+    supabase.rpc.mockResolvedValue({ data: DELIVERED, error: null });
+    supabase.functions.invoke.mockResolvedValue({ data: { photos: ["https://x.test/a.jpg"] }, error: null });
+    renderPage();
+    submit("WEB-000007", "09812345678");
+    expect(await screen.findByAltText("Your packed order, view 1")).toHaveAttribute("src", "https://x.test/a.jpg");
+    expect(supabase.functions.invoke).toHaveBeenCalledWith("order-packed-photos", {
+      body: { orderRef: "WEB-000007", phone: "9812345678" },
+    });
+  });
+
+  it("still shows the order when packed photos fail, and does not ask before packing", async () => {
+    supabase.rpc.mockResolvedValue({ data: DELIVERED, error: null });
+    supabase.functions.invoke.mockRejectedValue(new Error("down"));
+    renderPage();
+    submit("WEB-000007", "9812345678");
+    expect(await screen.findByText("Delivered", { selector: "p" })).toBeInTheDocument();
+    supabase.functions.invoke.mockClear();
+    fireEvent.click(await screen.findByRole("button", { name: /track another/i }));
+    supabase.rpc.mockResolvedValue({ data: { ...DELIVERED, status: "paid" }, error: null });
+    submit("WEB-000007", "9812345678");
+    await screen.findByRole("button", { name: /track another/i });
+    expect(supabase.functions.invoke).not.toHaveBeenCalled();
+  });
+
   it("renders heading, order-ref and phone inputs, and a submit button", () => {
     renderPage();
     expect(screen.getByRole("heading", { name: /track your order/i })).toBeInTheDocument();

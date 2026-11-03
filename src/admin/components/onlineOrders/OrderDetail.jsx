@@ -13,6 +13,7 @@ import {
 } from "../../../components/ui/dialog";
 import { action, getMyRole, getOrder, newOpKey } from "./onlineOrdersApi";
 import { CourierBadge, OutsideUpBadge, PickupBadge, ReturnBadge, StatusBadge } from "./OrderList";
+import PackedPhotosSection from "./PackedPhotosSection";
 import ReturnsSection from "./ReturnsSection";
 import { useBillPdf } from "../billing/useBillPdf";
 import { openBillPdf } from "../billing/billPdf";
@@ -580,6 +581,14 @@ export default function OrderDetail({ orderId, onChanged }) {
           </tbody>
         </table>
       </section>
+
+      <PackedPhotosSection
+        order={order}
+        onChanged={async () => {
+          await load();
+          onChanged?.();
+        }}
+      />
 
       <ReturnsSection
         order={order}
