@@ -6,7 +6,10 @@ import { COLLECTIONS } from "../lib/collections";
 export default function CollectionsIndexPage() {
   return (
     <div className="min-h-screen bg-storefront-cream">
-      <Seo title="Collections" />
+      <Seo
+        title="Collections"
+        description="Browse Bindal's Creation collections: sarees, lehengas, suits, kurtis, gowns and men's ethnic wear."
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <h1 className="font-display font-semibold text-4xl sm:text-5xl text-storefront-charcoal leading-tight mb-10 text-center">

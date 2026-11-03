@@ -1,4 +1,13 @@
 {
+  "functions": {
+    "api/render.js": { "includeFiles": "build/shell.html" }
+  },
+  "headers": [
+    {
+      "source": "/(admin(?:/.*)?|unauthorized|cart|checkout|wishlist|login|account(?:/.*)?|search|track|order/.*|refund-choice/.*|shell\\.html)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    }
+  ],
   "rewrites": [
     {
       "source": "/sb-rest/:path*",
@@ -11,6 +20,22 @@
     {
       "source": "/hooks/courier-status",
       "destination": "https://epotsxdugwfhyeiudjox.supabase.co/functions/v1/courier-status"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/(admin(?:/.*)?|unauthorized|cart|checkout|wishlist|login|account(?:/.*)?|search|track|order/.*|refund-choice/.*)",
+      "destination": "/shell.html"
+    },
+    {
+      "source": "/",
+      "destination": "/api/render"
+    },
+    {
+      "source": "/:path(.+)",
+      "destination": "/api/render?ssr_path=:path"
     }
   ]
 }

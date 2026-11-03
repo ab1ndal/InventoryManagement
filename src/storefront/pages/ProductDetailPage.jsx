@@ -26,7 +26,6 @@ import { flyToCart } from "../lib/flyToCart";
 import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
-import { buildProductJsonLd } from "../lib/seo";
 import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote, heldNote } from "../lib/deliveryEstimate";
 import { stripMarkdown, whatsappProductUrl } from "../lib/productText";
 import { isSoldOut } from "../lib/stock";
@@ -243,13 +242,6 @@ function ProductDetail({ productid }) {
   const description = stripMarkdown(product.description);
   const price = Number(product.retailprice);
   const soldOut = isSoldOut(variants);
-  const productLd = buildProductJsonLd({
-    product: { ...product, description },
-    variants,
-    imagePaths,
-    productid,
-    categoryName,
-  });
   const ogImage = imagePaths.length
     ? imageUrl(imagePaths[0], { width: 1200 })
     : undefined;
@@ -343,7 +335,6 @@ function ProductDetail({ productid }) {
         }
         type="product"
         image={ogImage}
-        jsonLd={productLd}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28">
         {/* Breadcrumb */}
