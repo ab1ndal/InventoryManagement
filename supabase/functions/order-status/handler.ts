@@ -29,7 +29,7 @@ export type OrderStatusResponse = {
   orderRef: string;
   status: string;
   fulfilment: "ship" | "pickup";
-  courier: "shiprocket" | "porter" | null;
+  courier: "shiprocket" | "porter" | "self" | null;
   items: { name: string; size: string | null; color: string | null; qty: number; status: string }[];
   totals: {
     subtotal: number;

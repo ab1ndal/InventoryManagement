@@ -4,16 +4,17 @@
  *
  *   set_availability {orderId, itemId, availableQty}
  *   process          {orderId, opKey}            claim → prepare → Shiprocket steps → packed (ship orders only)
- *   dispatch_manual  {orderId, trackingUrl?}     Porter, booked by hand: paid ship order (shelf checked) → shipped | cancelled
+ *   manual_process   {orderId, courier}          Porter or self: paid ship order (shelf checked) → processed | cancelled
+ *   manual_advance   {orderId, target}           manual order, forward only: packed | shipped (bill, email) | out_for_delivery
  *   mark_ready       {orderId}                   store pickup: paid (shelf checked) → ready_for_pickup | cancelled
  *   mark_collected   {orderId}                   store pickup: ready_for_pickup → delivered
- *   cancel           {orderId, opKey, reason}    paid, or ready_for_pickup (store pickup)
+ *   cancel           {orderId, opKey, reason}    paid, ready_for_pickup (store pickup), or processed / packed (manual)
  *   retry            {orderId}                   re-run failed jobs / resume Process
  *   send_back        {orderId, opKey, manualCancelConfirmed?}                  stalled Process → paid
  *   rebook           {orderId, opKey, parcelLost, note, manualCancelConfirmed?} packed/shipped → paid | cancelled
  *   release_op       {orderId, opKey}            abandon a send_back / rebook whose booking was not cancelled
  *   rto_received     {orderId}
- *   mark_delivered   {orderId, deliveredAt, reason}   superadmin only; any admin for a Porter order (reason optional)
+ *   mark_delivered   {orderId, deliveredAt, reason}   superadmin only; any admin for a manual order (reason optional)
  *   return_open      {orderId, reason, contactedAt, items, note, returnAwb?, overrideReason?}
  *   return_photo_url {returnId, contentType}  →  {uploadUrl, path, token}
  *   return_photo_add {returnId, path}
@@ -43,10 +44,14 @@ import {
 } from "../_shared/http.ts";
 import {
   DbError,
+  isManualCourier,
   logEvent,
+  type ManualCourier,
+  type ManualStage,
   type OrdersDb,
   runCancel,
-  runDispatchManual,
+  runManualAdvance,
+  runManualProcess,
   runProcess,
   runRebook,
   runRetry,
@@ -106,21 +111,13 @@ function boolField(body: Record<string, unknown>, key: string, optional = false)
   return v;
 }
 
-/** Max length of a pasted courier tracking link (matches the orders column check). */
-const TRACKING_URL_MAX = 500;
+const MANUAL_COURIERS: readonly ManualCourier[] = ["porter", "self"];
+const MANUAL_STAGES: readonly ManualStage[] = ["packed", "shipped", "out_for_delivery"];
 
-/** Optional https:// link shown to the shopper; blank → null. */
-function trackingUrlField(body: Record<string, unknown>, key: string): string | null {
+function enumField<T extends string>(body: Record<string, unknown>, key: string, allowed: readonly T[]): T {
   const v = body[key];
-  if (v === undefined || v === null) return null;
-  if (typeof v !== "string") throw new BadRequest(`${key} must be text`);
-  const url = v.trim();
-  if (!url) return null;
-  const parsed = URL.canParse(url) ? new URL(url) : null;
-  if (!parsed || parsed.protocol !== "https:" || /\s/.test(url) || url.length > TRACKING_URL_MAX) {
-    throw new BadRequest(`${key} must be an https:// link`);
-  }
-  return url;
+  if (!allowed.includes(v as T)) throw new BadRequest(`${key} must be one of ${allowed.join(", ")}`);
+  return v as T;
 }
 
 function textField(body: Record<string, unknown>, key: string): string {
@@ -189,15 +186,18 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         return await orderBody(orderId, { billId: r.billId, ...(r.refundId ? { refundId: r.refundId } : {}) });
       }
 
-      case "dispatch_manual": {
-        // One transaction in Postgres (the Porter booking is outside our system), so no op key:
+      case "manual_process": {
+        // One transaction in Postgres (the delivery is arranged outside our system), so no op key:
         // a repeat returns the stored result.
         const orderId = uuidField(body, "orderId");
-        const r = await runDispatchManual(ship, orderId, user.id, trackingUrlField(body, "trackingUrl"));
-        return await orderBody(orderId, {
-          ...(r.billId ? { billId: r.billId } : {}),
-          ...(r.refundId ? { refundId: r.refundId } : {}),
-        });
+        const r = await runManualProcess(ship, orderId, user.id, enumField(body, "courier", MANUAL_COURIERS));
+        return await orderBody(orderId, r.refundId ? { refundId: r.refundId } : {});
+      }
+
+      case "manual_advance": {
+        const orderId = uuidField(body, "orderId");
+        const r = await runManualAdvance(ship, orderId, user.id, enumField(body, "target", MANUAL_STAGES));
+        return await orderBody(orderId, r.billId ? { billId: r.billId } : {});
       }
 
       case "mark_ready": {
@@ -288,17 +288,25 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
 
       case "mark_delivered": {
         const orderId = uuidField(body, "orderId");
-        // No courier webhook ever delivers a Porter order, so any admin closes it. For Shiprocket
+        // No courier webhook ever delivers a manual order, so any admin closes it. For Shiprocket
         // orders a manual delivery overrides tracking: superadmin only, reason required.
-        const porter = (await deps.db.getOrder(orderId))?.courier === "porter";
-        if (!porter && !(await deps.isSuperadmin(user.id))) {
+        const order = await deps.db.getOrder(orderId);
+        const manual = isManualCourier(order?.courier);
+        if (!manual && !(await deps.isSuperadmin(user.id))) {
           throw new HttpError(403, "superadmin access required");
+        }
+        // Read before the advance below: a bad body must not leave the order billed and emailed.
+        const deliveredAt = isoTimestamp(body.deliveredAt, "deliveredAt");
+        const reason = manual ? optionalText(body.reason, "reason") : textField(body, "reason");
+        // Delivered completes the stages before it: the bill and shipped email still happen, once.
+        if (manual && (order?.status === "processed" || order?.status === "packed")) {
+          await runManualAdvance(ship, orderId, user.id, "shipped");
         }
         await deps.db.rpc("online_order_mark_delivered", {
           p_order_id: orderId,
           p_actor: user.id,
-          p_delivered_at: isoTimestamp(body.deliveredAt, "deliveredAt"),
-          p_reason: porter ? optionalText(body.reason, "reason") : textField(body, "reason"),
+          p_delivered_at: deliveredAt,
+          p_reason: reason,
         });
         return await orderBody(orderId);
       }

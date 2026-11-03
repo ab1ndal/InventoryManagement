@@ -128,7 +128,7 @@ export type OrderRow = {
   attempt_key: string | null;
   status: string;
   fulfilment: "ship" | "pickup";
-  courier: "shiprocket" | "porter" | null;
+  courier: "shiprocket" | "porter" | "self" | null;
   manual_tracking_url: string | null;
   customerid: number | null;
   auth_user_id: string | null;

@@ -7,7 +7,7 @@
  * The real SQL behaviour is covered by schema/test_online_orders*.sql.
  */
 
-import { DbError, type OrderItemRow, type OrderRow, type OrdersDb, type ProcessPlan } from "./process.ts";
+import { DbError, isManualCourier, type OrderItemRow, type OrderRow, type OrdersDb, type ProcessPlan } from "./process.ts";
 import {
   type AwbResult,
   type PickupResult,
@@ -193,7 +193,7 @@ export class FakeDb implements OrdersDb {
         const target = action === "process" ? "processing" : "cancelling";
         const res = (claimed: boolean, resumed: boolean, reason?: string) =>
           ({ claimed, resumed, ...(reason ? { reason } : {}), status: o.status, order: structuredClone(o) }) as T;
-        if ((o.fulfilment === "pickup" || o.courier === "porter") && action !== "cancel") {
+        if ((o.fulfilment === "pickup" || isManualCourier(o.courier)) && action !== "cancel") {
           return res(false, false, "status");
         }
         if ((action === "send_back" || action === "rebook") && o.op_action === action) {
@@ -236,7 +236,8 @@ export class FakeDb implements OrdersDb {
           Object.assign(o, { op_key: key, op_lease_until: lease() });
           return { claimed: true, resumed: true, status: o.status } as T;
         }
-        if (!(o.status === "paid" || (action === "cancel" && o.status === "ready_for_pickup"))) {
+        const manualBeforePickup = isManualCourier(o.courier) && (o.status === "processed" || o.status === "packed");
+        if (!(o.status === "paid" || (action === "cancel" && (o.status === "ready_for_pickup" || manualBeforePickup)))) {
           return { claimed: false, resumed: false, reason: "status", status: o.status } as T;
         }
         Object.assign(o, {
@@ -407,44 +408,57 @@ export class FakeDb implements OrdersDb {
       case "online_set_checkout_live":
         return { checkout_live: args.p_live, changed: true } as T;
       case "online_order_mark_delivered":
+        if (isManualCourier(o.courier)) {
+          if (!["shipped", "out_for_delivery"].includes(o.status)) {
+            throw raised(fn, `order ${o.id} must be shipped or out for delivery and not yet delivered (status ${o.status})`);
+          }
+          o.status = "delivered";
+        }
         return { delivered: true } as T;
       case "online_order_mark_ready":
         if (o.fulfilment !== "pickup") throw raised(fn, `mark_ready: order ${o.order_ref} is not a store pickup`);
         if (o.status !== "paid") throw raised(fn, `mark_ready: order must be paid (status ${o.status})`);
         Object.assign(o, { status: "ready_for_pickup", bill_id: 77 });
         return { status: o.status, bill_id: 77, refund_id: null, all_unavailable: false } as T;
-      case "online_order_dispatch_manual": {
+      case "online_order_manual_process": {
         // Repeat after success: stored result, nothing left for the caller to cancel.
-        if (o.courier === "porter") {
+        if (isManualCourier(o.courier)) {
           return {
             status: o.status,
-            bill_id: o.bill_id,
             refund_id: null,
             all_unavailable: false,
             changed: false,
             sr_order_id: null,
           } as T;
         }
-        if (o.fulfilment !== "ship") throw raised(fn, `dispatch_manual: order ${o.order_ref} is not a ship order`);
+        if (o.fulfilment !== "ship") throw raised(fn, `manual_process: order ${o.order_ref} is not a ship order`);
         if (o.status !== "paid" || o.op_action !== null || o.awb !== null) {
-          throw raised(fn, `dispatch_manual: order must be paid with no action or courier booking in progress`);
+          throw raised(fn, `manual_process: order must be paid with no action or courier booking in progress`);
         }
         const all = this.plan.all_unavailable;
         Object.assign(o, all ? { status: "cancelled" } : {
-          status: "shipped",
-          courier: "porter",
-          courier_name: "Porter",
-          manual_tracking_url: args.p_tracking_url,
-          bill_id: this.billId,
+          status: "processed",
+          courier: args.p_courier,
+          courier_name: args.p_courier === "porter" ? "Porter" : "Bindal's Creation",
         });
         return {
           status: o.status,
-          bill_id: all ? null : this.billId,
-          refund_id: all ? "refund-unavailable" : null,
+          refund_id: this.plan.refund_id,
           all_unavailable: all,
           changed: true,
           sr_order_id: o.sr_order_id,
         } as T;
+      }
+      case "online_order_manual_advance": {
+        if (!isManualCourier(o.courier)) throw raised(fn, `manual_advance: order ${o.order_ref} is not a manual delivery`);
+        const ranks = ["processed", "packed", "shipped", "out_for_delivery", "delivered"];
+        const from = ranks.indexOf(o.status);
+        const to = ranks.indexOf(args.p_target as string);
+        if (from < 0) throw raised(fn, `manual_advance: order ${o.order_ref} cannot advance from status ${o.status}`);
+        if (from >= to) return { status: o.status, bill_id: o.bill_id, changed: false } as T;
+        if (from < 2 && to >= 2) o.bill_id = this.billId;
+        o.status = args.p_target as string;
+        return { status: o.status, bill_id: o.bill_id, changed: true } as T;
       }
       case "online_order_mark_collected":
         if (o.status !== "ready_for_pickup") throw raised(fn, `mark_collected: order must be ready for pickup`);

@@ -23,10 +23,8 @@ export type EmailOrder = {
   creditApplied: number;
   gatewayAmount: number;
   awb: string | null;
-  courier: "shiprocket" | "porter" | null;
+  courier: "shiprocket" | "porter" | "self" | null;
   courierName: string | null;
-  /** Link staff pasted for a hand-booked (Porter) delivery; null when none. */
-  manualTrackingUrl: string | null;
   leftoverVoucher: { code: string; value: number } | null;
 };
 
@@ -127,28 +125,33 @@ export function shopNewOrder(o: EmailOrder, siteUrl: string): Email {
   };
 }
 
-/** A Shiprocket shipment needs its AWB; a Porter delivery has none (link optional). */
+/**
+ * A Shiprocket shipment needs its AWB. A manual delivery has none, and no tracker in another
+ * app: the shopper follows the stages staff set, on /track.
+ */
 export function shipped(o: EmailOrder, siteUrl: string): Email {
+  const manual = o.courier === "porter" || o.courier === "self";
   let tracking: string[];
-  if (o.courier === "porter") {
-    tracking = o.manualTrackingUrl
-      ? [`Track it here: ${o.manualTrackingUrl}`]
-      : ["We'll share the delivery details with you on WhatsApp."];
+  if (manual) {
+    tracking = [`Follow it at ${siteUrl}/track with your order number and phone number.`];
   } else {
     if (!o.awb) throw new Error(`order ${o.orderRef} has no AWB yet`);
     tracking = [`Tracking number (AWB): ${o.awb}`, `Track it here: ${trackingUrl(o.awb)}`];
   }
+  // courierName on a self delivery is the shop itself: "with Bindal's Creation" reads wrong.
+  const withCourier = o.courierName && o.courier !== "self" ? ` with ${o.courierName}` : "";
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",
-    `Your order ${o.orderRef} is on its way${o.courierName ? ` with ${o.courierName}` : ""}.`,
+    `Your order ${o.orderRef} is on its way${withCourier}.`,
     ...tracking,
     "",
     `Your order: ${siteUrl}/order/${o.orderRef}`,
     "",
     `- ${SHOP_NAME}`,
   ].join("\n");
-  return { subject: `Order ${o.orderRef} has shipped`, text };
+  const subject = manual ? `Order ${o.orderRef} has been picked up for delivery` : `Order ${o.orderRef} has shipped`;
+  return { subject, text };
 }
 
 export function readyForPickup(o: EmailOrder, siteUrl: string): Email {

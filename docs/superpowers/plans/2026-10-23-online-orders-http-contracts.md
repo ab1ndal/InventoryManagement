@@ -66,7 +66,7 @@ Errors: 403 `checkout_off`; 409 `price_changed` (re-quote); 409 `out_of_stock`; 
 
 ### POST `order-status`
 Req: `{ orderRef, accessToken }` (or no token with a signed-in owner's JWT)
-Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", courier: "shiprocket"|"porter"|null, items: [{ name, size, color, qty, status }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
+Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"processed"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", courier: "shiprocket"|"porter"|"self"|null, items: [{ name, size, color, qty, status }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
 (`courier: null` = the default Shiprocket flow. `trackingUrl`: the Shiprocket link when there is an AWB; for a Porter order the link staff pasted, or null.)
 404 for unknown ref or bad token (identical).
 
@@ -87,14 +87,18 @@ Reads: direct table selects (admin RLS) on `orders`, `order_items`, `order_event
 ### POST `admin-order-action`
 Req: `{ action: "set_availability", orderId, itemId, availableQty }`
    | `{ action: "process", orderId, opKey }`           // ship orders only; a pickup order → 409 bad_state
-   | `{ action: "dispatch_manual", orderId, trackingUrl?: string|null }`
-     // Porter, booked by hand: paid ship order (shelf checked, no AWB) → shipped with courier 'porter' (billId)
-     // or cancelled (nothing available; refundId). trackingUrl optional, https:// only, ≤ 500 chars (else 400).
+   | `{ action: "manual_process", orderId, courier: "porter"|"self" }`
+     // Porter or the shop's own delivery: paid ship order (shelf checked, no AWB) → processed with that courier
+     // (refundId when units were unavailable) or cancelled (nothing available; refundId). Any other courier → 400.
      // The Shiprocket order made at payment is cancelled best effort; a failure is left on orders.problem.
-     // No opKey: a repeat returns the stored result. A Porter order refuses process / send_back / rebook (409 bad_state).
+     // No opKey: a repeat returns the stored result. A manual order refuses process / send_back / rebook (409 bad_state).
+   | `{ action: "manual_advance", orderId, target: "packed"|"shipped"|"out_for_delivery" }`
+     // any admin, manual order only. Forward only: a repeat or a step back changes nothing (200). A later step
+     // completes the earlier ones; crossing into shipped does shipped_qty, Bill of Supply (billId) and the shipped
+     // email once. Any other target → 400; Shiprocket, pickup, cancelled or cancelling order → 409 bad_state.
    | `{ action: "mark_ready", orderId }`               // pickup: paid (shelf checked) → ready_for_pickup (billId) or cancelled (nothing available; refundId)
    | `{ action: "mark_collected", orderId }`           // pickup: ready_for_pickup → delivered (delivered_at = now)
-   | `{ action: "cancel", orderId, opKey, reason }`    // paid, or ready_for_pickup
+   | `{ action: "cancel", orderId, opKey, reason }`    // paid, ready_for_pickup, or processed / packed on a manual order
    | `{ action: "retry", orderId }`              // re-runs failed job(s) / resumes process
    | `{ action: "rto_received", orderId }`
    | `{ action: "set_live", live: boolean }`     // superadmin only; flips storefront_settings
@@ -105,7 +109,8 @@ Req: `{ action: "set_availability", orderId, itemId, availableQty }`
    | `{ action: "release_op", orderId, opKey }`
      // any admin: abandon a send_back / rebook claim whose courier booking was NOT cancelled
    | `{ action: "mark_delivered", orderId, deliveredAt: <ISO-8601 with zone>, reason }`   // superadmin only; delivered_at is never changed once set, at most 30 days back
-     // Porter order (courier 'porter'): any admin, reason optional
+     // manual order (courier 'porter' or 'self'): any admin, reason optional; from processed or packed it crosses
+     // shipped first (bill + shipped email), so a bad date refused by the DB leaves it shipped
    | `{ action: "return_open", orderId, reason: "damaged_wrong"|"change_of_mind", contactedAt: <ISO-8601 with zone>, items: [{ itemId, units }], note, returnAwb?, overrideReason? }`
      // outside the return window only a superadmin may open it, with a non-blank overrideReason
    | `{ action: "return_photo_url", returnId, contentType }`  // image/jpeg|png|webp|heic|heif; any orderId / path in the body is ignored

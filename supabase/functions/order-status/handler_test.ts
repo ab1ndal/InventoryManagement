@@ -46,6 +46,9 @@ Deno.test("order-status: Porter order → its manual link (or none), never a Shi
   const a = await setup({ ...porter, manual_tracking_url: "https://porter.in/track/abc" });
   const j = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), a.deps)).json();
   assertEquals([j.courier, j.trackingUrl], ["porter", "https://porter.in/track/abc"]);
+  const self = await setup({ status: "processed", courier: "self" as const, courier_name: "Bindal's Creation" });
+  const s = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), self.deps)).json();
+  assertEquals([s.status, s.courier, s.trackingUrl], ["processed", "self", null]);
   const b = await setup(porter);
   const k = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), b.deps)).json();
   assertEquals([k.courier, k.trackingUrl], ["porter", null]);

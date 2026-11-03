@@ -30,7 +30,6 @@ const o: EmailOrder = {
   awb: null,
   courier: null,
   courierName: null,
-  manualTrackingUrl: null,
   leftoverVoucher: null,
 };
 
@@ -75,15 +74,22 @@ Deno.test("shipped: AWB and tracking link; delivered", () => {
   assertEquals(delivered(o, SITE).subject, "Order WEB-000042 delivered");
 });
 
-Deno.test("shipped: Porter with a link, Porter without one, Shiprocket without an AWB throws", () => {
-  const porter = { ...o, courier: "porter" as const, courierName: "Porter" };
-  const m = shipped({ ...porter, manualTrackingUrl: "https://porter.in/track/abc" }, SITE);
-  assertStringIncludes(m.text, "on its way with Porter");
-  assertStringIncludes(m.text, "Track it here: https://porter.in/track/abc");
-  const n = shipped(porter, SITE);
-  assertStringIncludes(n.text, "We'll share the delivery details with you on WhatsApp.");
-  assertEquals(n.text.includes("AWB"), false);
+Deno.test("shipped: Porter is picked up for delivery, follows on /track; Shiprocket without an AWB throws", () => {
+  const m = shipped({ ...o, courier: "porter", courierName: "Porter" }, SITE);
+  assertEquals(m.subject, "Order WEB-000042 has been picked up for delivery");
+  assertStringIncludes(m.text, "Your order WEB-000042 is on its way with Porter.");
+  assertStringIncludes(m.text, `Follow it at ${SITE}/track with your order number and phone number.`);
+  assert(!/AWB|WhatsApp|Track it here/.test(m.text), "no link, no WhatsApp");
   assertThrows(() => shipped(o, SITE), Error, "no AWB");
+  assertThrows(() => shipped({ ...o, courier: "shiprocket" }, SITE), Error, "no AWB");
+});
+
+Deno.test("shipped: self delivery names no courier", () => {
+  const m = shipped({ ...o, courier: "self", courierName: "Bindal's Creation" }, SITE);
+  assertEquals(m.subject, "Order WEB-000042 has been picked up for delivery");
+  assertStringIncludes(m.text, "Your order WEB-000042 is on its way.");
+  assertEquals(m.text.includes("Bindal's Creation"), false);
+  assertStringIncludes(m.text, `${SITE}/track`);
 });
 
 const pickup: EmailOrder = { ...o, fulfilment: "pickup", shipping: 0, address: { name: "Asha Gupta", phone: "+919876543210" } };
