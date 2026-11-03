@@ -20,12 +20,12 @@ import {
   formatDateTime,
   formatRupees,
   isManualCourier,
-  localInputToIso,
+  istInputToIso,
   manualNextSteps,
   processRefundPreview,
   ceilToMinute,
   timelineRows,
-  toLocalInputValue,
+  toISTInputValue,
 } from "./orderHelpers";
 
 const BUSY_MESSAGE = "Another staff member is working on this order";
@@ -339,10 +339,10 @@ export default function OrderDetail({ orderId, onChanged }) {
     !isManual &&
     ["shipped", "out_for_delivery"].includes(order.status) &&
     !order.delivered_at;
-  const deliveredIso = localInputToIso(deliveredAt);
+  const deliveredIso = istInputToIso(deliveredAt);
   // The server allows at most 30 days back and nothing before payment; a minute of slack covers the
   // time between rendering and submitting.
-  const deliveredMin = toLocalInputValue(
+  const deliveredMin = toISTInputValue(
     ceilToMinute(
       new Date(Math.max(Date.now() - 30 * 24 * 3600 * 1000, order.paid_at ? new Date(order.paid_at) : 0) + 60000)
     )
@@ -362,7 +362,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   const shipUnits = items.reduce((s, it) => s + (avail[it.id] ?? 0), 0);
 
   const openDelivered = () => {
-    setDeliveredAt(toLocalInputValue(new Date()));
+    setDeliveredAt(toISTInputValue(new Date()));
     setDialog("delivered");
   };
   const advance = (step) =>
@@ -1003,7 +1003,7 @@ export default function OrderDetail({ orderId, onChanged }) {
               className="h-9 w-full rounded-md border border-input bg-white px-2"
               value={deliveredAt}
               min={deliveredMin}
-              max={toLocalInputValue(new Date())}
+              max={toISTInputValue(new Date())}
               onChange={(e) => setDeliveredAt(e.target.value)}
             />
           </label>

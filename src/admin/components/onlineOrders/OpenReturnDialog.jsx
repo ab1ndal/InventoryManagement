@@ -11,11 +11,11 @@ import {
 } from "../../../components/ui/dialog";
 import {
   RETURN_REASON_LABELS,
-  localInputToIso,
+  istInputToIso,
   outsideReturnWindow,
   returnableUnits,
   ceilToMinute,
-  toLocalInputValue,
+  toISTInputValue,
   windowLabel,
 } from "./orderHelpers";
 
@@ -23,7 +23,7 @@ const variantText = (it) => [it.size, it.color].filter(Boolean).join(" / ");
 
 export default function OpenReturnDialog({ open, order, items, role, pending, error, onClose, onSubmit }) {
   const [reason, setReason] = useState("change_of_mind");
-  const [contactedAt, setContactedAt] = useState(() => toLocalInputValue(new Date()));
+  const [contactedAt, setContactedAt] = useState(() => toISTInputValue(new Date()));
   const [units, setUnits] = useState({});
   const [note, setNote] = useState("");
   const [awb, setAwb] = useState("");
@@ -33,7 +33,7 @@ export default function OpenReturnDialog({ open, order, items, role, pending, er
     .map((it) => ({ it, max: returnableUnits(it, order.returns) }))
     .filter((r) => r.max > 0);
   const chosen = rows.filter((r) => Number(units[r.it.id]) > 0);
-  const contactedIso = localInputToIso(contactedAt);
+  const contactedIso = istInputToIso(contactedAt);
   const outside = outsideReturnWindow(reason, order.delivered_at, contactedIso);
   const isSuper = role === "superadmin";
 
@@ -95,8 +95,8 @@ export default function OpenReturnDialog({ open, order, items, role, pending, er
               aria-label="Contacted at"
               className="h-9 w-full rounded-md border border-input bg-white px-2"
               value={contactedAt}
-              min={order.delivered_at ? toLocalInputValue(ceilToMinute(new Date(order.delivered_at))) : undefined}
-              max={toLocalInputValue(new Date())}
+              min={order.delivered_at ? toISTInputValue(ceilToMinute(new Date(order.delivered_at))) : undefined}
+              max={toISTInputValue(new Date())}
               onChange={(e) => setContactedAt(e.target.value)}
             />
             <span className="text-xs text-muted-foreground">

@@ -47,6 +47,7 @@ export function formatRupees(n) {
 export function formatDateTime(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -261,18 +262,18 @@ export function ceilToMinute(date) {
   return new Date(Math.ceil(date.getTime() / 60000) * 60000);
 }
 
-// Value for <input type="datetime-local"> in the browser's local zone.
-export function toLocalInputValue(date) {
-  const pad = (n) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
+// The shop runs on IST, so these inputs read and write IST whatever zone the browser is in.
+// India has no daylight saving, so the offset is fixed.
+const IST_OFFSET_MS = 330 * 60000;
+
+// Value for <input type="datetime-local">, in IST.
+export function toISTInputValue(date) {
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 16);
 }
 
-// datetime-local text → ISO string with zone (the server rejects offset-less timestamps); null if blank/invalid.
-export function localInputToIso(value) {
-  const d = new Date(value);
+// datetime-local text, read as IST → ISO string with zone (the server rejects offset-less timestamps); null if blank/invalid.
+export function istInputToIso(value) {
+  const d = new Date(`${value}+05:30`);
   return value && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
 }
 
