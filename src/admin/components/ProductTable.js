@@ -261,6 +261,7 @@ const ProductTable = forwardRef(
             name: productData.name,
             categoryid: productData.categoryid,
             fabric: productData.fabric,
+            title_detail: productData.title_detail,
             purchaseprice: productData.purchaseprice,
             retailprice: productData.retailprice,
             description: productData.description,

@@ -39,11 +39,11 @@ describe("matchCategoryIds", () => {
 
 describe("buildNameCategoryOr", () => {
   it("builds a name-only filter when no categories match", () => {
-    expect(buildNameCategoryOr("silk", [])).toBe("name.ilike.%silk%");
+    expect(buildNameCategoryOr("silk", [])).toBe("name.ilike.%silk%,display_title.ilike.%silk%");
   });
   it("adds a categoryid membership condition when categories match", () => {
     expect(buildNameCategoryOr("saree", ["SAR", "LEH"])).toBe(
-      "name.ilike.%saree%,categoryid.in.(SAR,LEH)"
+      "name.ilike.%saree%,display_title.ilike.%saree%,categoryid.in.(SAR,LEH)"
     );
   });
 });

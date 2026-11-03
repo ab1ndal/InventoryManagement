@@ -23,7 +23,7 @@ export default function MoreLikeThis({ product, colours }) {
     supabase
       .from("products")
       .select(
-        "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock, color)"
+        "productid, name:display_title, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock, color)"
       )
       .in("categoryid", group?.categoryIds ?? [categoryid])
       .neq("productid", productid)

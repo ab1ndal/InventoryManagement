@@ -5,7 +5,7 @@ import ProductCard from "../ProductCard";
 
 // Columns used by ProductCard; shared by every home rail query.
 export const RAIL_PRODUCT_COLUMNS =
-  "productid, name, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
+  "productid, name:display_title, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
 export const RAIL_SIZE = 12;
 
 const ITEM_CLASS = "w-44 flex-shrink-0 sm:w-56";

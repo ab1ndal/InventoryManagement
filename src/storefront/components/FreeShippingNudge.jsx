@@ -13,7 +13,7 @@ const SUGGESTION_COUNT = 4;
 function suggestionQuery(gap, cartIds) {
   let query = supabase
     .from("products")
-    .select("productid, name, retailprice, productsizecolors!inner(stock)")
+    .select("productid, name:display_title, retailprice, productsizecolors!inner(stock)")
     .gt("productsizecolors.stock", 0)
     .gte("retailprice", gap);
   if (cartIds.length)
