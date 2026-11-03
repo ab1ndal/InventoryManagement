@@ -1,9 +1,14 @@
 import {
   STATUS_LABELS,
+  deliveryLabel,
+  hasOpenReturn,
   isOutsideUp,
   describeEvent,
   isManualCourier,
   manualNextSteps,
+  nextStepIsStatus,
+  nextStepLabel,
+  normalizeOrderSearch,
   outsideReturnWindow,
   returnBadge,
   returnableUnits,
@@ -129,4 +134,76 @@ test("timelineRows: unknown kinds and steps fall back to readable text", () => {
     { id: 3, kind: "refund_leg_processing", data: {}, created_at: D },
   ]);
   expect(rows.map((r) => r.label)).toEqual(["Some new kind", "New step", "Refund processing"]);
+});
+
+describe("nextStepLabel", () => {
+  test.each([
+    [{ status: "paid", fulfilment: "ship" }, "Check shelf and process"],
+    [{ status: "paid", fulfilment: "pickup" }, "Check shelf"],
+    [{ status: "processing" }, "Being booked"],
+    [{ status: "cancelling" }, "Cancelling"],
+    [{ status: "processed", courier: "porter" }, "Mark packed"],
+    [{ status: "packed", courier: "porter" }, "Mark picked up"],
+    [{ status: "packed", courier: "self" }, "Mark picked up"],
+    [{ status: "packed", courier: "shiprocket" }, "Waiting for courier pickup"],
+    [{ status: "packed", courier: null }, "Waiting for courier pickup"],
+    [{ status: "ready_for_pickup", fulfilment: "pickup" }, "Waiting for customer"],
+    [{ status: "shipped", courier: "porter" }, "Mark out for delivery"],
+    [{ status: "out_for_delivery", courier: "self" }, "Mark delivered"],
+    [{ status: "shipped", courier: "shiprocket" }, "With courier"],
+    [{ status: "out_for_delivery", courier: "shiprocket" }, "With courier"],
+    [{ status: "rto" }, "Receive returned parcel"],
+  ])("%j: %s", (order, label) => {
+    expect(nextStepLabel(order)).toBe(label);
+    expect(nextStepIsStatus(order)).toBe(false);
+  });
+
+  test.each([
+    [{ status: "delivered" }, "Delivered"],
+    [{ status: "delivered", fulfilment: "pickup" }, "Collected"],
+    [{ status: "cancelled" }, "Cancelled"],
+    [{ status: "rto_received" }, "RTO received"],
+    [{ status: "pending_payment" }, "Awaiting payment"],
+    [{ status: "payment_failed" }, "Payment failed"],
+    [{ status: "expired" }, "Expired"],
+  ])("no step left, %j shows the status label", (order, label) => {
+    expect(nextStepLabel(order)).toBe(label);
+    expect(nextStepIsStatus(order)).toBe(true);
+  });
+
+  test("every known status has a label", () => {
+    for (const status of Object.keys(STATUS_LABELS)) {
+      expect(nextStepLabel({ status })).toBeTruthy();
+    }
+  });
+
+  test.each([{ problem: "Lost" }, { process_error: "Courier down" }])("%j overrides the step", (extra) => {
+    expect(nextStepLabel({ status: "paid", ...extra })).toBe("Needs attention");
+    expect(nextStepLabel({ status: "delivered", ...extra })).toBe("Needs attention");
+    expect(nextStepIsStatus({ status: "delivered", ...extra })).toBe(false);
+  });
+});
+
+test.each([
+  [{ fulfilment: "pickup", courier: null }, "Pickup"],
+  [{ fulfilment: "ship", courier: "porter" }, "Porter"],
+  [{ fulfilment: "ship", courier: "self" }, "Self delivery"],
+  [{ fulfilment: "ship", courier: "shiprocket" }, "Shiprocket"],
+  [{ fulfilment: "ship", courier: null, awb: "123" }, "Shiprocket"],
+  [{ fulfilment: "ship", courier: null, awb: null }, null],
+])("deliveryLabel %j: %s", (order, label) => {
+  expect(deliveryLabel(order)).toBe(label);
+});
+
+test("normalizeOrderSearch trims, caps at 100 and treats blank as empty", () => {
+  expect(normalizeOrderSearch("  a b  ")).toBe("a b");
+  expect(normalizeOrderSearch("   ")).toBe("");
+  expect(normalizeOrderSearch(undefined)).toBe("");
+  expect(normalizeOrderSearch("x".repeat(101))).toHaveLength(100);
+});
+
+test("hasOpenReturn sees only open returns", () => {
+  expect(hasOpenReturn({ returns: [{ status: "open" }] })).toBe(true);
+  expect(hasOpenReturn({ returns: [{ status: "refunded" }] })).toBe(false);
+  expect(hasOpenReturn({})).toBe(false);
 });

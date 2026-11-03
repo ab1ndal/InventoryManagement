@@ -1,30 +1,36 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { listOrders, ORDER_FILTERS } from "./onlineOrdersApi";
+import { Input } from "../../../components/ui/input";
+import { countOrders, DEFAULT_QUEUE, listOrders, ORDER_QUEUES, searchOrders } from "./onlineOrdersApi";
 import {
+  MAX_SEARCH_LENGTH,
   STATUS_CLASSES,
-  STATUS_LABELS,
-  formatDateTime,
+  deliveryLabel,
   formatRupees,
-  hasProblem,
+  hasOpenReturn,
   isManualCourier,
   isOutsideUp,
   itemCount,
+  needsAttention,
+  nextStepIsStatus,
+  nextStepLabel,
+  normalizeOrderSearch,
   orderTotal,
   returnBadge,
+  statusLabel,
 } from "./orderHelpers";
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 export function StatusBadge({ status, fulfilment }) {
-  const label =
-    status === "delivered" && fulfilment === "pickup" ? "Collected" : STATUS_LABELS[status] || status;
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
         STATUS_CLASSES[status] || "bg-gray-100 text-gray-700"
       }`}
     >
-      {label}
+      {statusLabel(status, fulfilment)}
     </span>
   );
 }
@@ -66,15 +72,85 @@ export function CourierBadge({ courier }) {
   );
 }
 
+function NextStep({ order }) {
+  if (needsAttention(order)) {
+    return (
+      <span className="inline-flex items-center gap-1 font-medium text-red-700">
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+        {nextStepLabel(order)}
+      </span>
+    );
+  }
+  if (nextStepIsStatus(order)) return <StatusBadge status={order.status} fulfilment={order.fulfilment} />;
+  return <span className="font-medium text-foreground">{nextStepLabel(order)}</span>;
+}
+
+function OrderRow({ order, selected, onSelect }) {
+  const count = itemCount(order);
+  const delivery = deliveryLabel(order);
+  return (
+    <li className="border-t first:border-t-0">
+      <button
+        type="button"
+        onClick={() => onSelect(order.id)}
+        aria-current={selected ? "true" : undefined}
+        className={`block w-full px-3 py-2 text-left text-sm ${selected ? "bg-blue-50" : "hover:bg-gray-50"}`}
+      >
+        <span className="flex items-baseline gap-2">
+          <span className="shrink-0 font-medium">{order.order_ref}</span>
+          {/* relative: the sr-only phone is absolute and would escape this clip, widening the page. */}
+          <span className="relative min-w-0 flex-1 truncate">
+            {order.contact_name}
+            <span className="sr-only sm:not-sr-only sm:ml-2 sm:text-xs sm:text-muted-foreground">
+              {order.contact_phone}
+            </span>
+          </span>
+          <span className="shrink-0">{formatRupees(orderTotal(order))}</span>
+        </span>
+        <span className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span className="min-w-0">
+            {count} item{count === 1 ? "" : "s"}
+            {delivery && ` · ${delivery}`}
+            <OutsideUpBadge address={order.address} fulfilment={order.fulfilment} />
+            <ReturnBadge order={order} />
+            {hasOpenReturn(order) && (
+              <span className="ml-1 inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+                Return open
+              </span>
+            )}
+          </span>
+          <span className="shrink-0">
+            <NextStep order={order} />
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 export default function OrderList({ selectedId, onSelect, refreshKey }) {
-  const [filter, setFilter] = useState("to_check");
+  const [queue, setQueue] = useState(DEFAULT_QUEUE);
+  const [searchInput, setSearchInput] = useState("");
+  const [term, setTerm] = useState("");
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState(null);
+
+  // Clearing the box returns to the queue at once; only typing waits.
+  useEffect(() => {
+    const next = normalizeOrderSearch(searchInput);
+    if (!next) {
+      setTerm("");
+      return undefined;
+    }
+    const timer = setTimeout(() => setTerm(next), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    listOrders(filter)
+    (term ? searchOrders(term) : listOrders(queue))
       .then((rows) => {
         if (!cancelled) setOrders(rows);
       })
@@ -90,87 +166,76 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
     return () => {
       cancelled = true;
     };
-  }, [filter, refreshKey]);
+  }, [queue, term, refreshKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    countOrders()
+      .then((next) => {
+        if (!cancelled) setCounts(next);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setCounts(null);
+          toast.error("Could not count orders", { description: err.message });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  const selectQueue = (key) => {
+    setQueue(key);
+    setSearchInput("");
+  };
 
   return (
     <div className="space-y-3">
+      <Input
+        type="search"
+        aria-label="Search orders"
+        placeholder="Search by order number, phone or name"
+        maxLength={MAX_SEARCH_LENGTH}
+        value={searchInput}
+        onChange={(e) => setSearchInput(e.target.value)}
+        className="bg-white"
+      />
+
       <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-md bg-muted p-1">
-        {Object.entries(ORDER_FILTERS).map(([key, { label }]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={filter === key}
-            onClick={() => setFilter(key)}
-            className={`rounded-sm px-3 py-1.5 text-sm font-medium transition ${
-              filter === key
-                ? "bg-white text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        {Object.entries(ORDER_QUEUES).map(([key, { label, counted }]) => {
+          const active = !term && queue === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectQueue(key)}
+              className={`rounded-sm px-3 py-1.5 text-sm font-medium transition ${
+                active ? "bg-white text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+              {counted && counts && ` (${counts[key]})`}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="overflow-x-auto rounded-md border bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-muted text-left">
-            <tr>
-              <th className="px-3 py-2">Ref</th>
-              <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2">Customer</th>
-              <th className="px-3 py-2 text-right">Items</th>
-              <th className="px-3 py-2 text-right">Total paid</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">
-                <span className="sr-only">Problem</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="rounded-md border bg-white">
+        {orders.length > 0 && (
+          <ul aria-label="Orders">
             {orders.map((o) => (
-              <tr
-                key={o.id}
-                onClick={() => onSelect(o.id)}
-                className={`cursor-pointer border-t hover:bg-gray-50 ${
-                  selectedId === o.id ? "bg-blue-50" : ""
-                }`}
-              >
-                <td className="px-3 py-2 font-medium">{o.order_ref}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(o.created_at)}</td>
-                <td className="px-3 py-2">
-                  <div>{o.contact_name}</div>
-                  <div className="text-xs text-muted-foreground">{o.contact_phone}</div>
-                </td>
-                <td className="px-3 py-2 text-right">{itemCount(o)}</td>
-                <td className="px-3 py-2 text-right">{formatRupees(orderTotal(o))}</td>
-                <td className="px-3 py-2">
-                  <StatusBadge status={o.status} fulfilment={o.fulfilment} />
-                  <ReturnBadge order={o} />
-                  <OutsideUpBadge address={o.address} fulfilment={o.fulfilment} />
-                  <PickupBadge fulfilment={o.fulfilment} />
-                  <CourierBadge courier={o.courier} />
-                </td>
-                <td className="px-3 py-2">
-                  {hasProblem(o) && (
-                    <AlertTriangle
-                      className="h-4 w-4 text-red-600"
-                      aria-label="Needs attention"
-                    />
-                  )}
-                </td>
-              </tr>
+              <OrderRow key={o.id} order={o} selected={selectedId === o.id} onSelect={onSelect} />
             ))}
-            {!loading && orders.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
-                  No orders here.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+          </ul>
+        )}
+        {orders.length === 0 && (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            {loading ? "Loading orders…" : "No orders here."}
+          </p>
+        )}
       </div>
     </div>
   );

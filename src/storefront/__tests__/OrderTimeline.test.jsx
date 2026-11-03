@@ -32,9 +32,9 @@ it.each([
   expect(completed()).toEqual(SIX.map((_, i) => i < ticked));
 });
 
-it("the steps wrap instead of overflowing a narrow column", () => {
+it("lays the steps in three columns from sm, one column on a phone", () => {
   render(<OrderTimeline status="packed" />);
-  expect(screen.getByRole("list", { name: /order progress/i })).toHaveClass("sm:flex-wrap");
+  expect(screen.getByRole("list", { name: /order progress/i })).toHaveClass("grid-cols-1", "sm:grid-cols-3");
 });
 
 it("notes a cancelled order", () => {

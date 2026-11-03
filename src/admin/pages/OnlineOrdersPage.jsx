@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Link, useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import {
@@ -12,6 +14,10 @@ import {
 import OrderList from "../components/onlineOrders/OrderList";
 import OrderDetail from "../components/onlineOrders/OrderDetail";
 import { action, getCheckoutLive, getMyRole } from "../components/onlineOrders/onlineOrdersApi";
+
+const ORDERS_PATH = "/admin/online-orders";
+// Clears the sticky admin nav when bringing an order into view.
+const NAV_CLEARANCE_PX = 72;
 
 // Superadmin-only switch for storefront_settings.checkout_live.
 function CheckoutLiveSwitch() {
@@ -87,16 +93,41 @@ function CheckoutLiveSwitch() {
   );
 }
 
+// Both routes render this page, and React Router keeps it mounted between them, so the list's
+// queue and search survive opening an order. Below xl the list is only hidden.
 export default function OnlineOrdersPage() {
-  const [selectedId, setSelectedId] = useState(null);
+  const { orderId } = useParams();
+  const navigate = useNavigate();
+  const layout = useOutletContext();
   const [refreshKey, setRefreshKey] = useState(0);
   const [role, setRole] = useState(null);
+  const orderPane = useRef(null);
+  const listScrollY = useRef(0);
+  const hadOrder = useRef(Boolean(orderId));
 
   useEffect(() => {
     getMyRole()
       .then(setRole)
       .catch((err) => toast.error("Could not load your role", { description: err.message }));
   }, []);
+
+  // The document scrolls, so a row clicked far down the list would open the order out of view,
+  // and Back would lose the place in the list.
+  useLayoutEffect(() => {
+    if (orderId) {
+      const top = orderPane.current.getBoundingClientRect().top;
+      if (top < NAV_CLEARANCE_PX) window.scrollBy(0, top - NAV_CLEARANCE_PX);
+    } else if (hadOrder.current) {
+      window.scrollTo(0, listScrollY.current);
+    }
+    hadOrder.current = Boolean(orderId);
+  }, [orderId]);
+
+  const selectOrder = (id) => {
+    if (id === orderId) return;
+    listScrollY.current = window.scrollY;
+    navigate(`${ORDERS_PATH}/${id}`);
+  };
 
   return (
     <div className="space-y-4 p-4">
@@ -105,22 +136,34 @@ export default function OnlineOrdersPage() {
         {role === "superadmin" && <CheckoutLiveSwitch />}
       </div>
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <OrderList
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          refreshKey={refreshKey}
-        />
-        {selectedId ? (
-          <OrderDetail
-            key={selectedId}
-            orderId={selectedId}
-            onChanged={() => setRefreshKey((k) => k + 1)}
-          />
-        ) : (
-          <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-            Select an order to see its details.
-          </div>
-        )}
+        <div className={`min-w-0 ${orderId ? "hidden xl:block" : ""}`} data-testid="list-pane">
+          <OrderList selectedId={orderId} onSelect={selectOrder} refreshKey={refreshKey} />
+        </div>
+        <div ref={orderPane} className={`min-w-0 ${orderId ? "" : "hidden xl:block"}`} data-testid="order-pane">
+          {orderId ? (
+            <>
+              <Link
+                to={ORDERS_PATH}
+                className="mb-3 inline-flex items-center gap-1 text-sm text-blue-600 underline xl:hidden"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Back to orders
+              </Link>
+              <OrderDetail
+                key={orderId}
+                orderId={orderId}
+                onChanged={() => {
+                  setRefreshKey((k) => k + 1);
+                  layout?.refreshOrdersNeedingAction();
+                }}
+              />
+            </>
+          ) : (
+            <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+              Select an order to see its details.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
