@@ -16,8 +16,8 @@ export default function OrderTimeline({ status, fulfilment }) {
   if (done < 0) return null;
   return (
     <div className="font-sans text-sm text-storefront-charcoal">
-      {/* Wraps because six steps overflow the narrow /track column on one row. */}
-      <ol aria-label="Order progress" className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-between gap-3 sm:gap-2">
+      {/* Three columns so six steps make two full rows and pickup's three make one. */}
+      <ol aria-label="Order progress" className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2">
         {timelineSteps(fulfilment).map((step, index) => {
           const complete = index <= done;
           return (

@@ -33,6 +33,10 @@ export const STATUS_CLASSES = {
   cancelled: "bg-gray-200 text-gray-800",
 };
 
+export function statusLabel(status, fulfilment) {
+  return status === "delivered" && fulfilment === "pickup" ? "Collected" : STATUS_LABELS[status] || status;
+}
+
 export function formatRupees(n) {
   return `₹${Number(n || 0).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -96,6 +100,61 @@ export function hasProblem(o, jobs = []) {
   return Boolean(
     o.problem || o.process_error || o.status === "rto" || jobs.some((j) => j.status === "failed")
   );
+}
+
+// Failed jobs are not on list rows, so a row can only see these two.
+export function needsAttention(o) {
+  return Boolean(o.problem || o.process_error);
+}
+
+function activeNextStep(o) {
+  const manual = isManualCourier(o.courier);
+  switch (o.status) {
+    case "paid":
+      return o.fulfilment === "pickup" ? "Check shelf" : "Check shelf and process";
+    case "processing":
+      return "Being booked";
+    case "cancelling":
+      return "Cancelling";
+    case "processed":
+      return "Mark packed";
+    case "packed":
+      return manual ? "Mark picked up" : "Waiting for courier pickup";
+    case "ready_for_pickup":
+      return "Waiting for customer";
+    case "shipped":
+      return manual ? "Mark out for delivery" : "With courier";
+    case "out_for_delivery":
+      return manual ? "Mark delivered" : "With courier";
+    case "rto":
+      return "Receive returned parcel";
+    default:
+      return null;
+  }
+}
+
+// True when the order has no step left to take, so its status is all there is to say.
+export function nextStepIsStatus(o) {
+  return !needsAttention(o) && activeNextStep(o) === null;
+}
+
+export function nextStepLabel(o) {
+  if (needsAttention(o)) return "Needs attention";
+  return activeNextStep(o) ?? statusLabel(o.status, o.fulfilment);
+}
+
+// Null while undecided: a paid ship order has no courier yet.
+export function deliveryLabel(o) {
+  if (o.fulfilment === "pickup") return "Pickup";
+  if (o.courier === "porter") return "Porter";
+  if (o.courier === "self") return "Self delivery";
+  return o.awb || o.courier ? "Shiprocket" : null;
+}
+
+export const MAX_SEARCH_LENGTH = 100;
+
+export function normalizeOrderSearch(term) {
+  return String(term ?? "").trim().slice(0, MAX_SEARCH_LENGTH).trim();
 }
 
 // Paise of a line's paid value covered by its first n units: the remainder paise sit on
@@ -177,6 +236,10 @@ export function returnBadge(order) {
   if (refunded <= 0) return null;
   const shipped = sum(order.order_items, (i) => i.shipped_qty);
   return refunded >= shipped ? "Returned" : "Partly returned";
+}
+
+export function hasOpenReturn(order) {
+  return (order.returns || []).some((r) => r.status === "open");
 }
 
 // Units of one item still free to return: shipped − units in open returns − units received back

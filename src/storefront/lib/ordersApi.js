@@ -119,10 +119,17 @@ export function normalizeOrder(row) {
   };
 }
 
+// The server reads 09876543210 as no number at all, which counts as a failed attempt toward
+// the /track lockout, so a customer repeating it could lock themselves out.
+function withoutLeadingZero(phone) {
+  const digits = phone.replace(/\D/g, "");
+  return /^0\d{10}$/.test(digits) ? digits.slice(1) : phone;
+}
+
 export async function lookupOrder(orderRef, phone) {
   const { data, error } = await supabase.rpc("online_order_lookup", {
     p_order_ref: orderRef,
-    p_phone: phone,
+    p_phone: withoutLeadingZero(phone),
   });
   if (error) throw error;
   return normalizeOrder(data);

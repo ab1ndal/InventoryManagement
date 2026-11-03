@@ -3,25 +3,31 @@
 // Writes: only through the `admin-order-action` Edge Function
 // (docs/superpowers/plans/2026-10-23-online-orders-http-contracts.md).
 import { supabase } from "../../../lib/supabaseClient";
+import { normalizeOrderSearch } from "./orderHelpers";
 
 export const LIST_LIMIT = 200;
 
-// Tab key → which orders it shows. "problems" is handled separately (needs failed jobs).
-export const ORDER_FILTERS = {
-  to_check: { label: "To check", statuses: ["paid"] },
-  processing: { label: "Processing", statuses: ["processing", "cancelling", "processed"] },
-  packed: { label: "Packed", statuses: ["packed"] },
-  // Paid pickup orders stay in To check: the shelf check comes before Ready for pickup.
-  pickup: { label: "Pickup", statuses: ["ready_for_pickup"] },
-  shipped: { label: "Picked up", statuses: ["shipped", "out_for_delivery"] },
-  delivered: { label: "Delivered", statuses: ["delivered"] },
-  problems: { label: "Problems" },
-  all: { label: "All" },
+export const DEFAULT_QUEUE = "needs_action";
+
+// Porter and self delivery report nothing back, and a forgotten Delivered blocks the return window.
+export const MANUAL_STALE_DAYS = 2;
+const MANUAL_OPEN_STATUSES = ["processed", "packed", "shipped", "out_for_delivery"];
+
+// Queue key → which orders it shows. needs_action has no status list: its filter needs lookups.
+// An order may sit in both needs_action and in_progress.
+export const ORDER_QUEUES = {
+  needs_action: { label: "Needs action", counted: true },
+  in_progress: {
+    label: "In progress",
+    counted: true,
+    statuses: ["processing", "cancelling", "processed", "packed", "ready_for_pickup", "shipped", "out_for_delivery"],
+  },
+  closed: { label: "Closed", statuses: ["delivered", "cancelled", "rto_received"] },
 };
 
 const LIST_COLUMNS =
   "id, order_ref, created_at, status, contact_name, contact_phone, subtotal, promo_discount, " +
-  "shipping, voucher_applied, credit_applied, gateway_amount, problem, process_error, address, fulfilment, courier, " +
+  "shipping, voucher_applied, credit_applied, gateway_amount, problem, process_error, address, fulfilment, courier, awb, " +
   "order_items(qty, shipped_qty), returns:order_returns(status, items:order_return_items(received_units))";
 
 export class OrderActionError extends Error {
@@ -46,24 +52,81 @@ async function failedJobOrderIds() {
   return [...new Set((data || []).map((j) => j.order_id))];
 }
 
-export async function listOrders(filter = "all") {
-  if (!ORDER_FILTERS[filter]) throw new Error(`Unknown order filter: ${filter}`);
-  let query = supabase.from("orders").select(LIST_COLUMNS);
+async function openReturnOrderIds() {
+  const { data, error } = await supabase
+    .from("order_returns")
+    .select("order_id")
+    .eq("status", "open");
+  if (error) raise("Loading open returns", error);
+  return [...new Set((data || []).map((r) => r.order_id))];
+}
 
-  if (filter === "problems") {
-    const jobOrderIds = await failedJobOrderIds();
-    const clauses = ["problem.not.is.null", "process_error.not.is.null", "status.eq.rto"];
-    if (jobOrderIds.length) clauses.push(`id.in.(${jobOrderIds.join(",")})`);
-    query = query.or(clauses.join(","));
-  } else if (ORDER_FILTERS[filter].statuses) {
-    query = query.in("status", ORDER_FILTERS[filter].statuses);
-  }
+// Inside double quotes the characters PostgREST reserves in or() (, . : ( )) are plain text.
+function quoteFilterValue(value) {
+  return `"${value.replace(/[\\"]/g, "\\$&")}"`;
+}
 
-  const { data, error } = await query
+async function needsActionFilter(now) {
+  const staleBefore = new Date(now.getTime() - MANUAL_STALE_DAYS * 24 * 3600 * 1000).toISOString();
+  const [jobOrderIds, returnOrderIds] = await Promise.all([failedJobOrderIds(), openReturnOrderIds()]);
+  const orderIds = [...new Set([...jobOrderIds, ...returnOrderIds])];
+  const clauses = [
+    "status.eq.paid",
+    "problem.not.is.null",
+    "process_error.not.is.null",
+    "status.eq.rto",
+    `and(courier.in.(porter,self),status.in.(${MANUAL_OPEN_STATUSES.join(",")}),updated_at.lt.${quoteFilterValue(staleBefore)})`,
+  ];
+  if (orderIds.length) clauses.push(`id.in.(${orderIds.join(",")})`);
+  return clauses.join(",");
+}
+
+// Returns a function rather than a query: a supabase query is thenable, so an async
+// function returning one would run it.
+async function queueFilter(queue, now) {
+  if (!ORDER_QUEUES[queue]) throw new Error(`Unknown order queue: ${queue}`);
+  const { statuses } = ORDER_QUEUES[queue];
+  if (statuses) return (query) => query.in("status", statuses);
+  const filter = await needsActionFilter(now);
+  return (query) => query.or(filter);
+}
+
+async function fetchOrderRows(applyFilter) {
+  const { data, error } = await applyFilter(supabase.from("orders").select(LIST_COLUMNS))
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
   if (error) raise("Loading orders", error);
   return data || [];
+}
+
+export async function listOrders(queue = DEFAULT_QUEUE, now = new Date()) {
+  return fetchOrderRows(await queueFilter(queue, now));
+}
+
+// LIKE gives \, % and _ a meaning; escape them. PostgREST turns every * into % even inside
+// quotes, so a literal * cannot be sent: _ matches that one character and nothing wider.
+function likeContains(term) {
+  const literal = term.replace(/[\\%_]/g, "\\$&").replace(/\*/g, "_");
+  return quoteFilterValue(`%${literal}%`);
+}
+
+// contact_phone is stored as +91XXXXXXXXXX (public._normalize_phone), so only the digits of a
+// typed number can match. A term without digits skips the phone clause. Only a full 11-digit
+// number loses its leading 0: stripping zeros from "WEB-000006" would match any phone with a 6.
+export function orderSearchFilter(term) {
+  const pattern = likeContains(term);
+  const clauses = [`order_ref.ilike.${pattern}`, `contact_name.ilike.${pattern}`];
+  const digits = term.replace(/\D/g, "").replace(/^0(\d{10})$/, "$1");
+  if (digits) clauses.push(`contact_phone.ilike.${likeContains(digits)}`);
+  return clauses.join(",");
+}
+
+// Every status, including unpaid and expired orders, which no queue shows.
+export async function searchOrders(rawTerm) {
+  const term = normalizeOrderSearch(rawTerm);
+  if (!term) return [];
+  const filter = orderSearchFilter(term);
+  return fetchOrderRows((query) => query.or(filter));
 }
 
 // Embeds are aliased (items:, photos:), so they are ordered here instead of with referencedTable.
@@ -135,13 +198,21 @@ export async function getOrder(id) {
   };
 }
 
-export async function countOrdersToCheck() {
-  const { count, error } = await supabase
-    .from("orders")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "paid");
-  if (error) raise("Counting orders to check", error);
+export async function countQueue(queue, now = new Date()) {
+  const applyFilter = await queueFilter(queue, now);
+  const { count, error } = await applyFilter(
+    supabase.from("orders").select("id", { count: "exact", head: true })
+  );
+  if (error) raise(`Counting ${ORDER_QUEUES[queue].label} orders`, error);
   return count ?? 0;
+}
+
+export async function countOrders(now = new Date()) {
+  const [needs_action, in_progress] = await Promise.all([
+    countQueue("needs_action", now),
+    countQueue("in_progress", now),
+  ]);
+  return { needs_action, in_progress };
 }
 
 export async function getCheckoutLive() {

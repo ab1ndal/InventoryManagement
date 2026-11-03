@@ -68,6 +68,20 @@ function MoneyRow({ label, value, negative, strong }) {
   );
 }
 
+// Closed unless a problem in it needs seeing. Native <details>: staff can still toggle a forced-open
+// section, and React leaves that toggle alone until the prop itself changes.
+function CollapsibleSection({ title, summary, open = false, children }) {
+  return (
+    <details open={open} className="border-t pt-3 text-sm">
+      <summary className="cursor-pointer">
+        <h4 className="inline font-medium">{title}</h4>
+        {summary && <span className="ml-2 text-muted-foreground">{summary}</span>}
+      </summary>
+      <div className="mt-2">{children}</div>
+    </details>
+  );
+}
+
 function addressText(a, fulfilment) {
   if (!a) return "";
   // A pickup order's address holds only the contact the customer gave at checkout.
@@ -81,6 +95,7 @@ function variantText(it) {
 
 export default function OrderDetail({ orderId, onChanged }) {
   const [detail, setDetail] = useState(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [avail, setAvail] = useState({});
   const [checked, setChecked] = useState(() => new Set());
   const [savingLine, setSavingLine] = useState(null);
@@ -124,12 +139,14 @@ export default function OrderDetail({ orderId, onChanged }) {
       setAvail(a);
       setChecked(c);
     } catch (err) {
+      setLoadFailed(true);
       toast.error("Could not load order", { description: err.message });
     }
   }, [orderId]);
 
   useEffect(() => {
     setDetail(null);
+    setLoadFailed(false);
     setCourierError(null);
     opRef.current = null;
     setBillPdf({ state: "idle" });
@@ -287,7 +304,11 @@ export default function OrderDetail({ orderId, onChanged }) {
   };
 
   if (!detail) {
-    return <div className="p-6 text-sm text-muted-foreground">Loading order…</div>;
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        {loadFailed ? "Could not load this order." : "Loading order…"}
+      </div>
+    );
   }
 
   const { order, bill, items, events, refunds, legs, jobs } = detail;
@@ -395,6 +416,87 @@ export default function OrderDetail({ orderId, onChanged }) {
         </div>
       )}
 
+      {/* Actions */}
+      <div className="sticky top-[61px] z-10 -mx-4 flex flex-wrap gap-2 bg-white px-4 py-2 empty:hidden">
+        {isPaid && !isPickup && (
+          <Button disabled={!allChecked || pending} onClick={() => setDialog("process")}>
+            Process
+          </Button>
+        )}
+        {isPaid && isPickup && (
+          <Button disabled={!allChecked || pending} onClick={() => setDialog("ready")}>
+            Ready for pickup
+          </Button>
+        )}
+        {isReadyForPickup && (
+          <Button disabled={pending} onClick={() => setDialog("collected")}>
+            Collected
+          </Button>
+        )}
+        {manualSteps.map((step, index) => (
+          <Button
+            key={step.key}
+            variant={index === 0 ? "default" : "outline"}
+            disabled={pending}
+            onClick={() => onManualStep(step)}
+          >
+            {step.label}
+          </Button>
+        ))}
+        {(isPaid || isReadyForPickup || (isManual && ["processed", "packed"].includes(order.status))) && (
+          <Button variant="destructive" disabled={pending} onClick={() => setDialog("cancel")}>
+            Cancel order
+          </Button>
+        )}
+        {showRetry && (
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => run({ action: "retry", orderId }, "Retry started")}
+          >
+            Retry
+          </Button>
+        )}
+        {canSendBack && (
+          <Button variant="outline" disabled={pending} onClick={() => openBackDialog("sendback")}>
+            {order.op_action === "send_back" ? "Resume send back" : "Send back to To-check"}
+          </Button>
+        )}
+        {canRebook && (
+          <Button variant="outline" disabled={pending} onClick={() => openBackDialog("rebook")}>
+            {order.op_action === "rebook" ? "Resume rebook…" : "Rebook…"}
+          </Button>
+        )}
+        {canRelease && (
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={() => openRelease(newOpKey(), order.op_action === "send_back" ? "send back" : "rebook")}
+          >
+            Abandon
+          </Button>
+        )}
+        {canMarkDelivered && (
+          <Button
+            variant="outline"
+            disabled={pending}
+            onClick={openDelivered}
+          >
+            Mark delivered…
+          </Button>
+        )}
+        {order.status === "rto" && (
+          <Button variant="outline" disabled={pending} onClick={() => setDialog("rto")}>
+            Parcel received back
+          </Button>
+        )}
+      </div>
+      {isPaid && !allChecked && (
+        <p className="text-xs text-muted-foreground">
+          Check every item on the shelf before {isPickup ? "marking it ready for pickup" : "processing"}.
+        </p>
+      )}
+
       {/* Lines + shelf check */}
       <section>
         <h4 className="mb-2 font-medium">Items</h4>
@@ -479,9 +581,18 @@ export default function OrderDetail({ orderId, onChanged }) {
         </table>
       </section>
 
+      <ReturnsSection
+        order={order}
+        items={items}
+        role={role}
+        onChanged={async () => {
+          await load();
+          onChanged?.();
+        }}
+      />
+
       {/* Money */}
-      <section>
-        <h4 className="mb-2 font-medium">Money</h4>
+      <CollapsibleSection title="Money" summary={`Paid online ${formatRupees(order.gateway_amount)}`}>
         <dl className="max-w-sm space-y-1 text-sm">
           <MoneyRow label="Subtotal" value={order.subtotal} />
           <MoneyRow
@@ -498,12 +609,15 @@ export default function OrderDetail({ orderId, onChanged }) {
           <MoneyRow label="Store credit" value={order.credit_applied} negative />
           <MoneyRow label="Paid online" value={order.gateway_amount} strong />
         </dl>
-      </section>
+      </CollapsibleSection>
 
       {/* Shipment */}
       {(order.awb || order.label_url || order.manifest_url || order.bill_id || isManual) && (
-        <section className="text-sm">
-          <h4 className="mb-2 font-medium">Shipment</h4>
+        <CollapsibleSection
+          title="Shipment"
+          summary={isManual ? null : order.courier_name}
+          open={Boolean(order.process_error || courierError)}
+        >
           <ul className="space-y-1">
             {order.courier_name && <li>Courier: {order.courier_name}</li>}
             {order.awb && (
@@ -568,104 +682,16 @@ export default function OrderDetail({ orderId, onChanged }) {
               </li>
             )}
           </ul>
-        </section>
+        </CollapsibleSection>
       )}
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        {isPaid && !isPickup && (
-          <Button disabled={!allChecked || pending} onClick={() => setDialog("process")}>
-            Process
-          </Button>
-        )}
-        {isPaid && isPickup && (
-          <Button disabled={!allChecked || pending} onClick={() => setDialog("ready")}>
-            Ready for pickup
-          </Button>
-        )}
-        {isReadyForPickup && (
-          <Button disabled={pending} onClick={() => setDialog("collected")}>
-            Collected
-          </Button>
-        )}
-        {manualSteps.map((step, index) => (
-          <Button
-            key={step.key}
-            variant={index === 0 ? "default" : "outline"}
-            disabled={pending}
-            onClick={() => onManualStep(step)}
-          >
-            {step.label}
-          </Button>
-        ))}
-        {(isPaid || isReadyForPickup || (isManual && ["processed", "packed"].includes(order.status))) && (
-          <Button variant="destructive" disabled={pending} onClick={() => setDialog("cancel")}>
-            Cancel order
-          </Button>
-        )}
-        {showRetry && (
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={() => run({ action: "retry", orderId }, "Retry started")}
-          >
-            Retry
-          </Button>
-        )}
-        {canSendBack && (
-          <Button variant="outline" disabled={pending} onClick={() => openBackDialog("sendback")}>
-            {order.op_action === "send_back" ? "Resume send back" : "Send back to To-check"}
-          </Button>
-        )}
-        {canRebook && (
-          <Button variant="outline" disabled={pending} onClick={() => openBackDialog("rebook")}>
-            {order.op_action === "rebook" ? "Resume rebook…" : "Rebook…"}
-          </Button>
-        )}
-        {canRelease && (
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={() => openRelease(newOpKey(), order.op_action === "send_back" ? "send back" : "rebook")}
-          >
-            Abandon
-          </Button>
-        )}
-        {canMarkDelivered && (
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={openDelivered}
-          >
-            Mark delivered…
-          </Button>
-        )}
-        {order.status === "rto" && (
-          <Button variant="outline" disabled={pending} onClick={() => setDialog("rto")}>
-            Parcel received back
-          </Button>
-        )}
-      </div>
-      {isPaid && !allChecked && (
-        <p className="text-xs text-muted-foreground">
-          Check every item on the shelf before {isPickup ? "marking it ready for pickup" : "processing"}.
-        </p>
-      )}
-
-      <ReturnsSection
-        order={order}
-        items={items}
-        role={role}
-        onChanged={async () => {
-          await load();
-          onChanged?.();
-        }}
-      />
 
       {/* Refunds */}
       {refunds.length > 0 && (
-        <section className="text-sm">
-          <h4 className="mb-2 font-medium">Refunds</h4>
+        <CollapsibleSection
+          title="Refunds"
+          summary={`${refunds.length} refund${refunds.length === 1 ? "" : "s"}`}
+          open={refunds.some((r) => r.status !== "completed")}
+        >
           <ul className="space-y-2">
             {refunds.map((r) => (
               <li key={r.id} className="rounded border p-2">
@@ -691,12 +717,15 @@ export default function OrderDetail({ orderId, onChanged }) {
               </li>
             ))}
           </ul>
-        </section>
+        </CollapsibleSection>
       )}
 
       {/* Timeline */}
-      <section className="text-sm">
-        <h4 className="mb-2 font-medium">Timeline</h4>
+      <CollapsibleSection
+        title="Timeline"
+        summary={`${events.length} event${events.length === 1 ? "" : "s"}`}
+        open={failedJobs.length > 0}
+      >
         <ol className="space-y-1">
           {timelineRows(events).map((r) => (
             <li key={r.id} className="flex gap-3">
@@ -716,7 +745,7 @@ export default function OrderDetail({ orderId, onChanged }) {
           ))}
           {events.length === 0 && <li className="text-muted-foreground">No events yet.</li>}
         </ol>
-      </section>
+      </CollapsibleSection>
 
       <ConfirmDialog
         open={dialog === "process" || dialog === "ready"}

@@ -27,7 +27,7 @@ function renderPage() {
 }
 
 function submit(ref, phone) {
-  fireEvent.change(screen.getByLabelText(/order reference/i), { target: { value: ref } });
+  fireEvent.change(screen.getByLabelText(/order number/i), { target: { value: ref } });
   fireEvent.change(screen.getByLabelText(/phone/i), { target: { value: phone } });
   fireEvent.click(screen.getByRole("button", { name: /check status/i }));
 }
@@ -36,8 +36,8 @@ describe("TrackOrderPage", () => {
   it("renders heading, order-ref and phone inputs, and a submit button", () => {
     renderPage();
     expect(screen.getByRole("heading", { name: /track your order/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/order reference/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/phone/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/order number/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/phone number used at checkout/i)).toHaveAttribute("placeholder", "10-digit mobile number");
     expect(screen.getByRole("button", { name: /check status/i })).toBeInTheDocument();
   });
 

@@ -12,6 +12,7 @@ let mockRole = "admin";
 let mockGenerated = [];
 let mockGenerateImpl = null;
 let mockOpened = [];
+let mockGetOrderError = null;
 
 jest.mock("../../billing/useBillPdf", () => ({
   useBillPdf: () => ({
@@ -27,6 +28,7 @@ jest.mock("../../billing/billPdf", () => ({
 }));
 jest.mock("../onlineOrdersApi", () => ({
   getOrder: async () => {
+    if (mockGetOrderError) throw mockGetOrderError;
     if (mockNextDetail && mockDetail.__loaded) return mockNextDetail;
     mockDetail.__loaded = true;
     return mockDetail;
@@ -100,6 +102,7 @@ beforeEach(() => {
   mockToasts = [];
   mockKeyCounter = 0;
   mockRole = "admin";
+  mockGetOrderError = null;
 });
 
 const processButton = () => screen.getByRole("button", { name: "Process" });
@@ -997,5 +1000,96 @@ describe("bill PDF", () => {
     render(<OrderDetail orderId="o1" />);
     expect(await screen.findByText("Bill of Supply FY26-000390")).toBeInTheDocument();
     expect(mockGenerated).toEqual([]);
+  });
+});
+
+// A <details> is found by its summary heading; no role ties the two in this testing-library version.
+// eslint-disable-next-line testing-library/no-node-access
+const section = (name) => screen.queryByRole("heading", { name, hidden: true })?.closest("details");
+
+describe("page structure", () => {
+  const job = { id: "j1", kind: "email_shop", status: "failed", last_error: "smtp" };
+  const refund = (status) => ({ id: "r1", reason: "cancel", units: 1, total_amount: 100, status });
+
+  test("reads header, actions, items, then the collapsed sections", async () => {
+    mockDetail = detail({ order: { bill_id: 9 }, refunds: [refund("completed")] });
+    render(<OrderDetail orderId="o1" />);
+    const items = await screen.findByRole("heading", { name: "Items" });
+    const process = processButton();
+    const follows = (a, b) => expect(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    follows(screen.getByText("WEB-000007"), process);
+    follows(process, items);
+    follows(items, section("Money"));
+    follows(section("Money"), section("Shipment"));
+    follows(section("Shipment"), section("Refunds"));
+    follows(section("Refunds"), section("Timeline"));
+  });
+
+  test("the problem box sits above the action row", async () => {
+    mockDetail = detail({ order: { problem: "Parcel lost" } });
+    render(<OrderDetail orderId="o1" />);
+    const problem = await screen.findByText("Problem: Parcel lost");
+    expect(problem.compareDocumentPosition(processButton()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("sections start closed, with a one-line summary", async () => {
+    mockDetail = detail({ order: { bill_id: 9, courier_name: "Delhivery" }, refunds: [refund("completed")] });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("WEB-000007");
+    for (const name of ["Money", "Shipment", "Refunds", "Timeline"]) {
+      expect(section(name)).not.toHaveAttribute("open");
+    }
+    expect(section("Money")).toHaveTextContent("Paid online ₹2,099.00");
+    expect(section("Shipment")).toHaveTextContent("Delhivery");
+    expect(section("Refunds")).toHaveTextContent("1 refund");
+    expect(screen.getByRole("heading", { name: "Items" })).toBeInTheDocument();
+  });
+
+  test("a process error opens Shipment", async () => {
+    mockDetail = detail({ order: { bill_id: 9, process_error: "Courier down" } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("WEB-000007");
+    expect(section("Shipment")).toHaveAttribute("open");
+    expect(section("Timeline")).not.toHaveAttribute("open");
+  });
+
+  test("a courier error from an action opens Shipment", async () => {
+    mockDetail = detail({ order: { status: "paid", bill_id: 9 }, items: [item({ id: "i1", available_qty: 1, product_name: "Kurta", paid_value: 1 })] });
+    mockActionImpl = () => {
+      throw Object.assign(new Error("Courier said no"), { code: "courier_error" });
+    };
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("WEB-000007");
+    fireEvent.click(processButton());
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Process" }));
+    await waitFor(() => expect(section("Shipment")).toHaveAttribute("open"));
+  });
+
+  test("failed jobs open Timeline", async () => {
+    mockDetail = detail({ jobs: [job] });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("WEB-000007");
+    expect(section("Timeline")).toHaveAttribute("open");
+  });
+
+  test.each(["awaiting_choice", "processing", "failed"])("a %s refund opens Refunds", async (status) => {
+    mockDetail = detail({ refunds: [refund(status)] });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("WEB-000007");
+    expect(section("Refunds")).toHaveAttribute("open");
+  });
+
+  test("Shipment and Refunds stay hidden when empty", async () => {
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("WEB-000007");
+    expect(section("Shipment")).toBeFalsy();
+    expect(section("Refunds")).toBeFalsy();
+  });
+
+  test("an order that cannot be loaded says so instead of loading forever", async () => {
+    mockGetOrderError = new Error("no such order");
+    render(<OrderDetail orderId="nope" />);
+    expect(await screen.findByText("Could not load this order.")).toBeInTheDocument();
+    expect(mockToasts).toEqual([["error", "Could not load order", "no such order"]]);
   });
 });

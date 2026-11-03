@@ -111,6 +111,7 @@ function App() {
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="bills" element={<BillingPage />} />
               <Route path="online-orders" element={<OnlineOrdersPage />} />
+              <Route path="online-orders/:orderId" element={<OnlineOrdersPage />} />
               <Route path="vouchers" element={<VoucherPage />} />
               <Route path="discounts" element={<DiscountPage />} />
               <Route path="exchanges" element={<ExchangePage />} />

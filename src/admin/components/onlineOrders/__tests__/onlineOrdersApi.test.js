@@ -1,4 +1,15 @@
-import { action, getOrder, listOrders, ORDER_FILTERS, OrderActionError } from "../onlineOrdersApi";
+import {
+  action,
+  countOrders,
+  countQueue,
+  DEFAULT_QUEUE,
+  getOrder,
+  listOrders,
+  OrderActionError,
+  ORDER_QUEUES,
+  orderSearchFilter,
+  searchOrders,
+} from "../onlineOrdersApi";
 
 // Plain functions: CRA resetMocks wipes jest.fn implementations between tests.
 let mockCalls = [];
@@ -35,60 +46,168 @@ beforeEach(() => {
 
 const opsOf = (table) => mockCalls.find((c) => c.table === table).ops;
 
-test("to_check tab lists paid orders only", async () => {
-  await listOrders("to_check");
-  expect(opsOf("orders")).toContainEqual(["in", "status", ["paid"]]);
+const NOW = new Date("2026-11-02T12:00:00.000Z");
+const STALE_CLAUSE =
+  'and(courier.in.(porter,self),status.in.(processed,packed,shipped,out_for_delivery),updated_at.lt."2026-10-31T12:00:00.000Z")';
+const BASE_CLAUSES = `status.eq.paid,problem.not.is.null,process_error.not.is.null,status.eq.rto,${STALE_CLAUSE}`;
+
+const orOf = (table = "orders") => opsOf(table).find((o) => o[0] === "or")[1];
+
+test("there are three queues and Needs action is the default", () => {
+  expect(Object.keys(ORDER_QUEUES)).toEqual(["needs_action", "in_progress", "closed"]);
+  expect(DEFAULT_QUEUE).toBe("needs_action");
 });
 
-test("processing tab includes manual orders in processed", async () => {
-  await listOrders("processing");
-  expect(opsOf("orders")).toContainEqual(["in", "status", ["processing", "cancelling", "processed"]]);
+test("unknown queue is refused", async () => {
+  await expect(listOrders("to_check")).rejects.toThrow("Unknown order queue: to_check");
 });
 
-test("shipped tab is labelled Picked up", () => {
-  expect(ORDER_FILTERS.shipped.label).toBe("Picked up");
-});
-
-test("packed tab lists packed orders only", async () => {
-  await listOrders("packed");
-  expect(opsOf("orders")).toContainEqual(["in", "status", ["packed"]]);
-});
-
-test("shipped tab includes out_for_delivery", async () => {
-  await listOrders("shipped");
-  expect(opsOf("orders")).toContainEqual(["in", "status", ["shipped", "out_for_delivery"]]);
-});
-
-test("pickup tab lists ready_for_pickup orders only", async () => {
-  await listOrders("pickup");
-  expect(opsOf("orders")).toContainEqual(["in", "status", ["ready_for_pickup"]]);
-});
-
-test("list selects fulfilment", async () => {
-  await listOrders("all");
-  expect(opsOf("orders").find((o) => o[0] === "select")[1]).toContain("fulfilment");
-});
-
-test("list selects courier (courier badge)", async () => {
-  await listOrders("all");
-  expect(opsOf("orders").find((o) => o[0] === "select")[1]).toContain(" courier,");
-});
-
-test("problems tab ORs problem, process_error, rto and orders with failed jobs", async () => {
-  mockResults.order_jobs = { data: [{ order_id: "o1" }, { order_id: "o1" }, { order_id: "o2" }], error: null };
-  await listOrders("problems");
+test("needs action ORs paid, problems, rto and manual orders untouched for two days", async () => {
+  await listOrders("needs_action", NOW);
+  expect(orOf()).toBe(BASE_CLAUSES);
   expect(opsOf("order_jobs")).toContainEqual(["eq", "status", "failed"]);
+  expect(opsOf("order_returns")).toContainEqual(["eq", "status", "open"]);
+});
+
+test("needs action adds orders with failed jobs or open returns, each once", async () => {
+  mockResults.order_jobs = { data: [{ order_id: "o1" }, { order_id: "o1" }, { order_id: "o2" }], error: null };
+  mockResults.order_returns = { data: [{ order_id: "o2" }, { order_id: "o3" }], error: null };
+  await listOrders("needs_action", NOW);
+  expect(orOf()).toBe(`${BASE_CLAUSES},id.in.(o1,o2,o3)`);
+});
+
+test("needs action is a single orders query, so an order matching twice cannot repeat", async () => {
+  mockResults.order_returns = { data: [{ order_id: "o1" }], error: null };
+  await listOrders("needs_action", NOW);
+  expect(mockCalls.filter((c) => c.table === "orders")).toHaveLength(1);
+  expect(opsOf("orders").map((o) => o[0])).not.toContain("in");
+});
+
+test("a failed returns lookup fails the needs action list", async () => {
+  mockResults.order_returns = { data: null, error: { message: "boom" } };
+  await expect(listOrders("needs_action", NOW)).rejects.toThrow("Loading open returns: boom");
+});
+
+test("in progress lists every open status", async () => {
+  await listOrders("in_progress");
   expect(opsOf("orders")).toContainEqual([
-    "or",
-    "problem.not.is.null,process_error.not.is.null,status.eq.rto,id.in.(o1,o2)",
+    "in",
+    "status",
+    ["processing", "cancelling", "processed", "packed", "ready_for_pickup", "shipped", "out_for_delivery"],
   ]);
 });
 
-test("all tab applies no status filter", async () => {
-  await listOrders("all");
-  const ops = opsOf("orders").map((o) => o[0]);
-  expect(ops).not.toContain("in");
-  expect(ops).not.toContain("or");
+test("closed lists delivered, cancelled and rto_received", async () => {
+  await listOrders("closed");
+  expect(opsOf("orders")).toContainEqual(["in", "status", ["delivered", "cancelled", "rto_received"]]);
+});
+
+test("list selects fulfilment, courier and awb (delivery label)", async () => {
+  await listOrders("closed");
+  const select = opsOf("orders").find((o) => o[0] === "select")[1];
+  expect(select).toContain("fulfilment");
+  expect(select).toContain(" courier,");
+  expect(select).toContain(" awb,");
+});
+
+test("counts use a head count with the queue's own filter", async () => {
+  mockResults.orders = { count: 4, error: null };
+  await expect(countQueue("needs_action", NOW)).resolves.toBe(4);
+  expect(opsOf("orders")).toContainEqual(["select", "id", { count: "exact", head: true }]);
+  expect(orOf()).toBe(BASE_CLAUSES);
+});
+
+test("countOrders counts needs action and in progress", async () => {
+  mockResults.orders = { count: 7, error: null };
+  await expect(countOrders(NOW)).resolves.toEqual({ needs_action: 7, in_progress: 7 });
+});
+
+test("a count failure rejects", async () => {
+  mockResults.orders = { count: null, error: { message: "boom" } };
+  await expect(countQueue("in_progress", NOW)).rejects.toThrow("Counting In progress orders: boom");
+});
+
+// Reads an or() string as PostgREST's grammar does: outside double quotes a comma ends the clause;
+// inside them, \ makes the next character literal and nothing else is special.
+function parseClauses(filter) {
+  const clauses = [];
+  let i = 0;
+  while (i < filter.length) {
+    const open = filter.indexOf('"', i);
+    const comma = filter.indexOf(",", i);
+    if (open === -1 || (comma !== -1 && comma < open)) {
+      throw new Error(`Unquoted value in clause at ${i}: ${filter}`);
+    }
+    const column = filter.slice(i, open);
+    let value = "";
+    let at = open + 1;
+    while (filter[at] !== '"') {
+      if (at >= filter.length) throw new Error(`Unterminated quote: ${filter}`);
+      if (filter[at] === "\\") at += 1;
+      value += filter[at];
+      at += 1;
+    }
+    clauses.push([column, value]);
+    at += 1;
+    if (at < filter.length && filter[at] !== ",") throw new Error(`Text after the quote: ${filter}`);
+    i = at + 1;
+  }
+  return clauses;
+}
+
+const contains = (literal) => `%${literal}%`;
+
+test.each([
+  ["a,status.eq.paid", "a,status.eq.paid"],
+  ['x"),id.not.is.null', 'x"),id.not.is.null'],
+  ["(a)", "(a)"],
+  ["a.b", "a.b"],
+  ["back\\slash", "back\\\\slash"],
+  ['end\\"', 'end\\\\"'],
+  ["half%_off", "half\\%\\_off"],
+])("hostile term %s stays one literal value in each clause", (term, like) => {
+  const clauses = parseClauses(orderSearchFilter(term));
+  const expected = contains(like);
+  expect(clauses.map(([c]) => c)).toEqual(["order_ref.ilike.", "contact_name.ilike."]);
+  expect(clauses.map(([, v]) => v)).toEqual([expected, expected]);
+});
+
+test("a * is not sent as a wildcard: it becomes the one-character match", () => {
+  expect(orderSearchFilter("a*b")).toBe('order_ref.ilike."%a_b%",contact_name.ilike."%a_b%"');
+});
+
+test("the phone clause uses only the digits of the term", () => {
+  const clauses = parseClauses(orderSearchFilter("+91 99999 99999"));
+  expect(clauses[2]).toEqual(["contact_phone.ilike.", "%919999999999%"]);
+  expect(parseClauses(orderSearchFilter("99999 99999"))[2]).toEqual(["contact_phone.ilike.", "%9999999999%"]);
+});
+
+test("a full number typed with a leading 0 still finds the phone", () => {
+  expect(parseClauses(orderSearchFilter("09999 999999"))[2]).toEqual(["contact_phone.ilike.", "%9999999999%"]);
+});
+
+test("an order number keeps its zeros, so it does not match every phone with that digit", () => {
+  expect(parseClauses(orderSearchFilter("WEB-000006"))[2]).toEqual(["contact_phone.ilike.", "%000006%"]);
+});
+
+test("a term without digits has no phone clause", () => {
+  expect(orderSearchFilter("Asha")).not.toContain("contact_phone");
+});
+
+test("search covers every status: it adds no status filter", async () => {
+  await searchOrders("  WEB-000007 ");
+  expect(opsOf("orders").map((o) => o[0])).not.toContain("in");
+  expect(orOf()).toBe(orderSearchFilter("WEB-000007"));
+});
+
+test("an empty term runs no query", async () => {
+  await expect(searchOrders("   ")).resolves.toEqual([]);
+  expect(mockCalls).toEqual([]);
+});
+
+test("a long term is capped at 100 characters", async () => {
+  await searchOrders("a".repeat(150));
+  expect(orOf()).toBe(orderSearchFilter("a".repeat(100)));
 });
 
 test("action posts the payload to admin-order-action", async () => {
