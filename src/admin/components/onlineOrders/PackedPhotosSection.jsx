@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Button } from "../../../components/ui/button";
 import { action } from "./onlineOrdersApi";
 import { formatDateTime } from "./orderHelpers";
+import { resizePhoto } from "./resizePhoto";
 
 const PHOTO_TYPES = "image/jpeg,image/png,image/webp";
 const MAX_PHOTOS = 4;
@@ -18,7 +19,8 @@ export default function PackedPhotosSection({ order, onChanged }) {
     if (!files.length) return;
     setPending(true);
     try {
-      for (const file of files) {
+      for (const picked of files) {
+        const file = await resizePhoto(picked);
         const { uploadUrl, path } = await action({
           action: "packed_photo_url",
           orderId: order.id,

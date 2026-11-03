@@ -142,7 +142,8 @@ address and phone, and `/track` opens with an order number and phone only.
 Decisions: 4 per order; staff can remove a photo (the fix for a label slipping through); jpg/png/webp only since browsers
 cannot show HEIC; hidden from customers once cancelled, returning or sent back. `/track` gets links from a new
 `order-packed-photos` function because its SQL lookup cannot sign URLs and `order-status` would expose the voucher code.
-Left out: resizing on upload, so a large phone photo loads at full size on the customer's page.
+Photos are resized in the browser before upload (longest side 1600 px, JPEG), which also strips EXIF GPS. A photo the
+browser cannot decode uploads as it is.
 
 Ship order: migrate `migration_online_orders_packed_photos.sql` → deploy `order-packed-photos`, `order-status`,
 `admin-order-action` → merge. Prod steps need owner OK.
