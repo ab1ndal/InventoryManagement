@@ -683,7 +683,7 @@ describe("store pickup", () => {
   });
 });
 
-describe("Porter (manual)", () => {
+describe("manual delivery", () => {
   const checkedItems = () => [
     item({ id: "i1", line_no: 1, product_name: "Kurta", unit_price: 1200, paid_value: 1200, available_qty: 1 }),
     item({ id: "i2", line_no: 2, product_name: "Dupatta", unit_price: 800, paid_value: 800, available_qty: 0 }),
@@ -694,37 +694,75 @@ describe("Porter (manual)", () => {
     fireEvent.click(processButton());
     return screen.findByRole("dialog");
   };
+  const manual = (status, courier = "porter", over = {}) =>
+    detail({
+      order: {
+        status,
+        courier,
+        courier_name: courier === "porter" ? "Porter" : "Bindal's Creation",
+        delivered_at: null,
+        ...over,
+      },
+    });
+  const stepNames = ["Packed", "Picked up", "Out for delivery", "Delivered"];
+  const shownSteps = () => stepNames.filter((name) => screen.queryByRole("button", { name }));
+  const openAt = async (status, courier) => {
+    mockDetail = manual(status, courier);
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+  };
 
-  test("Process defaults to Shiprocket; Porter needs a valid link if one is given, then sends dispatch_manual", async () => {
+  test("Process offers Shiprocket, Porter and Self delivery, with no link field", async () => {
     mockDetail = detail({ items: checkedItems() });
     const dialog = await openProcess();
     expect(within(dialog).getByRole("radio", { name: "Shiprocket" })).toBeChecked();
-    expect(within(dialog).queryByLabelText("Porter tracking link")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Process" })).toBeInTheDocument();
-
-    fireEvent.click(within(dialog).getByRole("radio", { name: "Porter (manual)" }));
-    expect(dialog).toHaveTextContent("Book the delivery in the Porter app first.");
-    // same refund preview as Process: the missing Dupatta is refunded
-    expect(within(dialog).getByTestId("refund-total")).toHaveTextContent("₹800.00");
-    const dispatched = within(dialog).getByRole("button", { name: "Dispatched" });
-    expect(dispatched).toBeEnabled(); // the link is optional
-    fireEvent.change(within(dialog).getByLabelText("Porter tracking link"), { target: { value: "porter.in/x" } });
-    expect(dispatched).toBeDisabled();
-    fireEvent.change(within(dialog).getByLabelText("Porter tracking link"), {
-      target: { value: " https://porter.in/track/abc " },
-    });
-    fireEvent.click(dispatched);
-    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order dispatched with Porter"]));
-    expect(mockActions).toEqual([{ action: "dispatch_manual", orderId: "o1", trackingUrl: "https://porter.in/track/abc" }]);
+    expect(within(dialog).getByRole("radio", { name: "Porter (manual)" })).not.toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: "Self delivery" })).not.toBeChecked();
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    expect(dialog).toHaveTextContent("1 unit will be booked with the courier");
   });
 
-  test("Porter without a link sends trackingUrl null; nothing available → Cancel and refund", async () => {
+  test.each([
+    ["Porter (manual)", "porter"],
+    ["Self delivery", "self"],
+  ])("%s sends manual_process with no link", async (radio, courier) => {
+    mockDetail = detail({ items: checkedItems() });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: radio }));
+    expect(dialog).toHaveTextContent(
+      "1 unit will be marked processed. Book or arrange the delivery yourself; the customer follows the status on our website."
+    );
+    // same refund preview as Process: the missing Dupatta is refunded
+    expect(within(dialog).getByTestId("refund-total")).toHaveTextContent("₹800.00");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Process" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order processed"]));
+    expect(mockActions).toEqual([{ action: "manual_process", orderId: "o1", courier }]);
+  });
+
+  test("the plural reads units", async () => {
+    mockDetail = detail({
+      items: [item({ id: "i1", line_no: 1, product_name: "Kurta", qty: 2, stock_taken: 2, paid_value: 2400, available_qty: 2 })],
+    });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Self delivery" }));
+    expect(dialog).toHaveTextContent("2 units will be marked processed.");
+  });
+
+  test("nothing available: manual Process offers Cancel and refund", async () => {
     mockDetail = detail({ items: [item({ id: "i1", line_no: 1, product_name: "Kurta", paid_value: 1200, available_qty: 0 })] });
     const dialog = await openProcess();
-    fireEvent.click(within(dialog).getByRole("radio", { name: "Porter (manual)" }));
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Self delivery" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel and refund" }));
     await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order cancelled and refunded"]));
-    expect(mockActions).toEqual([{ action: "dispatch_manual", orderId: "o1", trackingUrl: null }]);
+    expect(mockActions).toEqual([{ action: "manual_process", orderId: "o1", courier: "self" }]);
+  });
+
+  test("Shiprocket still sends process with an op key", async () => {
+    mockDetail = detail({ items: checkedItems() });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Process" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order processed"]));
+    expect(mockActions).toEqual([{ action: "process", orderId: "o1", opKey: "key-1" }]);
   });
 
   test("closing the dialog resets the choice to Shiprocket", async () => {
@@ -737,42 +775,178 @@ describe("Porter (manual)", () => {
     expect(within(await screen.findByRole("dialog")).getByRole("radio", { name: "Shiprocket" })).toBeChecked();
   });
 
-  test("shipped Porter order: badge, link, no Rebook; any admin marks it delivered without a reason", async () => {
-    mockDetail = detail({
-      order: {
-        status: "shipped",
-        courier: "porter",
-        courier_name: "Porter",
-        manual_tracking_url: "https://porter.in/track/abc",
-        bill_id: 42,
-        delivered_at: null,
-      },
+  test.each([
+    ["processed", ["Packed", "Picked up", "Out for delivery", "Delivered"]],
+    ["packed", ["Picked up", "Out for delivery", "Delivered"]],
+    ["shipped", ["Out for delivery", "Delivered"]],
+    ["out_for_delivery", ["Delivered"]],
+    ["delivered", []],
+  ])("%s shows the remaining steps in order, first one primary", async (status, steps) => {
+    await openAt(status, "self");
+    expect(shownSteps()).toEqual(steps);
+    steps.forEach((name, i) => {
+      const button = screen.getByRole("button", { name });
+      if (i === 0) expect(button).toHaveClass("bg-primary");
+      else expect(button).not.toHaveClass("bg-primary");
     });
-    render(<OrderDetail orderId="o1" />);
-    await screen.findByText("Kurta");
-    expect(screen.getByText("Porter")).toBeInTheDocument();
-    expect(screen.getByText("Courier: Porter")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Porter tracking link" })).toHaveAttribute("href", "https://porter.in/track/abc");
-    expect(screen.queryByRole("button", { name: "Rebook…" })).not.toBeInTheDocument();
-    expect(mockRole).toBe("admin");
-
-    fireEvent.click(await screen.findByRole("button", { name: "Mark delivered…" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("Reason (optional)");
-    const confirm = within(dialog).getByRole("button", { name: "Mark delivered" });
-    expect(confirm).toBeEnabled();
-    fireEvent.click(confirm);
-    await waitFor(() => expect(mockActions).toHaveLength(1));
-    expect(mockActions[0]).toMatchObject({ action: "mark_delivered", orderId: "o1", reason: "" });
-    expect(typeof mockActions[0].deliveredAt).toBe("string");
   });
 
-  test("a pickup order's Process is replaced by Ready for pickup, so no Porter choice", async () => {
+  test("the steps are not offered on a Shiprocket or legacy null-courier order", async () => {
+    mockDetail = detail({ order: { status: "packed", courier: "shiprocket" } });
+    const { unmount } = render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(shownSteps()).toEqual([]);
+    unmount();
+    mockDetail = detail({ order: { status: "shipped", courier: null } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(shownSteps()).toEqual([]);
+  });
+
+  test("Packed runs directly", async () => {
+    await openAt("processed");
+    fireEvent.click(screen.getByRole("button", { name: "Packed" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order marked packed"]));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(mockActions).toEqual([{ action: "manual_advance", orderId: "o1", target: "packed" }]);
+  });
+
+  test("Out for delivery after Picked up runs directly", async () => {
+    await openAt("shipped");
+    fireEvent.click(screen.getByRole("button", { name: "Out for delivery" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order marked out for delivery"]));
+    expect(mockActions).toEqual([{ action: "manual_advance", orderId: "o1", target: "out_for_delivery" }]);
+  });
+
+  test.each(["processed", "packed"])("Picked up from %s confirms first", async (status) => {
+    await openAt(status);
+    fireEvent.click(screen.getByRole("button", { name: "Picked up" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(mockActions).toEqual([]);
+    expect(dialog).toHaveTextContent("Mark WEB-000007 picked up?");
+    expect(dialog).toHaveTextContent(
+      "Picked up creates the Bill of Supply, emails the customer and means the order can no longer be cancelled."
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Picked up" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order marked picked up"]));
+    expect(mockActions).toEqual([{ action: "manual_advance", orderId: "o1", target: "shipped" }]);
+  });
+
+  test.each(["processed", "packed"])("Out for delivery from %s skips Picked up, so it confirms too", async (status) => {
+    await openAt(status);
+    fireEvent.click(screen.getByRole("button", { name: "Out for delivery" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(mockActions).toEqual([]);
+    expect(dialog).toHaveTextContent("This also marks the order picked up.");
+    expect(dialog).toHaveTextContent("creates the Bill of Supply");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Out for delivery" }));
+    await waitFor(() => expect(mockActions).toHaveLength(1));
+    expect(mockActions[0]).toEqual({ action: "manual_advance", orderId: "o1", target: "out_for_delivery" });
+  });
+
+  test("backing out of the confirmation sends nothing", async () => {
+    await openAt("packed");
+    fireEvent.click(screen.getByRole("button", { name: "Picked up" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(mockActions).toEqual([]);
+  });
+
+  test.each(["processed", "packed", "shipped", "out_for_delivery"])(
+    "Delivered from %s opens the date dialog; any admin, reason optional",
+    async (status) => {
+      await openAt(status, "self");
+      expect(mockRole).toBe("admin");
+      fireEvent.click(screen.getByRole("button", { name: "Delivered" }));
+      const dialog = await screen.findByRole("dialog");
+      expect(dialog).toHaveTextContent(
+        "Use when the parcel has reached the customer. The delivery date starts the return window and cannot be changed afterwards."
+      );
+      expect(dialog).toHaveTextContent("Reason (optional)");
+      expect(dialog).not.toHaveTextContent("Porter");
+      const confirm = within(dialog).getByRole("button", { name: "Mark delivered" });
+      expect(confirm).toBeEnabled();
+      fireEvent.click(confirm);
+      await waitFor(() => expect(mockActions).toHaveLength(1));
+      expect(mockActions[0]).toMatchObject({ action: "mark_delivered", orderId: "o1", reason: "" });
+      expect(typeof mockActions[0].deliveredAt).toBe("string");
+    }
+  );
+
+  test("Mark delivered… never appears on a manual order, even for a superadmin", async () => {
+    mockRole = "superadmin";
+    await openAt("shipped");
+    // Wait for the role to land: it is what would reveal the button.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delivered" })).toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByRole("button", { name: "Mark delivered…" })).not.toBeInTheDocument();
+  });
+
+  test.each(["processed", "packed"])("Cancel is offered at %s and sends the existing payload", async (status) => {
+    await openAt(status);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel order" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Cancel reason"), { target: { value: "Customer changed mind" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel order" }));
+    await waitFor(() =>
+      expect(mockActions).toContainEqual({ action: "cancel", orderId: "o1", opKey: "key-1", reason: "Customer changed mind" })
+    );
+  });
+
+  test.each(["shipped", "out_for_delivery", "delivered"])("Cancel is hidden at %s", async (status) => {
+    await openAt(status);
+    expect(screen.queryByRole("button", { name: "Cancel order" })).not.toBeInTheDocument();
+  });
+
+  test("Cancel stays hidden on a Shiprocket packed order", async () => {
+    mockDetail = detail({ order: { status: "packed", courier: "shiprocket" } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.queryByRole("button", { name: "Cancel order" })).not.toBeInTheDocument();
+  });
+
+  test.each([
+    ["porter", "Porter"],
+    ["self", "Self delivery"],
+  ])("Rebook is hidden for %s, whose badge reads %s", async (courier, badge) => {
+    await openAt("shipped", courier);
+    expect(screen.getByText(badge)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Rebook/ })).not.toBeInTheDocument();
+  });
+
+  test.each([["self"], ["shiprocket"], [null]])("a shipped order with courier %s reads Picked up", async (courier) => {
+    mockDetail = detail({ order: { status: "shipped", courier } });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByText("Picked up")).toBeInTheDocument();
+    expect(screen.queryByText("Shipped")).not.toBeInTheDocument();
+  });
+
+  test("the Shipment section names the courier from processed on, with no tracking link", async () => {
+    mockDetail = manual("processed", "self", { manual_tracking_url: "https://porter.in/track/abc" });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByRole("heading", { name: "Shipment" })).toBeInTheDocument();
+    expect(screen.getByText("Courier: Bindal's Creation")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /tracking link/i })).not.toBeInTheDocument();
+  });
+
+  test("a legacy shipped Porter order keeps its bill and can still advance", async () => {
+    mockDetail = manual("shipped", "porter", { bill_id: 42 });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByText("Courier: Porter")).toBeInTheDocument();
+    expect(screen.getByText("Bill of Supply #42")).toBeInTheDocument();
+    expect(shownSteps()).toEqual(["Out for delivery", "Delivered"]);
+  });
+
+  test("a pickup order's Process is replaced by Ready for pickup, so no courier choice", async () => {
     mockDetail = detail({ order: { fulfilment: "pickup", shipping: 0, address: { name: "Asha" } } });
     render(<OrderDetail orderId="o1" />);
     await screen.findByText("Kurta");
     expect(screen.queryByRole("button", { name: "Process" })).not.toBeInTheDocument();
     expect(screen.queryByText("Porter (manual)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Self delivery")).not.toBeInTheDocument();
   });
 });
 

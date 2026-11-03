@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatRupees,
   hasProblem,
+  isManualCourier,
   isOutsideUp,
   itemCount,
   orderTotal,
@@ -56,11 +57,11 @@ export function PickupBadge({ fulfilment }) {
   );
 }
 
-export function PorterBadge({ courier }) {
-  if (courier !== "porter") return null;
+export function CourierBadge({ courier }) {
+  if (!isManualCourier(courier)) return null;
   return (
     <span className="ml-1 inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
-      Porter
+      {courier === "porter" ? "Porter" : "Self delivery"}
     </span>
   );
 }
@@ -149,7 +150,7 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
                   <ReturnBadge order={o} />
                   <OutsideUpBadge address={o.address} fulfilment={o.fulfilment} />
                   <PickupBadge fulfilment={o.fulfilment} />
-                  <PorterBadge courier={o.courier} />
+                  <CourierBadge courier={o.courier} />
                 </td>
                 <td className="px-3 py-2">
                   {hasProblem(o) && (

@@ -1,14 +1,16 @@
-// Shopper-facing wording for online order states (spec §10). Staff-only
-// states (processing, cancelling) read as "Paid": the shopper's order is
-// simply confirmed and waiting to be packed.
+// Shopper-facing wording for online order states (spec §10). Every ship order
+// follows the same six steps whichever courier carries it; Shiprocket's own
+// `processing` reads as Processed and manual `processed` is the same step.
+// `cancelling` reads like paid: the shopper only sees the outcome.
 export const STATUS_LABELS = {
   pending_payment: "Awaiting payment",
-  paid: "Paid",
-  processing: "Paid",
-  cancelling: "Paid",
+  paid: "Order placed",
+  processing: "Processed",
+  cancelling: "Order placed",
+  processed: "Processed",
   ready_for_pickup: "Ready for pickup",
   packed: "Packed",
-  shipped: "Shipped",
+  shipped: "Picked up",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
   payment_failed: "Payment failed",
@@ -18,20 +20,28 @@ export const STATUS_LABELS = {
   rto_received: "Returned to us",
 };
 
-export const TIMELINE_STEPS = ["Paid", "Packed", "Shipped", "Out for delivery", "Delivered"];
+const PICKUP_LABELS = {
+  paid: "Paid",
+  processing: "Paid",
+  cancelling: "Paid",
+  delivered: "Collected",
+};
+
+export const TIMELINE_STEPS = ["Order placed", "Processed", "Packed", "Picked up", "Out for delivery", "Delivered"];
 export const PICKUP_TIMELINE_STEPS = ["Paid", "Ready for pickup", "Collected"];
 
 const STEP_INDEX = {
   paid: 0,
-  processing: 0,
   cancelling: 0,
-  packed: 1,
-  shipped: 2,
-  out_for_delivery: 3,
-  delivered: 4,
-  rto: 2,
-  rto_received: 2,
   cancelled: 0,
+  processing: 1,
+  processed: 1,
+  packed: 2,
+  shipped: 3,
+  out_for_delivery: 4,
+  delivered: 5,
+  rto: 3,
+  rto_received: 3,
 };
 
 const PICKUP_STEP_INDEX = {
@@ -62,6 +72,6 @@ export function isConfirmed(status, fulfilment = "ship") {
 
 // A pickup order is marked delivered when the shopper collects it.
 export function statusLabel(status, fulfilment = "ship") {
-  if (fulfilment === "pickup" && status === "delivered") return "Collected";
+  if (fulfilment === "pickup" && PICKUP_LABELS[status]) return PICKUP_LABELS[status];
   return STATUS_LABELS[status] ?? status;
 }

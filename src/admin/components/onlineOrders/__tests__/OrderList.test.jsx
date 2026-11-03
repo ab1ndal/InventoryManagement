@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import OrderList from "../OrderList";
+import OrderList, { CourierBadge, StatusBadge } from "../OrderList";
 
 let mockFilters = [];
 const mockRows = {
@@ -114,7 +114,7 @@ jest.mock("../onlineOrdersApi", () => ({
     processing: { label: "Processing" },
     packed: { label: "Packed" },
     pickup: { label: "Pickup" },
-    shipped: { label: "Shipped" },
+    shipped: { label: "Picked up" },
     delivered: { label: "Delivered" },
     problems: { label: "Problems" },
     all: { label: "All" },
@@ -194,11 +194,30 @@ test("Pickup tab shows store pickup orders with their badge and no Outside UP", 
   expect(row).not.toHaveTextContent("Outside UP");
 });
 
-test("a Porter order carries a Porter badge", async () => {
+test("a Porter order carries a Porter badge and reads Picked up", async () => {
   render(<OrderList onSelect={() => {}} refreshKey={0} />);
   const shipRow = await screen.findByRole("row", { name: /WEB-000001/ });
   expect(shipRow).not.toHaveTextContent("Porter");
-  fireEvent.click(screen.getByRole("tab", { name: "Shipped" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Picked up" }));
   const row = await screen.findByRole("row", { name: /WEB-000005/ });
   expect(row).toHaveTextContent("Porter");
+  expect(row).toHaveTextContent("Picked up");
+});
+
+test("CourierBadge names Porter and self delivery, nothing otherwise", () => {
+  const { rerender, container } = render(<CourierBadge courier="porter" />);
+  expect(container).toHaveTextContent("Porter");
+  rerender(<CourierBadge courier="self" />);
+  expect(container).toHaveTextContent("Self delivery");
+  rerender(<CourierBadge courier="shiprocket" />);
+  expect(container).toBeEmptyDOMElement();
+  rerender(<CourierBadge courier={null} />);
+  expect(container).toBeEmptyDOMElement();
+});
+
+test("StatusBadge: shipped reads Picked up, processed reads Processed", () => {
+  const { rerender } = render(<StatusBadge status="shipped" />);
+  expect(screen.getByText("Picked up")).toBeInTheDocument();
+  rerender(<StatusBadge status="processed" />);
+  expect(screen.getByText("Processed")).toBeInTheDocument();
 });

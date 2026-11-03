@@ -1,4 +1,4 @@
-import { action, getOrder, listOrders, OrderActionError } from "../onlineOrdersApi";
+import { action, getOrder, listOrders, ORDER_FILTERS, OrderActionError } from "../onlineOrdersApi";
 
 // Plain functions: CRA resetMocks wipes jest.fn implementations between tests.
 let mockCalls = [];
@@ -40,6 +40,20 @@ test("to_check tab lists paid orders only", async () => {
   expect(opsOf("orders")).toContainEqual(["in", "status", ["paid"]]);
 });
 
+test("processing tab includes manual orders in processed", async () => {
+  await listOrders("processing");
+  expect(opsOf("orders")).toContainEqual(["in", "status", ["processing", "cancelling", "processed"]]);
+});
+
+test("shipped tab is labelled Picked up", () => {
+  expect(ORDER_FILTERS.shipped.label).toBe("Picked up");
+});
+
+test("packed tab lists packed orders only", async () => {
+  await listOrders("packed");
+  expect(opsOf("orders")).toContainEqual(["in", "status", ["packed"]]);
+});
+
 test("shipped tab includes out_for_delivery", async () => {
   await listOrders("shipped");
   expect(opsOf("orders")).toContainEqual(["in", "status", ["shipped", "out_for_delivery"]]);
@@ -55,7 +69,7 @@ test("list selects fulfilment", async () => {
   expect(opsOf("orders").find((o) => o[0] === "select")[1]).toContain("fulfilment");
 });
 
-test("list selects courier (Porter badge)", async () => {
+test("list selects courier (courier badge)", async () => {
   await listOrders("all");
   expect(opsOf("orders").find((o) => o[0] === "select")[1]).toContain(" courier,");
 });

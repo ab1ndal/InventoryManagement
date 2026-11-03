@@ -1,7 +1,9 @@
 import {
   STATUS_LABELS,
   isOutsideUp,
-  isValidTrackingUrl,
+  describeEvent,
+  isManualCourier,
+  manualNextSteps,
   outsideReturnWindow,
   returnBadge,
   returnableUnits,
@@ -68,12 +70,31 @@ test("ready_for_pickup has a label", () => {
   expect(STATUS_LABELS.ready_for_pickup).toBe("Ready for pickup");
 });
 
-test("isValidTrackingUrl: https only, no spaces, at most 500 chars", () => {
-  expect(isValidTrackingUrl("https://porter.in/track/abc")).toBe(true);
-  expect(isValidTrackingUrl("http://porter.in/track/abc")).toBe(false);
-  expect(isValidTrackingUrl("javascript:alert(1)")).toBe(false);
-  expect(isValidTrackingUrl("https://porter.in/a b")).toBe(false);
-  expect(isValidTrackingUrl("https://p.in/" + "a".repeat(500))).toBe(false);
+test("isManualCourier: porter and self only", () => {
+  expect(isManualCourier("porter")).toBe(true);
+  expect(isManualCourier("self")).toBe(true);
+  expect(isManualCourier("shiprocket")).toBe(false);
+  expect(isManualCourier(null)).toBe(false);
+});
+
+test("manualNextSteps: the remaining steps of a manual order, in order", () => {
+  const packed = { key: "packed", label: "Packed" };
+  const pickedUp = { key: "shipped", label: "Picked up" };
+  const out = { key: "out_for_delivery", label: "Out for delivery" };
+  const delivered = { key: "delivered", label: "Delivered" };
+  expect(manualNextSteps("processed")).toEqual([packed, pickedUp, out, delivered]);
+  expect(manualNextSteps("packed")).toEqual([pickedUp, out, delivered]);
+  expect(manualNextSteps("shipped")).toEqual([out, delivered]);
+  expect(manualNextSteps("out_for_delivery")).toEqual([delivered]);
+  for (const status of ["paid", "processing", "delivered", "cancelled", "rto"]) {
+    expect(manualNextSteps(status)).toEqual([]);
+  }
+});
+
+test("describeEvent: manual stage events read as words", () => {
+  expect(describeEvent({ kind: "processed", data: {} }).label).toBe("Processed");
+  expect(describeEvent({ kind: "out_for_delivery", data: {} }).label).toBe("Out for delivery");
+  expect(describeEvent({ kind: "x", from_status: "paid", to_status: "processed", data: {} }).status).toBe("Processed");
 });
 
 // WEB-000006 (2026-10-30): raw kinds and same-status arrows, with nine identical retries.

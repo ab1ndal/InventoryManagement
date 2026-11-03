@@ -8,15 +8,16 @@ const OFF_PATH = {
   rto_received: "This parcel came back to us. The item value is being refunded; shipping is not refundable.",
 };
 
-// Paid → Packed → Shipped → Out for delivery → Delivered (store pickup:
-// Paid → Ready for pickup → Collected), with the cancelled /
-// returned-to-origin exits shown as a note under the steps.
+// Order placed → Processed → Packed → Picked up → Out for delivery → Delivered
+// for every courier (store pickup: Paid → Ready for pickup → Collected), with
+// the cancelled / returned-to-origin exits shown as a note under the steps.
 export default function OrderTimeline({ status, fulfilment }) {
   const done = completedStep(status, fulfilment);
   if (done < 0) return null;
   return (
     <div className="font-sans text-sm text-storefront-charcoal">
-      <ol aria-label="Order progress" className="flex flex-col sm:flex-row sm:justify-between gap-3 sm:gap-2">
+      {/* Wraps because six steps overflow the narrow /track column on one row. */}
+      <ol aria-label="Order progress" className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-between gap-3 sm:gap-2">
         {timelineSteps(fulfilment).map((step, index) => {
           const complete = index <= done;
           return (

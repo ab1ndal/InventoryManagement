@@ -125,6 +125,15 @@ Deno.test("ensureSrOrder: Shiprocket failure records sr_create_failed and rethro
   assert(String(db.order.sr_last_error).includes("injected failure"));
 });
 
+Deno.test("ensureSrOrder: queued job after a manual Process → skipped, no Shiprocket call", async () => {
+  for (const courier of ["porter", "self"] as const) {
+    const db = new FakeDb({ status: "processed", courier, sr_order_id: null, sr_shipment_id: null });
+    const sr = new FakeShiprocket();
+    assertEquals(await ensureSrOrder({ db, shiprocket: sr, shopEmail: SHOP }, ORDER_ID), "skipped");
+    assertEquals(sr.calls.length, 0);
+  }
+});
+
 Deno.test("ensureSrOrder: cancelled before the job ran → skipped, no Shiprocket call", async () => {
   const db = new FakeDb({ sr_order_id: null, sr_shipment_id: null, status: "cancelled" });
   const sr = new FakeShiprocket();
