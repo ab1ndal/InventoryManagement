@@ -21,7 +21,7 @@ const QUOTE_DEBOUNCE_MS = 300;
 const PINCODE = /^\d{6}$/;
 
 const OUTSIDE_UP_NOTE =
-  "We usually deliver within Uttar Pradesh. For other states we'll confirm delivery with you on WhatsApp before dispatch.";
+  "We'll confirm delivery to your address on WhatsApp before dispatch.";
 
 const CODE_MESSAGES = {
   ok: "Code applied",

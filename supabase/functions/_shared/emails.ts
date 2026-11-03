@@ -79,10 +79,8 @@ export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
   const next = o.fulfilment === "pickup"
     ? `You chose store pickup at ${SHOP_ADDRESS}. We'll email you when your order is ready to collect (usually 1–2 days).`
     : `${
-      inUp(o.address)
-        ? "We deliver within Uttar Pradesh."
-        : "We'll confirm delivery to your address on WhatsApp before dispatch."
-    } We'll email you again when your parcel ships.`;
+      inUp(o.address) ? "" : "We'll confirm delivery to your address on WhatsApp before dispatch. "
+    }We'll email you again when your parcel ships.`;
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",
