@@ -32,9 +32,44 @@ it.each([
   expect(completed()).toEqual(SIX.map((_, i) => i < ticked));
 });
 
-it("lays the steps in three columns from sm, one column on a phone", () => {
+it("joins the steps with a line that is dark up to the current step", () => {
   render(<OrderTimeline status="packed" />);
-  expect(screen.getByRole("list", { name: /order progress/i })).toHaveClass("grid-cols-1", "sm:grid-cols-3");
+  const lines = screen.getAllByTestId("timeline-connector");
+  expect(lines).toHaveLength(5);
+  expect(lines.map((l) => l.classList.contains("bg-storefront-charcoal"))).toEqual([true, true, false, false, false]);
+});
+
+it("runs top to bottom on a phone and left to right from md", () => {
+  render(<OrderTimeline status="packed" />);
+  expect(screen.getByRole("list", { name: /order progress/i })).toHaveClass("md:flex");
+});
+
+it.each([
+  ["paid", /checking your items/],
+  ["processed", /confirmed and being prepared/],
+  ["packed", /waiting to be picked up/],
+  ["shipped", /on its way to you/],
+  ["out_for_delivery", /out for delivery and should reach you soon/],
+  ["delivered", /return within 7 days/],
+])("says in a sentence what is happening at %s", (status, text) => {
+  render(<OrderTimeline status={status} />);
+  expect(screen.getByText(text)).toBeInTheDocument();
+});
+
+it("leaves the explaining to the existing note when an order has stopped or is ready to collect", () => {
+  const { rerender } = render(<OrderTimeline status="cancelled" />);
+  expect(screen.queryByText(/checking your items/)).not.toBeInTheDocument();
+  rerender(<OrderTimeline status="ready_for_pickup" fulfilment="pickup" />);
+  expect(screen.getByText(/Your order is ready at our shop/)).toBeInTheDocument();
+});
+
+it("marks the current step, but none on an order that has stopped", () => {
+  const { container, rerender } = render(<OrderTimeline status="packed" />);
+  expect(container.querySelector('[aria-current="step"]')).toHaveTextContent("Packed");
+  rerender(<OrderTimeline status="cancelled" />);
+  expect(container.querySelector('[aria-current="step"]')).toBeNull();
+  rerender(<OrderTimeline status="rto" />);
+  expect(container.querySelector('[aria-current="step"]')).toBeNull();
 });
 
 it("notes a cancelled order", () => {
@@ -81,5 +116,56 @@ describe("store pickup", () => {
     render(<OrderTimeline status="cancelled" fulfilment="pickup" />);
     expect(completed()).toEqual([true, false, false]);
     expect(screen.getByText(/This order was cancelled/)).toBeInTheDocument();
+  });
+});
+
+describe("step times", () => {
+  const row = (name) =>
+    within(screen.getByRole("list", { name: /order progress/i }))
+      .getAllByRole("listitem")
+      .find((li) => li.textContent.includes(name));
+  const TIMES = {
+    paid: "2026-11-01T17:03:00Z",
+    processed: "2026-11-02T04:00:00Z",
+    packed: "2026-11-02T06:00:00Z",
+    shipped: "2026-11-03T06:00:00Z",
+  };
+
+  it("shows India time under each completed step", () => {
+    render(<OrderTimeline status="packed" statusTimes={TIMES} />);
+    expect(row("Order placed").querySelector("time")).toHaveTextContent("1 Nov, 10:33 pm");
+    expect(row("Order placed").querySelector("time")).toHaveAttribute("datetime", TIMES.paid);
+    expect(row("Processed").querySelector("time")).toHaveTextContent("2 Nov, 9:30 am");
+    expect(row("Packed").querySelector("time")).toHaveTextContent("2 Nov, 11:30 am");
+  });
+
+  it("shows no time on a pending step, even if one is recorded", () => {
+    render(<OrderTimeline status="packed" statusTimes={TIMES} />);
+    expect(row("Picked up").querySelector("time")).toBeNull();
+  });
+
+  it("shows no time on a completed step with none recorded", () => {
+    const { paid, processed, shipped } = TIMES;
+    render(<OrderTimeline status="shipped" statusTimes={{ paid, processed, shipped }} />);
+    expect(row("Packed").getAttribute("data-complete")).toBe("true");
+    expect(row("Packed").querySelector("time")).toBeNull();
+  });
+
+  it("shows times on the steps a cancelled order reached", () => {
+    render(<OrderTimeline status="cancelled" statusTimes={TIMES} />);
+    expect(row("Order placed").querySelector("time")).toHaveTextContent("1 Nov, 10:33 pm");
+    expect(row("Processed").querySelector("time")).toBeNull();
+  });
+
+  it("maps pickup steps", () => {
+    render(<OrderTimeline status="ready_for_pickup" fulfilment="pickup" statusTimes={{ paid: TIMES.paid, ready_for_pickup: TIMES.processed }} />);
+    expect(row("Paid").querySelector("time")).toHaveTextContent("1 Nov, 10:33 pm");
+    expect(row("Ready for pickup").querySelector("time")).toHaveTextContent("2 Nov, 9:30 am");
+    expect(row("Collected").querySelector("time")).toBeNull();
+  });
+
+  it("renders without times when the field is absent", () => {
+    render(<OrderTimeline status="delivered" />);
+    expect(document.querySelector("time")).toBeNull();
   });
 });

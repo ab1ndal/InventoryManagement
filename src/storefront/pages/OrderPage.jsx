@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import Seo from "../components/Seo";
+import OrderDelivery from "../components/OrderDelivery";
 import OrderDetails from "../components/OrderDetails";
+import OrderHelp from "../components/OrderHelp";
 import OrderTimeline from "../components/OrderTimeline";
 import { useCart } from "../context/CartContext";
 import { useStorefrontAuth } from "../context/StorefrontAuthContext";
@@ -156,12 +158,20 @@ export default function OrderPage() {
         </p>
       )}
 
-      <OrderTimeline status={order.status} fulfilment={order.fulfilment} />
+      <OrderTimeline status={order.status} fulfilment={order.fulfilment} statusTimes={order.statusTimes} />
+      <OrderDelivery
+        status={order.status}
+        fulfilment={order.fulfilment}
+        courierName={order.courierName}
+        city={order.deliveryCity}
+        pincode={order.deliveryPincode}
+      />
       {order.fulfilment !== "pickup" && order.trackingUrl && (
         <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
           See detailed tracking on Shiprocket
         </a>
       )}
+      <OrderHelp orderRef={order.orderRef} />
 
       <OrderDetails order={order} />
 

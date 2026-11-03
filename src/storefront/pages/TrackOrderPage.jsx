@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import Seo from "../components/Seo";
+import OrderDelivery from "../components/OrderDelivery";
 import OrderDetails from "../components/OrderDetails";
+import OrderHelp from "../components/OrderHelp";
 import OrderTimeline from "../components/OrderTimeline";
 import { WHATSAPP_URL, lookupOrder } from "../lib/ordersApi";
 import { statusLabel } from "../lib/orderStatus";
@@ -24,7 +26,7 @@ export default function TrackOrderPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 sm:px-6 py-16">
+    <div className={`${result.kind === "found" ? "max-w-2xl" : "max-w-md"} mx-auto px-4 sm:px-6 py-16`}>
       <Seo title="Track order" noindex />
       <h1 className="font-display text-3xl font-semibold text-storefront-charcoal mb-2">
         Track your order
@@ -36,12 +38,20 @@ export default function TrackOrderPage() {
             <p className="text-xs tracking-widest uppercase text-storefront-muted">Order {result.order.orderRef}</p>
             <p className="text-lg font-semibold mt-1">{statusLabel(result.order.status, result.order.fulfilment)}</p>
           </div>
-          <OrderTimeline status={result.order.status} fulfilment={result.order.fulfilment} />
+          <OrderTimeline status={result.order.status} fulfilment={result.order.fulfilment} statusTimes={result.order.statusTimes} />
+          <OrderDelivery
+            status={result.order.status}
+            fulfilment={result.order.fulfilment}
+            courierName={result.order.courierName}
+            city={result.order.deliveryCity}
+            pincode={result.order.deliveryPincode}
+          />
           {result.order.fulfilment !== "pickup" && result.order.trackingUrl && (
             <a href={result.order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
               See detailed tracking on Shiprocket
             </a>
           )}
+          <OrderHelp orderRef={result.order.orderRef} />
           <OrderDetails order={result.order} />
           <button
             type="button"

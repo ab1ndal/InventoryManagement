@@ -53,6 +53,10 @@ const PICKUP_STEP_INDEX = {
   cancelled: 0,
 };
 
+// Which order statuses each timeline step's time comes from, in TIMELINE_STEPS order.
+const STEP_STATUSES = [["paid"], ["processing", "processed"], ["packed"], ["shipped"], ["out_for_delivery"], ["delivered"]];
+const PICKUP_STEP_STATUSES = [["paid"], ["ready_for_pickup"], ["delivered"]];
+
 // Rows from before store pickup existed carry no fulfilment: they shipped.
 export function timelineSteps(fulfilment = "ship") {
   return fulfilment === "pickup" ? PICKUP_TIMELINE_STEPS : TIMELINE_STEPS;
@@ -64,10 +68,72 @@ export function completedStep(status, fulfilment = "ship") {
   return index[status] ?? -1;
 }
 
+// One ISO time or null per timeline step. A step the order skipped has no time.
+export function stepTimes(statusTimes, fulfilment = "ship") {
+  const stepStatuses = fulfilment === "pickup" ? PICKUP_STEP_STATUSES : STEP_STATUSES;
+  return stepStatuses.map((statuses) =>
+    statuses
+      .map((status) => statusTimes?.[status] ?? null)
+      .reduce((latest, time) => {
+        if (!time) return latest;
+        return !latest || new Date(time) > new Date(latest) ? time : latest;
+      }, null)
+  );
+}
+
+const IST_PARTS = new Intl.DateTimeFormat("en-IN", {
+  timeZone: "Asia/Kolkata",
+  day: "numeric",
+  month: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+// e.g. "1 Nov, 10:33 pm". Built from parts because browsers disagree on the separators and on the
+// space before pm. Always India time: the shop and its customers think in it, wherever the device is.
+export function formatStepTime(iso) {
+  const date = new Date(iso ?? NaN);
+  if (Number.isNaN(date.getTime())) return null;
+  const part = Object.fromEntries(IST_PARTS.formatToParts(date).map((p) => [p.type, p.value]));
+  return `${part.day} ${part.month}, ${part.hour}:${part.minute} ${part.dayPeriod.toLowerCase()}`;
+}
+
+// Shiprocket names carry the rate slab ("Amazon Shipping Surface 1kg"), which means nothing to a shopper.
+export function courierDisplayName(name) {
+  const cleaned = (name ?? "").trim().replace(/\s+[-–]?\s*\d+(\.\d+)?\s*(kgs?|gms?|g)\.?$/i, "").trim();
+  return cleaned || null;
+}
+
 export function isConfirmed(status, fulfilment = "ship") {
   return (
     completedStep(status, fulfilment) >= 0 && status !== "cancelled" && status !== "rto" && status !== "rto_received"
   );
+}
+
+const RETURN_NOTE =
+  "If something isn't right, you can ask for a return within 7 days, or within 48 hours if an item is damaged or wrong.";
+
+const STATUS_MESSAGES = {
+  paid: "We've received your order and payment. We're checking your items now.",
+  processing: "Your items are confirmed and being prepared.",
+  processed: "Your items are confirmed and being prepared.",
+  packed: "Your order is packed and waiting to be picked up for delivery.",
+  shipped: "Your order has been picked up and is on its way to you.",
+  out_for_delivery: "Your order is out for delivery and should reach you soon.",
+  delivered: `Your order has been delivered. ${RETURN_NOTE}`,
+};
+
+const PICKUP_STATUS_MESSAGES = {
+  paid: "We've received your order and payment. We're checking your items now.",
+  delivered: `You've collected your order. ${RETURN_NOTE}`,
+};
+
+// What is happening now, in a sentence. Null when another note already explains the state
+// (ready for pickup, cancelled, returning). Never a delivery date: none is stored.
+export function statusMessage(status, fulfilment = "ship") {
+  const messages = fulfilment === "pickup" ? PICKUP_STATUS_MESSAGES : STATUS_MESSAGES;
+  return messages[status] ?? (status === "cancelling" ? messages.paid : null);
 }
 
 // A pickup order is marked delivered when the shopper collects it.

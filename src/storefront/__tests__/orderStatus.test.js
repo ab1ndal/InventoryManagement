@@ -2,8 +2,11 @@ import {
   PICKUP_TIMELINE_STEPS,
   TIMELINE_STEPS,
   completedStep,
+  courierDisplayName,
+  formatStepTime,
   isConfirmed,
   statusLabel,
+  stepTimes,
   timelineSteps,
 } from "../lib/orderStatus";
 
@@ -75,4 +78,63 @@ test.each([
   ["cancelled", "Cancelled"],
 ])("statusLabel for a pickup order: %s reads %s", (status, label) => {
   expect(statusLabel(status, "pickup")).toBe(label);
+});
+
+test.each([
+  ["2026-11-01T17:03:00Z", "1 Nov, 10:33 pm"],
+  ["2026-11-01T17:03:00+00:00", "1 Nov, 10:33 pm"],
+  // Past midnight in India, still the day before in UTC.
+  ["2026-10-31T18:35:00Z", "1 Nov, 12:05 am"],
+  ["2026-11-01T06:30:00Z", "1 Nov, 12:00 pm"],
+  ["2026-11-01T03:45:00.123456+00:00", "1 Nov, 9:15 am"],
+])("formatStepTime shows %s as %s, India time", (iso, text) => {
+  expect(formatStepTime(iso)).toBe(text);
+});
+
+test.each([[null], [undefined], [""], ["not a date"]])("formatStepTime of %s is null", (iso) => {
+  expect(formatStepTime(iso)).toBeNull();
+});
+
+test.each([
+  ["Amazon Shipping Surface 1kg", "Amazon Shipping Surface"],
+  ["Delhivery Surface 0.5 kg", "Delhivery Surface"],
+  ["Xpressbees Air 2 KG", "Xpressbees Air"],
+  ["Ekart Surface 500g", "Ekart Surface"],
+  ["BlueDart - 10kgs", "BlueDart"],
+  ["  Delhivery  ", "Delhivery"],
+  ["Bindal's Creation", "Bindal's Creation"],
+  ["Porter", "Porter"],
+  ["DTDC 2 Day", "DTDC 2 Day"],
+  ["", null],
+  ["   ", null],
+  [null, null],
+  [undefined, null],
+])("courierDisplayName(%s) is %s", (name, text) => {
+  expect(courierDisplayName(name)).toBe(text);
+});
+
+describe("stepTimes", () => {
+  const T = (hour) => `2026-11-01T${hour}:00:00Z`;
+
+  it("maps statuses onto the six ship steps, null where the order skipped a step", () => {
+    expect(stepTimes({ paid: T("01"), processed: T("02"), shipped: T("04") })).toEqual(
+      [T("01"), T("02"), null, T("04"), null, null]
+    );
+  });
+
+  it("uses the later of processing and processed for Processed", () => {
+    expect(stepTimes({ processing: T("02"), processed: T("03") })[1]).toBe(T("03"));
+    expect(stepTimes({ processing: T("05"), processed: T("03") })[1]).toBe(T("05"));
+    expect(stepTimes({ processing: T("02") })[1]).toBe(T("02"));
+  });
+
+  it("maps statuses onto the three pickup steps", () => {
+    expect(stepTimes({ paid: T("01"), ready_for_pickup: T("02"), delivered: T("03") }, "pickup")).toEqual(
+      [T("01"), T("02"), T("03")]
+    );
+  });
+
+  it.each([[null], [undefined], [{}]])("gives no times for %s, an order read before the deploy", (times) => {
+    expect(stepTimes(times)).toEqual([null, null, null, null, null, null]);
+  });
 });

@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { formatSize } from "../lib/sizes";
 import { formatRupees } from "../lib/ordersApi";
+import { imageUrl } from "../lib/productImage";
 
 function Row({ label, value, strong }) {
   return (
@@ -18,6 +19,21 @@ const ITEM_NOTES = {
   refunded: "Refunded",
 };
 
+// A photo that fails to load counts as no photo: the row reads fine without one.
+function ItemPhoto({ url, name }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return null;
+  return (
+    <img
+      src={imageUrl(url, { width: 150 })}
+      alt={name}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-16 w-12 shrink-0 object-cover"
+    />
+  );
+}
+
 // Items and money of a placed order (order-status / lookup shape).
 export default function OrderDetails({ order }) {
   const t = order.totals;
@@ -26,7 +42,8 @@ export default function OrderDetails({ order }) {
     <div className="font-sans text-sm text-storefront-charcoal">
       <ul className="divide-y divide-storefront-border border-t border-storefront-border">
         {order.items.map((i, index) => (
-          <li key={`${i.name}-${index}`} className="flex justify-between py-3">
+          <li key={`${i.name}-${index}`} className="flex items-start gap-3 py-3">
+            <ItemPhoto url={i.imageUrl} name={i.name} />
             <span>
               {i.name} ({formatSize(i.size)}/{i.color}) ×{i.qty}
               {ITEM_NOTES[i.status] && <span className="block text-xs text-storefront-muted">{ITEM_NOTES[i.status]}</span>}

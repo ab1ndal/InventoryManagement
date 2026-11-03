@@ -7,6 +7,7 @@ import {
   getCheckoutLive,
   loadCashfree,
   lookupOrder,
+  orderHelpUrl,
   myOrders,
   orderStatus,
   refundChoose,
@@ -100,6 +101,31 @@ it("keeps a Porter order's courier and manual tracking link", async () => {
   await expect(lookupOrder("WEB-000001", "9810873280")).resolves.toMatchObject({ courier: "porter", trackingUrl: "https://porter.in/t/1" });
 });
 
+test("lookupOrder: tracking fields reach components under the order-status names", async () => {
+  supabase.rpc.mockResolvedValue({
+    data: {
+      order_ref: "WEB-000001", status: "shipped", courier_name: "Delhivery",
+      status_times: { paid: "2026-11-01T17:03:00+00:00" }, delivery_city: "Ghaziabad", delivery_pincode: "201001",
+      items: [{ name: "Kurti", qty: 1, image_url: "https://img.test/a.webp" }, { name: "Saree", qty: 1, image_url: null }],
+    },
+    error: null,
+  });
+  const order = await lookupOrder("WEB-000001", "9810873280");
+  expect(order).toMatchObject({
+    courierName: "Delhivery",
+    statusTimes: { paid: "2026-11-01T17:03:00+00:00" },
+    deliveryCity: "Ghaziabad",
+    deliveryPincode: "201001",
+  });
+  expect(order.items.map((i) => i.imageUrl)).toEqual(["https://img.test/a.webp", null]);
+});
+
+test("lookupOrder: a response from before the migration gives nulls", async () => {
+  supabase.rpc.mockResolvedValue({ data: { order_ref: "WEB-000001", status: "paid", items: [{ name: "Kurti", qty: 1 }] }, error: null });
+  const order = await lookupOrder("WEB-000001", "9810873280");
+  expect([order.statusTimes, order.deliveryCity, order.deliveryPincode, order.items[0].imageUrl]).toEqual([null, null, null, null]);
+});
+
 it("lists my orders newest first, unwrapping setof jsonb rows", async () => {
   supabase.rpc.mockResolvedValue({
     data: [
@@ -130,4 +156,10 @@ it("injects the Cashfree SDK once and returns an instance for the mode", async (
 it("formats rupees without decimals for whole amounts", () => {
   expect(formatRupees(3080)).toBe("3,080");
   expect(formatRupees(99.5)).toBe("99.50");
+});
+
+it("the order help link opens WhatsApp with the order number filled in", () => {
+  expect(orderHelpUrl("WEB-000006")).toBe(
+    "https://wa.me/919810873280?text=Hi%2C%20I%20need%20help%20with%20my%20order%20WEB-000006."
+  );
 });

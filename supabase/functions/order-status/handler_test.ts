@@ -27,7 +27,11 @@ Deno.test("order-status: valid token → contract shape", async () => {
     status: "shipped",
     fulfilment: "ship",
     courier: null,
-    items: [{ name: "Silk Kurti", size: "M", color: "Red", qty: 1, status: "ordered" }],
+    courierName: null,
+    statusTimes: null,
+    deliveryCity: null,
+    deliveryPincode: null,
+    items: [{ name: "Silk Kurti", size: "M", color: "Red", qty: 1, status: "ordered", imageUrl: null }],
     totals: { subtotal: 1000, promoDiscount: 0, shipping: 80, voucherApplied: 0, creditApplied: 0, gatewayAmount: 1080 },
     trackingUrl: "https://shiprocket.co/tracking/AWB1",
     leftoverVoucher: { code: "LEFT123", value: 250 },
@@ -52,6 +56,43 @@ Deno.test("order-status: Porter order → its manual link (or none), never a Shi
   const b = await setup(porter);
   const k = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), b.deps)).json();
   assertEquals([k.courier, k.trackingUrl], ["porter", null]);
+});
+
+Deno.test("order-status: tracking details come from the shared SQL helper, keyed by line", async () => {
+  const { deps, store, o } = await setup({ status: "shipped", courier_name: "Amazon Shipping Surface 1kg" });
+  store.items.set(o.id, [item(), item({ id: "i-2", line_no: 2, product_name: "No Photo Kurti" })]);
+  store.impls._order_tracking_json = (a) => {
+    assertEquals(a, { p_order_id: o.id });
+    return {
+      status_times: { paid: "2026-11-01T17:03:00+00:00" },
+      delivery_city: "Ghaziabad",
+      delivery_pincode: "201001",
+      item_images: { "1": "https://img.test/kurti.webp" },
+    };
+  };
+  const j = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps)).json();
+  assertEquals(j.courierName, "Amazon Shipping Surface 1kg");
+  assertEquals(j.statusTimes, { paid: "2026-11-01T17:03:00+00:00" });
+  assertEquals([j.deliveryCity, j.deliveryPincode], ["Ghaziabad", "201001"]);
+  assertEquals(j.items.map((i: { imageUrl: string | null }) => i.imageUrl), ["https://img.test/kurti.webp", null]);
+});
+
+Deno.test("order-status: never returns the address beyond city and pincode", async () => {
+  const address = { name: "Secret Receiver", line1: "12 Hidden Street", landmark: "Quiet Temple", city: "Ghaziabad", pincode: "201001" };
+  const { deps } = await setup({ status: "shipped", address });
+  const text = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps)).text();
+  for (const secret of ["Secret Receiver", "Hidden Street", "Quiet Temple"]) assertEquals(text.includes(secret), false, secret);
+});
+
+Deno.test("order-status: helper failure still returns the order, without the extras", async () => {
+  const { deps, store } = await setup({ status: "paid" });
+  store.impls._order_tracking_json = () => {
+    throw new Error("function not found");
+  };
+  const res = await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps);
+  assertEquals(res.status, 200);
+  const j = await res.json();
+  assertEquals([j.status, j.statusTimes, j.deliveryCity, j.items[0].imageUrl], ["paid", null, null, null]);
 });
 
 Deno.test("order-status: unknown ref, wrong token, no credentials, other user's JWT → identical 404", async () => {

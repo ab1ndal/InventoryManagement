@@ -30,7 +30,18 @@ export type OrderStatusResponse = {
   status: string;
   fulfilment: "ship" | "pickup";
   courier: "shiprocket" | "porter" | "self" | null;
-  items: { name: string; size: string | null; color: string | null; qty: number; status: string }[];
+  courierName: string | null;
+  statusTimes: Record<string, string> | null;
+  deliveryCity: string | null;
+  deliveryPincode: string | null;
+  items: {
+    name: string;
+    size: string | null;
+    color: string | null;
+    qty: number;
+    status: string;
+    imageUrl: string | null;
+  }[];
   totals: {
     subtotal: number;
     promoDiscount: number;
@@ -41,6 +52,14 @@ export type OrderStatusResponse = {
   };
   trackingUrl: string | null;
   leftoverVoucher: { code: string; value: number } | null;
+};
+
+/** `_order_tracking_json` in schema/migration_online_orders_customer_tracking.sql. */
+type OrderTracking = {
+  status_times: Record<string, string>;
+  delivery_city: string | null;
+  delivery_pincode: string | null;
+  item_images: Record<string, string>;
 };
 
 const notFound = () => new ApiError(404, "not_found", "order not found");
@@ -80,12 +99,30 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
 
     const items = await deps.store.orderItems(order.id);
     const leftoverValue = order.leftover_voucher_id ? await deps.store.voucherValue(order.leftover_voucher_id) : null;
+    let tracking: OrderTracking | null = null;
+    try {
+      tracking = await deps.store.rpc<OrderTracking | null>("_order_tracking_json", { p_order_id: order.id });
+    } catch (err) {
+      // These details only reassure; the order's status must still reach a shopper waiting on payment.
+      logEvent("warn", "order_status_tracking_failed", { orderRef: ref, error: errorMessage(err) });
+    }
     return {
       orderRef: order.order_ref,
       status: order.status,
       fulfilment: order.fulfilment,
       courier: order.courier,
-      items: items.map((i) => ({ name: i.product_name, size: i.size, color: i.color, qty: i.qty, status: i.status })),
+      courierName: order.courier_name,
+      statusTimes: tracking?.status_times ?? null,
+      deliveryCity: tracking?.delivery_city ?? null,
+      deliveryPincode: tracking?.delivery_pincode ?? null,
+      items: items.map((i) => ({
+        name: i.product_name,
+        size: i.size,
+        color: i.color,
+        qty: i.qty,
+        status: i.status,
+        imageUrl: tracking?.item_images[String(i.line_no)] ?? null,
+      })),
       totals: {
         subtotal: order.subtotal,
         promoDiscount: order.promo_discount,
