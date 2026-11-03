@@ -19,7 +19,7 @@ npm test           # Run tests in interactive watch mode
 All routes live in `src/App.js`. The structure is:
 - `/` → redirects to `/admin/inventory`
 - `/admin/*` → protected by `RequireAdminAuth` wrapper, rendered inside `AdminLayout`
-- Public auth pages: `/admin/login`, `/admin/signup`, `/admin/forgot-password`, `/admin/reset-password`
+- Public auth pages: `/admin/login`, `/admin/forgot-password`, `/admin/reset-password`. There is no admin signup: a superadmin adds an email and role in Admin > Users (`admin_invites`), and the first sign-in with that confirmed email claims it.
 - `/unauthorized` → shown when a user lacks the required role
 
 ### Auth & Roles

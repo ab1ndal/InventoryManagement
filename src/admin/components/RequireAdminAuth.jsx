@@ -4,36 +4,35 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 //import { useToast } from "../../components/hooks/use-toast";
 import UserRegistration from "./UserRegistration";
+import { ADMIN_ROLES, NO_ADMIN_ACCESS, OAUTH_PENDING_KEY, hasAdminAccess } from "../lib/adminAccess";
 
-export default function RequireAdminAuth({ allowedRoles = ["admin", "superadmin"] }) {
+export default function RequireAdminAuth({ allowedRoles = ADMIN_ROLES }) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [redirectReason, setRedirectReason] = useState(null);
 
   const location = useLocation();
 
   const checkUserRole = async (session) => {
     if (!session?.user) return;
 
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("role, is_active")
-        .eq("id", session.user.id)
-        .single();
-
-        if (!error && allowedRoles.includes(data?.role) && data?.is_active !== false) {
-          setIsAuthorized(true);
-        } else {
-          setRedirectReason("unauthorized");
-        }
-    } catch (err) {
-      console.error("Role check failed:", err);
-      setRedirectReason("unauthorized");
-    } finally {
-      setLoading(false);
+    // Read before the await: the auth listener and the session restore both run this check at once,
+    // and both must agree on the attempt.
+    const freshOAuthLogin = sessionStorage.getItem(OAUTH_PENDING_KEY);
+    const allowed = await hasAdminAccess(supabase, session.user.id, allowedRoles);
+    sessionStorage.removeItem(OAUTH_PENDING_KEY);
+    // A Google sign-in that turns out not to be an admin must not stay logged in. Anyone else refused
+    // here may be a shop customer, so their shop session is left alone.
+    if (!allowed && freshOAuthLogin) {
+      sessionStorage.setItem(
+        "toastData",
+        JSON.stringify({ title: "Login Failed", description: NO_ADMIN_ACCESS, icon: "⚠️" })
+      );
+      await supabase.auth.signOut();
+      return;
     }
+    setIsAuthorized(allowed);
+    setLoading(false);
   };
 
   const waitForSession = async () => {
@@ -51,7 +50,6 @@ export default function RequireAdminAuth({ allowedRoles = ["admin", "superadmin"
       attempts++;
     }
     console.warn("[RequireAdminAuth] Session was never restored");
-    setRedirectReason("not_logged_in");
     setLoading(false);
   };
 
@@ -64,7 +62,8 @@ export default function RequireAdminAuth({ allowedRoles = ["admin", "superadmin"
           setSession(session);
           checkUserRole(session);
         } else {
-          setRedirectReason("not_logged_in");
+          setSession(null);
+          setIsAuthorized(false);
           setLoading(false);
         }
       }
@@ -89,7 +88,7 @@ export default function RequireAdminAuth({ allowedRoles = ["admin", "superadmin"
     );
   }
 
-  if (!session && redirectReason === "not_logged_in") {
+  if (!session) {
     return (
       <Navigate
         to="/admin/login"
@@ -98,7 +97,7 @@ export default function RequireAdminAuth({ allowedRoles = ["admin", "superadmin"
     );
   }
 
-  if (!isAuthorized && redirectReason === "unauthorized") {
+  if (!isAuthorized) {
     return (
       <Navigate
         to="/unauthorized"
