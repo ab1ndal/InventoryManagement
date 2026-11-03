@@ -13,7 +13,7 @@ export async function fetchServerCart() {
   const { data, error } = await supabase
     .from("cart_items")
     .select(
-      "variant_id, product_id, quantity, productsizecolors(size, color, stock), products(name, retailprice)"
+      "variant_id, product_id, quantity, productsizecolors(size, color, stock), products(name:display_title, retailprice)"
     );
   if (error || !data) return [];
   return Promise.all(

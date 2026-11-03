@@ -18,7 +18,7 @@ export function isMissingTableError(error) {
 export async function fetchServerWishlist() {
   const { data, error } = await supabase
     .from(TABLE)
-    .select("product_id, products(productid, name, retailprice)")
+    .select("product_id, products(productid, name:display_title, retailprice)")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data || [])

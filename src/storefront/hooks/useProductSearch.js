@@ -39,9 +39,9 @@ export function useProductSearch(query) {
 
       const { data } = await supabase
         .from("products")
-        .select("productid, name, retailprice, categoryid, categories(name), productsizecolors(stock)")
+        .select("productid, name:display_title, retailprice, categoryid, categories(name), productsizecolors(stock)")
         .or(buildNameCategoryOr(clean, categoryIds))
-        .order("name")
+        .order("display_title")
         .limit(LIMIT);
 
       if (!cancelled) {

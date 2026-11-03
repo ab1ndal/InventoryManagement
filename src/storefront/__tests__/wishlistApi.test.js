@@ -21,7 +21,7 @@ describe("wishlistApi.fetchServerWishlist", () => {
     const items = await fetchServerWishlist();
 
     expect(supabase.from).toHaveBeenCalledWith("wishlist_items");
-    expect(select).toHaveBeenCalledWith("product_id, products(productid, name, retailprice)");
+    expect(select).toHaveBeenCalledWith("product_id, products(productid, name:display_title, retailprice)");
     expect(order).toHaveBeenCalledWith("created_at", { ascending: true });
     expect(items).toEqual([{ productid: "BC1", name: "Silk Saree", retailprice: 1000 }]);
   });

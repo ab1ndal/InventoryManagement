@@ -27,7 +27,7 @@ export function matchCategoryIds(clean, categories) {
 // Build the PostgREST `.or()` filter: product name substring OR (when any
 // category name matched) membership in those category ids.
 export function buildNameCategoryOr(clean, categoryIds) {
-  const conditions = [`name.ilike.%${clean}%`];
+  const conditions = [`name.ilike.%${clean}%`, `display_title.ilike.%${clean}%`];
   if (categoryIds && categoryIds.length) {
     conditions.push(`categoryid.in.(${categoryIds.join(",")})`);
   }

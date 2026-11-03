@@ -1,3 +1,4 @@
+import ProductTitleField from "./ProductTitleField";
 import React, { useEffect, useState } from "react";
 import {
   Dialog,
@@ -45,6 +46,7 @@ const formSchema = z.object({
   name: z.string().min(1),
   categoryid: z.string().nullable().optional(),
   fabric: z.string().nullable().optional(),
+  title_detail: z.string().max(60, "Keep it under 60 characters").nullable().optional(),
   purchaseprice: z.coerce.number().nonnegative(),
   retailprice: z.coerce.number().nonnegative(),
   description: z.string().nullable().optional(),
@@ -68,6 +70,7 @@ export default function ProductEditDialog({
       name: "",
       categoryid: "",
       fabric: "",
+      title_detail: "",
       purchaseprice: 0,
       retailprice: 0,
       description: "",
@@ -349,6 +352,8 @@ export default function ProductEditDialog({
                 </div>
               )}
             </div>
+
+            <ProductTitleField form={form} productid={product?.productid} />
 
             {/* Name field in its own row */}
             <FormField
