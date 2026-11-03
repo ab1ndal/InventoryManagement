@@ -184,9 +184,17 @@ budget decision.
 
 ## Current state
 
-- Branch `feat/seo-render`, uncommitted: `api/render.js`, `src/seoRender/` (19 tests pass), `src/storefront/lib/imageVariant.js`.
-- Next: `vercel.json` rewrites, rename shell at build, read the shell in the function (check `vercel build` includes it), app
-  removes `data-ssr` tags, Seo canonical, drop client JSON-LD, robots, sitemap. Not yet deployed anywhere.
+- Branch `feat/seo-render`, pushed and checked on a Vercel preview, not merged. Done there: 1.1, 1.2, 1.3, 1.4 (except
+  Rich Results Test), 1.6, 1.8.
+- Server text is hidden when JS runs, because swapping it for the app shifted the page (CLS 0.94). Readers without JS still see it.
+- Sitemap has no `lastmod`: products have no change date, and a made-up date is worse than none.
+- Open:
+  - 1.5 shipping and return policy markup.
+  - 1.7 crawlable links past the first 48 products. The app has no URL pagination, so server page links would not match it.
+    Sitemap covers discovery until then.
+  - 1.9 product pages shift about 0.94 on production today, before this branch (footer, then the product info column).
+- After merge, check `curl -I` on a public page shows no `X-Robots-Tag`. Vercel adds noindex to all preview pages, so this
+  cannot be checked earlier. Rollback is a Vercel promote of the previous deployment.
 
 ## Sources
 

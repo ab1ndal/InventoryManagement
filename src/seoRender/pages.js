@@ -111,9 +111,10 @@ function frame(main) {
   );
 }
 
-const staticPage = (path, title, description, main, jsonLd = []) => ({
+// seoTitle: some pages name themselves differently in the tab than in the heading. Matches the app.
+const staticPage = (path, title, description, main, jsonLd = [], seoTitle = title) => ({
   status: 200,
-  title,
+  title: seoTitle,
   description,
   canonical: path,
   bodyHtml: frame(`<h1>${esc(title)}</h1>${main}`),
@@ -145,7 +146,8 @@ const STATIC_PAGES = {
             acceptedAnswer: { "@type": "Answer", text: f.a },
           })),
         },
-      ]
+      ],
+      "FAQ"
     ),
   "/about": () =>
     staticPage(
@@ -153,17 +155,20 @@ const STATIC_PAGES = {
       ABOUT.title,
       "The story behind Bindal's Creation, a family-run ethnic wear shop in Ghaziabad.",
       `<p>${esc(ABOUT.lede)}</p>${paragraphs(ABOUT.story)}<h2>${esc(ABOUT.craftsmanship.title)}</h2>${paragraphs(ABOUT.craftsmanship.body)}`,
-      [STORE_JSON_LD]
+      [STORE_JSON_LD],
+      "About"
     ),
   "/customize": () =>
     staticPage(
       "/customize",
-      "Custom Tailoring",
-      "Seen a lehenga, saree or sherwani you love? Send us the photo and our in-house tailors in Ghaziabad will make it in your size.",
+      CUSTOMIZE.title,
+      "Seen a lehenga, saree or sherwani you love? Send us the photo and our in-house tailors in Ghaziabad will make it in your size. Get a quote on WhatsApp.",
       `<p>${esc(CUSTOMIZE.lede)}</p><p>${esc(CUSTOMIZE.pitch)}</p>` +
         CUSTOMIZE.makes.map((m) => `<h2>${esc(m.group)}</h2><p>${esc(m.items.join(", "))}</p>`).join("") +
         `<h2>How it works</h2><ol>${CUSTOMIZE.steps.map((s) => `<li>${esc(s.title)}: ${esc(s.desc)}</li>`).join("")}</ol>` +
-        `<ul>${CUSTOMIZE.facts.map((f) => `<li>${esc(f.value)}: ${esc(f.label)}</li>`).join("")}</ul>`
+        `<ul>${CUSTOMIZE.facts.map((f) => `<li>${esc(f.value)}: ${esc(f.label)}</li>`).join("")}</ul>`,
+      [],
+      "Custom Tailoring"
     ),
   "/contact": () =>
     staticPage(
@@ -171,7 +176,8 @@ const STATIC_PAGES = {
       "Visit Us",
       "Visit Bindal's Creation at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (closed Tuesdays).",
       `<p>${esc(SHOP_ADDRESS)}</p><p><a href="tel:+919810873280">+91 98108 73280</a></p><p><a href="mailto:bindalscreations@gmail.com">bindalscreations@gmail.com</a></p>`,
-      [STORE_JSON_LD]
+      [STORE_JSON_LD],
+      "Contact & Store"
     ),
   "/size-guide": () =>
     staticPage(
@@ -254,7 +260,7 @@ async function shopPage(rest) {
     title: "Shop",
     description: "Browse our handpicked sarees, lehengas, suits, and ethnic wear.",
     canonical: "/shop",
-    bodyHtml: frame(`<h1>Shop all</h1>${productList(products)}`),
+    bodyHtml: frame(`<h1>Shop</h1>${productList(products)}`),
     jsonLd: [itemList(products)],
   };
 }
