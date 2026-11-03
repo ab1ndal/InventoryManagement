@@ -129,6 +129,13 @@ describe("renderHtml", () => {
     expect(html).toMatch(/<div id="root"><div data-ssr-body/);
   });
 
+  test("server text is hidden only by a script, so a reader without JS still sees it", async () => {
+    const html = renderHtml(shell, await describePage("faq", rest()));
+    expect(html).toContain('.js [data-ssr-body]{display:none}');
+    expect(html).toContain('classList.add("js")');
+    expect(html).not.toMatch(/<div data-ssr-body[^>]*display:\s*none/);
+  });
+
   test("page text with $ patterns stays literal", () => {
     const html = renderHtml(shell, { title: "T", bodyHtml: "cost $& more" });
     expect(html).toContain("cost $& more");

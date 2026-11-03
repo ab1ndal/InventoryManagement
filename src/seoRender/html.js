@@ -35,19 +35,22 @@ function headTags({ title, description, canonical, image, type, noindex }) {
 
 // The shell's own title, description and robots tags would otherwise compete with the page's.
 const SHELL_HEAD_TAGS = [
-  /<title>[\s\S]*?<\/title>/,
-  /<meta\s+name="description"[\s\S]*?\/?>/,
-  /<meta\s+name="robots"[\s\S]*?\/?>/,
-  /<meta\s+name="googlebot"[\s\S]*?\/?>/,
+  /<title[^>]*>[\s\S]*?<\/title>/,
+  /<meta\s+data-ssr\s+name="description"[\s\S]*?\/?>/,
 ];
 const ROOT_DIV = '<div id="root"></div>';
+// Swapping this text for the app would shift the whole page, which Google scores as poor. Anything
+// that runs JS gets the app and skips it; anything that does not (many crawlers) reads it as normal.
+const HIDE_WHEN_JS =
+  `<script>document.documentElement.classList.add("js")</script>` +
+  `<style>.js [data-ssr-body]{display:none}</style>`;
 
 export function renderHtml(shell, page) {
   if (!shell.includes(ROOT_DIV) || !shell.includes("</head>")) {
     throw new Error("shell is missing the root div or </head>");
   }
   const stripped = SHELL_HEAD_TAGS.reduce((html, tag) => html.replace(tag, ""), shell);
-  const head = headTags(page) + (page.jsonLd || []).map(jsonLdTag).join("");
+  const head = HIDE_WHEN_JS + headTags(page) + (page.jsonLd || []).map(jsonLdTag).join("");
   // Function replacers: page text may hold "$&", which a plain string replacement would expand.
   return stripped
     .replace("</head>", () => `${head}</head>`)

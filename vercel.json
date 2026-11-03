@@ -34,8 +34,8 @@
       "destination": "/api/render"
     },
     {
-      "source": "/:path+",
-      "destination": "/api/render?ssr_path=:path+"
+      "source": "/:path(.+)",
+      "destination": "/api/render?ssr_path=:path"
     }
   ]
 }
