@@ -99,7 +99,7 @@ create trigger trg_variant_display_title
   after insert or delete or update of color, productid on public.productsizecolors
   for each row execute function public._refresh_display_title_from_variant();
 
-update public.products set display_title = null;
+update public.products set display_title = null where true;
 alter table public.products alter column display_title set not null;
 
 create or replace function public.preview_product_title(
