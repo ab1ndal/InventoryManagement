@@ -5,6 +5,11 @@ import { supabase } from "lib/supabaseClient";
 // Every money figure comes from the server; nothing here prices an order.
 
 export const WHATSAPP_URL = "https://wa.me/919810873280";
+
+export function orderHelpUrl(orderRef) {
+  return `${WHATSAPP_URL}?text=${encodeURIComponent(`Hi, I need help with my order ${orderRef}.`)}`;
+}
+
 const CASHFREE_SDK_URL = "https://sdk.cashfree.com/js/v3/cashfree.js";
 
 // Non-2xx responses carry `{ error, code }`. `code` drives UI messages;

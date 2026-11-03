@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import Seo from "../components/Seo";
 import OrderDetails from "../components/OrderDetails";
+import OrderHelp from "../components/OrderHelp";
 import OrderTimeline from "../components/OrderTimeline";
 import { useCart } from "../context/CartContext";
 import { useStorefrontAuth } from "../context/StorefrontAuthContext";
@@ -162,6 +163,7 @@ export default function OrderPage() {
           See detailed tracking on Shiprocket
         </a>
       )}
+      <OrderHelp orderRef={order.orderRef} />
 
       <OrderDetails order={order} />
 

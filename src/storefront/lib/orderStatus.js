@@ -70,6 +70,31 @@ export function isConfirmed(status, fulfilment = "ship") {
   );
 }
 
+const RETURN_NOTE =
+  "If something isn't right, you can ask for a return within 7 days, or within 48 hours if an item is damaged or wrong.";
+
+const STATUS_MESSAGES = {
+  paid: "We've received your order and payment. We're checking your items now.",
+  processing: "Your items are confirmed and being prepared.",
+  processed: "Your items are confirmed and being prepared.",
+  packed: "Your order is packed and waiting to be picked up for delivery.",
+  shipped: "Your order has been picked up and is on its way to you.",
+  out_for_delivery: "Your order is out for delivery and should reach you soon.",
+  delivered: `Your order has been delivered. ${RETURN_NOTE}`,
+};
+
+const PICKUP_STATUS_MESSAGES = {
+  paid: "We've received your order and payment. We're checking your items now.",
+  delivered: `You've collected your order. ${RETURN_NOTE}`,
+};
+
+// What is happening now, in a sentence. Null when another note already explains the state
+// (ready for pickup, cancelled, returning). Never a delivery date: none is stored.
+export function statusMessage(status, fulfilment = "ship") {
+  const messages = fulfilment === "pickup" ? PICKUP_STATUS_MESSAGES : STATUS_MESSAGES;
+  return messages[status] ?? (status === "cancelling" ? messages.paid : null);
+}
+
 // A pickup order is marked delivered when the shopper collects it.
 export function statusLabel(status, fulfilment = "ship") {
   if (fulfilment === "pickup" && PICKUP_LABELS[status]) return PICKUP_LABELS[status];

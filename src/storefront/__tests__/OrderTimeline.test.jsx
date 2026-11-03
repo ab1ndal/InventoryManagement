@@ -32,9 +32,44 @@ it.each([
   expect(completed()).toEqual(SIX.map((_, i) => i < ticked));
 });
 
-it("lays the steps in three columns from sm, one column on a phone", () => {
+it("joins the steps with a line that is dark up to the current step", () => {
   render(<OrderTimeline status="packed" />);
-  expect(screen.getByRole("list", { name: /order progress/i })).toHaveClass("grid-cols-1", "sm:grid-cols-3");
+  const lines = screen.getAllByTestId("timeline-connector");
+  expect(lines).toHaveLength(5);
+  expect(lines.map((l) => l.classList.contains("bg-storefront-charcoal"))).toEqual([true, true, false, false, false]);
+});
+
+it("runs top to bottom on a phone and left to right from md", () => {
+  render(<OrderTimeline status="packed" />);
+  expect(screen.getByRole("list", { name: /order progress/i })).toHaveClass("md:flex");
+});
+
+it.each([
+  ["paid", /checking your items/],
+  ["processed", /confirmed and being prepared/],
+  ["packed", /waiting to be picked up/],
+  ["shipped", /on its way to you/],
+  ["out_for_delivery", /out for delivery and should reach you soon/],
+  ["delivered", /return within 7 days/],
+])("says in a sentence what is happening at %s", (status, text) => {
+  render(<OrderTimeline status={status} />);
+  expect(screen.getByText(text)).toBeInTheDocument();
+});
+
+it("leaves the explaining to the existing note when an order has stopped or is ready to collect", () => {
+  const { rerender } = render(<OrderTimeline status="cancelled" />);
+  expect(screen.queryByText(/checking your items/)).not.toBeInTheDocument();
+  rerender(<OrderTimeline status="ready_for_pickup" fulfilment="pickup" />);
+  expect(screen.getByText(/Your order is ready at our shop/)).toBeInTheDocument();
+});
+
+it("marks the current step, but none on an order that has stopped", () => {
+  const { container, rerender } = render(<OrderTimeline status="packed" />);
+  expect(container.querySelector('[aria-current="step"]')).toHaveTextContent("Packed");
+  rerender(<OrderTimeline status="cancelled" />);
+  expect(container.querySelector('[aria-current="step"]')).toBeNull();
+  rerender(<OrderTimeline status="rto" />);
+  expect(container.querySelector('[aria-current="step"]')).toBeNull();
 });
 
 it("notes a cancelled order", () => {

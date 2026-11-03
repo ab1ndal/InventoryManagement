@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Seo from "../components/Seo";
 import OrderDetails from "../components/OrderDetails";
+import OrderHelp from "../components/OrderHelp";
 import OrderTimeline from "../components/OrderTimeline";
 import { WHATSAPP_URL, lookupOrder } from "../lib/ordersApi";
 import { statusLabel } from "../lib/orderStatus";
@@ -24,7 +25,7 @@ export default function TrackOrderPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 sm:px-6 py-16">
+    <div className={`${result.kind === "found" ? "max-w-2xl" : "max-w-md"} mx-auto px-4 sm:px-6 py-16`}>
       <Seo title="Track order" noindex />
       <h1 className="font-display text-3xl font-semibold text-storefront-charcoal mb-2">
         Track your order
@@ -42,6 +43,7 @@ export default function TrackOrderPage() {
               See detailed tracking on Shiprocket
             </a>
           )}
+          <OrderHelp orderRef={result.order.orderRef} />
           <OrderDetails order={result.order} />
           <button
             type="button"

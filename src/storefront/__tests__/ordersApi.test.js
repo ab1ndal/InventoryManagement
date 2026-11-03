@@ -7,6 +7,7 @@ import {
   getCheckoutLive,
   loadCashfree,
   lookupOrder,
+  orderHelpUrl,
   myOrders,
   orderStatus,
   refundChoose,
@@ -130,4 +131,10 @@ it("injects the Cashfree SDK once and returns an instance for the mode", async (
 it("formats rupees without decimals for whole amounts", () => {
   expect(formatRupees(3080)).toBe("3,080");
   expect(formatRupees(99.5)).toBe("99.50");
+});
+
+it("the order help link opens WhatsApp with the order number filled in", () => {
+  expect(orderHelpUrl("WEB-000006")).toBe(
+    "https://wa.me/919810873280?text=Hi%2C%20I%20need%20help%20with%20my%20order%20WEB-000006."
+  );
 });
