@@ -102,7 +102,6 @@ it("shows server totals and a Pay button with the gateway amount", async () => {
   await waitFor(() => expect(screen.getByTestId("quote-shipping")).toHaveTextContent("₹80"));
   expect(screen.getByTestId("quote-to-pay")).toHaveTextContent("₹3,080");
   const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
-  expect(screen.queryByText(/We usually deliver within Uttar Pradesh/)).not.toBeInTheDocument();
   await waitFor(() => expect(pay).toBeEnabled());
   expect(mockApi.quote).toHaveBeenLastCalledWith({ items: [{ variantId: "v1", qty: 2 }], fulfilment: "ship", holderKey: HOLDER_KEY, pincode: "201001" });
 });
@@ -206,29 +205,15 @@ it("hides store credit for guests", async () => {
   expect(screen.queryByLabelText(/use store credit/i)).not.toBeInTheDocument();
 });
 
-it("accepts an address outside Uttar Pradesh with a soft note and Pay enabled", async () => {
+it("accepts an address outside Uttar Pradesh with no warning and Pay enabled", async () => {
   mockApi.quote.mockImplementation(async (p) =>
     p.pincode ? quoteResponse({ pincode: { ok: true, inUp: false } }) : quoteResponse({ pincode: null })
   );
   renderPage();
   fillAddress("400001", "Maharashtra");
-  expect(
-    await screen.findByText(
-      "We usually deliver within Uttar Pradesh. For other states we'll confirm delivery with you on WhatsApp before dispatch."
-    )
-  ).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Pay ₹3,080" })).toBeEnabled());
+  expect(screen.queryByText(/Uttar Pradesh\./)).not.toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("button", { name: "Pay ₹3,080" })).toBeEnabled());
-});
-
-it("shows the soft note when the pincode is outside UP even if the state says UP", async () => {
-  mockApi.quote.mockImplementation(async (p) =>
-    p.pincode ? quoteResponse({ pincode: { ok: true, inUp: false } }) : quoteResponse({ pincode: null })
-  );
-  renderPage();
-  fillAddress("247001");
-  expect(await screen.findByText(/We usually deliver within Uttar Pradesh\./)).toBeInTheDocument();
-  await waitFor(() => expect(screen.getByRole("button", { name: "Pay ₹3,080" })).toBeEnabled());
 });
 
 it("warns about unavailable items and blocks payment", async () => {

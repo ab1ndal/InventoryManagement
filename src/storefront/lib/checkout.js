@@ -50,11 +50,6 @@ export function shippingFee(subtotal) {
   return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
 }
 
-// The business is a GST composition dealer (CGST Act s.10(2)(c)) and usually
-// delivers within Uttar Pradesh, but checkout accepts any state: the owner
-// decides fulfilment for out-of-UP orders (owner decision 2026-10-30).
-export const UP_STATE = "Uttar Pradesh";
-
 const contactSchema = z.object({
   name: z.string().min(2, "Enter your full name"),
   phone: z

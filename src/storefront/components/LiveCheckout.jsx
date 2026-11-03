@@ -15,13 +15,10 @@ import {
 } from "../lib/ordersApi";
 import { rememberPendingOrder } from "../lib/pendingOrder";
 import { guestHolderKey } from "../lib/holder";
-import { INDIAN_STATES, UP_STATE } from "../lib/checkout";
+import { INDIAN_STATES } from "../lib/checkout";
 
 const QUOTE_DEBOUNCE_MS = 300;
 const PINCODE = /^\d{6}$/;
-
-const OUTSIDE_UP_NOTE =
-  "We usually deliver within Uttar Pradesh. For other states we'll confirm delivery with you on WhatsApp before dispatch.";
 
 const CODE_MESSAGES = {
   ok: "Code applied",
@@ -229,10 +226,6 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
   }
 
   const q = response?.quote;
-  // Soft note only: out-of-UP orders are accepted and the owner confirms fulfilment (2026-10-30).
-  const stateValue = watch("state");
-  const outsideUp =
-    !pickup && (response?.pincode?.inUp === false || (Boolean(stateValue) && stateValue !== UP_STATE));
   const unavailable = response?.unavailable ?? [];
   const canPay =
     formState.isValid &&
@@ -317,10 +310,6 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
           />
           <p className="text-xs font-sans text-storefront-muted">Available ₹{formatRupees(creditAvailable)}</p>
         </div>
-      )}
-
-      {outsideUp && (
-        <p className="mt-4 text-sm font-sans text-storefront-muted">{OUTSIDE_UP_NOTE}</p>
       )}
       {unavailable.length > 0 && (
         <div role="alert" className="mt-4 text-sm font-sans text-red-600 space-y-1">

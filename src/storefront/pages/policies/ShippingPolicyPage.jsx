@@ -7,7 +7,7 @@ export default function ShippingPolicyPage() {
   return (
     <StaticPage
       title="Shipping Policy"
-      seoDescription="How and when Bindal's Creation dispatches and delivers orders within Uttar Pradesh."
+      seoDescription="How and when Bindal's Creation dispatches and delivers orders anywhere in India."
     >
       {SHIPPING.map((s) => (
         <PolicySection key={s.heading} {...s} />

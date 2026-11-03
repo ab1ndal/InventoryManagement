@@ -51,7 +51,7 @@ export const CUSTOMIZE = {
     "Rush orders (under 2 weeks) cost extra. The quote shows how much.",
     "Your budget helps us plan. The price in our quote is the final price.",
     "Have your own fabric? We'll quote for stitching only.",
-    "Delivery is within Uttar Pradesh, for a fee shown in the quote. Or collect from the shop.",
+    "We deliver anywhere in India, for a fee shown in the quote. Or collect from the shop.",
     "Fittings and free alterations are done at the shop. We can't take back delivered pieces for alterations, but you're always welcome to bring them in.",
     "We start work as soon as the advance is paid. If you change your mind, call or WhatsApp us within 1 day and we'll tell you if a refund is still possible. After that the advance can't be refunded. If we ever have to cancel, we refund everything you paid.",
   ],

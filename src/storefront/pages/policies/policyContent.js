@@ -22,7 +22,7 @@ export const SHIPPING = [
   {
     heading: "Serviceable regions",
     body: [
-      "We currently deliver within Uttar Pradesh only. For other locations, please contact us on WhatsApp.",
+      "We deliver anywhere in India.",
     ],
   },
 ];
@@ -166,7 +166,7 @@ export const TERMS = [
   {
     heading: "Delivery",
     body: [
-      "We currently deliver within Uttar Pradesh only. Dispatch times, delivery times and shipping charges are set out in our Shipping Policy.",
+      "We deliver anywhere in India. Dispatch times, delivery times and shipping charges are set out in our Shipping Policy.",
     ],
   },
   {
@@ -182,7 +182,7 @@ export const TERMS = [
       "Work starts once you pay 50% of the quote as an advance. The balance is due when the piece is ready, before collection or dispatch.",
       "Because work starts straight away, the advance is not refundable. If you contact us by phone or WhatsApp within 1 day of paying, we will tell you whether a refund is still possible; this is at our discretion. If we cancel a custom order, we refund everything you paid.",
       "One fitting and free alterations are offered at our shop. Pieces delivered to you cannot be sent back for alterations, but you are welcome to bring them to the shop.",
-      "Custom pieces cannot be returned or exchanged. Delivery is within Uttar Pradesh only, for a fee shown in the quote.",
+      "Custom pieces cannot be returned or exchanged. We deliver anywhere in India, for a fee shown in the quote.",
     ],
   },
   {
