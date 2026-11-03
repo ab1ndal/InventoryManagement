@@ -47,7 +47,6 @@ const SuppliersPage = lazy(() => import("./admin/pages/SuppliersPage"));
 const AdminLoginPage = lazy(() => import("./admin/pages/LoginPage"));
 const RequireAdminAuth = lazy(() => import("./admin/components/RequireAdminAuth"));
 const AdminPage = lazy(() => import("./admin/pages/AdminPage"));
-const SignupPage = lazy(() => import("./admin/pages/SignupPage"));
 const ForgetPasswordPage = lazy(() => import("./admin/pages/ForgetPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./admin/pages/ResetPasswordPage"));
 const MockupPage = lazy(() => import("./admin/pages/MockupPage"));
@@ -93,7 +92,7 @@ function App() {
           {/* Public Pages */}
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route path="/admin/signup" element={<SignupPage />} />
+          <Route path="/admin/signup" element={<Navigate to="/admin/login" replace />} />
           <Route
             path="/admin/forgot-password"
             element={<ForgetPasswordPage />}

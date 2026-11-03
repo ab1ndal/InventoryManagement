@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { NO_ADMIN_ACCESS, OAUTH_PENDING_KEY, hasAdminAccess } from "../lib/adminAccess";
 
 export default function LoginPage() {
   const location = useLocation();
@@ -30,10 +31,17 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    if (!error && !(await hasAdminAccess(supabase, data.user.id))) {
+      await supabase.auth.signOut();
+      setLoading(false);
+      toast("Login Failed", { description: NO_ADMIN_ACCESS, icon: "⚠️" });
+      return;
+    }
 
     setLoading(false);
 
@@ -59,28 +67,18 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
+    sessionStorage.setItem(OAUTH_PENDING_KEY, "1");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin + redirectTo },
     });
 
     if (error) {
-      sessionStorage.setItem("toastData", JSON.stringify({
-        title: "Google Login Failed",
-        description: error.message,
-        icon: "⚠️",
-      }));
+      sessionStorage.removeItem(OAUTH_PENDING_KEY);
       toast("Google Login Failed", {
         description: error.message,
         icon: "⚠️",
       });
-    } else {
-      sessionStorage.setItem("toastData", JSON.stringify({
-        title: "Google Login Success",
-        description: "Logged in successfully.",
-        icon: "✅",
-      }));
-      navigate(redirectTo);
     }
   };
 
@@ -156,13 +154,6 @@ export default function LoginPage() {
             Sign in with Google
           </span>
         </button>
-
-        <p className="text-sm text-gray-600 mt-2">
-          Don't have an account?{" "}
-          <a href="/admin/signup" className="text-amber-600 underline">
-            Sign up
-          </a>
-        </p>
       </div>
     </div>
   );
