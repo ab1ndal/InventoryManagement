@@ -526,7 +526,7 @@ describe("Mark delivered", () => {
     expect(mockActions[0]).toEqual({
       action: "mark_delivered",
       orderId: "o1",
-      deliveredAt: new Date("2026-10-20T10:00").toISOString(),
+      deliveredAt: "2026-10-20T04:30:00.000Z",
       reason: "Customer confirmed on call",
     });
   });
@@ -539,12 +539,7 @@ describe("Mark delivered", () => {
     await screen.findByText("Kurta");
     fireEvent.click(await screen.findByRole("button", { name: "Mark delivered…" }));
     const input = within(await screen.findByRole("dialog")).getByLabelText("Delivered at");
-    const d = new Date("2099-01-01T10:02:00Z");
-    const pad = (n) => String(n).padStart(2, "0");
-    expect(input).toHaveAttribute(
-      "min",
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-    );
+    expect(input).toHaveAttribute("min", "2099-01-01T15:32");
   });
 
   test("a server refusal keeps the dialog open with the message and the typed reason", async () => {

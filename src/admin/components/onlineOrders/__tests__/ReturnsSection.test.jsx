@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import ReturnsSection from "../ReturnsSection";
-import { toLocalInputValue } from "../orderHelpers";
+import { toISTInputValue } from "../orderHelpers";
 
 // Plain functions + mutable state: CRA resetMocks wipes jest.fn implementations.
 let mockActions = [];
@@ -88,7 +88,7 @@ test("Open return sends ISO contactedAt and only the chosen units", async () => 
     action: "return_open",
     orderId: "o1",
     reason: "change_of_mind",
-    contactedAt: new Date("2026-10-21T12:30").toISOString(),
+    contactedAt: "2026-10-21T07:00:00.000Z",
     items: [{ itemId: "i1", units: 2 }],
     note: "Too small",
   });
@@ -395,7 +395,7 @@ test("Open return limits Contacted at to between delivery and now", async () => 
   renderSection();
   fireEvent.click(screen.getByRole("button", { name: "Open return…" }));
   const input = within(await screen.findByRole("dialog")).getByLabelText("Contacted at");
-  expect(input).toHaveAttribute("min", toLocalInputValue(new Date(DELIVERED)));
+  expect(input).toHaveAttribute("min", toISTInputValue(new Date(DELIVERED)));
   expect(input.getAttribute("max")).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d$/);
 });
 
@@ -455,5 +455,5 @@ test("Open return Contacted at min rounds a seconds-precise delivery up to the n
   renderSection({ order: order({ delivered_at: "2026-10-20T10:00:30Z" }) });
   fireEvent.click(screen.getByRole("button", { name: "Open return…" }));
   const input = within(await screen.findByRole("dialog")).getByLabelText("Contacted at");
-  expect(input).toHaveAttribute("min", toLocalInputValue(new Date("2026-10-20T10:01:00Z")));
+  expect(input).toHaveAttribute("min", "2026-10-20T15:31");
 });

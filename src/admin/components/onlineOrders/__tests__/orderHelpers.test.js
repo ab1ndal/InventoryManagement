@@ -4,6 +4,8 @@ import {
   hasOpenReturn,
   isOutsideUp,
   describeEvent,
+  formatDateTime,
+  istInputToIso,
   isManualCourier,
   manualNextSteps,
   nextStepIsStatus,
@@ -13,6 +15,7 @@ import {
   returnBadge,
   returnableUnits,
   timelineRows,
+  toISTInputValue,
   windowLabel,
 } from "../orderHelpers";
 
@@ -206,4 +209,20 @@ test("hasOpenReturn sees only open returns", () => {
   expect(hasOpenReturn({ returns: [{ status: "open" }] })).toBe(true);
   expect(hasOpenReturn({ returns: [{ status: "refunded" }] })).toBe(false);
   expect(hasOpenReturn({})).toBe(false);
+});
+
+// Shop days roll over at 18:30 UTC, so this instant falls on the 21st in IST but the 20th in the Americas.
+test("formatDateTime shows IST whatever the browser zone", () => {
+  expect(formatDateTime("2026-10-20T20:15:00Z")).toMatch(/^21 Oct.*01:45 am$/i);
+  expect(formatDateTime(null)).toBe("—");
+});
+
+test("toISTInputValue writes the IST wall clock", () => {
+  expect(toISTInputValue(new Date("2026-10-20T20:15:30Z"))).toBe("2026-10-21T01:45");
+});
+
+test("istInputToIso reads the text as IST", () => {
+  expect(istInputToIso("2026-10-21T01:45")).toBe("2026-10-20T20:15:00.000Z");
+  expect(istInputToIso("")).toBeNull();
+  expect(istInputToIso("not a date")).toBeNull();
 });
