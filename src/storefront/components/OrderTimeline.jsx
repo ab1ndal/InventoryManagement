@@ -22,7 +22,6 @@ export default function OrderTimeline({ status, fulfilment, statusTimes }) {
       {message && <p className="mb-5 leading-relaxed">{message}</p>}
       {/* Top to bottom on a phone; left to right from md, where six steps fit on one line. */}
       <ol aria-label="Order progress" className="md:flex">
-
         {steps.map((step, index) => {
           const complete = index <= done;
           // A cancelled or returning order has stopped, so no step is where it is "now".

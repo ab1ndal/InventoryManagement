@@ -134,6 +134,13 @@ Left out: switching courier after Process (cancel + refund instead); dropping `o
 
 Ship order: migrate → deploy `admin-order-action` + `run-jobs` → merge. Prod steps need owner OK.
 
+## Packed item photo (owner idea 2026-11-02, not built)
+Optional photo staff add at Packed; the customer sees it on `/track` and the order page. Never required, never blocks
+a step. Reuse the return-photo pattern (`order_return_photos`, `return_photo_url`, `return_photo_add`, private
+storage, short-lived view links). Rule for staff, shown beside the upload: photograph before the label goes on, because
+a label shows the customer's address and phone, and `/track` opens with an order number and phone only.
+Build after the customer tracking fields ship.
+
 ## Online Orders screen cleanup (approved 2026-11-02)
 Branch `feat/online-orders-queues`, stacked on `feat/manual-delivery-stages`. No DB change. Owner works at half-screen
 (720-960px).

@@ -24,6 +24,9 @@ Written 2026-10-30. Status: roadmap, not scheduled.
    order ref, customer, items, amount, fulfilment, admin link to one or more shop numbers (secret).
 2. Customer messages at the same milestones as the emails: confirmed, shipped (tracking link), delivered,
    ready for pickup. Send to `contact_phone` for every order, so phone-only customers are covered.
+   Owner 2026-11-02: WhatsApp is meant to carry updates to the phone. Consider every timeline step, not just the
+   email milestones, and reuse the sentences in `statusMessage` (`src/storefront/lib/orderStatus.js`) so the site and
+   the message say the same thing.
 3. Same rules as email jobs: missing config resolves `{sent:false}` (no retry storm), real failure retries with
    backoff, at-least-once accepted.
 4. Opt-in wording at checkout for customer WhatsApp (Meta policy).
