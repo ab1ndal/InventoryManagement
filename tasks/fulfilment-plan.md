@@ -98,6 +98,58 @@ Status 2026-10-30: plan APPROVED. Shipped: PR A #101, PR B #102, PR C #103, PR D
 3. Admin Process dialog courier choice + Porter link field; customer order page shows Porter link; tests.
 4. Migrate → deploy → merge.
 
+## Manual delivery stages (owner decision 2026-11-02; supersedes §5 Porter dispatch)
+Branch `feat/manual-delivery-stages`. Porter and self-delivery have no tracker in another app: customers follow the
+status staff set in admin, on `/track` (order number + phone, phone check kept: refs are sequential) or the order page.
+No tracking link. No WhatsApp button.
+
+Customer timeline for every ship order, whichever courier (owner 2026-11-02):
+Order placed → Processed → Packed → Picked up → Out for delivery → Delivered.
+Shiprocket orders show the same steps plus a link to Shiprocket's own tracking page for its detailed steps; the link
+appears once an AWB exists. For Shiprocket: `processing` = Processed, `packed` = Packed, `shipped` = Picked up,
+`rto`/`rto_received` stop at Picked up with the existing note. Store pickup timeline is unchanged.
+
+| Status | Customer step | Staff action | Side effects |
+|---|---|---|---|
+| paid | Order placed | none | as today |
+| processed (new) | Processed | shelf check, Process, choose Porter/Self | unavailable refunds, courier + courier_name set, Shiprocket order cancelled best effort; none available → cancelled |
+| packed | Packed | Packed | none |
+| shipped | Picked up | Picked up | shipped_qty, Bill of Supply, email_shipped (ref `manual`) |
+| out_for_delivery | Out for delivery | Out for delivery | none |
+| delivered | Delivered | Delivered (date dialog) | delivered_at, email_delivered |
+
+Rules:
+- A new `processed` status, not `processing`: `processing` means a Shiprocket op holds a lease and drives Send back.
+- Forward only. A later step completes the earlier ones; a repeat is a no-op. No step goes back.
+- Crossing into shipped (including by skipping) does the bill + shipped_qty + email exactly once.
+- Bill at Picked up, so cancelling before the parcel leaves has no bill to reverse.
+- Cancel allowed at paid, processed, packed. Not after Picked up (as Porter today).
+- Any admin may advance a manual order. Rebook / send back never apply.
+- Jumping straight to Delivered sends both emails (accepted, rare).
+- `courier_name`: Porter = `Porter`, self = `Bindal's Creation`.
+- Orders already `shipped` with courier `porter` keep working: they read as Picked up and can advance.
+
+Left out: switching courier after Process (cancel + refund instead); dropping `online_order_dispatch_manual` and
+`manual_tracking_url` (unused after this; remove in a later cleanup once prod is on the new functions).
+
+Ship order: migrate → deploy `admin-order-action` + `run-jobs` → merge. Prod steps need owner OK.
+
+## Online Orders screen cleanup (approved 2026-11-02)
+Branch `feat/online-orders-queues`, stacked on `feat/manual-delivery-stages`. No DB change. Owner works at half-screen
+(720-960px).
+- Eight tabs become three queues with counts on the first two:
+  - Needs action: failed jobs, problem, process_error, rto; `paid`; open returns; manual orders in
+    processed/packed/shipped/out_for_delivery untouched for 2+ days (a forgotten Delivered blocks the return window).
+  - In progress: processing, cancelling, processed, packed, ready_for_pickup, shipped, out_for_delivery.
+  - Closed: delivered, cancelled, rto_received.
+- Search by order number, phone or name across every status replaces All. Unpaid and expired show only through search.
+- Rows are two lines and show the next step, not a stack of badges. One delivery label; badges only for exceptions.
+- Order URL `/admin/online-orders/:id`. Below 1280px the order fills the page with a Back link; from 1280px list and
+  order sit side by side.
+- Order page: next action directly under the header. Items stay open; Money, Shipment, Refunds, Timeline collapse.
+  A problem opens the section it concerns.
+- Customer timeline: three-column grid so six steps never leave one alone on a row.
+
 ## Owner answers (2026-10-30)
 1. Weight: **full sum per item** (3 lehengas = 6 kg).
 2. Pickup: **always prepaid online**.
