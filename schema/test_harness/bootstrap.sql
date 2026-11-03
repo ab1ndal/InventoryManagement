@@ -141,6 +141,12 @@ create table if not exists public.exchanges (
   product_name text,
   product_code text
 );
+create table if not exists public.mockups (
+  productid character varying(20) primary key,
+  redo boolean, base_mockup boolean, file_mockup boolean, mockup boolean, ig_reel boolean, ig_post boolean,
+  video boolean, whatsapp boolean,
+  ig_post_date timestamp without time zone, whatsapp_post_date timestamp without time zone
+);
 create table if not exists public.products (
   productid character varying(20) not null,
   name character varying(100) not null,

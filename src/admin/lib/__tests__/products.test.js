@@ -20,7 +20,7 @@ describe("normalizeProductCode", () => {
 describe("findProducts", () => {
   it("returns the exact match with category, cost Z-code and sorted variants", async () => {
     const client = fakeSupabase({
-      "products.select": { data: [saree], error: null },
+      "products_admin.select": { data: [saree], error: null },
       "productsizecolors.select": {
         data: [
           { variantid: "v2", productid: "BC252051", size: "L", color: "Red", stock: 0 },
@@ -37,13 +37,13 @@ describe("findProducts", () => {
       { variantid: "v2", size: "L", color: "Red", stock: 0 },
     ]);
     // exact hit: no partial search
-    expect(client.calls.filter((c) => c.table === "products")).toHaveLength(1);
+    expect(client.calls.filter((c) => c.table === "products_admin")).toHaveLength(1);
   });
 
   it("falls back to a partial match when there is no exact one", async () => {
     let n = 0;
     const client = fakeSupabase({
-      "products.select": () => (n++ === 0 ? { data: [], error: null } : { data: [saree], error: null }),
+      "products_admin.select": () => (n++ === 0 ? { data: [], error: null } : { data: [saree], error: null }),
       "productsizecolors.select": { data: [], error: null },
       "categories.select": { data: [], error: null },
     });
@@ -53,7 +53,7 @@ describe("findProducts", () => {
   });
 
   it("returns [] when nothing matches", async () => {
-    const client = fakeSupabase({ "products.select": { data: [], error: null } });
+    const client = fakeSupabase({ "products_admin.select": { data: [], error: null } });
     await expect(findProducts(client, "ZZZ999")).resolves.toEqual([]);
   });
 
@@ -62,7 +62,7 @@ describe("findProducts", () => {
   });
 
   it("propagates a database error", async () => {
-    const client = fakeSupabase({ "products.select": { data: null, error: new Error("boom") } });
+    const client = fakeSupabase({ "products_admin.select": { data: null, error: new Error("boom") } });
     await expect(findProducts(client, "BC1")).rejects.toThrow("boom");
   });
 });
@@ -86,7 +86,7 @@ describe("searchProducts", () => {
   ];
   const client = () =>
     fakeSupabase({
-      "products.select": { data: rows, error: null },
+      "products_admin.select": { data: rows, error: null },
       "productsizecolors.select": { data: variants, error: null },
       "categories.select": { data: [{ categoryid: "SA", name: "Saree" }], error: null },
     });

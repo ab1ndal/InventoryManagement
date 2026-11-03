@@ -40,7 +40,7 @@ export async function findProducts(client, rawCode) {
   if (!code) throw new ProductInputError("Product code is required");
 
   const { data: exact, error: exactErr } = await client
-    .from("products")
+    .from("products_admin")
     .select(PRODUCT_COLUMNS)
     .eq("productid", code);
   if (exactErr) throw exactErr;
@@ -48,7 +48,7 @@ export async function findProducts(client, rawCode) {
   let products = exact ?? [];
   if (products.length === 0) {
     const { data, error } = await client
-      .from("products")
+      .from("products_admin")
       .select(PRODUCT_COLUMNS)
       .ilike("productid", `%${code}%`)
       .order("productid")
@@ -106,7 +106,7 @@ export async function searchProducts(client, { name, categoryid, cost, mrp, colo
   if (![name, categoryid, cost, mrp].some(has)) {
     throw new ProductInputError("Give at least one of name, category, cost or MRP");
   }
-  let query = client.from("products").select(PRODUCT_COLUMNS);
+  let query = client.from("products_admin").select(PRODUCT_COLUMNS);
   if (has(name)) query = query.ilike("name", `%${String(name).trim()}%`);
   if (has(categoryid)) query = query.eq("categoryid", String(categoryid).trim());
   if (has(cost)) {

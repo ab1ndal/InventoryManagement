@@ -61,7 +61,7 @@ const ProductTable = forwardRef(
       // Build a reusable filtered query builder — filters are pushed to the DB,
       // but we still batch with .range() to respect PostgREST's max_rows cap.
       const buildProductQuery = () => {
-        let q = supabase.from("products").select("productid").order("productid");
+        let q = supabase.from("products_admin").select("productid").order("productid");
         if (debouncedFilters.productid)
           q = q.ilike("productid", `%${debouncedFilters.productid}%`);
         if (debouncedFilters.fabric)
@@ -186,7 +186,7 @@ const ProductTable = forwardRef(
         if (idsForPage.length === 0) return { products: [], variants: [] };
 
         const [{ data: prods }, { data: vars }] = await Promise.all([
-          supabase.from("products").select("*").in("productid", idsForPage),
+          supabase.from("products_admin").select("*").in("productid", idsForPage),
           supabase.from("productsizecolors").select("*").in("productid", idsForPage),
         ]);
 

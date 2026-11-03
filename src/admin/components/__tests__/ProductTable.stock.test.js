@@ -41,7 +41,7 @@ const mockChain = (table) => {
     delete: () => { op.method = "delete"; return chain; },
     then: (resolve) => {
       if (op.method !== "select") return resolve({ data: null, error: null });
-      if (table === "products") return resolve({ data: [mockProduct], error: null });
+      if (table === "products_admin") return resolve({ data: [mockProduct], error: null });
       if (table === "productsizecolors") return resolve({ data: mockVariants, error: null });
       return resolve({ data: [], error: null });
     },
