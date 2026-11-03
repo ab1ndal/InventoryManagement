@@ -33,6 +33,10 @@ function setup(
           token: "t",
         });
       },
+      removeObject: (path) => {
+        storageCalls.push({ fn: "remove", path });
+        return path.startsWith("stuck/") ? Promise.reject(new Error("storage down")) : Promise.resolve();
+      },
       createViewUrl: (path, seconds) => {
         storageCalls.push({ fn: "view", path, seconds });
         return Promise.resolve(path.startsWith("gone/") ? null : `https://storage.test/view/${path}`);
@@ -971,4 +975,49 @@ Deno.test("mark_delivered: a cancelled manual order is refused, nothing advanced
   const r = await call({ action: "mark_delivered", orderId: ORDER_ID, deliveredAt: "2026-10-29T10:00:00Z" });
   assertEquals([r.status, r.body.code], [409, "bad_state"]);
   assertEquals(db.fns(), ["online_order_mark_delivered"]);
+});
+
+const PACKED_ORDER = "11111111-1111-4111-8111-111111111111";
+
+Deno.test("packed_photo_url: path from the RPC, a client path is ignored", async () => {
+  const { db, call } = setup();
+  const r = await call({ action: "packed_photo_url", orderId: PACKED_ORDER, contentType: "image/jpeg", path: "../evil.jpg" });
+  assertEquals(r.status, 200);
+  assertEquals(r.body.path, `${PACKED_ORDER}/packed/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.jpg`);
+  assert(db.calls.some((c) => c.fn === "online_packed_photo_path"));
+});
+
+Deno.test("packed_photo_url: refused type → 400; HEIC refused by the DB → 409", async () => {
+  const { db, call } = setup();
+  assertEquals((await call({ action: "packed_photo_url", orderId: PACKED_ORDER, contentType: "application/pdf" })).status, 400);
+  db.rpcRaises.set("online_packed_photo_path", "unsupported photo type heic, use jpg, png or webp");
+  const r = await call({ action: "packed_photo_url", orderId: PACKED_ORDER, contentType: "image/heic" });
+  assertEquals([r.status, r.body.code], [409, "bad_state"]);
+});
+
+Deno.test("packed_photo_add: RPC with actor; a fifth photo refused by the DB → 409", async () => {
+  const { db, call } = setup();
+  const r = await call({ action: "packed_photo_add", orderId: PACKED_ORDER, path: "p.jpg" });
+  assertEquals([r.status, r.body.photoId], [200, "ffffffff-ffff-4fff-8fff-ffffffffffff"]);
+  db.rpcRaises.set("online_packed_photo_add", "an order can have at most 4 packed photos");
+  assertEquals((await call({ action: "packed_photo_add", orderId: PACKED_ORDER, path: "p.jpg" })).status, 409);
+});
+
+Deno.test("packed_photo_view: unknown → 404; known → 10 minute link", async () => {
+  const { db, call, storageCalls } = setup();
+  assertEquals((await call({ action: "packed_photo_view", photoId: PHOTO_ID })).status, 404);
+  db.packedPhotoPaths.set(PHOTO_ID, "o/packed/a.jpg");
+  const r = await call({ action: "packed_photo_view", photoId: PHOTO_ID });
+  assertEquals(r.body.url, "https://storage.test/view/o/packed/a.jpg");
+  assertEquals(storageCalls.at(-1), { fn: "view", path: "o/packed/a.jpg", seconds: 600 });
+});
+
+Deno.test("packed_photo_remove: deletes row and file; a stuck file still succeeds; unknown → 404", async () => {
+  const { db, call, storageCalls } = setup();
+  assertEquals((await call({ action: "packed_photo_remove", photoId: PHOTO_ID })).status, 404);
+  db.packedPhotoPaths.set(PHOTO_ID, "o/packed/a.jpg");
+  assertEquals((await call({ action: "packed_photo_remove", photoId: PHOTO_ID })).status, 200);
+  assertEquals(storageCalls.at(-1), { fn: "remove", path: "o/packed/a.jpg" });
+  db.packedPhotoPaths.set(PHOTO_ID, "stuck/a.jpg");
+  assertEquals((await call({ action: "packed_photo_remove", photoId: PHOTO_ID })).status, 200);
 });

@@ -31,6 +31,7 @@ Deno.test("order-status: valid token → contract shape", async () => {
     statusTimes: null,
     deliveryCity: null,
     deliveryPincode: null,
+    packedPhotos: [],
     items: [{ name: "Silk Kurti", size: "M", color: "Red", qty: 1, status: "ordered", imageUrl: null }],
     totals: { subtotal: 1000, promoDiscount: 0, shipping: 80, voucherApplied: 0, creditApplied: 0, gatewayAmount: 1080 },
     trackingUrl: "https://shiprocket.co/tracking/AWB1",
@@ -146,4 +147,16 @@ Deno.test("order-status: rate limited per IP after repeated failures (still 404)
   const res = await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps);
   assertEquals(res.status, 404, "even the right token is refused while limited");
   await res.body?.cancel();
+});
+
+Deno.test("order-status: packed photos come back as signed links, and a failure costs only the photos", async () => {
+  const { deps, store } = await setup({ status: "packed" });
+  store.impls.online_order_packed_photo_paths = () => ["o/packed/a.jpg"];
+  const ok = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps)).json();
+  assertEquals(ok.packedPhotos, ["https://storage.test/view/o/packed/a.jpg?ttl=3600"]);
+  store.impls.online_order_packed_photo_paths = () => {
+    throw new Error("db down");
+  };
+  const res = await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps);
+  assertEquals([res.status, (await res.json()).packedPhotos], [200, []]);
 });

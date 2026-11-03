@@ -140,7 +140,7 @@ const sortReturns = (returns) =>
   }));
 
 export async function getOrder(id) {
-  const [order, items, events, refunds, jobs, returns] = await Promise.all([
+  const [order, items, events, refunds, jobs, returns, packedPhotos] = await Promise.all([
     supabase.from("orders").select("*").eq("id", id).single(),
     supabase.from("order_items").select("*").eq("order_id", id).order("line_no"),
     supabase.from("order_events").select("*").eq("order_id", id).order("id"),
@@ -152,6 +152,7 @@ export async function getOrder(id) {
       .select("*, items:order_return_items(*), photos:order_return_photos(id, uploaded_at)")
       .eq("order_id", id)
       .order("opened_at"),
+    supabase.from("order_packed_photos").select("id, uploaded_at").eq("order_id", id).order("uploaded_at"),
   ]);
   for (const [what, res] of [
     ["order", order],
@@ -160,6 +161,7 @@ export async function getOrder(id) {
     ["refunds", refunds],
     ["jobs", jobs],
     ["returns", returns],
+    ["packed photos", packedPhotos],
   ]) {
     if (res.error) raise(`Loading ${what}`, res.error);
   }
@@ -188,7 +190,7 @@ export async function getOrder(id) {
   }
 
   return {
-    order: { ...order.data, returns: sortReturns(returns.data || []) },
+    order: { ...order.data, returns: sortReturns(returns.data || []), packed_photos: packedPhotos.data || [] },
     bill,
     items: items.data || [],
     events: events.data || [],

@@ -20,6 +20,7 @@ import {
   sha256Hex,
 } from "../_shared/context.ts";
 import { reconcilePayment } from "../_shared/confirm.ts";
+import { packedPhotoUrlsOrNone } from "../_shared/packedPhotos.ts";
 
 /** Failed lookups per IP hash per hour before every answer becomes 404. */
 export const STATUS_FAILURE_LIMIT = 20;
@@ -34,6 +35,7 @@ export type OrderStatusResponse = {
   statusTimes: Record<string, string> | null;
   deliveryCity: string | null;
   deliveryPincode: string | null;
+  packedPhotos: string[];
   items: {
     name: string;
     size: string | null;
@@ -115,6 +117,7 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
       statusTimes: tracking?.status_times ?? null,
       deliveryCity: tracking?.delivery_city ?? null,
       deliveryPincode: tracking?.delivery_pincode ?? null,
+      packedPhotos: await packedPhotoUrlsOrNone(deps, order.id, order.order_ref),
       items: items.map((i) => ({
         name: i.product_name,
         size: i.size,

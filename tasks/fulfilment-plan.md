@@ -134,12 +134,19 @@ Left out: switching courier after Process (cancel + refund instead); dropping `o
 
 Ship order: migrate → deploy `admin-order-action` + `run-jobs` → merge. Prod steps need owner OK.
 
-## Packed item photo (owner idea 2026-11-02, not built)
-Optional photo staff add at Packed; the customer sees it on `/track` and the order page. Never required, never blocks
-a step. Reuse the return-photo pattern (`order_return_photos`, `return_photo_url`, `return_photo_add`, private
-storage, short-lived view links). Rule for staff, shown beside the upload: photograph before the label goes on, because
-a label shows the customer's address and phone, and `/track` opens with an order number and phone only.
-Build after the customer tracking fields ship.
+## Packed item photo (owner idea 2026-11-02, built 2026-11-03)
+Optional photos staff add from Packed onward; the customer sees them on `/track` and the order page. Never required,
+never blocks a step. Reuses the return-photo pattern and the private `order-returns` bucket (`<order_id>/packed/`).
+Rule for staff, shown beside the upload: photograph before the label goes on, because a label shows the customer's
+address and phone, and `/track` opens with an order number and phone only.
+Decisions: 4 per order; staff can remove a photo (the fix for a label slipping through); jpg/png/webp only since browsers
+cannot show HEIC; hidden from customers once cancelled, returning or sent back. `/track` gets links from a new
+`order-packed-photos` function because its SQL lookup cannot sign URLs and `order-status` would expose the voucher code.
+Photos are resized in the browser before upload (longest side 1600 px, JPEG), which also strips EXIF GPS. A photo the
+browser cannot decode uploads as it is.
+
+Ship order: migrate `migration_online_orders_packed_photos.sql` → deploy `order-packed-photos`, `order-status`,
+`admin-order-action` → merge. Prod steps need owner OK.
 
 ## Online Orders screen cleanup (approved 2026-11-02)
 Branch `feat/online-orders-queues`, stacked on `feat/manual-delivery-stages`. No DB change. Owner works at half-screen

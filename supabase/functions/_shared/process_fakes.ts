@@ -152,6 +152,10 @@ export class FakeDb implements OrdersDb {
     return Promise.resolve(id === this.order.id ? structuredClone(this.order) : null);
   }
 
+  packedPhotoPaths = new Map<string, string>();
+  getPackedPhotoPath(photoId: string): Promise<string | null> {
+    return Promise.resolve(this.packedPhotoPaths.get(photoId) ?? null);
+  }
   getOrderWithReturns(id: string): Promise<OrderRow | null> {
     this.orderReads.push("getOrderWithReturns");
     return Promise.resolve(id === this.order.id ? structuredClone({ ...this.order, returns: this.returns }) : null);
@@ -476,6 +480,12 @@ export class FakeDb implements OrdersDb {
         return `${o.id}/${args.p_return_id}/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.${args.p_ext}` as T;
       case "online_return_add_photo":
         return "ffffffff-ffff-4fff-8fff-ffffffffffff" as T;
+      case "online_packed_photo_path":
+        return `${args.p_order_id}/packed/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee.${args.p_ext}` as T;
+      case "online_packed_photo_add":
+        return "ffffffff-ffff-4fff-8fff-ffffffffffff" as T;
+      case "online_packed_photo_remove":
+        return (this.packedPhotoPaths.get(args.p_photo_id as string) ?? null) as T;
       case "online_order_apply_tracking":
         return { matched: true, changed: true, status: args.p_status } as T;
       default:

@@ -19,6 +19,10 @@
  *   return_photo_url {returnId, contentType}  →  {uploadUrl, path, token}
  *   return_photo_add {returnId, path}
  *   return_photo_view {photoId}               →  {url} (10 min)
+ *   packed_photo_url {orderId, contentType}   →  {uploadUrl, path, token}
+ *   packed_photo_add {orderId, path}
+ *   packed_photo_view {photoId}               →  {url} (10 min)
+ *   packed_photo_remove {photoId}
  *   return_preview   {returnId, items}        →  {preview}
  *   return_receive   {returnId, items, note?}
  *   return_cancel    {returnId, note}
@@ -357,6 +361,50 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         return json(200, { ok: true, url }, cors);
       }
 
+      case "packed_photo_url": {
+        // Only orderId and contentType are read: the path is always built by the DB.
+        const path = await deps.db.rpc<string>("online_packed_photo_path", {
+          p_order_id: uuidField(body, "orderId"),
+          p_ext: photoExtFor(body.contentType),
+        });
+        const { uploadUrl, token } = await deps.storage.createUploadUrl(path);
+        return json(200, { ok: true, uploadUrl, path, token }, cors);
+      }
+
+      case "packed_photo_add": {
+        const photoId = await deps.db.rpc<string>("online_packed_photo_add", {
+          p_order_id: uuidField(body, "orderId"),
+          p_path: textField(body, "path"),
+          p_actor: user.id,
+        });
+        return json(200, { ok: true, photoId }, cors);
+      }
+
+      case "packed_photo_view": {
+        const path = await deps.db.getPackedPhotoPath(uuidField(body, "photoId"));
+        if (!path) return fail(404, "not_found", "photo not found");
+        const url = await deps.storage.createViewUrl(path, PHOTO_VIEW_TTL_SECONDS);
+        if (!url) return fail(404, "not_found", "photo file not found");
+        return json(200, { ok: true, url }, cors);
+      }
+
+      case "packed_photo_remove": {
+        const photoId = uuidField(body, "photoId");
+        const path = await deps.db.rpc<string | null>("online_packed_photo_remove", { p_photo_id: photoId });
+        if (!path) return fail(404, "not_found", "photo not found");
+        // The row is gone, so no customer gets a new link; a leftover file is unreachable clutter.
+        try {
+          await deps.storage.removeObject(path);
+        } catch (err) {
+          logEvent("warn", "packed_photo_file_not_removed", {
+            photoId,
+            path,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return json(200, { ok: true }, cors);
+      }
+
       case "return_preview": {
         const preview = await deps.db.rpc<Record<string, unknown>>(
           "online_return_preview",
@@ -423,8 +471,11 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
       return fail(err.status, code, err.message);
     }
     if (err instanceof DbError && err.isRaised) return fail(409, "bad_state", err.message);
-    // Only return_photo_add inserts a client-supplied unique value: a replayed path.
-    if (err instanceof DbError && err.isUniqueViolation && err.fn === "online_return_add_photo") {
+    // Only the photo adds insert a client-supplied unique value: a replayed path.
+    if (
+      err instanceof DbError && err.isUniqueViolation &&
+      (err.fn === "online_return_add_photo" || err.fn === "online_packed_photo_add")
+    ) {
       return fail(409, "bad_state", "photo already recorded");
     }
     logEvent("error", "admin_order_action_failed", { error: err instanceof Error ? err.message : String(err) });

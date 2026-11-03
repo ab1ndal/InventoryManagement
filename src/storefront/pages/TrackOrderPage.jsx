@@ -3,9 +3,10 @@ import Seo from "../components/Seo";
 import OrderDelivery from "../components/OrderDelivery";
 import OrderDetails from "../components/OrderDetails";
 import OrderHelp from "../components/OrderHelp";
+import PackedPhotos from "../components/PackedPhotos";
 import OrderTimeline from "../components/OrderTimeline";
-import { WHATSAPP_URL, lookupOrder } from "../lib/ordersApi";
-import { statusLabel } from "../lib/orderStatus";
+import { WHATSAPP_URL, lookupOrder, packedPhotosFor } from "../lib/ordersApi";
+import { PACKED_PHOTO_STATUSES, statusLabel } from "../lib/orderStatus";
 
 export default function TrackOrderPage() {
   const [orderRef, setOrderRef] = useState("");
@@ -19,6 +20,11 @@ export default function TrackOrderPage() {
     try {
       const order = await lookupOrder(orderRef.trim(), phone.trim());
       setResult(order ? { kind: "found", order } : { kind: "not_found", order: null });
+      if (order && PACKED_PHOTO_STATUSES.includes(order.status)) {
+        const packedPhotos = await packedPhotosFor(orderRef.trim(), phone.trim());
+        // The customer may have pressed "Track another order" while this loaded.
+        setResult((current) => (current.order === order ? { kind: "found", order: { ...order, packedPhotos } } : current));
+      }
     } catch (error) {
       console.warn("online_order_lookup failed", { orderRef, message: error.message });
       setResult({ kind: "error", order: null });
@@ -46,6 +52,7 @@ export default function TrackOrderPage() {
             city={result.order.deliveryCity}
             pincode={result.order.deliveryPincode}
           />
+          <PackedPhotos photos={result.order.packedPhotos} />
           {result.order.fulfilment !== "pickup" && result.order.trackingUrl && (
             <a href={result.order.trackingUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm font-sans underline">
               See detailed tracking on Shiprocket

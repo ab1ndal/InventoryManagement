@@ -124,6 +124,7 @@ export function normalizeOrder(row) {
     statusTimes: row.status_times ?? null,
     deliveryCity: row.delivery_city ?? null,
     deliveryPincode: row.delivery_pincode ?? null,
+    packedPhotos: [],
     leftoverVoucher: null,
   };
 }
@@ -142,6 +143,17 @@ export async function lookupOrder(orderRef, phone) {
   });
   if (error) throw error;
   return normalizeOrder(data);
+}
+
+// Signed links need a server. Photos only reassure, so a failure leaves the rest of /track working.
+export async function packedPhotosFor(orderRef, phone) {
+  try {
+    const { photos } = await invoke("order-packed-photos", { orderRef, phone: withoutLeadingZero(phone) });
+    return photos;
+  } catch (error) {
+    console.warn("order-packed-photos failed", { orderRef, message: error.message });
+    return [];
+  }
 }
 
 export async function myOrders() {
