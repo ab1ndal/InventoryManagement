@@ -9,11 +9,11 @@ export const LIST_LIMIT = 200;
 // Tab key → which orders it shows. "problems" is handled separately (needs failed jobs).
 export const ORDER_FILTERS = {
   to_check: { label: "To check", statuses: ["paid"] },
-  processing: { label: "Processing", statuses: ["processing", "cancelling"] },
+  processing: { label: "Processing", statuses: ["processing", "cancelling", "processed"] },
   packed: { label: "Packed", statuses: ["packed"] },
   // Paid pickup orders stay in To check: the shelf check comes before Ready for pickup.
   pickup: { label: "Pickup", statuses: ["ready_for_pickup"] },
-  shipped: { label: "Shipped", statuses: ["shipped", "out_for_delivery"] },
+  shipped: { label: "Picked up", statuses: ["shipped", "out_for_delivery"] },
   delivered: { label: "Delivered", statuses: ["delivered"] },
   problems: { label: "Problems" },
   all: { label: "All" },

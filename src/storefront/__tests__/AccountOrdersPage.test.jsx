@@ -41,8 +41,8 @@ it("lists the shopper's orders newest first with status badges and tracking link
   const rows = await screen.findAllByTestId("account-order");
   expect(supabase.rpc).toHaveBeenCalledWith("my_online_orders");
   expect(rows.map((r) => within(r).getByText(/^WEB-/).textContent)).toEqual(["WEB-000003", "WEB-000002", "WEB-000001"]);
-  expect(within(rows[0]).getByText("Paid")).toBeInTheDocument();
-  expect(within(rows[1]).getByText("Shipped")).toBeInTheDocument();
+  expect(within(rows[0]).getByText("Order placed")).toBeInTheDocument();
+  expect(within(rows[1]).getByText("Picked up")).toBeInTheDocument();
   expect(within(rows[2]).getByText("Delivered")).toBeInTheDocument();
   expect(within(rows[0]).getByRole("link", { name: /track/i })).toHaveAttribute("href", "/order/WEB-000003");
   expect(within(rows[0]).getByText(/₹3,080/)).toBeInTheDocument();

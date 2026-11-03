@@ -5,9 +5,10 @@ export const STATUS_LABELS = {
   paid: "To check",
   processing: "Processing",
   cancelling: "Cancelling",
+  processed: "Processed",
   packed: "Packed",
   ready_for_pickup: "Ready for pickup",
-  shipped: "Shipped",
+  shipped: "Picked up",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
   payment_failed: "Payment failed",
@@ -21,6 +22,7 @@ export const STATUS_CLASSES = {
   paid: "bg-amber-100 text-amber-800",
   processing: "bg-blue-100 text-blue-800",
   cancelling: "bg-blue-100 text-blue-800",
+  processed: "bg-blue-100 text-blue-800",
   packed: "bg-indigo-100 text-indigo-800",
   ready_for_pickup: "bg-sky-100 text-sky-800",
   shipped: "bg-sky-100 text-sky-800",
@@ -70,9 +72,24 @@ export function isOutsideUp(address, fulfilment = "ship") {
   return state !== "" && state !== "uttar pradesh";
 }
 
-// Porter links are pasted by staff and shown to the customer; the server enforces the same rule.
-export function isValidTrackingUrl(value) {
-  return /^https:\/\/\S+$/.test(value) && value.length <= 500;
+// Porter and self delivery have no tracker elsewhere: staff set each stage here.
+export function isManualCourier(courier) {
+  return courier === "porter" || courier === "self";
+}
+
+const MANUAL_STEPS = [
+  { key: "packed", label: "Packed" },
+  { key: "shipped", label: "Picked up" },
+  { key: "out_for_delivery", label: "Out for delivery" },
+  { key: "delivered", label: "Delivered" },
+];
+
+const MANUAL_STEP_START = { processed: 0, packed: 1, shipped: 2, out_for_delivery: 3 };
+
+// A later step completes the earlier ones on the server, so every remaining step is offered.
+export function manualNextSteps(status) {
+  const start = MANUAL_STEP_START[status];
+  return start === undefined ? [] : MANUAL_STEPS.slice(start);
 }
 
 export function hasProblem(o, jobs = []) {
@@ -208,10 +225,12 @@ const EVENT_LABELS = {
   claim_takeover: "Processing taken over",
   process_prepared: "Items to ship confirmed",
   op_released: "Processing stopped",
+  processed: "Processed",
   packed: "Packed",
   ready_for_pickup: "Ready for pickup",
   bill_created: "Bill of Supply created",
-  shipped: "Shipped",
+  shipped: "Picked up",
+  out_for_delivery: "Out for delivery",
   delivered: "Delivered",
   cancelled: "Cancelled",
   manual_cancel_confirmed: "Courier cancellation confirmed by staff",

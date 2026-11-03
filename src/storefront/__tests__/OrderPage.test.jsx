@@ -133,16 +133,35 @@ it("shows a ready store-pickup order with the shop address and no courier link",
   expect(await screen.findByText("Payment received — order confirmed")).toBeInTheDocument();
   expect(screen.getByText(/ready at our shop: 58 Sihani Gate Market/)).toBeInTheDocument();
   expect(screen.getByText("Free (store pickup)")).toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: /track with the courier/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /detailed tracking/i })).not.toBeInTheDocument();
 });
 
-it("shows a Porter order's link as Track with Porter, and no link when none was given", async () => {
-  mockOrderStatus.mockResolvedValue(order("shipped", { courier: "porter", trackingUrl: "https://porter.in/track/abc" }));
+it("links to Shiprocket's tracking once the order has a tracking URL, and not before", async () => {
+  mockOrderStatus.mockResolvedValue(order("shipped", { courier: "shiprocket", trackingUrl: "https://shiprocket.co/tracking/1" }));
   const { unmount } = renderAt("/order/WEB-000001?t=tok");
-  expect(await screen.findByRole("link", { name: "Track with Porter" })).toHaveAttribute("href", "https://porter.in/track/abc");
+  expect(await screen.findByRole("link", { name: "See detailed tracking on Shiprocket" })).toHaveAttribute("href", "https://shiprocket.co/tracking/1");
   unmount();
+  mockOrderStatus.mockResolvedValue(order("processing", { courier: "shiprocket", trackingUrl: null }));
+  renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByRole("link", { name: "Track an order" })).toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /detailed tracking/i })).not.toBeInTheDocument();
+});
+
+it("a porter order with no tracking URL shows no link", async () => {
   mockOrderStatus.mockResolvedValue(order("shipped", { courier: "porter", trackingUrl: null }));
   renderAt("/order/WEB-000001?t=tok");
   expect(await screen.findByRole("link", { name: "Track an order" })).toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: /track with/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: /detailed tracking/i })).not.toBeInTheDocument();
+});
+
+it("a processed order is confirmed, stops polling and clears the cart", async () => {
+  rememberPendingOrder("WEB-000001");
+  mockOrderStatus.mockReset();
+  mockClearCart.mockReset();
+  mockOrderStatus.mockResolvedValue(order("processed", { courier: "self" }));
+  renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByText("Payment received — order confirmed")).toBeInTheDocument();
+  expect(screen.getByText("Picked up")).toBeInTheDocument();
+  expect(mockClearCart).toHaveBeenCalledTimes(1);
+  expect(mockOrderStatus).toHaveBeenCalledTimes(1);
 });

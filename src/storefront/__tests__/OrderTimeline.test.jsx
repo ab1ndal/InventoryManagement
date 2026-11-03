@@ -8,14 +8,33 @@ function completed() {
     .map((li) => li.getAttribute("data-complete") === "true");
 }
 
-it("ticks steps up to the current status", () => {
-  render(<OrderTimeline status="shipped" />);
-  expect(completed()).toEqual([true, true, true, false, false]);
+const SIX = ["Order placed", "Processed", "Packed", "Picked up", "Out for delivery", "Delivered"];
+
+function stepNames() {
+  return within(screen.getByRole("list", { name: /order progress/i }))
+    .getAllByRole("listitem")
+    .map((li) => li.textContent.replace(/^(✓|\d)/, "").replace(/\s*\((done|pending)\)/, ""));
+}
+
+it.each([
+  ["paid", 1],
+  ["cancelling", 1],
+  ["cancelled", 1],
+  ["processing", 2],
+  ["processed", 2],
+  ["packed", 3],
+  ["shipped", 4],
+  ["out_for_delivery", 5],
+  ["delivered", 6],
+])("a ship order at %s ticks the first %i of six steps", (status, ticked) => {
+  render(<OrderTimeline status={status} />);
+  expect(stepNames()).toEqual(SIX);
+  expect(completed()).toEqual(SIX.map((_, i) => i < ticked));
 });
 
-it("shows staff-side processing as paid", () => {
-  render(<OrderTimeline status="processing" />);
-  expect(completed()).toEqual([true, false, false, false, false]);
+it("the steps wrap instead of overflowing a narrow column", () => {
+  render(<OrderTimeline status="packed" />);
+  expect(screen.getByRole("list", { name: /order progress/i })).toHaveClass("sm:flex-wrap");
 });
 
 it("notes a cancelled order", () => {
@@ -24,10 +43,13 @@ it("notes a cancelled order", () => {
 });
 
 it("notes a parcel returning to origin, without refunding shipping", () => {
+  const stopsAtPickedUp = [true, true, true, true, false, false];
   const { rerender } = render(<OrderTimeline status="rto" />);
   expect(screen.getByText(/returning this parcel to us/)).toBeInTheDocument();
+  expect(completed()).toEqual(stopsAtPickedUp);
   rerender(<OrderTimeline status="rto_received" />);
   expect(screen.getByText(/shipping is not refundable/)).toBeInTheDocument();
+  expect(completed()).toEqual(stopsAtPickedUp);
 });
 
 it("renders nothing for an unpaid order", () => {
@@ -36,12 +58,6 @@ it("renders nothing for an unpaid order", () => {
 });
 
 describe("store pickup", () => {
-  function stepNames() {
-    return within(screen.getByRole("list", { name: /order progress/i }))
-      .getAllByRole("listitem")
-      .map((li) => li.textContent.replace(/^(✓|\d)/, "").replace(/\s*\((done|pending)\)/, ""));
-  }
-
   it("shows Paid → Ready for pickup → Collected", () => {
     render(<OrderTimeline status="paid" fulfilment="pickup" />);
     expect(stepNames()).toEqual(["Paid", "Ready for pickup", "Collected"]);

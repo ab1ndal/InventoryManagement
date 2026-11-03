@@ -56,22 +56,46 @@ describe("TrackOrderPage", () => {
     const progress = await screen.findByRole("list", { name: /order progress/i });
     const steps = within(progress).getAllByRole("listitem");
     expect(steps.map((s) => s.textContent.replace(/\s*\((done|pending)\)/, ""))).toEqual(
-      ["✓Paid", "✓Packed", "✓Shipped", "✓Out for delivery", "✓Delivered"]
+      ["✓Order placed", "✓Processed", "✓Packed", "✓Picked up", "✓Out for delivery", "✓Delivered"]
     );
     steps.forEach((s) => expect(s).toHaveAttribute("data-complete", "true"));
-    expect(screen.getByRole("link", { name: /track with the courier/i })).toHaveAttribute("href", "https://shiprocket.co/tracking/AWB1");
+    expect(screen.getByRole("link", { name: "See detailed tracking on Shiprocket" })).toHaveAttribute("href", "https://shiprocket.co/tracking/AWB1");
     expect(screen.getByText("Silk Saree (FREE/Red) ×2")).toBeInTheDocument();
   });
 
-  it("labels a Porter order's manual link Track with Porter", async () => {
+  describe.each(["shiprocket", null, "porter", "self"])("courier %s", (courier) => {
+    it.each([
+      ["paid", "Order placed", 1],
+      ["cancelling", "Order placed", 1],
+      ["processing", "Processed", 2],
+      ["processed", "Processed", 2],
+      ["packed", "Packed", 3],
+      ["shipped", "Picked up", 4],
+      ["out_for_delivery", "Out for delivery", 5],
+      ["delivered", "Delivered", 6],
+    ])("%s reads %s and ticks %i of six steps", async (status, label, ticked) => {
+      supabase.rpc.mockResolvedValue({ data: { ...DELIVERED, status, courier, tracking_url: null }, error: null });
+      renderPage();
+      submit("WEB-000007", "9810873280");
+      const progress = await screen.findByRole("list", { name: /order progress/i });
+      const steps = within(progress).getAllByRole("listitem");
+      expect(steps.map((s) => s.textContent.replace(/^(✓|\d)/, "").replace(/\s*\((done|pending)\)/, ""))).toEqual(
+        ["Order placed", "Processed", "Packed", "Picked up", "Out for delivery", "Delivered"]
+      );
+      expect(steps.map((s) => s.getAttribute("data-complete") === "true")).toEqual(steps.map((_, i) => i < ticked));
+      expect(screen.getByText(label, { selector: "p" })).toBeInTheDocument();
+    });
+  });
+
+  it("shows no tracking link before Shiprocket has an AWB", async () => {
     supabase.rpc.mockResolvedValue({
-      data: { ...DELIVERED, status: "shipped", courier: "porter", courier_name: "Porter", awb: null, tracking_url: "https://porter.in/track/abc" },
+      data: { ...DELIVERED, status: "processing", courier: "shiprocket", awb: null, tracking_url: null },
       error: null,
     });
     renderPage();
     submit("WEB-000007", "9810873280");
-    expect(await screen.findByRole("link", { name: "Track with Porter" })).toHaveAttribute("href", "https://porter.in/track/abc");
-    expect(screen.queryByRole("link", { name: /track with the courier/i })).not.toBeInTheDocument();
+    await screen.findByRole("list", { name: /order progress/i });
+    expect(screen.queryByRole("link", { name: /detailed tracking/i })).not.toBeInTheDocument();
   });
 
   it("shows a collected store-pickup order without a courier link", async () => {
@@ -85,6 +109,6 @@ describe("TrackOrderPage", () => {
     const steps = within(progress).getAllByRole("listitem");
     expect(steps.map((s) => s.textContent.replace(/\s*\((done|pending)\)/, ""))).toEqual(["✓Paid", "✓Ready for pickup", "✓Collected"]);
     expect(screen.getByText("Collected", { selector: "p" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /track with the courier/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /detailed tracking/i })).not.toBeInTheDocument();
   });
 });
