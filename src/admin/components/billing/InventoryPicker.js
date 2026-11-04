@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatINR } from "../../../utility/formatCurrency";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
@@ -32,23 +32,36 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
   const [gstRate, setGstRate] = useState(initialVal?.gstRate || null);
   const [discount, setDiscount] = useState(initialVal?.quickDiscountPct || 0);
   const [salespersonId, setSalespersonId] = useState(initialVal?.salesperson_id || null);
+  const variantsLoadedFor = useRef(null);
 
-  // When editing, load the full product from Supabase on mount
+  // When editing, load the product and its variants together on mount
   useEffect(() => {
     if (!initialVal?.productid) return;
-    supabase
-      .from("products_admin")
-      .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
-      .eq("productid", initialVal.productid)
-      .single()
-      .then(({ data }) => {
-        if (data) setSelected(data);
-      });
+    Promise.all([
+      supabase
+        .from("products_admin")
+        .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
+        .eq("productid", initialVal.productid)
+        .single(),
+      supabase
+        .from("productsizecolors")
+        .select("variantid, productid, size, color, stock")
+        .eq("productid", initialVal.productid),
+    ]).then(([{ data: product }, { data: productVariants }]) => {
+      setVariants(sortVariantsBySizeColor(productVariants || []));
+      variantsLoadedFor.current = initialVal.productid;
+      if (product) setSelected(product);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Search products only after 6 characters (skip once a product is selected)
+  // Search products only after 6 characters, and only for what the user typed: the code an edit
+  // starts with is not a search, and its list would open over the form.
   useEffect(() => {
-    if (selected) return;
+    if (selected || query === initialVal?.productid) {
+      setResults([]);
+      return;
+    }
+    let superseded = false;
     const run = async () => {
       if (query.length < 6) {
         setResults([]);
@@ -59,20 +72,35 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
         .select("productid, categoryid, purchaseprice, retailprice, name, unit_type")
         .ilike("productid", `%${query}%`)
         .order("productid");
-      if (!error) setResults(data || []);
+      if (!superseded && !error) setResults(data || []);
     };
     const t = setTimeout(run, 300);
-    return () => clearTimeout(t);
-  }, [query, isEditing, selected]);
+    return () => {
+      superseded = true;
+      clearTimeout(t);
+    };
+  }, [query, selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load variants for selected product
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) return undefined;
+    if (variantsLoadedFor.current === selected.productid) {
+      variantsLoadedFor.current = null;
+      return undefined;
+    }
+    // Clear first: the previous product's variants must not be choosable while these load.
+    setVariants([]);
+    let superseded = false;
     supabase
       .from("productsizecolors")
       .select("variantid, productid, size, color, stock")
       .eq("productid", selected.productid)
-      .then(({ data }) => setVariants(sortVariantsBySizeColor(data || [])));
+      .then(({ data }) => {
+        if (!superseded) setVariants(sortVariantsBySizeColor(data || []));
+      });
+    return () => {
+      superseded = true;
+    };
   }, [selected]);
 
   // When editing, the original variant's stock is effectively higher by the original quantity
@@ -153,17 +181,18 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
       {results.length > 0 && (
         <div className="border rounded bg-white max-h-60 overflow-y-auto">
           {results.map((p) => (
-            <div
+            <button
+              type="button"
               key={p.productid}
               onClick={() => {
                 setSelected(p);
                 setQuery(p.productid);
                 setResults([]);
               }}
-              className="p-2 hover:bg-gray-100 cursor-pointer"
+              className="block w-full p-2 text-left hover:bg-gray-100 focus-visible:bg-gray-100"
             >
               {p.productid} | {p.name}
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -274,7 +303,10 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
           )}
 
           <Button
-            disabled={!variantId || !!error}
+            disabled={
+              !!error ||
+              !variants.some((v) => v.variantid === variantId && v.productid === selected.productid)
+            }
             onClick={() => {
               const chosenVariant = variants.find(
                 (v) => v.variantid === variantId,

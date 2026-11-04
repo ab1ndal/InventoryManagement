@@ -175,7 +175,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type, salesmethods(methodname)"
+          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type, salesmethods(methodname), bill_payments(amount)"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
@@ -192,28 +192,29 @@ export default function BillTable({ onEdit }) {
 
         // Find customers matching name or phone
         const customerIds = new Set();
-        const { data: nameOrPhoneMatches } = await supabase
-          .from("customers")
-          .select("customerid")
-          .or(`first_name.ilike.%${safeTerm}%,last_name.ilike.%${safeTerm}%,phone.ilike.%${safeTerm}%`);
-        for (const c of nameOrPhoneMatches || []) customerIds.add(c.customerid);
-
         // "First Last" full-name search: match first word against first_name, last word against last_name
         const words = safeTerm.split(/\s+/).filter(Boolean);
-        if (words.length >= 2) {
-          const { data: fullNameMatches } = await supabase
+        const [
+          { data: nameOrPhoneMatches },
+          { data: fullNameMatches },
+          // Online bills are also found by who the order is for.
+          { data: orderMatches, error: orderMatchErr },
+        ] = await Promise.all([
+          supabase
             .from("customers")
             .select("customerid")
-            .ilike("first_name", `%${words[0]}%`)
-            .ilike("last_name", `%${words[words.length - 1]}%`);
-          for (const c of fullNameMatches || []) customerIds.add(c.customerid);
-        }
-
-        // Online bills are also found by who the order is for.
-        const { data: orderMatches, error: orderMatchErr } = await supabase
-          .from("orders")
-          .select("bill_id")
-          .ilike("contact_name", `%${safeTerm}%`);
+            .or(`first_name.ilike.%${safeTerm}%,last_name.ilike.%${safeTerm}%,phone.ilike.%${safeTerm}%`),
+          words.length >= 2
+            ? supabase
+                .from("customers")
+                .select("customerid")
+                .ilike("first_name", `%${words[0]}%`)
+                .ilike("last_name", `%${words[words.length - 1]}%`)
+            : { data: [] },
+          supabase.from("orders").select("bill_id").ilike("contact_name", `%${safeTerm}%`),
+        ]);
+        for (const c of nameOrPhoneMatches || []) customerIds.add(c.customerid);
+        for (const c of fullNameMatches || []) customerIds.add(c.customerid);
         if (superseded) return;
         if (orderMatchErr) {
           toast({ title: "Error loading bills", description: orderMatchErr.message, variant: "destructive" });
@@ -245,27 +246,11 @@ export default function BillTable({ onEdit }) {
         // bills.payment_amount tracks that running total, but bill_payments is the
         // ledger of record, so sum it when rows exist and fall back to payment_amount
         // for bills paid in one go (which write no bill_payments row).
-        const billIds = pageBills.map((b) => b.billid);
-        const receivedByBill = new Map();
-        if (billIds.length > 0) {
-          const { data: payRows } = await supabase
-            .from("bill_payments")
-            .select("billid, amount")
-            .in("billid", billIds);
-          if (superseded) return;
-          for (const p of payRows || []) {
-            receivedByBill.set(
-              p.billid,
-              (receivedByBill.get(p.billid) || 0) + Number(p.amount)
-            );
-          }
-        }
-
         setBills(
           pageBills.map((b) => ({
             ...withOrderContact(b),
-            amount_received: receivedByBill.has(b.billid)
-              ? receivedByBill.get(b.billid)
+            amount_received: b.bill_payments?.length
+              ? b.bill_payments.reduce((sum, p) => sum + Number(p.amount), 0)
               : b.payment_amount != null
                 ? Number(b.payment_amount)
                 : null,
@@ -598,7 +583,7 @@ export default function BillTable({ onEdit }) {
   return (
     <div className="space-y-3">
       {/* Filters */}
-      <div className="flex gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center">
         <Input
           placeholder="Search by bill #, customer name, or phone"
           value={searchInput}
@@ -617,13 +602,13 @@ export default function BillTable({ onEdit }) {
       </div>
 
       {/* Table */}
-      <div className="border rounded-2xl overflow-hidden">
-        {loading ? (
+      <div className="border rounded-2xl overflow-x-auto">
+        {loading && bills.length === 0 ? (
           <div className="p-4 flex items-center justify-center">
             <Loader2 className="animate-spin" />
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <table className={`w-full text-sm ${loading ? "opacity-60" : ""}`}>
             <thead className="bg-muted">
               <tr>
                 <th
@@ -633,7 +618,7 @@ export default function BillTable({ onEdit }) {
                   Bill ID{sortIndicator("bill_number")}
                 </th>
                 <th className="p-2 text-left">Customer</th>
-                <th className="p-2 text-left">Type</th>
+                <th className="p-2 text-left hidden xl:table-cell">Type</th>
                 <th
                   className="p-2 text-left cursor-pointer select-none hover:bg-muted-foreground/10"
                   onClick={() => handleSortClick("orderdate")}
@@ -647,13 +632,13 @@ export default function BillTable({ onEdit }) {
                   Total{sortIndicator("totalamount")}
                 </th>
                 <th
-                  className="p-2 text-right cursor-pointer select-none hover:bg-muted-foreground/10"
+                  className="p-2 text-right cursor-pointer select-none hover:bg-muted-foreground/10 hidden xl:table-cell"
                   onClick={() => handleSortClick("gst_total")}
                 >
                   GST{sortIndicator("gst_total")}
                 </th>
                 <th
-                  className="p-2 text-right cursor-pointer select-none hover:bg-muted-foreground/10"
+                  className="p-2 text-right cursor-pointer select-none hover:bg-muted-foreground/10 hidden lg:table-cell"
                   onClick={() => handleSortClick("discount_total")}
                 >
                   Discount{sortIndicator("discount_total")}
@@ -671,39 +656,43 @@ export default function BillTable({ onEdit }) {
             <tbody>
               {bills.map((b) => (
                 <tr key={b.billid} className="border-t">
-                  <td className="p-2">
+                  <td className="p-2 whitespace-nowrap">
                     <div>{b.bill_number || b.billid}</div>
                     {b.bill_number && (
                       <div className="text-xs text-muted-foreground">
                         ID: {b.billid}
                       </div>
                     )}
+                    {/* The Type column is hidden on narrow windows. */}
+                    <div className="text-xs text-muted-foreground xl:hidden">
+                      {b.document_type === "invoice" ? "Invoice" : "BoS"}
+                    </div>
                   </td>
                   <td className="p-2">
                     {b.customers
                       ? `${b.customers.first_name} ${b.customers.last_name || ""}`.trim()
                       : "—"}
                   </td>
-                  <td className="p-2">
+                  <td className="p-2 hidden xl:table-cell">
                     <Badge variant={b.document_type === "invoice" ? "default" : "secondary"}>
                       {b.document_type === "invoice" ? "Tax Invoice" : "Bill of Supply"}
                     </Badge>
                   </td>
-                  <td className="p-2">
+                  <td className="p-2 whitespace-nowrap">
                     {b.orderdate ? formatDate(b.orderdate) : "—"}
                   </td>
-                  <td className="p-2 text-right">
+                  <td className="p-2 text-right whitespace-nowrap">
                     {formatINR((b.totalamount || 0) + (b.discount_total || 0), 2)}
                   </td>
-                  <td className="p-2 text-right">
+                  <td className="p-2 text-right hidden xl:table-cell">
                     {formatINR(b.gst_total || 0, 2)}
                   </td>
-                  <td className="p-2 text-right">
+                  <td className="p-2 text-right hidden lg:table-cell">
                     {b.discount_total != null && b.discount_total > 0
                       ? formatINR(b.discount_total, 2)
                       : "—"}
                   </td>
-                  <td className="p-2 text-right">
+                  <td className="p-2 text-right whitespace-nowrap">
                     {b.amount_received != null
                       ? formatINR(b.amount_received, 2)
                       : "—"}
@@ -748,7 +737,8 @@ export default function BillTable({ onEdit }) {
                     )}
                   </td>
                   <td className="p-2">
-                    <div className="flex gap-1 justify-center">
+                    {/* Two short rows on narrow windows, one row when there is room. */}
+                    <div className="grid grid-cols-3 gap-0.5 justify-items-center xl:flex xl:gap-1 xl:justify-center">
                       {isWebsiteMethod(b.salesmethods) ? (
                         <span
                           className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground"
@@ -762,6 +752,7 @@ export default function BillTable({ onEdit }) {
                           variant="ghost"
                           onClick={() => onEdit(b.billid)}
                           title="Edit bill"
+                          aria-label="Edit bill"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -778,6 +769,7 @@ export default function BillTable({ onEdit }) {
                             ? "View invoice PDF"
                             : "PDF available after finalize"
                         }
+                        aria-label="View invoice PDF"
                         onClick={() => handleViewPdf(b)}
                       >
                         <FileText className="h-4 w-4" />
@@ -788,6 +780,7 @@ export default function BillTable({ onEdit }) {
                         disabled={!b.pdf_url || sendingSms.has(b.billid)}
                         className={!b.pdf_url ? "opacity-40 cursor-not-allowed" : ""}
                         title={b.pdf_url ? "Send bill via SMS" : "Finalize bill first to send via SMS"}
+                        aria-label="Send bill via SMS"
                         onClick={() => handleSendSms(b)}
                       >
                         {sendingSms.has(b.billid)
@@ -800,6 +793,7 @@ export default function BillTable({ onEdit }) {
                           variant="ghost"
                           disabled={regeningBills.has(b.billid)}
                           title="Regenerate PDF"
+                          aria-label="Regenerate PDF"
                           onClick={() => handleRegenPdf(b)}
                         >
                           {regeningBills.has(b.billid) ? (
@@ -834,6 +828,7 @@ export default function BillTable({ onEdit }) {
                               ? "Delete finalized bill (restores stock)"
                               : "Delete draft"
                           }
+                          aria-label="Delete bill"
                           onClick={() => handleDelete(b)}
                         >
                           <Trash2 className="h-4 w-4" />

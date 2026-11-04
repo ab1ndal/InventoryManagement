@@ -15,8 +15,10 @@ const mockDb = {
 
 const mockResolve = (s) => {
   if (s.table === "customers" && s.op === "select") {
-    if (s.cols === "store_credit") return { data: { store_credit: mockDb.customerCredit }, error: null };
-    return { data: { first_name: "Asha", last_name: "", phone: "999" }, error: null };
+    return {
+      data: { first_name: "Asha", last_name: "", phone: "999", store_credit: mockDb.customerCredit },
+      error: null,
+    };
   }
   if (s.table === "productsizecolors" && s.op === "select") {
     return { data: [{ variantid: "v1", stock: 5, size: "M", color: "Red" }], error: null };

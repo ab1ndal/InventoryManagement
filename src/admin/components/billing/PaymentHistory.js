@@ -1,14 +1,10 @@
 // src/admin/components/billing/PaymentHistory.js
 import { money } from "./billUtils";
+import { formatDate } from "../../../utility/dateFormat";
 
-function fmtDate(ts) {
-  return new Date(ts).toLocaleDateString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
+// recorded_at has no time zone, so its date is read as written. Parsing it would shift it by a day in
+// a browser outside India.
+const fmtDate = (ts) => formatDate(String(ts).slice(0, 10));
 
 export default function PaymentHistory({ payments, netAmount }) {
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);

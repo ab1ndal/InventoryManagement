@@ -1,9 +1,8 @@
 // src/admin/components/RequireAdminAuth.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 //import { useToast } from "../../components/hooks/use-toast";
-import UserRegistration from "./UserRegistration";
 import { ADMIN_ROLES, NO_ADMIN_ACCESS, OAUTH_PENDING_KEY, hasAdminAccess } from "../lib/adminAccess";
 
 export default function RequireAdminAuth({ allowedRoles = ADMIN_ROLES }) {
@@ -13,11 +12,21 @@ export default function RequireAdminAuth({ allowedRoles = ADMIN_ROLES }) {
 
   const location = useLocation();
 
-  const checkUserRole = async (session) => {
-    if (!session?.user) return;
+  const checkInFlight = useRef(null);
 
-    // Read before the await: the auth listener and the session restore both run this check at once,
-    // and both must agree on the attempt.
+  // The auth listener and the session restore both ask for this check on load. They share one run.
+  const checkUserRole = (session) => {
+    if (!session?.user) return undefined;
+    if (checkInFlight.current?.userId !== session.user.id) {
+      const run = runRoleCheck(session).finally(() => {
+        if (checkInFlight.current?.run === run) checkInFlight.current = null;
+      });
+      checkInFlight.current = { userId: session.user.id, run };
+    }
+    return checkInFlight.current.run;
+  };
+
+  const runRoleCheck = async (session) => {
     const freshOAuthLogin = sessionStorage.getItem(OAUTH_PENDING_KEY);
     const allowed = await hasAdminAccess(supabase, session.user.id, allowedRoles);
     sessionStorage.removeItem(OAUTH_PENDING_KEY);
@@ -106,10 +115,5 @@ export default function RequireAdminAuth({ allowedRoles = ADMIN_ROLES }) {
     );
   }
 
-  return (
-    <>
-      <UserRegistration />
-      <Outlet />
-    </>
-  );
+  return <Outlet />;
 }

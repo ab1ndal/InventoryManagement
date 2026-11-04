@@ -46,6 +46,28 @@ export function computeStockDelta(existingBillItems, newInventoryItems) {
  * @param {string} docType
  * @returns {Array} Array of bill_items insert objects ready for Supabase insert
  */
+/**
+ * Why a new bill's stock request cannot be met, as one line per variant, or null when it can. Lines
+ * are totalled per variant first: two lines of 4 from a stock of 5 must fail, though each fits alone.
+ */
+export function describeStockShortfalls(inventoryItems, stockMap) {
+  const requested = new Map();
+  for (const it of inventoryItems) {
+    const entry = requested.get(it.variantid) || { name: it.product_name, quantity: 0 };
+    entry.quantity += Number(it.quantity);
+    requested.set(it.variantid, entry);
+  }
+  const lines = [];
+  for (const [variantId, { name, quantity }] of requested) {
+    const row = stockMap[variantId];
+    const available = row?.stock ?? 0;
+    if (quantity > available) {
+      lines.push(`${name} (${row?.size || ""}/${row?.color || ""}): requested ${quantity}, available ${available}`);
+    }
+  }
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
 export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overallDiscount = 0, docType = 'invoice') {
   const pricedItems = items.map(priceItem);
   const totalWithCharges = pricedItems.reduce((s, p) => s + p.withCharges, 0);

@@ -176,6 +176,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
               variant="ghost"
               size="icon"
               className="h-8 w-8"
+              aria-label={`Edit ${item.product_name || "item"}`}
               onClick={() => onEdit(item._id)}
             >
               <Pencil className="h-4 w-4" />
@@ -185,6 +186,7 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-destructive hover:text-destructive"
+            aria-label={`Remove ${item.product_name || "item"}`}
             onClick={() => onRemove(item._id)}
           >
             <Trash2 className="h-4 w-4" />

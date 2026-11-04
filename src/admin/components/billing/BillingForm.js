@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
-import { buildBillItemsPayload, computeStockDelta, backCalcDiscountPct } from "./stockHelpers";
+import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct } from "./stockHelpers";
 import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
@@ -16,16 +16,15 @@ import {
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "../../../components/ui/card";
 import { Label } from "../../../components/ui/label";
 //import { Textarea } from "../../../components/ui/textarea";
 import { supabase } from "../../../lib/supabaseClient";
 import { toast } from "sonner";
 import { logActivity } from "../../../lib/activityLog";
-import { money, customerName as activityCustomerName } from "../../../utility/activitySummary";
-import { todayIST } from "../../../utility/dateFormat";
+import { money } from "../../../utility/activitySummary";
+import { formatDate, todayIST } from "../../../utility/dateFormat";
+import { money as billMoney } from "./billUtils";
 
 import CustomerSelector from "./CustomerSelector";
 import ItemTable from "./ItemTable";
@@ -38,6 +37,14 @@ import InvoiceView from "./InvoiceView";
 import PaymentHistory from "./PaymentHistory";
 import { generateInvoicePdf } from "./generateInvoicePdf";
 import {
+  DISCOUNT_COLUMNS,
+  loadActiveDiscounts,
+  loadActiveSalespeople,
+  loadCategories,
+  loadSalesLocations,
+  loadSalesMethods,
+} from "./billingLookups";
+import {
   Dialog,
   //  DialogTrigger,
   DialogDescription,
@@ -45,6 +52,54 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
+
+// A payment entered today keeps the database's own time. recorded_at has no time zone, so an earlier
+// date is stored as midday, well clear of the day boundary.
+export const paymentDateFields = (date) =>
+  date === todayIST() ? {} : { recorded_at: `${date}T12:00:00` };
+
+// Each change is atomic and independent, so they run together. Returns the variants that failed.
+async function applyStockChanges(changes, reason, ref) {
+  const results = await Promise.all(
+    changes.map(async ([variantId, delta]) => {
+      const { error } = await adjustStock(variantId, delta, reason, ref);
+      if (error) console.error("Stock update failed for", variantId, error);
+      return error ? variantId : null;
+    }),
+  );
+  return results.filter(Boolean);
+}
+
+// Everything the form needs about a customer, in one request.
+const CUSTOMER_SELECT =
+  "first_name, last_name, phone, store_credit, discount_usage(code, billid), " +
+  "exchanges(exchangeid, credit_amount, quantity, product_name, bill_items(product_name, bills(bill_number)))";
+
+// Everything the form needs about a bill, in one request, so opening one costs one round trip.
+const BILL_SELECT =
+  "orderdate, customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, " +
+  "finalized, pdf_url, paymentstatus, net_amount, totalamount, exchange_credit_used, exchange_source_bill, " +
+  `document_type, applied_codes, customers(${CUSTOMER_SELECT}), ` +
+  "bill_payments(payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)), " +
+  "bill_items(*, productsizecolors(size, color)), " +
+  "bill_salespersons(salesperson_id, salespersons(name)), " +
+  "linked_exchanges:exchanges(exchangeid, credit_amount, quantity, product_name, bill_items(product_name))";
+
+function pendingExchangeCredit(exchanges) {
+  if (!exchanges?.length) return null;
+  const total = exchanges.reduce((s, e) => s + Number(e.credit_amount || 0), 0);
+  const bills = [...new Set(exchanges.map((e) => e.bill_items?.bills?.bill_number).filter(Boolean))];
+  return {
+    amount: total,
+    exchangeIds: exchanges.map((e) => e.exchangeid),
+    label: `Exchange Credit${bills.length ? ` — Bill${bills.length > 1 ? "s" : ""} #${bills.join(", #")}` : ""}`,
+    items: exchanges.map((e) => ({
+      product_name: e.bill_items?.product_name || e.product_name || "Unknown",
+      returnQty: Number(e.quantity || 0),
+      creditAmount: Number(e.credit_amount || 0),
+    })),
+  };
+}
 
 // Online orders change productsizecolors.stock, customers.store_credit and vouchers
 // concurrently with this screen, so each of those writes is one atomic DB call
@@ -144,7 +199,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const invoiceRef = useRef(null);
   const [customerName, setCustomerName] = useState("");
   const [customerDisplayText, setCustomerDisplayText] = useState("");
-  const [salespersonNames, setSalespersonNames] = useState([]);
+  // Names from the opened bill: it may list someone no longer in the active salespeople list.
+  const [billSalespersonNames, setBillSalespersonNames] = useState({});
+  const [billLoaded, setBillLoaded] = useState(false);
+  const [discountStatus, setDiscountStatus] = useState("loading"); // 'loading'|'ready'|'failed'
+  const [discountAttempt, setDiscountAttempt] = useState(0);
+  const [loadedCustomerId, setLoadedCustomerId] = useState(null);
+  const [loadedBillDate, setLoadedBillDate] = useState(null);
+  const [discountsOpen, setDiscountsOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [addPaymentDate, setAddPaymentDate] = useState(() => todayIST());
+  const [firstPaymentDate, setFirstPaymentDate] = useState("");
+  const cleanSnapshotRef = useRef(null);
+  // Set when the bill's own response already carried this customer, so no second fetch is needed.
+  const preloadedCustomerRef = useRef(null);
   const [effectiveBillId, setEffectiveBillId] = useState(null);
   const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
   const [isBackdated, setIsBackdated] = useState(false);
@@ -215,12 +283,21 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setSalesLocationId(null);
       setSalesMethodId(null);
       setBackdatedDate(billId ? "" : todayIST());
+      setBillSalespersonNames({});
+      setBillLoaded(false);
+      setDiscountStatus("loading");
+      setDiscountsOpen(false);
+      setDiscardOpen(false);
+      setAddPaymentDate(todayIST());
+      preloadedCustomerRef.current = null;
       setBillPaymentStatus("draft");
       setBillPayments([]);
       setAddPaymentAmount("");
       setAddPaymentMethodId(null);
       setIsAddingPayment(false);
       setPartialConfirmOpen(false);
+      setConfirmOpen(false);
+      setLoadedBillDate(null);
       setFinalAmount("");
       setLoadedNetAmount(null);
     }
@@ -240,71 +317,82 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     }
   }, [open, billId, prefilledCustomerId]);
 
-  // Fetch categories once for categoryid → name resolution
+  // Discounts are rarely used and matter least on open, so an existing bill fetches them only
+  // after everything else has arrived. Saving waits for them when totals depend on them.
   useEffect(() => {
-    supabase
-      .from("categories")
-      .select("categoryid, name")
-      .then(({ data }) => {
-        if (data) setCategoryMap(Object.fromEntries(data.map((c) => [c.categoryid, c.name])));
-      });
-  }, []);
-
-  // Load discounts (and re-evaluate auto-apply eligibility) whenever the
-  // dialog is open or the item list changes.
-  useEffect(() => {
-    if (!open) return;
-
-    const loadDiscounts = async () => {
+    if (!open || (billId && !billLoaded)) return;
+    let superseded = false;
+    const load = async () => {
+      setDiscountStatus("loading");
+      const { data, error } = await loadActiveDiscounts().catch((err) => ({ data: null, error: err }));
       const today = todayIST();
-      const { data, error } = await supabase
-        .from("discounts")
-        .select(
-          "id, code, type, value, max_discount, category, once_per_customer, exclusive, auto_apply, min_total, start_date, end_date, active, rules",
-        )
-        .eq("active", true);
-      if (error) {
-        console.error("Error loading discounts:", error.message);
-        toast.error("Could not load discounts", { description: error.message });
-        return;
-      }
-      const valid = (data || []).filter((d) => {
+      const usable = (data || []).filter((d) => {
         if (d.start_date && d.start_date > today) return false;
         if (d.end_date && d.end_date < today) return false;
         return true;
       });
-      setAllDiscounts(valid);
-      // Only auto-apply on new bills — edits load codes from saved applied_codes
-      if (!billId) {
-        const autoCodes = valid
-          .filter((d) => d.auto_apply && isAutoApplyEligible(d, items, today))
-          .map((d) => d.code);
-        setSelectedCodes(autoCodes);
-      }
-    };
 
-    loadDiscounts();
-  }, [open, billId, items]); // eslint-disable-line react-hooks/exhaustive-deps
+      // A bill keeps the discounts it was saved with, even if one has since ended or been switched
+      // off. Without its terms the total would silently go up on the next save.
+      const savedElsewhere = billId
+        ? selectedCodes.filter((code) => !usable.some((d) => d.code === code))
+        : [];
+      let savedDiscounts = [];
+      let savedError = null;
+      if (!error && savedElsewhere.length > 0) {
+        const saved = await Promise.resolve(
+          supabase.from("discounts").select(DISCOUNT_COLUMNS).in("code", savedElsewhere),
+        ).catch((err) => ({ data: null, error: err }));
+        savedDiscounts = (saved.data || []).map((d) => ({ ...d, savedOnBillOnly: true }));
+        savedError = saved.error;
+      }
+      if (superseded) return;
+
+      const failure = error || savedError;
+      if (failure) {
+        console.error("Error loading discounts:", failure.message);
+        toast.error("Could not load discounts", { description: failure.message });
+        setDiscountStatus("failed");
+        return;
+      }
+      if (savedDiscounts.length < savedElsewhere.length) {
+        toast.warning("A discount on this bill no longer exists", {
+          description: "Its amount is not in the total shown. Check the total before saving.",
+        });
+      }
+      setAllDiscounts([...usable, ...savedDiscounts]);
+      setDiscountStatus("ready");
+    };
+    load();
+    return () => {
+      superseded = true;
+    };
+  }, [open, billId, billLoaded, discountAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Only auto-apply on new bills — edits load codes from saved applied_codes
+  useEffect(() => {
+    if (!open || billId || discountStatus !== "ready") return;
+    const today = todayIST();
+    setSelectedCodes(
+      allDiscounts
+        .filter((d) => d.auto_apply && isAutoApplyEligible(d, items, today))
+        .map((d) => d.code),
+    );
+  }, [open, billId, discountStatus, allDiscounts, items]);
 
   useEffect(() => {
     if (!open) return;
     const loadLookups = async () => {
-      const [{ data: locs }, { data: methods }, { data: sps }] =
+      const [{ data: locs }, { data: methods }, { data: sps }, { data: categories }] =
         await Promise.all([
-          supabase
-            .from("saleslocations")
-            .select("saleslocationid, locationname")
-            .order("saleslocationid"),
-          supabase
-            .from("salesmethods")
-            .select("salesmethodid, methodname")
-            .order("salesmethodid"),
-          supabase
-            .from("salespersons")
-            .select("salesperson_id, name")
-            .eq("active", true)
-            .order("name"),
+          loadSalesLocations(),
+          loadSalesMethods(),
+          loadActiveSalespeople(),
+          loadCategories(),
         ]);
+      if (categories) {
+        setCategoryMap(Object.fromEntries(categories.map((c) => [c.categoryid, c.name])));
+      }
       if (locs) {
         setSalesLocations(locs);
         if (!billId) {
@@ -319,18 +407,24 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   }, [open, billId]);
 
   useEffect(() => {
-    if (!open || !billId) return;
+    if (!open || !billId) return undefined;
+    // Closing or switching bills abandons this load, so a late reply cannot refill the form.
+    let superseded = false;
     const loadBill = async () => {
       try {
         const { data: bill, error: billErr } = await supabase
           .from("bills")
-          .select(
-            "orderdate, customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, totalamount, exchange_credit_used, exchange_source_bill, document_type",
-          )
+          .select(BILL_SELECT)
           .eq("billid", billId)
+          .is("customers.exchanges.new_billid", null)
+          .order("recorded_at", { ascending: true, referencedTable: "bill_payments" })
+          .order("bill_item_id", { ascending: true, referencedTable: "bill_items" })
           .single();
+        if (superseded) return;
         if (billErr) throw billErr;
-        setBackdatedDate(bill.orderdate ? bill.orderdate.slice(0, 10) : todayIST());
+        const savedBillDate = bill.orderdate ? bill.orderdate.slice(0, 10) : todayIST();
+        setBackdatedDate(savedBillDate);
+        setLoadedBillDate(savedBillDate);
         setEffectiveBillNumber(bill.bill_number || null);
         setDocType(bill.document_type || 'bos');
         setIsFinalizedBill(!!bill.finalized);
@@ -343,35 +437,15 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         // Fetch installment history regardless of current paymentstatus — a bill that
         // started "partial" flips to "finalized" once fully paid (handleAddPayment), but
         // its bill_payments rows still exist and must stay visible on reopen.
-        const { data: payments } = await supabase
-          .from("bill_payments")
-          .select(
-            "payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)"
-          )
-          .eq("billid", billId)
-          .order("recorded_at", { ascending: true });
-        setBillPayments(payments || []);
+        setBillPayments(bill.bill_payments || []);
 
-        // Fetch applied_codes separately — column may not exist if migration not yet run
-        const { data: codesRow } = await supabase
-          .from("bills")
-          .select("applied_codes")
-          .eq("billid", billId)
-          .single();
+        const billItems = bill.bill_items || [];
 
-        // Fetch bill items
-        const { data: billItems, error: itemsErr } = await supabase
-          .from("bill_items")
-          .select("*")
-          .eq("billid", billId);
-        if (itemsErr) throw itemsErr;
-
-        // Fetch salesperson associations
-        const { data: spData } = await supabase
-          .from("bill_salespersons")
-          .select("salesperson_id")
-          .eq("billid", billId);
-        setSelectedSalespersonIds((spData || []).map((r) => r.salesperson_id));
+        const spData = bill.bill_salespersons || [];
+        setSelectedSalespersonIds(spData.map((r) => r.salesperson_id));
+        setBillSalespersonNames(
+          Object.fromEntries(spData.map((r) => [r.salesperson_id, r.salespersons?.name])),
+        );
 
         // Rehydrate applied exchange credit so it shows when editing an existing bill.
         // Authoritative amount/source live on the bills row; the per-item breakdown
@@ -379,10 +453,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         // bill was later edited — its bill_items delete cascades the exchange rows.
         const exAmount = Number(bill.exchange_credit_used ?? 0);
         if (exAmount > 0) {
-          const { data: linkedEx } = await supabase
-            .from("exchanges")
-            .select("exchangeid, credit_amount, quantity, product_name, bill_items(product_name)")
-            .eq("new_billid", billId);
+          const linkedEx = bill.linked_exchanges;
           const items = (linkedEx || []).map((e) => ({
             product_name: e.bill_items?.product_name || e.product_name || "Item",
             returnQty: Number(e.quantity || 0),
@@ -398,6 +469,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         // Set form state from bill
+        if (bill.customers) {
+          preloadedCustomerRef.current = bill.customerid;
+          applyCustomer(bill.customers);
+          setLoadedCustomerId(bill.customerid);
+        }
         setSelectedCustomerId(bill.customerid || null);
         setNotes(bill.notes || "");
         setSalesLocationId(bill.saleslocationid || null);
@@ -406,29 +482,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setFinalAmount(bill.final_amount != null ? String(bill.final_amount) : "");
 
         // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts
-        const savedCodes = codesRow?.applied_codes;
-        setSelectedCodes(savedCodes || []);
+        setSelectedCodes(bill.applied_codes || []);
 
-        // Fetch size/color for inventory variants
-        const inventoryBillItems = (billItems || []).filter(
-          (bi) => bi.variantid,
-        );
-        let variantMap = {};
-        if (inventoryBillItems.length > 0) {
-          const { data: variants } = await supabase
-            .from("productsizecolors")
-            .select("variantid, size, color")
-            .in(
-              "variantid",
-              inventoryBillItems.map((bi) => bi.variantid),
-            );
-          variantMap = Object.fromEntries(
-            (variants || []).map((v) => [v.variantid, v]),
-          );
-        }
-
-        // Fetch size/color for manual items from manual_items table
-        const manualBillItems = (billItems || []).filter(
+        // Fetch size/color for manual items from manual_items table. product_code has no
+        // foreign key to it, so this cannot join the bill request.
+        const manualBillItems = billItems.filter(
           (bi) => !bi.variantid && bi.product_code,
         );
         let manualMap = {};
@@ -440,6 +498,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               "manual_item_id",
               manualBillItems.map((bi) => bi.product_code),
             );
+          if (superseded) return;
           manualMap = Object.fromEntries(
             (manuals || []).map((m) => [m.manual_item_id, m]),
           );
@@ -447,7 +506,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
         // Reconstruct items — product_code in DB stores the BC-format productid for inventory items
         setItems(
-          (billItems || []).map((bi) => ({
+          billItems.map((bi) => ({
             _id: String(bi.bill_item_id),
             source: bi.variantid ? "inventory" : "manual",
             variantid: bi.variantid || null,
@@ -470,137 +529,85 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               bi.stitch_type ||
               (Number(bi.gst_rate) === 18 ? "stitched" : "unstitched"),
             size:
-              variantMap[bi.variantid]?.size ||
+              bi.productsizecolors?.size ||
               manualMap[bi.product_code]?.size ||
               null,
             color:
-              variantMap[bi.variantid]?.color ||
+              bi.productsizecolors?.color ||
               manualMap[bi.product_code]?.color ||
               null,
             salesperson_id: bi.salesperson_id || null,
           })),
         );
+        // Set only on success: saving a half-loaded bill would overwrite the real one.
+        setBillLoaded(true);
       } catch (e) {
-        toast.error("Error loading bill", { description: e.message });
+        if (!superseded) toast.error("Error loading bill", { description: e.message });
       }
     };
     loadBill();
-  }, [open, billId]);
+    return () => {
+      superseded = true;
+    };
+  }, [open, billId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch customer display name for InvoiceView and CustomerSelector
+  function applyCustomer(data) {
+    const name = data ? `${data.first_name} ${data.last_name || ""}`.trim() : "";
+    setCustomerName(name);
+    setCustomerDisplayText(data ? `${name} | ${data.phone || "No Phone"}` : "");
+    // D-16: auto-apply the full balance; Summary/computation will clamp to grandTotal
+    const balance = Number(data?.store_credit ?? 0);
+    setCustomerStoreCreditBalance(balance);
+    setAppliedStoreCredit(balance);
+    setAvailableExchangeCredit(exchangeCreditProp ? null : pendingExchangeCredit(data?.exchanges));
+    // D-05: hides once_per_customer discounts already used. This bill's own use does not count,
+    // or reopening it would drop the discount it was finalized with.
+    setUsedCodeSet(
+      new Set((data?.discount_usage || []).filter((r) => String(r.billid) !== String(billId)).map((r) => r.code)),
+    );
+  }
+
+  // Load what the form shows about a customer whenever the choice changes.
   useEffect(() => {
     if (!selectedCustomerId) {
-      setCustomerName("");
-      setCustomerDisplayText("");
-      return;
+      applyCustomer(null);
+      setLoadedCustomerId(null);
+      return undefined;
+    }
+    if (preloadedCustomerRef.current === selectedCustomerId) {
+      preloadedCustomerRef.current = null;
+      return undefined;
     }
     let superseded = false;
     supabase
       .from("customers")
-      .select("first_name, last_name, phone")
+      .select(CUSTOMER_SELECT)
       .eq("customerid", selectedCustomerId)
+      .is("exchanges.new_billid", null)
       .single()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (superseded) return;
-        const name = data
-          ? `${data.first_name} ${data.last_name || ""}`.trim()
-          : "";
-        const displayText = data ? `${name} | ${data.phone || "No Phone"}` : "";
-        setCustomerName(name);
-        setCustomerDisplayText(displayText);
+        if (error) {
+          toast.error("Could not load customer", { description: error.message });
+        }
+        applyCustomer(data);
+        setLoadedCustomerId(selectedCustomerId);
       });
     return () => {
       superseded = true;
     };
-  }, [selectedCustomerId]);
-
-  // D-16: Auto-apply store credit when customer changes
-  useEffect(() => {
-    if (!selectedCustomerId) {
-      setCustomerStoreCreditBalance(0);
-      setAppliedStoreCredit(0);
-      return;
-    }
-    supabase
-      .from("customers")
-      .select("store_credit")
-      .eq("customerid", selectedCustomerId)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          setCustomerStoreCreditBalance(0);
-          setAppliedStoreCredit(0);
-          return;
-        }
-        const balance = Number(data.store_credit ?? 0);
-        setCustomerStoreCreditBalance(balance);
-        // Auto-apply the full balance; Summary/computation will clamp to grandTotal
-        setAppliedStoreCredit(balance);
-      });
-  }, [selectedCustomerId]);
-
-  // Fetch pending (unredeemed) exchange credits for selected customer
-  useEffect(() => {
-    if (!selectedCustomerId || exchangeCreditProp) {
-      setAvailableExchangeCredit(null);
-      return;
-    }
-    supabase
-      .from("exchanges")
-      .select("exchangeid, credit_amount, quantity, product_name, bill_items(product_name, bills(bill_number))")
-      .eq("customerid", selectedCustomerId)
-      .is("new_billid", null)
-      .then(({ data }) => {
-        if (!data || data.length === 0) { setAvailableExchangeCredit(null); return; }
-        const total = data.reduce((s, e) => s + Number(e.credit_amount || 0), 0);
-        const exchangeIds = data.map((e) => e.exchangeid);
-        const bills = [...new Set(data.map((e) => e.bill_items?.bills?.bill_number).filter(Boolean))];
-        const label = `Exchange Credit${bills.length ? ` — Bill${bills.length > 1 ? "s" : ""} #${bills.join(", #")}` : ""}`;
-        const items = data.map((e) => ({
-          product_name: e.bill_items?.product_name || e.product_name || "Unknown",
-          returnQty: Number(e.quantity || 0),
-          creditAmount: Number(e.credit_amount || 0),
-        }));
-        setAvailableExchangeCredit({ amount: total, exchangeIds, label, items });
-      });
-  }, [selectedCustomerId, exchangeCreditProp]);
-
-  // D-05: Query discount_usage when customer changes to hide once_per_customer discounts already used
-  useEffect(() => {
-    if (!selectedCustomerId) {
-      setUsedCodeSet(new Set());
-      return;
-    }
-    const fetchUsedCodes = async () => {
-      const { data } = await supabase
-        .from("discount_usage")
-        .select("code")
-        .eq("customerid", selectedCustomerId);
-      const codes = new Set((data || []).map((r) => r.code));
-      setUsedCodeSet(codes);
-      // Also deselect any currently selected codes that are once_per_customer and already used
-      setSelectedCodes((prev) =>
-        prev.filter((c) => {
-          const disc = allDiscounts.find((d) => d.code === c);
-          return !(disc && disc.once_per_customer && codes.has(c));
-        }),
-      );
-    };
-    fetchUsedCodes();
   }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch salesperson display names for InvoiceView
+  // Deselect once_per_customer codes this customer already used. Either list can arrive first.
   useEffect(() => {
-    if (!selectedSalespersonIds?.length) {
-      setSalespersonNames([]);
-      return;
-    }
-    supabase
-      .from("salespersons")
-      .select("name")
-      .in("salesperson_id", selectedSalespersonIds)
-      .then(({ data }) => setSalespersonNames((data ?? []).map((r) => r.name)));
-  }, [selectedSalespersonIds]);
+    if (usedCodeSet.size === 0) return;
+    setSelectedCodes((prev) =>
+      prev.filter((c) => {
+        const disc = allDiscounts.find((d) => d.code === c);
+        return !(disc && disc.once_per_customer && usedCodeSet.has(c));
+      }),
+    );
+  }, [usedCodeSet, allDiscounts]);
 
   const salespersonMap = useMemo(
     () =>
@@ -609,6 +616,91 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       ),
     [salespersonsList],
   );
+
+  const salespersonNames = useMemo(
+    () =>
+      selectedSalespersonIds
+        .map((id) => salespersonMap[id] || billSalespersonNames[id])
+        .filter(Boolean),
+    [selectedSalespersonIds, salespersonMap, billSalespersonNames],
+  );
+
+  // Totals depend on discount definitions, so saving before they arrive would store wrong totals.
+  // A new bill also needs them for auto-apply. An existing bill with no codes does not wait.
+  const discountsPending = discountStatus !== "ready" && (!billId || selectedCodes.length > 0);
+  const billPending = Boolean(billId) && !billLoaded;
+  const customerPending = Boolean(selectedCustomerId) && loadedCustomerId !== selectedCustomerId;
+  // Only when the date was changed here: older rows hold the database's clock, which can read a day
+  // behind India, and must not stop an untouched bill from saving.
+  const earliestPaymentDate = billPayments
+    .map((p) => String(p.recorded_at).slice(0, 10))
+    .sort()[0];
+  const billDateAfterPayment =
+    Boolean(earliestPaymentDate) &&
+    backdatedDate !== loadedBillDate &&
+    backdatedDate > earliestPaymentDate;
+  const saveBlocked =
+    billPending || discountsPending || customerPending || !backdatedDate || billDateAfterPayment;
+  const saveBlockedReason = billPending
+    ? "Loading bill…"
+    : discountsPending
+      ? discountStatus === "failed"
+        ? "Discounts did not load. Retry to save."
+        : "Loading discounts…"
+      : customerPending
+        ? "Loading customer…"
+        : !backdatedDate
+          ? "Choose a bill date to save."
+          : billDateAfterPayment
+            ? `Bill date cannot be after the first payment (${formatDate(earliestPaymentDate)}).`
+            : null;
+  const discountsShown =
+    discountsOpen || discountStatus === "failed" || selectedCodes.length > 0 || Boolean(appliedVoucher);
+
+  // What Cancel would lose. Payment amount is left out once installments exist, since recording one
+  // saves it straight away.
+  const formSnapshot = JSON.stringify([
+    items,
+    selectedCustomerId,
+    selectedSalespersonIds,
+    notes,
+    billPaymentStatus === "partial" || billPayments.length > 0 ? null : paymentAmount,
+    finalAmount,
+    backdatedDate,
+    salesMethodId,
+    appliedVoucher,
+    selectedCodes,
+    docType,
+    appliedStoreCredit,
+    exchangeCredit?.amount ?? null,
+    addPaymentAmount,
+    // A new bill fills in Walk-In by itself once the list arrives, so that is not an edit.
+    billId ? salesLocationId : null,
+  ]);
+
+  useEffect(() => {
+    if (!open) {
+      cleanSnapshotRef.current = null;
+    } else if (cleanSnapshotRef.current === null && (!billId || billLoaded)) {
+      cleanSnapshotRef.current = formSnapshot;
+    }
+  }, [open, billId, billLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const requestClose = () => {
+    if (cleanSnapshotRef.current !== null && cleanSnapshotRef.current !== formSnapshot) {
+      setDiscardOpen(true);
+    } else {
+      onOpenChange?.(false);
+    }
+  };
+
+  // Late bills are common, so a payment can be dated anywhere from the bill's date up to today.
+  const paymentDateProblem = (date) => {
+    if (!date) return "Choose the date this payment was received";
+    if (date > todayIST()) return "A payment date cannot be in the future";
+    if (backdatedDate && date < backdatedDate) return "A payment date cannot be before the bill date";
+    return null;
+  };
 
   const computed = useMemo(
     () =>
@@ -653,12 +745,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     docType,
   ]);
 
+  // A finalized bill's routine "Save Draft" edit does not force-fit the total to finalAmount.
+  const shownComputed = isFinalizedBill ? computed : balanceAdjustedComputed;
+
   const visibleDiscounts = useMemo(() => {
-    if (!selectedCustomerId) return allDiscounts; // D-06: no filter without customer
-    return allDiscounts.filter(
+    const offered = allDiscounts.filter((d) => !d.savedOnBillOnly || selectedCodes.includes(d.code));
+    if (!selectedCustomerId) return offered; // D-06: no filter without customer
+    return offered.filter(
       (d) => !(d.once_per_customer && usedCodeSet.has(d.code)),
     );
-  }, [allDiscounts, usedCodeSet, selectedCustomerId]);
+  }, [allDiscounts, usedCodeSet, selectedCustomerId, selectedCodes]);
 
   const showPartialButton = useMemo(() => {
     if (isFinalizedBill) return false;
@@ -767,6 +863,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
   // BILL-01 + STOCK-01: New draft save | BILL-02 + STOCK-02: Draft update (Plan 03)
   const handleSaveDraft = async () => {
+    if (saveBlocked) return;
     setIsSaving(true);
     try {
       if (billId) {
@@ -920,14 +1017,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         // Step I: Apply stock deltas (skipped for backdated bills)
         const stockFailures = [];
         if (!isBackdated) {
-          for (const [vid, delta] of Object.entries(deltaMap)) {
-            if (delta === 0) continue;
-            const { error: stockUpdateErr } = await adjustStock(vid, delta, "bill_draft_edit", billId);
-            if (stockUpdateErr) {
-              console.error("Stock update failed for", vid, stockUpdateErr);
-              stockFailures.push(vid);
-            }
-          }
+          stockFailures.push(
+            ...(await applyStockChanges(
+              Object.entries(deltaMap).filter(([, delta]) => delta !== 0),
+              "bill_draft_edit",
+              billId,
+            )),
+          );
         }
 
         // Step J: Success
@@ -937,10 +1033,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
           });
         }
-        const custName = selectedCustomerId
-          ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
-          : null;
-        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Edited draft bill #${effectiveBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(totalsToUse.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Edited draft bill #${effectiveBillNumber || "(no number)"} for ${customerName || "walk-in"} — ${money(totalsToUse.grandTotal)}, ${items.length} items` });
         onOpenChange?.(false);
         onSubmit?.();
         return;
@@ -965,18 +1058,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           throw new Error("Could not verify stock: " + stockErr.message);
 
         stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
-        const outOfStock = inventoryItems.filter((it) => {
-          const available = stockMap[it.variantid]?.stock ?? 0;
-          return it.quantity > available;
-        });
-        if (outOfStock.length > 0) {
-          const details = outOfStock
-            .map((it) => {
-              const avail = stockMap[it.variantid]?.stock ?? 0;
-              return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
-            })
-            .join("\n");
-          toast.error("Insufficient stock", { description: details });
+        const shortfalls = describeStockShortfalls(inventoryItems, stockMap);
+        if (shortfalls) {
+          toast.error("Insufficient stock", { description: shortfalls });
           return;
         }
       }
@@ -1039,22 +1123,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       // Step E - Decrement stock for inventory items (skipped for backdated bills)
       const newDraftStockFailures = [];
       if (!isBackdated) {
-        for (const it of inventoryItems) {
-          const { error: stockUpdateErr } = await adjustStock(
-            it.variantid,
-            -it.quantity,
+        newDraftStockFailures.push(
+          ...(await applyStockChanges(
+            Object.entries(computeStockDelta([], inventoryItems)),
             "bill_draft_create",
             bill.billid,
-          );
-          if (stockUpdateErr) {
-            console.error(
-              "Stock update failed for",
-              it.variantid,
-              stockUpdateErr,
-            );
-            newDraftStockFailures.push(it.variantid);
-          }
-        }
+          )),
+        );
       }
 
       // Step F - Success
@@ -1064,10 +1139,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           description: `Stock could not be updated for ${newDraftStockFailures.length} variant(s). Please recheck inventory.`,
         });
       }
-      const custName = selectedCustomerId
-        ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
-        : null;
-      logActivity({ action: "create", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Created draft bill #${bill.bill_number || "(no number)"} for ${activityCustomerName(custName)} — ${money(computed.grandTotal)}, ${items.length} items` });
+      logActivity({ action: "create", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Created draft bill #${bill.bill_number || "(no number)"} for ${customerName || "walk-in"} — ${money(computed.grandTotal)}, ${items.length} items` });
       onOpenChange?.(false);
       onSubmit?.();
     } catch (e) {
@@ -1134,6 +1206,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const openPartialFinalizeConfirm = () => {
+    setFirstPaymentDate(backdatedDate);
     if (!selectedCustomerId) {
       toast.error("Customer required", {
         description: "A customer must be selected before finalizing.",
@@ -1180,6 +1253,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const handleConfirmFinalize = async () => {
+    if (saveBlocked) return;
     setIsSaving(true);
     let activeBillId = billId;
     let pdfBillNumber = effectiveBillNumber;
@@ -1211,17 +1285,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             throw new Error("Could not verify stock: " + stockErr.message);
           stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
           if (!isBackdated) {
-            const outOfStock = inventoryItems.filter(
-              (it) => (stockMap[it.variantid]?.stock ?? 0) < it.quantity,
-            );
-            if (outOfStock.length > 0) {
-              const details = outOfStock
-                .map((it) => {
-                  const avail = stockMap[it.variantid]?.stock ?? 0;
-                  return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
-                })
-                .join("\n");
-              toast.error("Insufficient stock", { description: details });
+            const shortfalls = describeStockShortfalls(inventoryItems, stockMap);
+            if (shortfalls) {
+              toast.error("Insufficient stock", { description: shortfalls });
               return;
             }
           }
@@ -1314,22 +1380,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
         // Decrement stock (skipped for backdated bills)
         if (!isBackdated) {
-          for (const it of inventoryItems) {
-            const { error: stockUpdateErr } = await adjustStock(
-              it.variantid,
-              -it.quantity,
+          stockFailures.push(
+            ...(await applyStockChanges(
+              Object.entries(computeStockDelta([], inventoryItems)),
               "bill_finalize",
               activeBillId,
-            );
-            if (stockUpdateErr) {
-              console.error(
-                "Stock update failed for",
-                it.variantid,
-                stockUpdateErr,
-              );
-              stockFailures.push(it.variantid);
-            }
-          }
+            )),
+          );
         }
 
         // Flush finalized state into InvoiceView before PDF capture
@@ -1451,14 +1508,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
         // Apply stock deltas
         if (!isBackdated) {
-          for (const [vid, delta] of Object.entries(deltaMap)) {
-            if (delta === 0) continue;
-            const { error: stockUpdateErr } = await adjustStock(vid, delta, "bill_edit", activeBillId);
-            if (stockUpdateErr) {
-              console.error("Stock update failed for", vid, stockUpdateErr);
-              stockFailures.push(vid);
-            }
-          }
+          stockFailures.push(
+            ...(await applyStockChanges(
+              Object.entries(deltaMap).filter(([, delta]) => delta !== 0),
+              "bill_edit",
+              activeBillId,
+            )),
+          );
         }
 
         // Re-finalization: adjust customer store credit by delta only
@@ -1537,13 +1593,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
         });
       }
-      const custName = selectedCustomerId
-        ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
-        : null;
       if (billId) {
-        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Re-finalized bill #${effectiveBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Re-finalized bill #${effectiveBillNumber || "(no number)"} for ${customerName || "walk-in"} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
       } else {
-        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill #${pdfBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill #${pdfBillNumber || "(no number)"} for ${customerName || "walk-in"} — ${money(balanceAdjustedComputed.grandTotal)}, ${items.length} items` });
       }
       setConfirmOpen(false);
       onOpenChange?.(false);
@@ -1556,6 +1609,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const handleConfirmPartialFinalize = async () => {
+    if (saveBlocked) return;
+    const firstDateProblem = Number(paymentAmount) > 0 ? paymentDateProblem(firstPaymentDate) : null;
+    if (firstDateProblem) {
+      toast.error(firstDateProblem);
+      return;
+    }
     setIsSaving(true);
     let activeBillId = billId || null;
     let pdfBillNumber = billId ? effectiveBillNumber : null;
@@ -1588,17 +1647,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           if (stockErr) throw new Error("Could not verify stock: " + stockErr.message);
           stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
           if (!isBackdated) {
-            const outOfStock = inventoryItems.filter(
-              (it) => (stockMap[it.variantid]?.stock ?? 0) < it.quantity,
-            );
-            if (outOfStock.length > 0) {
-              const details = outOfStock
-                .map((it) => {
-                  const avail = stockMap[it.variantid]?.stock ?? 0;
-                  return `${it.product_name} (${stockMap[it.variantid]?.size || ""}/${stockMap[it.variantid]?.color || ""}): requested ${it.quantity}, available ${avail}`;
-                })
-                .join("\n");
-              toast.error("Insufficient stock", { description: details });
+            const shortfalls = describeStockShortfalls(inventoryItems, stockMap);
+            if (shortfalls) {
+              toast.error("Insufficient stock", { description: shortfalls });
               return;
             }
           }
@@ -1676,18 +1727,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         if (!isBackdated) {
-          for (const it of inventoryItems) {
-            const { error: stockUpdateErr } = await adjustStock(
-              it.variantid,
-              -it.quantity,
+          stockFailures.push(
+            ...(await applyStockChanges(
+              Object.entries(computeStockDelta([], inventoryItems)),
               "bill_partial_finalize",
               activeBillId,
-            );
-            if (stockUpdateErr) {
-              console.error("Stock update failed for", it.variantid, stockUpdateErr);
-              stockFailures.push(it.variantid);
-            }
-          }
+            )),
+          );
         }
       } else {
         // ── EXISTING DRAFT: delta stock validation + bill update (stock already decremented) ──
@@ -1776,14 +1822,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         if (!isBackdated) {
-          for (const [vid, delta] of Object.entries(deltaMap)) {
-            if (delta === 0) continue;
-            const { error: stockUpdateErr } = await adjustStock(vid, delta, "bill_partial_finalize", activeBillId);
-            if (stockUpdateErr) {
-              console.error("Stock update failed for", vid, stockUpdateErr);
-              stockFailures.push(vid);
-            }
-          }
+          stockFailures.push(
+            ...(await applyStockChanges(
+              Object.entries(deltaMap).filter(([, delta]) => delta !== 0),
+              "bill_partial_finalize",
+              activeBillId,
+            )),
+          );
         }
 
         if (exchangeCredit?.exchangeIds?.length) {
@@ -1804,6 +1849,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             billid: activeBillId,
             amount: Number(paymentAmount),
             salesmethodid: salesMethodId,
+            ...paymentDateFields(firstPaymentDate),
           })
           .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
           .single();
@@ -1863,13 +1909,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
         });
       }
-      const custName = selectedCustomerId
-        ? (await supabase.from("customers").select("first_name,last_name").eq("customerid", selectedCustomerId).single()).data
-        : null;
       if (isNewBill) {
-        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill (partial) #${pdfBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "create", entityType: "bill", entityId: pdfBillNumber || activeBillId, summary: `Finalized bill (partial) #${pdfBillNumber || "(no number)"} for ${customerName || "walk-in"} — ${money(billComputed.grandTotal)}, ${items.length} items` });
       } else {
-        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Finalized bill (partial) #${effectiveBillNumber || "(no number)"} for ${activityCustomerName(custName)} — ${money(billComputed.grandTotal)}, ${items.length} items` });
+        logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Finalized bill (partial) #${effectiveBillNumber || "(no number)"} for ${customerName || "walk-in"} — ${money(billComputed.grandTotal)}, ${items.length} items` });
       }
       setPartialConfirmOpen(false);
       onOpenChange?.(false);
@@ -1882,6 +1925,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const handleAddPayment = async () => {
+    if (saveBlocked) return;
     // Guard against recording a payment (and regenerating the customer-facing PDF) off
     // unsaved item edits: this handler renders the PDF from live in-memory `items`/`computed`
     // state, not from bill_items in the DB. If items were changed here but "Save Draft" was
@@ -1901,6 +1945,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       toast.error("Select a payment method");
       return;
     }
+    const addDateProblem = paymentDateProblem(addPaymentDate);
+    if (addDateProblem) {
+      toast.error(addDateProblem);
+      return;
+    }
     setIsAddingPayment(true);
     try {
       const { data: billRow, error: billFetchErr } = await supabase
@@ -1913,12 +1962,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
       const { data: newPayment, error: payErr } = await supabase
         .from("bill_payments")
-        .insert({ billid: billId, amount: amt, salesmethodid: addPaymentMethodId })
+        .insert({
+          billid: billId,
+          amount: amt,
+          salesmethodid: addPaymentMethodId,
+          ...paymentDateFields(addPaymentDate),
+        })
         .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
         .single();
       if (payErr) throw new Error("Failed to record payment: " + payErr.message);
 
-      const updatedPayments = [...billPayments, newPayment];
+      const updatedPayments = [...billPayments, newPayment].sort(
+        (a, b) => new Date(a.recorded_at) - new Date(b.recorded_at),
+      );
       const { totalPaid, remaining, isFullyPaid, paymentStatus } = tallyPayment(
         billPayments,
         amt,
@@ -1980,7 +2036,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => (next ? onOpenChange?.(true) : requestClose())}
+      >
         {/* Closing resets the whole bill, so it takes the X or Cancel, never a stray click or Esc. */}
         <DialogContent
           className="max-w-[95vw] w-full max-h-[90vh] overflow-y-auto bg-white"
@@ -1989,22 +2048,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         >
           <DialogHeader>
             <DialogTitle>
-              {billId ? `Edit Bill #${billId}` : "New Bill"}
+              {billId ? `Edit Bill ${effectiveBillNumber || `#${billId}`}` : "New Bill"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               {billId ? "Edit existing bill details" : "Create a new bill"}
             </DialogDescription>
           </DialogHeader>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Billing</CardTitle>
-              <div className="text-sm text-muted-foreground">
-                {billId ? `Bill ID: ${billId}` : "New Bill"}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <Card className="border-0 shadow-none">
+            <CardContent className="space-y-6 p-0 sm:p-2">
               {/* Document type */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium">Document:</span>
                 <div className="inline-flex rounded-md border overflow-hidden">
                   <button
@@ -2031,19 +2084,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
               {/* Customer */}
               <section className="grid gap-3">
-                <Label>Customer</Label>
+                <Label htmlFor="bill-customer">Customer</Label>
                 <CustomerSelector
                   selectedCustomerId={selectedCustomerId}
                   setSelectedCustomerId={setSelectedCustomerId}
                   displayName={customerDisplayText}
-                />
-              </section>
-
-              {/* Salesperson(s) */}
-              <section className="grid gap-3">
-                <SalespersonSelector
-                  selectedIds={selectedSalespersonIds}
-                  setSelectedIds={setSelectedSalespersonIds}
                 />
               </section>
 
@@ -2072,7 +2117,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     htmlFor="backdated-bill"
                     className="cursor-pointer text-sm font-normal text-muted-foreground"
                   >
-                    Skip stock decrement (backdated entry)
+                    Don't reduce stock (entering an old bill)
                   </Label>
                 </div>
               </section>
@@ -2119,7 +2164,32 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 />
               )}
 
-              {/* Discounts */}
+              {/* Discounts and voucher: rarely used, so folded away unless one applies */}
+              <section className="space-y-3">
+                <button
+                  type="button"
+                  aria-expanded={discountsShown}
+                  className="flex w-full items-center justify-between rounded border px-3 py-2 text-sm font-medium hover:bg-gray-50"
+                  onClick={() => setDiscountsOpen((prev) => !prev)}
+                >
+                  <span>Discounts &amp; Voucher</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    {discountStatus === "loading"
+                      ? "Loading…"
+                      : selectedCodes.length + (appliedVoucher ? 1 : 0) > 0
+                        ? `${selectedCodes.length + (appliedVoucher ? 1 : 0)} applied`
+                        : "None applied"}
+                  </span>
+                </button>
+                {discountStatus === "failed" && (
+                  <div className="flex items-center justify-between gap-2 rounded border border-destructive/40 px-3 py-2 text-sm text-destructive">
+                    <span>Discounts did not load.</span>
+                    <Button variant="outline" size="sm" onClick={() => setDiscountAttempt((n) => n + 1)}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+              <div className={discountsShown ? "space-y-6" : "hidden"}>
               <section className="space-y-2">
                 <Label>Overall Discounts</Label>
                 <DiscountSelector
@@ -2183,10 +2253,24 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 )}
               </section>
 
+              </div>
+              </section>
+
+              {/* Salesperson(s) */}
+              <section className="grid gap-3">
+                <SalespersonSelector
+                  selectedIds={selectedSalespersonIds}
+                  setSelectedIds={setSelectedSalespersonIds}
+                />
+              </section>
+
+              {/* Notes */}
+              <Notes notes={notes} setNotes={setNotes} />
+
               {/* Sale Context */}
               <section className="space-y-2">
                 <Label>Sale Details</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Select
                     value={salesLocationId ? String(salesLocationId) : ""}
                     onValueChange={(v) => setSalesLocationId(Number(v))}
@@ -2225,9 +2309,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   </Select>
                 </div>
               </section>
-
-              {/* Notes */}
-              <Notes notes={notes} setNotes={setNotes} />
 
               {showPartialButton && (
                 <section className="space-y-2">
@@ -2272,8 +2353,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   {billPaymentStatus === "partial" && (
                     <div className="space-y-2">
                       <Label>Record Additional Payment</Label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
+                      <div className="flex flex-wrap gap-2">
+                        <Input
+                          type="date"
+                          aria-label="Date payment was received"
+                          className="w-40"
+                          value={addPaymentDate}
+                          min={backdatedDate || undefined}
+                          max={todayIST()}
+                          onChange={(e) => setAddPaymentDate(e.target.value)}
+                        />
+                        <div className="relative flex-1 min-w-[8rem]">
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
                             ₹
                           </span>
@@ -2301,7 +2391,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                           </SelectContent>
                         </Select>
                         <Button
-                          disabled={isAddingPayment}
+                          disabled={isAddingPayment || saveBlocked}
                           onClick={handleAddPayment}
                         >
                           {isAddingPayment ? "Saving..." : "Record"}
@@ -2351,7 +2441,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   here to match what will actually be saved (see handleSaveDraft) */}
               <Summary
                 docType={docType}
-                computed={isFinalizedBill ? computed : balanceAdjustedComputed}
+                computed={shownComputed}
                 appliedStoreCredit={appliedStoreCredit}
                 appliedVoucher={appliedVoucher}
                 customerStoreCreditBalance={customerStoreCreditBalance}
@@ -2368,25 +2458,35 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 onAcknowledgeExchangeBalance={() => setExchangeBalanceAcknowledged(true)}
               />
 
-              {/* Actions */}
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => onOpenChange?.(false)}>
+              {/* Actions stay in view, with the total, however far the form is scrolled */}
+              <div className="sticky bottom-0 z-10 -mx-2 flex flex-wrap items-center justify-end gap-2 border-t bg-white px-2 py-3">
+                <div className="mr-auto min-w-0 text-sm">
+                  <span className="font-semibold tabular-nums">
+                    Total {billMoney(shownComputed.grandTotal)}
+                  </span>
+                  {saveBlockedReason && (
+                    <span className="ml-2 text-xs text-muted-foreground" aria-live="polite">
+                      {saveBlockedReason}
+                    </span>
+                  )}
+                </div>
+                <Button variant="outline" onClick={requestClose}>
                   Cancel
                 </Button>
-                <Button disabled={isSaving} onClick={handleSaveDraft}>
+                <Button disabled={isSaving || saveBlocked} onClick={handleSaveDraft}>
                   {isSaving ? "Saving..." : "Save Draft"}
                 </Button>
                 {showPartialButton && (
                   <Button
                     variant="outline"
-                    disabled={isSaving}
+                    disabled={isSaving || saveBlocked}
                     onClick={openPartialFinalizeConfirm}
                     className="border-amber-500 text-amber-700 hover:bg-amber-50"
                   >
                     {isSaving ? "Saving..." : "Partial Payment"}
                   </Button>
                 )}
-                <Button disabled={isSaving} onClick={openFinalizeConfirm}>
+                <Button disabled={isSaving || saveBlocked} onClick={openFinalizeConfirm}>
                   {isSaving ? "Saving..." : "Finalize"}
                 </Button>
               </div>
@@ -2550,6 +2650,29 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       </Dialog>
 
       {/* Partial Payment Confirmation Dialog */}
+      <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Discard Unsaved Changes?</DialogTitle>
+            <DialogDescription>Changes to this bill since it was opened will be lost.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDiscardOpen(false)}>
+              Keep Editing
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDiscardOpen(false);
+                onOpenChange?.(false);
+              }}
+            >
+              Discard Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={partialConfirmOpen} onOpenChange={setPartialConfirmOpen}>
         <DialogContent className="bg-white max-w-md">
           <DialogHeader>
@@ -2575,6 +2698,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           <div className="space-y-2 text-sm">
             <div><span className="font-semibold">Bill #:</span> {billId ?? "(new)"}</div>
             <div><span className="font-semibold">Customer:</span> {customerName || "—"}</div>
+            {Number(paymentAmount) > 0 && (
+              <div className="grid gap-1">
+                <Label htmlFor="first-payment-date">Date this payment was received</Label>
+                <Input
+                  id="first-payment-date"
+                  type="date"
+                  className="w-48"
+                  value={firstPaymentDate}
+                  min={backdatedDate || undefined}
+                  max={todayIST()}
+                  onChange={(e) => setFirstPaymentDate(e.target.value)}
+                />
+              </div>
+            )}
             <div>
               <span className="font-semibold">Grand Total:</span>{" "}
               ₹{balanceAdjustedComputed.grandTotal.toFixed(2)}
