@@ -6,6 +6,7 @@ import { countQueue } from "./onlineOrders/onlineOrdersApi";
 import { lastCheckedRole } from "../lib/adminAccess";
 import { Toaster } from "../../components/ui/toaster";
 import RouteErrorBoundary from "../../components/RouteErrorBoundary";
+import { keepErrorToastsUntilDismissed } from "../lib/stickyErrorToasts";
 
 const navItems = [
   { label: "Dashboard", path: "/admin/dashboard", superadminOnly: true },
@@ -27,6 +28,9 @@ export default function AdminLayout() {
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState(null);
   const [ordersNeedingAction, setOrdersNeedingAction] = useState(0);
+
+  // Error messages stay on screen in the admin area until closed.
+  useEffect(() => keepErrorToastsUntilDismissed(), []);
 
   useEffect(() => {
     (async () => {

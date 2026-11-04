@@ -195,6 +195,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [selectedSalespersonIds, setSelectedSalespersonIds] = useState([]);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [blockingError, setBlockingError] = useState(null);
   const [discountWarningAcked, setDiscountWarningAcked] = useState(false);
   const invoiceRef = useRef(null);
   const [customerName, setCustomerName] = useState("");
@@ -870,7 +871,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   // BILL-01 + STOCK-01: New draft save | BILL-02 + STOCK-02: Draft update (Plan 03)
+  // Errors that stop a save also show in a red box by the Save buttons, so they
+  // do not vanish like a toast. Cleared on the next save attempt or when the
+  // items or payment change.
+  const showBlockingError = (title, description) => {
+    toast.error(title, { description });
+    setBlockingError({ title, description });
+  };
+  useEffect(() => {
+    setBlockingError(null);
+  }, [items, paymentAmount, salesMethodId]);
+
   const handleSaveDraft = async () => {
+    setBlockingError(null);
     if (saveBlocked) return;
     setIsSaving(true);
     try {
@@ -933,9 +946,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             }
           }
           if (stockErrors.length > 0) {
-            toast.error("Insufficient stock", {
-              description: stockErrors.join("\n"),
-            });
+            showBlockingError("Insufficient stock", stockErrors.join("\n"));
             return;
           }
         }
@@ -1068,7 +1079,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         stockMap = Object.fromEntries(stockData.map((r) => [r.variantid, r]));
         const shortfalls = describeStockShortfalls(inventoryItems, stockMap);
         if (shortfalls) {
-          toast.error("Insufficient stock", { description: shortfalls });
+          showBlockingError("Insufficient stock", shortfalls);
           return;
         }
       }
@@ -1158,6 +1169,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const openFinalizeConfirm = () => {
+    setBlockingError(null);
     // D-06: Customer required to finalize
     if (!selectedCustomerId) {
       toast.error("Customer required", {
@@ -1204,9 +1216,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         diff > 0
           ? `Amount received is ₹${Math.abs(diff)} more than the total (₹${effectiveGrandTotal.toFixed(2)}).`
           : `Amount received is ₹${Math.abs(diff)} short of the total (₹${effectiveGrandTotal.toFixed(2)}).`;
-      toast.error("Payment mismatch", {
-        description: msg + " Must be within ₹100.",
-      });
+      showBlockingError("Payment mismatch", msg + " Must be within ₹100.");
       return;
     }
     setDiscountWarningAcked(false);
@@ -1214,6 +1224,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const openPartialFinalizeConfirm = () => {
+    setBlockingError(null);
     setFirstPaymentDate(backdatedDate);
     if (!selectedCustomerId) {
       toast.error("Customer required", {
@@ -1261,6 +1272,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const handleConfirmFinalize = async () => {
+    setBlockingError(null);
     if (saveBlocked) return;
     setIsSaving(true);
     let activeBillId = billId;
@@ -1295,7 +1307,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           if (!isBackdated) {
             const shortfalls = describeStockShortfalls(inventoryItems, stockMap);
             if (shortfalls) {
-              toast.error("Insufficient stock", { description: shortfalls });
+              showBlockingError("Insufficient stock", shortfalls);
               return;
             }
           }
@@ -1452,7 +1464,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             }
           }
           if (stockErrors.length > 0) {
-            toast.error("Insufficient stock", { description: stockErrors.join("\n") });
+            showBlockingError("Insufficient stock", stockErrors.join("\n"));
             return;
           }
         }
@@ -1617,6 +1629,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
 
   const handleConfirmPartialFinalize = async () => {
+    setBlockingError(null);
     if (saveBlocked) return;
     const firstDateProblem = Number(paymentAmount) > 0 ? paymentDateProblem(firstPaymentDate) : null;
     if (firstDateProblem) {
@@ -1657,7 +1670,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           if (!isBackdated) {
             const shortfalls = describeStockShortfalls(inventoryItems, stockMap);
             if (shortfalls) {
-              toast.error("Insufficient stock", { description: shortfalls });
+              showBlockingError("Insufficient stock", shortfalls);
               return;
             }
           }
@@ -1775,7 +1788,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               }
             }
             if (stockErrors.length > 0) {
-              toast.error("Insufficient stock", { description: stockErrors.join("\n") });
+              showBlockingError("Insufficient stock", stockErrors.join("\n"));
               return;
             }
           }
@@ -2468,6 +2481,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 onAcknowledgeExchangeBalance={() => setExchangeBalanceAcknowledged(true)}
               />
 
+              {blockingError && (
+                <div role="alert" className="mt-3 whitespace-pre-line rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+                  <p className="font-semibold">{blockingError.title}</p>
+                  <p>{blockingError.description}</p>
+                </div>
+              )}
               {/* Actions stay in view, with the total, however far the form is scrolled */}
               <div className="sticky -bottom-6 z-10 -mx-2 flex flex-wrap items-center justify-end gap-2 border-t bg-white px-2 pt-3 pb-6">
                 <div className="mr-auto min-w-0 text-sm">
