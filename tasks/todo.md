@@ -37,6 +37,7 @@ Plan and rules: `tasks/seo-aeo-plan.md`. PRs below are not merged unless marked.
 - [ ] Request indexing: kurta-pajama, about, contact, all-products. Held until #138 so Google reads the new titles.
 - [ ] Saree titles LIVE 2026-11-04: all 89 unique, final list in `tasks/title-drafts/sarees.json`. Wait 4 weeks of Search Console data, then decide on other categories. Check recorded colours against photos first.
 - [ ] New photos will go live with shared titles such as "Silk Saree", because `title_detail` is empty until someone fills it. 731 visible products have none, and about 2,860 more have no photo yet. Have the mockup-generator draft `title_detail` when a product is approved.
+- [ ] Add a Kids collection and nav link when the first kids' photos go live. `collections.js` has none, so they would only appear under Shop All.
 - [ ] Add photos in batches and watch Search Console: "Crawled, not indexed" rising means slow down and improve the thinnest pages. Sitemap, feed and all-products pick up new products automatically.
 - [ ] Order snapshots still store `name`, so order pages and emails show the old title.
 - [ ] Needs title list in admin.
@@ -48,6 +49,8 @@ Plan and rules: `tasks/seo-aeo-plan.md`. PRs below are not merged unless marked.
 - [ ] Create a Merchant Center account, then give it `https://www.bindalscreations.com/feeds/google-products.xml` (after #141).
 - [ ] Watch the Business Profile account's inbox for Google's reply to the listing appeal (dead website link on Maps).
 - [ ] Bing Webmaster Tools import from Search Console. Review QR counter card. Real shop and tailoring photos.
+
+Decided, 2026-11-04: home wording names women, men and kids. Owner considers it settled, do not reopen.
 
 Decided, 2026-11-04: Vercel's edge cache does not engage for the image rewrite (always MISS, even with
 `x-vercel-enable-rewrite-caching` and `CDN-Cache-Control`), so those headers were dropped. Speed matches direct Storage.
