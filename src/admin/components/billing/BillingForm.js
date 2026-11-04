@@ -2459,7 +2459,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               />
 
               {/* Actions stay in view, with the total, however far the form is scrolled */}
-              <div className="sticky bottom-0 z-10 -mx-2 flex flex-wrap items-center justify-end gap-2 border-t bg-white px-2 py-3">
+              <div className="sticky -bottom-6 z-10 -mx-2 flex flex-wrap items-center justify-end gap-2 border-t bg-white px-2 pt-3 pb-6">
                 <div className="mr-auto min-w-0 text-sm">
                   <span className="font-semibold tabular-nums">
                     Total {billMoney(shownComputed.grandTotal)}
