@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent, within } from "@testing-library/react";
+import { act, render, screen, fireEvent, within } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import { useProduct } from "../hooks/useProduct";
@@ -9,6 +9,7 @@ import ProductDetailPage from "../pages/ProductDetailPage";
 import { MEASURE_INTRO } from "../pages/sizeGuideContent";
 import { toast } from "sonner";
 import { flyToCart } from "../lib/flyToCart";
+import { DELIVERY_ESTIMATE } from "../lib/deliveryEstimate";
 
 jest.mock("lib/supabaseClient", () => ({
   supabase: { from: jest.fn() },
@@ -175,11 +176,53 @@ describe("ProductDetailPage", () => {
 
   it("shows Sold out instead of the price and its note when every variant is sold out", async () => {
     await renderPage(PRODUCT, VARIANTS.map((v) => ({ ...v, stock: 0 })));
-    expect(screen.getByText("Sold out")).toBeInTheDocument();
+    expect(screen.getAllByText("Sold out").length).toBeGreaterThan(0);
     expect(screen.queryByText("₹12,500")).not.toBeInTheDocument();
     expect(
       screen.queryByText("Final price · Free shipping above ₹5,000")
     ).not.toBeInTheDocument();
+  });
+
+  describe("when sold out", () => {
+    const soldOutVariants = VARIANTS.map((v) => ({ ...v, stock: 0 }));
+
+    it("stops asking for a size", async () => {
+      await renderPage(PRODUCT, soldOutVariants);
+      expect(screen.queryByText(/select size/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /out of stock/i })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sold out" })).toBeDisabled();
+    });
+
+    it("offers WhatsApp as the way forward, naming the product code", async () => {
+      await renderPage(PRODUCT, soldOutVariants);
+      const link = screen.getByRole("link", { name: /ask us to make this/i });
+      const text = decodeURIComponent(link.getAttribute("href").split("?text=")[1]);
+      expect(link.getAttribute("href")).toContain("wa.me/");
+      expect(text).toContain(PRODUCT.productid);
+      expect(text).toMatch(/sold out/i);
+      expect(screen.queryByRole("link", { name: /ask on whatsapp/i })).not.toBeInTheDocument();
+    });
+
+    it("makes no delivery promise", async () => {
+      await renderPage(PRODUCT, soldOutVariants);
+      expect(screen.queryByText(DELIVERY_ESTIMATE)).not.toBeInTheDocument();
+    });
+
+    it("the sticky bar says sold out and cannot be tapped", async () => {
+      await renderPage(PRODUCT, soldOutVariants);
+      // The page's only observer is the sticky bar's: report its target off screen.
+      const [[report]] = global.IntersectionObserver.mock.calls;
+      act(() => report([{ isIntersecting: false }]));
+      const bar = screen.getByTestId("sticky-add-to-cart");
+      expect(within(bar).getByRole("button", { name: "Sold out" })).toBeDisabled();
+    });
+  });
+
+  it("keeps the size prompt and delivery line while something is in stock", async () => {
+    await renderPage();
+    expect(screen.getByRole("button", { name: /select size & colour/i })).toBeDisabled();
+    expect(screen.getByText(DELIVERY_ESTIMATE)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /ask on whatsapp/i })).toBeInTheDocument();
   });
 
   it("keeps the price when only some variants are sold out", async () => {
