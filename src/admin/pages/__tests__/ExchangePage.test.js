@@ -142,6 +142,47 @@ test("delivered online bill past the window can be allowed, counted from deliver
   expect(await screen.findByText(/Return items from Bill #FY26-000501/)).toBeInTheDocument();
 });
 
+async function confirmExchange() {
+  await loadBill();
+  await screen.findByText(/Return items from Bill #FY26-000501/);
+  fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "1" } });
+  fireEvent.click(screen.getByRole("button", { name: "Review & Confirm" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Exchange" }));
+}
+
+test("a completed exchange is logged with the bill number, item count and credit, and no customer details", async () => {
+  await confirmExchange();
+  await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+
+  expect(mockActivity).toHaveLength(1);
+  expect(mockActivity[0]).toMatchObject({ action: "create", entityType: "bill", entityId: "FY26-000501" });
+  expect(mockActivity[0].summary).toBe("Exchange recorded on bill #FY26-000501 — 1 item, ₹1000.00 credit");
+  expect(mockActivity[0].summary).not.toMatch(/Asha/);
+});
+
+test("a failed exchange is not logged", async () => {
+  supabase.rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
+  await confirmExchange();
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Exchange failed", expect.anything()));
+  expect(mockActivity).toEqual([]);
+  expect(mockNavigate).not.toHaveBeenCalled();
+});
+
+test("a past-window exchange that is allowed and completed gets one entry for each step", async () => {
+  mockBill.orderdate = daysAgo(400);
+  await loadBill();
+  fireEvent.click(await screen.findByRole("button", { name: "Allow Exchange" }));
+  await screen.findByText(/Return items from Bill #FY26-000501/);
+  fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "1" } });
+  fireEvent.click(screen.getByRole("button", { name: "Review & Confirm" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Exchange" }));
+  await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+
+  expect(mockActivity).toHaveLength(2);
+  expect(mockActivity[0].summary).toMatch(/outside the/);
+  expect(mockActivity[1].summary).toMatch(/^Exchange recorded/);
+});
+
 test("confirm calls exchange_record once and links the returned ids", async () => {
   await loadBill();
   await screen.findByText(/Return items from Bill #FY26-000501/);

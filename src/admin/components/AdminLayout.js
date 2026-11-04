@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 import { countQueue } from "./onlineOrders/onlineOrdersApi";
@@ -23,8 +23,21 @@ const navItems = [
   { label: "Suppliers", path: "/admin/suppliers" },
 ];
 
+// Soft shadow on whichever edge of the menu has more items hidden past it, so staff can tell it
+// scrolls. Pure background, so the header height does not change.
+const MENU_SCROLL_CUE = {
+  background: [
+    "linear-gradient(to right, #fff 30%, rgba(255,255,255,0)) 0 0 / 40px 100% no-repeat local",
+    "linear-gradient(to left, #fff 30%, rgba(255,255,255,0)) 100% 0 / 40px 100% no-repeat local",
+    "radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.25), rgba(0,0,0,0)) 0 0 / 14px 100% no-repeat scroll",
+    "radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.25), rgba(0,0,0,0)) 100% 0 / 14px 100% no-repeat scroll",
+  ].join(", "),
+};
+
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const menuRef = useRef(null);
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState(null);
   const [ordersNeedingAction, setOrdersNeedingAction] = useState(0);
@@ -74,6 +87,13 @@ export default function AdminLayout() {
 
   const badgeCounts = { ordersNeedingAction };
 
+  // On a narrow screen the active item (and the red count) can sit off-screen; bring it into view.
+  useEffect(() => {
+    menuRef.current
+      ?.querySelector('[aria-current="page"]')
+      ?.scrollIntoView?.({ inline: "nearest", block: "nearest" });
+  }, [pathname, userRole]);
+
   const visibleNavItems = navItems.filter(
     (item) => !item.superadminOnly || userRole === "superadmin"
   );
@@ -106,7 +126,11 @@ export default function AdminLayout() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Top Navigation Bar */}
       <nav className="sticky top-0 z-40 bg-white border-b shadow px-3 sm:px-6 py-4 flex items-center gap-3 sm:gap-6">
-        <div className="flex space-x-6 overflow-x-auto whitespace-nowrap flex-1 min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={menuRef}
+          style={MENU_SCROLL_CUE}
+          className="flex space-x-6 overflow-x-auto whitespace-nowrap flex-1 min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           {visibleNavItems.map((item) => (
             <NavLink
               key={item.path}
@@ -134,7 +158,7 @@ export default function AdminLayout() {
 
         {/* User Info and Logout */}
         <div className="flex items-center space-x-4 text-sm text-gray-600 shrink-0">
-          {userEmail && <span className="hidden sm:inline">{userEmail}</span>}
+          {userEmail && <span className="hidden xl:inline">{userEmail}</span>}
           <button
             onClick={handleLogout}
             className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
