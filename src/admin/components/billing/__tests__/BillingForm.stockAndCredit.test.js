@@ -103,6 +103,7 @@ test("a wrong amount is refused when the stock tick is on", async () => {
   fireEvent.click(finalize());
 
   expect(mockToasts).toContain("Payment mismatch");
+  expect(await screen.findByRole("alert")).toHaveTextContent("Payment mismatch");
   expect(screen.queryByRole("button", { name: /Confirm/ })).not.toBeInTheDocument();
 });
 
