@@ -8,7 +8,7 @@ describe("ContactPage", () => {
     render(<ContactPage />);
     expect(screen.getByRole("heading", { name: /visit us|contact/i })).toBeInTheDocument();
     expect(screen.getByText(/58 Sihani Gate/i)).toBeInTheDocument();
-    expect(screen.getByText(/closed tuesdays/i)).toBeInTheDocument();
+    expect(screen.getByText(/usually closed tuesdays/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /whatsapp/i })).toHaveAttribute(
       "href",
       expect.stringContaining("wa.me/919810873280")
@@ -23,6 +23,14 @@ describe("ContactPage", () => {
     expect(screen.getByRole("link", { name: /directions/i })).toHaveAttribute(
       "href",
       "https://maps.google.com/?cid=3990311017020362668"
+    );
+  });
+
+  it("links to the shop's Google review form", () => {
+    render(<ContactPage />);
+    expect(screen.getByRole("link", { name: /review us on google/i })).toHaveAttribute(
+      "href",
+      "https://g.page/r/CayP03i6bmA3EBE/review"
     );
   });
 

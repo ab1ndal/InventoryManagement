@@ -1,6 +1,7 @@
 import React from "react";
 import StaticPage from "../components/StaticPage";
-import { MapPin, Phone, Mail, MessageCircle, Clock } from "lucide-react";
+import { MapPin, Phone, Mail, MessageCircle, Clock, Star } from "lucide-react";
+import { GOOGLE_REVIEW_URL } from "../lib/siteConfig";
 
 const ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001";
 // Map and directions use the verified Google listing's pin, not the address
@@ -19,7 +20,7 @@ export default function ContactPage() {
     <StaticPage
       title="Visit Us"
       seoTitle="Contact & Store"
-      seoDescription="Visit Bindal's Creation at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (closed Tuesdays)."
+      seoDescription="Visit Bindal's Creation at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (usually closed Tuesdays)."
       containerClassName="max-w-6xl"
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-14">
@@ -41,7 +42,7 @@ export default function ContactPage() {
           </div>
           <div className="flex items-start gap-3">
             <Clock size={18} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
-            <span>Open 10 AM – 8:30 PM. Closed Tuesdays.</span>
+            <span>Open 10 AM – 8:30 PM. Usually closed Tuesdays, so please call first.</span>
           </div>
           <div className="flex items-start gap-3">
             <Phone size={18} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
@@ -67,6 +68,17 @@ export default function ContactPage() {
               className="hover:text-storefront-gold transition-colors"
             >
               bindalscreations@gmail.com
+            </a>
+          </div>
+          <div className="flex items-start gap-3">
+            <Star size={18} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
+            <a
+              href={GOOGLE_REVIEW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-storefront-gold transition-colors"
+            >
+              Review us on Google
             </a>
           </div>
 
