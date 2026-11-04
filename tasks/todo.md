@@ -76,8 +76,8 @@ Untested against real services: payment on production keys (task above) and Proc
 **Reference**
 - Pricing: live cheapest-courier rate rounded up to ₹10; free ≥ ₹5,000; no-rate fallback by chargeable weight
   ≤0.5 kg ₹90, ≤1 ₹140, ≤2 ₹150, ≤3 ₹180, ≤5 ₹230 (PR #79). WhatsApp checkout still flat ₹150.
-- Deploy: `supabase functions deploy <fn> --use-api --import-map supabase/functions/deno.json` (`--no-verify-jwt`
-  for all except admin-order-action). Secrets propagate without redeploy. Migrations: `npm run migrate` from the
+- Deploy: `supabase functions deploy <fn> --use-api --import-map supabase/functions/deno.json`. `supabase/config.toml` fixes the
+  gateway check for functions that take no user token (webhooks, cron). Check `supabase functions list` after deploying. Secrets propagate without redeploy. Migrations: `npm run migrate` from the
   branch that holds the file (it only sees files in the checked-out tree).
 - Webhooks: Cashfree → `https://epotsxdugwfhyeiudjox.supabase.co/functions/v1/cashfree-webhook` (v2026-01-01,
   success/failed/dropped); Shiprocket → `https://www.bindalscreations.com/hooks/courier-status` (x-api-key).

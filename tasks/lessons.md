@@ -59,6 +59,10 @@
 - To test a supabase-js write path with zero prod changes: (1) run the real code with `createClient(..., { global: { fetch: fakeFetch } })` to capture the exact PostgREST requests, then (2) replay the captured row on prod inside `begin; set local role service_role; ...; rollback;` via `supabase db query --linked -f`. Pass explicit ids (`customerid: -1`, `overriding system value` for identity columns) — a rolled-back `nextval` still advances the sequence. Replay with an explicit column list: `json_populate_record` turns omitted keys into NULL instead of column defaults, unlike PostgREST (NOT NULL defaults like `marketing_opt_in` then fail).
 - Node ESM can't resolve extensionless imports, so `src/` modules shared with a Node CLI use `./x.js` import paths (CRA/jest accept both). Don't add `"type": "module"` to `src/` — webpack would then demand fully specified imports app-wide.
 
+## Edge functions
+
+- Deploying without `--no-verify-jwt` silently turned the gateway check on for webhooks on 2026-10-31. Callers with no user token then get 401 `UNAUTHORIZED_NO_AUTH_HEADER` before any of our code runs, while `cron.job_run_details` still says `succeeded`, because it only records that the HTTP request was queued. Read `net._http_response` for the real status. `supabase/config.toml` now fixes the setting.
+
 ## Database access
 
 - Production rejects `UPDATE` without a `WHERE` ("UPDATE requires a WHERE clause", through `exec_sql`), and the local test database does not. Use `where true` for a deliberate full-table backfill. The migration runs in one transaction, so a refusal leaves nothing behind.

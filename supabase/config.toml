@@ -1,0 +1,21 @@
+# Keeps each function's gateway check fixed, so a deploy cannot silently change it. These three take no
+# user token and check their own signature, API key or cron secret; with the check on, the gateway rejects them.
+project_id = "epotsxdugwfhyeiudjox"
+
+[functions.cashfree-webhook]
+verify_jwt = false
+
+[functions.courier-status]
+verify_jwt = false
+
+[functions.refund-sweeper]
+verify_jwt = false
+
+[functions.run-jobs]
+verify_jwt = false
+
+[functions.order-status]
+verify_jwt = false
+
+[functions.order-packed-photos]
+verify_jwt = false
