@@ -3,7 +3,7 @@ import { SORT_OPTIONS } from "../../hooks/sortOptions";
 
 export default function SortControl({ value, onChange, options = SORT_OPTIONS }) {
   return (
-    <label className="flex items-center gap-2">
+    <label className="flex min-w-0 items-center gap-2">
       <span className="hidden sm:inline text-[11px] font-sans tracking-[0.12em] uppercase text-storefront-muted">
         Sort
       </span>
@@ -11,7 +11,7 @@ export default function SortControl({ value, onChange, options = SORT_OPTIONS })
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Sort products"
-        className="bg-transparent border border-storefront-border text-storefront-charcoal font-sans text-xs tracking-wide px-2.5 py-1.5 cursor-pointer hover:border-storefront-charcoal focus:outline-none focus:border-storefront-charcoal transition-colors"
+        className="min-w-0 bg-transparent border border-storefront-border text-storefront-charcoal font-sans text-xs tracking-wide px-2.5 py-1.5 cursor-pointer hover:border-storefront-charcoal focus:outline-none focus:border-storefront-charcoal transition-colors"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
