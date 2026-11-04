@@ -31,6 +31,31 @@ describe("describePage", () => {
     expect([offer.price, offer.priceCurrency, offer.availability]).toEqual([2195, "INR", "https://schema.org/InStock"]);
   });
 
+  test("a product's offer and the store state the published return policy", async () => {
+    const page = await describePage("product/BC1", rest());
+    const policy = ld(page, "Product").offers.hasMerchantReturnPolicy;
+    expect(policy.merchantReturnDays).toBe(7);
+    expect(policy.returnFees).toBe("https://schema.org/ReturnFeesCustomerResponsibility");
+    expect(policy.merchantReturnLink).toBe("https://www.bindalscreations.com/policies/returns");
+    const contact = await describePage("contact", rest());
+    expect(ld(contact, "ClothingStore").hasMerchantReturnPolicy).toEqual(policy);
+  });
+
+  test("all-products links every product, across pages of results", async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => ({ productid: `BC${i}`, name: `Piece ${i}` }));
+    const q = jest
+      .fn()
+      .mockResolvedValueOnce(full)
+      .mockResolvedValueOnce([{ productid: "BC-last", name: "Last <Piece>" }]);
+    const page = await describePage("all-products", q);
+    expect([page.status, page.canonical]).toEqual([200, "/all-products"]);
+    expect(page.bodyHtml).toContain('href="/product/BC0"');
+    expect(page.bodyHtml).toContain('href="/product/BC-last"');
+    expect(page.bodyHtml).toContain("Last &lt;Piece&gt;");
+    expect(q).toHaveBeenCalledTimes(2);
+    expect(q.mock.calls[1][0]).toContain("offset=1000");
+  });
+
   test("a product with no stock says so", async () => {
     const page = await describePage("product/BC1", rest([{ ...product, productsizecolors: [{ stock: 0 }] }]));
     expect(ld(page, "Product").offers.availability).toBe("https://schema.org/OutOfStock");

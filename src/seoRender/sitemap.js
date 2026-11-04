@@ -21,6 +21,7 @@ export async function buildSitemap(rest) {
   const paths = [
     "/",
     "/shop",
+    "/all-products",
     ...STATIC_PATHS,
     ...COLLECTIONS.map((c) => `/collections/${encodeURIComponent(c.slug)}`),
     ...products.map((id) => `/product/${encodeURIComponent(id)}`),

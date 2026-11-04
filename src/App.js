@@ -19,6 +19,7 @@ import ReturnsPolicyPage from "./storefront/pages/policies/ReturnsPolicyPage";
 import PrivacyPolicyPage from "./storefront/pages/policies/PrivacyPolicyPage";
 import TermsPage from "./storefront/pages/policies/TermsPage";
 import AboutPage from "./storefront/pages/AboutPage";
+import AllProductsPage from "./storefront/pages/AllProductsPage";
 import CustomizePage from "./storefront/pages/CustomizePage";
 import ContactPage from "./storefront/pages/ContactPage";
 import SizeGuidePage from "./storefront/pages/SizeGuidePage";
@@ -74,6 +75,7 @@ function App() {
             <Route path="policies/privacy" element={<PrivacyPolicyPage />} />
             <Route path="policies/terms" element={<TermsPage />} />
             <Route path="about" element={<AboutPage />} />
+            <Route path="all-products" element={<AllProductsPage />} />
             <Route path="customize" element={<CustomizePage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="size-guide" element={<SizeGuidePage />} />

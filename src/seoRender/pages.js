@@ -10,11 +10,28 @@ import { CUSTOMIZE } from "../storefront/pages/customizeContent";
 import { FAQ_ITEMS } from "../storefront/pages/faqContent";
 import { MEASURE_INTRO, SIZE_CHART } from "../storefront/pages/sizeGuideContent";
 import { PRIVACY, RETURNS, SHIPPING, TERMS } from "../storefront/pages/policies/policyContent";
+import {
+  ALL_PRODUCTS_DESCRIPTION,
+  ALL_PRODUCTS_PAGE,
+  ALL_PRODUCTS_TITLE,
+} from "../storefront/pages/allProductsContent";
 import { SITE_NAME, SITE_URL, esc } from "./html";
 
 const LISTED_PRODUCTS = 48;
 const PRODUCT_ID_RE = /^[A-Za-z0-9-]{1,40}$/;
 const LIST_FIELDS = "productid,name:display_title,retailprice,productimages(imageurl,displayorder)";
+
+// States only what /policies/returns says: 7 days from delivery, sent back at the customer's cost or
+// brought to the shop.
+const RETURN_POLICY = {
+  "@type": "MerchantReturnPolicy",
+  applicableCountry: "IN",
+  returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+  merchantReturnDays: 7,
+  returnMethod: ["https://schema.org/ReturnByMail", "https://schema.org/ReturnInStore"],
+  returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+  merchantReturnLink: `${SITE_URL}/policies/returns`,
+};
 
 const STORE_JSON_LD = {
   "@context": "https://schema.org",
@@ -43,6 +60,7 @@ const STORE_JSON_LD = {
     closes: "20:30",
   },
   sameAs: ["https://instagram.com/bindals_creation_shop"],
+  hasMerchantReturnPolicy: RETURN_POLICY,
 };
 
 const breadcrumbs = (...crumbs) => ({
@@ -97,6 +115,7 @@ function frame(main) {
     ["/contact", "Contact"],
     ["/faq", "FAQ"],
     ["/size-guide", "Size guide"],
+    ["/all-products", ALL_PRODUCTS_TITLE],
     ["/policies/shipping", "Shipping"],
     ["/policies/returns", "Returns"],
   ]
@@ -265,6 +284,30 @@ async function shopPage(rest) {
   };
 }
 
+async function allProductsPage(rest) {
+  const products = [];
+  for (let offset = 0; ; offset += ALL_PRODUCTS_PAGE) {
+    const rows = await rest(
+      `products?select=productid,name:display_title&order=productid.desc&limit=${ALL_PRODUCTS_PAGE}&offset=${offset}`
+    );
+    products.push(...rows);
+    if (rows.length < ALL_PRODUCTS_PAGE) break;
+  }
+  const links = products
+    .map((p) => `<li><a href="/product/${esc(encodeURIComponent(p.productid))}">${esc(p.name)}</a></li>`)
+    .join("");
+  return {
+    status: 200,
+    title: ALL_PRODUCTS_TITLE,
+    description: ALL_PRODUCTS_DESCRIPTION,
+    canonical: "/all-products",
+    bodyHtml: frame(
+      `<h1>${esc(ALL_PRODUCTS_TITLE)}</h1><p>${esc(ALL_PRODUCTS_DESCRIPTION)}</p><ul>${links}</ul>`
+    ),
+    jsonLd: [breadcrumbs(["Home", "/"], [ALL_PRODUCTS_TITLE, "/all-products"])],
+  };
+}
+
 function collectionQuery(collection) {
   if (collection.productIds) return `select=${LIST_FIELDS}&productid=in.(${collection.productIds.join(",")})`;
   if (collection.categoryIds) return `select=${LIST_FIELDS}&categoryid=in.(${collection.categoryIds.join(",")})`;
@@ -347,6 +390,7 @@ async function productPage(id, rest) {
           itemCondition: "https://schema.org/NewCondition",
           availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
           seller: { "@id": `${SITE_URL}/#store` },
+          hasMerchantReturnPolicy: RETURN_POLICY,
         },
       },
     ],
@@ -359,6 +403,7 @@ export async function describePage(rawPath, rest) {
   const path = `/${rawPath}`.replace(/\/{2,}/g, "/").replace(/(.)\/$/, "$1");
   if (path === "/") return homePage(rest);
   if (path === "/shop") return shopPage(rest);
+  if (path === "/all-products") return allProductsPage(rest);
   if (STATIC_PAGES[path]) return STATIC_PAGES[path]();
   const collection = path.match(/^\/collections\/([^/]+)$/);
   if (collection) return collectionPage(collection[1], rest);

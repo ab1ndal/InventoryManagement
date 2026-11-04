@@ -65,15 +65,22 @@ function mockRelated(data = RELATED) {
   return chain;
 }
 
-function renderPage(product = PRODUCT, variants = VARIANTS) {
-  useProduct.mockReturnValue({ product, variants, loading: false, error: null });
+function renderRoute(productid) {
   return render(
-    <MemoryRouter initialEntries={[`/product/${product.productid}`]}>
+    <MemoryRouter initialEntries={[`/product/${productid}`]}>
       <Routes>
         <Route path="/product/:productid" element={<ProductDetailPage />} />
       </Routes>
     </MemoryRouter>
   );
+}
+
+// Resolves once the page is past its loading state.
+async function renderPage(product = PRODUCT, variants = VARIANTS) {
+  useProduct.mockReturnValue({ product, variants, loading: false, error: null });
+  const view = renderRoute(product.productid);
+  await screen.findByRole("heading", { level: 1, hidden: true });
+  return view;
 }
 
 beforeEach(() => {
@@ -91,7 +98,7 @@ afterEach(() => {
 
 describe("ProductDetailPage", () => {
   it("opens the size guide in a modal without leaving the page", async () => {
-    renderPage();
+    await renderPage();
     fireEvent.click(screen.getByRole("button", { name: /size guide/i }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("heading", { name: /size guide/i })).toBeInTheDocument();
@@ -104,20 +111,20 @@ describe("ProductDetailPage", () => {
   });
 
   it("renders the description without markdown asterisks", async () => {
-    const { container } = renderPage();
+    const { container } = await renderPage();
     expect(
       await screen.findByText("A shimmering pistachio green lehenga with zari work.")
     ).toBeInTheDocument();
     expect(container.textContent).not.toContain("**");
   });
 
-  it("hides the description block when the description is empty", () => {
-    renderPage({ ...PRODUCT, description: " ** " });
+  it("hides the description block when the description is empty", async () => {
+    await renderPage({ ...PRODUCT, description: " ** " });
     expect(screen.queryByRole("heading", { name: /^description$/i })).not.toBeInTheDocument();
   });
 
-  it("links Ask on WhatsApp with a message naming the product id", () => {
-    renderPage();
+  it("links Ask on WhatsApp with a message naming the product id", async () => {
+    await renderPage();
     const link = screen.getByRole("link", { name: /ask on whatsapp/i });
     const href = link.getAttribute("href");
     expect(href).toMatch(/^https:\/\/wa\.me\/919810873280\?text=/);
@@ -125,8 +132,8 @@ describe("ProductDetailPage", () => {
     expect(decodeURIComponent(href)).toContain("Silk-Lehenga");
   });
 
-  it("shows a details table with category, fabric, colours and sizes", () => {
-    renderPage();
+  it("shows a details table with category, fabric, colours and sizes", async () => {
+    await renderPage();
     const details = screen.getByRole("region", { name: /details/i });
     expect(within(details).getByText("Lehenga")).toBeInTheDocument();
     expect(within(details).getByText("Silk")).toBeInTheDocument();
@@ -134,8 +141,8 @@ describe("ProductDetailPage", () => {
     expect(within(details).getByText("Unstitched")).toBeInTheDocument();
   });
 
-  it("lists only in-stock sizes, in order, as available sizes", () => {
-    renderPage(PRODUCT, [
+  it("lists only in-stock sizes, in order, as available sizes", async () => {
+    await renderPage(PRODUCT, [
       { variantid: "x1", size: "XL|42", color: "Green", stock: 1 },
       { variantid: "x2", size: "M|38", color: "Green", stock: 0 },
       { variantid: "x3", size: "M|38", color: "Peach", stock: 2 },
@@ -146,8 +153,8 @@ describe("ProductDetailPage", () => {
     expect(within(details).getByText("M (38), XL (42)")).toBeInTheDocument();
   });
 
-  it("has no category eyebrow above the product title", () => {
-    renderPage();
+  it("has no category eyebrow above the product title", async () => {
+    await renderPage();
     const h1 = screen.getByRole("heading", { level: 1, name: "Silk-Lehenga", hidden: true });
     // Checks DOM order: what sits directly above the title.
     // eslint-disable-next-line testing-library/no-node-access
@@ -155,8 +162,8 @@ describe("ProductDetailPage", () => {
     expect(prev?.textContent ?? "").not.toBe("Lehenga");
   });
 
-  it("shows the price and shipping line and the trust row", () => {
-    renderPage();
+  it("shows the price and shipping line and the trust row", async () => {
+    await renderPage();
     expect(
       screen.getByText("Final price · Free shipping above ₹5,000")
     ).toBeInTheDocument();
@@ -166,8 +173,8 @@ describe("ProductDetailPage", () => {
     expect(document.body.textContent).not.toMatch(/inclusive of all taxes/i);
   });
 
-  it("shows Sold out instead of the price and its note when every variant is sold out", () => {
-    renderPage(PRODUCT, VARIANTS.map((v) => ({ ...v, stock: 0 })));
+  it("shows Sold out instead of the price and its note when every variant is sold out", async () => {
+    await renderPage(PRODUCT, VARIANTS.map((v) => ({ ...v, stock: 0 })));
     expect(screen.getByText("Sold out")).toBeInTheDocument();
     expect(screen.queryByText("₹12,500")).not.toBeInTheDocument();
     expect(
@@ -175,20 +182,20 @@ describe("ProductDetailPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the price when only some variants are sold out", () => {
-    renderPage(PRODUCT, [{ ...VARIANTS[0], stock: 0 }, VARIANTS[1]]);
+  it("keeps the price when only some variants are sold out", async () => {
+    await renderPage(PRODUCT, [{ ...VARIANTS[0], stock: 0 }, VARIANTS[1]]);
     expect(screen.getByText("₹12,500")).toBeInTheDocument();
     expect(screen.queryByText("Sold out")).not.toBeInTheDocument();
   });
 
-  it("keeps the price for a product with no variants", () => {
-    renderPage(PRODUCT, []);
+  it("keeps the price for a product with no variants", async () => {
+    await renderPage(PRODUCT, []);
     expect(screen.getByText("₹12,500")).toBeInTheDocument();
     expect(screen.queryByText("Sold out")).not.toBeInTheDocument();
   });
 
   it("opens a lightbox from the main image and steps to the next photo", async () => {
-    renderPage();
+    await renderPage();
     fireEvent.click(await screen.findByRole("button", { name: /enlarge image/i }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("1 / 2")).toBeInTheDocument();
@@ -198,7 +205,7 @@ describe("ProductDetailPage", () => {
 
   it("shows a ranked More like this rail from the category group, without sold-out pieces", async () => {
     const chain = mockRelated();
-    renderPage();
+    await renderPage();
     expect(await screen.findByText("Rose Lehenga")).toBeInTheDocument();
     // Gold shares a colour (Green) with this product, so it ranks first.
     expect(screen.getAllByTestId("product-card").map((c) => c.textContent)).toEqual([
@@ -213,9 +220,55 @@ describe("ProductDetailPage", () => {
     );
   });
 
-  it("renders one add-to-cart button until the sticky bar is needed", () => {
-    renderPage();
+  it("renders one add-to-cart button until the sticky bar is needed", async () => {
+    await renderPage();
     expect(screen.getAllByRole("button", { name: /select size/i })).toHaveLength(1);
+  });
+});
+
+describe("ProductDetailPage — layout stability", () => {
+  const expectFrameKeepsShape = (frame) => {
+    const classes = frame.className.split(/\s+/);
+    expect(classes).toContain("aspect-[3/4]");
+    // Bare self-start on the stacked phone layout collapses the frame until
+    // the photo downloads, which moved the whole page down by the frame height.
+    expect(classes).toContain("sm:self-start");
+    expect(classes).not.toContain("self-start");
+  };
+
+  it("reserves the photo frame while the product loads", () => {
+    getProductImagePaths.mockReturnValue(new Promise(() => {}));
+    useProduct.mockReturnValue({ product: null, variants: [], loading: true, error: null });
+    renderRoute("BC252742");
+    expectFrameKeepsShape(screen.getByTestId("product-loading-frame"));
+  });
+
+  it("waits for the photo list so thumbnails do not push the content down", async () => {
+    let resolvePaths;
+    getProductImagePaths.mockReturnValue(new Promise((res) => { resolvePaths = res; }));
+    useProduct.mockReturnValue({ product: PRODUCT, variants: VARIANTS, loading: false, error: null });
+    renderRoute(PRODUCT.productid);
+    expect(screen.getByTestId("product-loading-frame")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, hidden: true })).not.toBeInTheDocument();
+
+    resolvePaths(["one.png", "two.png"]);
+    // The title and the rail land in the same render.
+    await screen.findByRole("heading", { level: 1, hidden: true });
+    expect(screen.getByRole("button", { name: "View image 2" })).toBeInTheDocument();
+    expect(screen.queryByTestId("product-loading-frame")).not.toBeInTheDocument();
+  });
+
+  it("keeps the gallery frame's shape before the photo has loaded", async () => {
+    await renderPage();
+    // eslint-disable-next-line testing-library/no-node-access
+    expectFrameKeepsShape(screen.getByRole("button", { name: /enlarge image/i }).parentElement);
+  });
+
+  it("does not wait for photos when the product is not found", () => {
+    getProductImagePaths.mockReturnValue(new Promise(() => {}));
+    useProduct.mockReturnValue({ product: null, variants: [], loading: false, error: new Error("not found") });
+    renderRoute("NOPE");
+    expect(screen.getByText("Product not found.")).toBeInTheDocument();
   });
 });
 
@@ -228,7 +281,7 @@ describe("ProductDetailPage — colour photos", () => {
 
   it("shows the photo of the colour the shopper picks", async () => {
     getProductImagePaths.mockResolvedValue(["green.png", "peach.png"]);
-    renderPage();
+    await renderPage();
     await screen.findByRole("button", { name: /enlarge image/i });
     expect(mainImageSrc()).toContain("green.png");
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
@@ -239,7 +292,7 @@ describe("ProductDetailPage — colour photos", () => {
 
   it("keeps the current photo when the picked colour has none", async () => {
     getProductImagePaths.mockResolvedValue(["green.png", "other.png"]);
-    renderPage();
+    await renderPage();
     await screen.findByRole("button", { name: /enlarge image/i });
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     expect(mainImageSrc()).toContain("green.png");
@@ -247,23 +300,23 @@ describe("ProductDetailPage — colour photos", () => {
 });
 
 describe("ProductDetailPage — stock limit", () => {
-  function addPeach() {
-    renderPage();
+  async function addPeach() {
+    await renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     fireEvent.click(screen.getByRole("button", { name: /add to cart/i }));
   }
 
-  it("passes the variant's stock to the cart and animates a real add", () => {
+  it("passes the variant's stock to the cart and animates a real add", async () => {
     mockAddItem.mockReturnValue(1);
-    addPeach();
+    await addPeach();
     expect(mockAddItem).toHaveBeenCalledWith(expect.objectContaining({ variant_id: "v2", stock: 1 }));
     expect(flyToCart).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith("Added to cart", expect.anything());
   });
 
-  it("says so, without the animation, when the cart already holds all the stock", () => {
+  it("says so, without the animation, when the cart already holds all the stock", async () => {
     mockAddItem.mockReturnValue(0);
-    addPeach();
+    await addPeach();
     expect(flyToCart).not.toHaveBeenCalled();
     expect(toast.info).toHaveBeenCalledWith("The last piece is already in your cart", expect.anything());
   });
@@ -274,10 +327,10 @@ describe("ProductDetailPage — units held in other carts", () => {
     useVariantAvailability.mockImplementation((variantId) => (variantId === "v2" ? { variant_id: "v2", ...row } : null));
   }
 
-  it("says the piece is in someone's cart and blocks adding it", () => {
+  it("says the piece is in someone's cart and blocks adding it", async () => {
     const inTenMinutes = new Date(Date.now() + 9.5 * 60000).toISOString();
     availabilityFor({ stock: 1, held_by_others: 1, available: 0, my_held: 0, others_expire_at: inTenMinutes });
-    renderPage();
+    await renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     expect(screen.getByText("In someone's cart — may free up in 10 min")).toBeInTheDocument();
     const button = screen.getByRole("button", { name: /in someone's cart/i });
@@ -287,10 +340,10 @@ describe("ProductDetailPage — units held in other carts", () => {
     expect(mockAddItem).not.toHaveBeenCalled();
   });
 
-  it("caps the cart at what this shopper can have", () => {
+  it("caps the cart at what this shopper can have", async () => {
     availabilityFor({ stock: 3, held_by_others: 1, available: 2, my_held: 0, others_expire_at: null });
     mockAddItem.mockReturnValue(1);
-    renderPage(PRODUCT, [VARIANTS[0], { ...VARIANTS[1], stock: 3 }]);
+    await renderPage(PRODUCT, [VARIANTS[0], { ...VARIANTS[1], stock: 3 }]);
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     expect(screen.getByText("Only 2 pieces left in this design")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /add to cart/i }));
