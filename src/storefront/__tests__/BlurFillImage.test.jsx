@@ -26,6 +26,14 @@ describe("BlurFillImage", () => {
     );
   });
 
+  it("asks for high priority only when told to", () => {
+    const { rerender } = render(<BlurFillImage path={PATH} alt="Saree" />);
+    expect(screen.getByAltText("Saree")).not.toHaveAttribute("fetchpriority");
+    rerender(<BlurFillImage path={PATH} alt="Saree" eager priority />);
+    expect(screen.getByAltText("Saree")).toHaveAttribute("fetchpriority", "high");
+    expect(screen.getByAltText("Saree")).toHaveAttribute("loading", "eager");
+  });
+
   it("fit=cover fills the frame from the top with no blur layer", () => {
     const { container } = render(<BlurFillImage path={PATH} alt="Saree" fit="cover" />);
     const img = screen.getByAltText("Saree");

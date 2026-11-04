@@ -290,6 +290,17 @@ describe("ProductDetailPage — colour photos", () => {
     expect(mainImageSrc()).toContain("green.png");
   });
 
+  it("gives only the first photo high priority", async () => {
+    getProductImagePaths.mockResolvedValue(["green.png", "peach.png"]);
+    await renderPage();
+    const enlarge = await screen.findByRole("button", { name: /enlarge image/i });
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(enlarge.querySelector("img")).toHaveAttribute("fetchpriority", "high");
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(enlarge.querySelector("img")).not.toHaveAttribute("fetchpriority");
+  });
+
   it("keeps the current photo when the picked colour has none", async () => {
     getProductImagePaths.mockResolvedValue(["green.png", "other.png"]);
     await renderPage();

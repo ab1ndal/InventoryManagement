@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useProduct } from "../hooks/useProduct";
 import { useVariantAvailability } from "../hooks/useVariantAvailability";
 import { getProductImagePaths, imageUrl, imageColor } from "../lib/productImage";
+import { PRODUCT_PHOTO_WIDTH } from "../lib/imageVariant";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
 import ProductSpecs from "../components/product/ProductSpecs";
@@ -168,9 +169,10 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
               key={paths[active]}
               path={paths[active]}
               alt={productImageAlt(name, imageColor(paths[active]), active + 1, paths.length)}
-              width={1000}
+              width={PRODUCT_PHOTO_WIDTH}
               fit="cover"
               eager
+              priority={active === 0}
             />
             <span className="pointer-events-none absolute top-3 right-3 p-2 bg-white/85 text-storefront-charcoal opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden sm:flex">
               <Expand size={15} aria-hidden="true" />

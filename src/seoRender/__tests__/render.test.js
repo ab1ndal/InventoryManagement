@@ -31,6 +31,28 @@ describe("describePage", () => {
     expect(html.match(/rel="preload"/g)).toHaveLength(2);
   });
 
+  test("a product preloads its first photo and its text copies stay lazy, so one file is downloaded", async () => {
+    const images = [
+      { imageurl: IMG, displayorder: 0 },
+      { imageurl: IMG.replace("a.webp", "b.webp"), displayorder: 1 },
+    ];
+    const html = renderHtml(shell, await describePage("product/BC1", rest([{ ...product, productimages: images }])));
+    const first = "https://www.bindalscreations.com/images/BC1/a_1200.webp";
+    expect(html.match(/rel="preload"[^>]*>/g)).toEqual([
+      `rel="preload" as="image" href="${first}" fetchpriority="high"/>`,
+    ]);
+    expect(html).toContain(`<img src="${first}"`);
+    expect(html).not.toContain("_600.webp");
+    const photos = html.match(/<img src="[^"]*BC1\/[^>]*>/g);
+    expect(photos).toHaveLength(2);
+    photos.forEach((tag) => expect(tag).toContain('loading="lazy"'));
+  });
+
+  test("a product with no photo preloads nothing", async () => {
+    const html = renderHtml(shell, await describePage("product/BC1", rest([{ ...product, productimages: [] }])));
+    expect(html).not.toContain('rel="preload"');
+  });
+
   test("a product gives real text, an offer in rupees and a canonical URL", async () => {
     const page = await describePage("product/BC1", rest());
     expect(page.status).toBe(200);

@@ -18,6 +18,7 @@ export default function BlurFillImage({
   alt,
   width = 600,
   eager = false,
+  priority = false,
   className = "",
   fit = "contain",
 }) {
@@ -41,6 +42,7 @@ export default function BlurFillImage({
         src={fg}
         alt={alt}
         loading={eager ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
         draggable={false}
         onLoad={() => setLoaded(true)}
         className={`relative w-full h-full ${

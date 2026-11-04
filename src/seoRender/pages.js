@@ -10,7 +10,7 @@ import {
   STORE_LATITUDE,
   STORE_LONGITUDE,
 } from "../storefront/lib/siteConfig";
-import { imageUrl } from "../storefront/lib/imageVariant";
+import { PRODUCT_PHOTO_WIDTH, imageUrl } from "../storefront/lib/imageVariant";
 import { stripMarkdown } from "../storefront/lib/productText";
 import {
   HOME_DESCRIPTION,
@@ -386,7 +386,7 @@ async function productPage(id, rest) {
   const price = Number(product.retailprice);
   const inStock = (product.productsizecolors || []).some((v) => Number(v.stock) > 0);
   const images = sortedImages(product);
-  const image = firstImage(product, 1200);
+  const image = firstImage(product, PRODUCT_PHOTO_WIDTH);
   const description = productMetaDescription({ name: product.name, text, price });
   const colours = [...new Set((product.productsizecolors || []).map((v) => v.color).filter(Boolean))];
   const group = categoryGroup(product.categoryid);
@@ -414,13 +414,16 @@ async function productPage(id, rest) {
     canonical: path,
     type: "product",
     image,
+    preloadImages: image ? [{ href: image }] : [],
     bodyHtml: frame(
       link(group ? `/collections/${group.slug}` : "/shop", group ? group.title : "Shop") +
         `<h1>${esc(product.name)}</h1>` +
         images
           .map((img, i) => {
             const alt = productImageAlt(product.name, img.productcolor, i + 1, images.length);
-            return `<img src="${esc(imageUrl(img.imageurl, { width: 600 }))}" alt="${esc(alt)}" width="600"/>`;
+            // Lazy: the app hides this text, and a hidden lazy image is never fetched. Crawlers still read src.
+            const src = imageUrl(img.imageurl, { width: PRODUCT_PHOTO_WIDTH });
+            return `<img src="${esc(src)}" alt="${esc(alt)}" width="600" loading="lazy"/>`;
           })
           .join("") +
         `<ul>${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` +
