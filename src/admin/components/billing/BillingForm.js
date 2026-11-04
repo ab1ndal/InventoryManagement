@@ -1195,7 +1195,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
     }
 
-    if (effectiveGrandTotal > 0 && !isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
+    if (effectiveGrandTotal > 0 && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
       const diff = (paidAmt - effectiveGrandTotal).toFixed(2);
       const msg =
         diff > 0

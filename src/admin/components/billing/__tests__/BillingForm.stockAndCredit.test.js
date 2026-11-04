@@ -1,33 +1,76 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import BillingForm from "../BillingForm";
 import { clearBillingLookups } from "../billingLookups";
 
-jest.mock("../../../../lib/supabaseClient", () => {
-  const chain = () => {
-    const c = {
-      select: () => c,
-      eq: () => c,
-      in: () => c,
-      is: () => c,
-      order: () => c,
-      limit: () => c,
-      single: () => Promise.resolve({ data: null, error: null }),
-      maybeSingle: () => Promise.resolve({ data: null, error: null }),
-      then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej),
-    };
-    return c;
-  };
-  return {
-    supabase: {
-      from: () => chain(),
-      auth: { getSession: async () => ({ data: { session: null } }) },
+const mockToasts = [];
+let mockBill;
+const mockUpdates = [];
+
+jest.mock("sonner", () => ({
+  toast: {
+    error: (title) => mockToasts.push(title),
+    success: () => {},
+    warning: () => {},
+  },
+}));
+
+const mockChain = (table) => {
+  const chain = {
+    select: () => chain,
+    insert: () => chain,
+    delete: () => chain,
+    update: (payload) => {
+      mockUpdates.push({ table, payload });
+      return chain;
     },
+    eq: () => chain,
+    in: () => chain,
+    is: () => chain,
+    not: () => chain,
+    order: () => chain,
+    limit: () => chain,
+    single: () => Promise.resolve({ data: table === "bills" ? mockBill : null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej),
   };
-});
+  return chain;
+};
+
+jest.mock("../../../../lib/supabaseClient", () => ({
+  supabase: {
+    from: (table) => mockChain(table),
+    auth: { getSession: async () => ({ data: { session: null } }) },
+  },
+}));
+
+const baseBill = {
+  orderdate: "2026-09-30T00:00:00",
+  customerid: 7,
+  customers: { first_name: "Asha", last_name: "", phone: "999", store_credit: 0, discount_usage: [], exchanges: [] },
+  paymentstatus: "draft",
+  finalized: false,
+  payment_amount: 500,
+  salesmethodid: 1,
+  store_credit_used: 0,
+  applied_codes: [],
+  document_type: "bos",
+  bill_payments: [],
+  bill_salespersons: [],
+  linked_exchanges: [],
+  bill_items: [
+    { bill_item_id: 11, product_name: "Kurti", quantity: 1, mrp: 5000, discount_total: 0, total: 5000, stitch_type: "unstitched" },
+  ],
+};
 
 const stockTick = () => screen.getByRole("checkbox", { name: /Don't reduce stock/ });
+const saveDraft = () => screen.getByRole("button", { name: "Save Draft" });
+const finalize = () => screen.getByRole("button", { name: "Finalize" });
+const billUpdate = () => mockUpdates.find((u) => u.table === "bills").payload;
 
 beforeEach(() => {
+  mockToasts.length = 0;
+  mockUpdates.length = 0;
+  mockBill = baseBill;
   clearBillingLookups();
 });
 
@@ -45,4 +88,27 @@ test("the Don't reduce stock tick does not carry over to the next new bill", () 
 test("the tick does not describe itself as being for old bills", () => {
   render(<BillingForm open onOpenChange={() => {}} />);
   expect(stockTick().labels[0].textContent).not.toMatch(/old bill/i);
+});
+
+test("a wrong amount is refused when the stock tick is on", async () => {
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(finalize()).toBeEnabled());
+  fireEvent.click(stockTick());
+
+  fireEvent.click(finalize());
+
+  expect(mockToasts).toContain("Payment mismatch");
+  expect(screen.queryByRole("button", { name: /Confirm/ })).not.toBeInTheDocument();
+});
+
+test("a correct amount still goes through to the confirm step with the stock tick on", async () => {
+  mockBill = { ...baseBill, payment_amount: 5000 };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(finalize()).toBeEnabled());
+  fireEvent.click(stockTick());
+
+  fireEvent.click(finalize());
+
+  expect(mockToasts).not.toContain("Payment mismatch");
+  expect(await screen.findByRole("button", { name: /Confirm/ })).toBeInTheDocument();
 });
