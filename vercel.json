@@ -26,6 +26,10 @@
       "destination": "/api/sitemap"
     },
     {
+      "source": "/feeds/google-products.xml",
+      "destination": "/api/merchant-feed"
+    },
+    {
       "source": "/(admin(?:/.*)?|unauthorized|cart|checkout|wishlist|login|account(?:/.*)?|search|track|order/.*|refund-choice/.*)",
       "destination": "/shell.html"
     },
