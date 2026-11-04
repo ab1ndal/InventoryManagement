@@ -43,7 +43,7 @@ export const COLLECTIONS = [
     title: "Men",
     subtitle: "Sherwanis, kurtas, jackets, suits and shirts",
     seoTitle: "Men's Ethnic Wear in Ghaziabad",
-    description: "Sherwanis, kurta pajamas, Nehru jackets, suits and shirts for men from Bindal's Creation, Ghaziabad. Shop online or visit our store at Sihani Gate Market.",
+    description: "Kurta pajamas, shirts, Nehru jackets, sherwanis, blazers and Jodhpuri suits for men from Bindal's Creation, Ghaziabad. Shop online or visit our store.",
     categoryIds: ["SW", "KP", "SK", "NHJ", "IW", "SJ-2P", "S2P", "S5P", "BLZ", "SHT", "T-SHT", "FRMP", "PNT"],
   },
   // Wedding and Festive hidden until curated (owner 2026-10-25): with no

@@ -1,11 +1,13 @@
 // Search-facing wording shared by the app and the server's HTML, so the two always match.
 // Pure, and free of app imports, because the server renderer loads it too.
 
-export const HOME_TITLE = "Sarees, Lehengas & Sherwanis in Ghaziabad";
+// Ordered by what the shop stocks most, not by what has a photo yet: photos are still being added.
+export const HOME_TITLE = "Indian Ethnic Wear for Women & Men in Ghaziabad";
 export const HOME_DESCRIPTION =
-  "Handpicked sarees, lehengas, suits and sherwanis from Bindal's Creation in Ghaziabad. Seen a look you love? Our in-house tailors can make it for you.";
+  "Sarees, lehengas, suits, gowns and kurtis for women; kurta pajamas, sherwanis, shirts and blazers for men. Custom tailoring at Bindal's Creation, Ghaziabad.";
 export const SHOP_TITLE = "Shop Indian Ethnic Wear";
-export const SHOP_DESCRIPTION = "Browse our handpicked sarees, lehengas, suits, and ethnic wear.";
+export const SHOP_DESCRIPTION =
+  "Browse sarees, lehengas, suits, gowns and kurtis for women, plus kurta pajamas, sherwanis, shirts and Nehru jackets for men, from Bindal's Creation, Ghaziabad.";
 
 // Google shows about this many characters of a description.
 const DESCRIPTION_MAX = 160;
