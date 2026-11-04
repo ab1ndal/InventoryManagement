@@ -5,6 +5,7 @@ import { clearBillingLookups } from "../billingLookups";
 const mockToasts = [];
 let mockBill;
 const mockUpdates = [];
+const mockSelects = [];
 
 jest.mock("sonner", () => ({
   toast: {
@@ -16,7 +17,10 @@ jest.mock("sonner", () => ({
 
 const mockChain = (table) => {
   const chain = {
-    select: () => chain,
+    select: (columns) => {
+      mockSelects.push(String(columns));
+      return chain;
+    },
     insert: () => chain,
     delete: () => chain,
     update: (payload) => {
@@ -70,6 +74,7 @@ const billUpdate = () => mockUpdates.find((u) => u.table === "bills").payload;
 beforeEach(() => {
   mockToasts.length = 0;
   mockUpdates.length = 0;
+  mockSelects.length = 0;
   mockBill = baseBill;
   clearBillingLookups();
 });
@@ -111,4 +116,34 @@ test("a correct amount still goes through to the confirm step with the stock tic
 
   expect(mockToasts).not.toContain("Payment mismatch");
   expect(await screen.findByRole("button", { name: /Confirm/ })).toBeInTheDocument();
+});
+
+const customerWithCredit = { ...baseBill.customers, store_credit: 1000 };
+
+test("reopening a finalized bill saves the credit it used, not the customer's balance today", async () => {
+  mockBill = { ...baseBill, finalized: true, paymentstatus: "finalized", store_credit_used: 200, customers: customerWithCredit };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(saveDraft()).toBeEnabled());
+
+  expect(mockSelects.some((s) => /\bstore_credit_used\b/.test(s))).toBe(true);
+  fireEvent.click(saveDraft());
+
+  await waitFor(() => expect(mockUpdates.some((u) => u.table === "bills")).toBe(true));
+  expect(billUpdate().store_credit_used).toBe(200);
+});
+
+test("a finalized bill that used no credit does not pick up the customer's balance", async () => {
+  mockBill = { ...baseBill, finalized: true, paymentstatus: "finalized", store_credit_used: 0, customers: customerWithCredit };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(saveDraft()).toBeEnabled());
+
+  expect(screen.queryByText("Paid via Store Credit")).not.toBeInTheDocument();
+});
+
+test("a draft has used no credit yet, so it still offers the balance like a new bill", async () => {
+  mockBill = { ...baseBill, customers: customerWithCredit };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(saveDraft()).toBeEnabled());
+
+  expect(screen.getByText("Paid via Store Credit")).toBeInTheDocument();
 });
