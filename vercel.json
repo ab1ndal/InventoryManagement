@@ -4,11 +4,19 @@
   },
   "headers": [
     {
+      "source": "/images/:path*",
+      "headers": [{ "key": "X-Robots-Tag", "value": "all" }]
+    },
+    {
       "source": "/(admin(?:/.*)?|unauthorized|cart|checkout|wishlist|login|account(?:/.*)?|search|track|order/.*|refund-choice/.*|shell\\.html)",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     }
   ],
   "rewrites": [
+    {
+      "source": "/images/:path*",
+      "destination": "https://epotsxdugwfhyeiudjox.supabase.co/storage/v1/object/public/mockups/:path*"
+    },
     {
       "source": "/sb-rest/:path*",
       "destination": "https://epotsxdugwfhyeiudjox.supabase.co/rest/v1/:path*"
