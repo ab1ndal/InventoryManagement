@@ -211,7 +211,12 @@ In review, not live (2026-11-04):
 - PR #138, 2.4 alt text, plus titles, descriptions, product links and store markup.
 - PR #140, 1.9 page speed: main.js 846 KB to 664 KB. Public pages stay eager to protect layout stability.
 - PR #141, 3.4 Merchant Center feed, 778 in-stock items.
-- 2.2 saree titles: 89 drafts for owner review, `tasks/title-drafts/sarees.json`. 16 titles become 89.
+
+Live 2026-11-04: 2.2 saree titles, owner reviewed. 16 titles became 89, list in `tasks/title-drafts/sarees.json`. Five stock colours corrected.
+
+Catalogue, 2026-11-04: 3,685 products, 3,530 in stock, and 821 with photos. Only products with photos show on the site, and
+photos are being added steadily. Sarees are the largest category: 1,300 products, 89 visible. Figures earlier in this plan
+count visible products only. Stock depth is an advantage for rungs 3 to 5 once photos catch up.
 
 Found while drafting: colours recorded on some products do not match their photos, such as BC25875 (Off White, photo magenta).
 Titles and alt text state these colours, so check colours before rolling titles out to other categories.
