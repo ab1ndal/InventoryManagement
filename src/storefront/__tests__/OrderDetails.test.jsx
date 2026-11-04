@@ -16,7 +16,7 @@ function order(item) {
 it("shows the item's 150px variant, lazily, named for the product", () => {
   render(<OrderDetails order={order({ imageUrl: MOCKUP })} />);
   const img = screen.getByRole("img", { name: "Silk Saree" });
-  expect(img).toHaveAttribute("src", MOCKUP.replace(".webp", "_150.webp"));
+  expect(img).toHaveAttribute("src", "https://www.bindalscreations.com/images/kurti/front_150.webp");
   expect(img).toHaveAttribute("loading", "lazy");
 });
 

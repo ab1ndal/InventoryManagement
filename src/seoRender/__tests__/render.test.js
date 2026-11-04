@@ -125,6 +125,19 @@ describe("sitemap", () => {
     expect(xml).not.toMatch(/\/(admin|cart|checkout|account|login|search|track)/);
   });
 
+  test("lists each product's photos at the site's own address, in display order", async () => {
+    const productimages = [
+      { imageurl: "https://x.supabase.co/storage/v1/object/public/mockups/BC1/b.webp", displayorder: 1 },
+      { imageurl: "https://x.supabase.co/storage/v1/object/public/mockups/BC1/a.webp", displayorder: 0 },
+    ];
+    const xml = await buildSitemap(rest([{ productid: "BC1", productimages }]));
+    const first = xml.indexOf("<image:loc>https://www.bindalscreations.com/images/BC1/a_1200.webp</image:loc>");
+    const second = xml.indexOf("<image:loc>https://www.bindalscreations.com/images/BC1/b_1200.webp</image:loc>");
+    expect(first).toBeGreaterThan(-1);
+    expect(second).toBeGreaterThan(first);
+    expect(xml).toContain('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"');
+  });
+
   test("pages past the database's row cap", async () => {
     const full = Array.from({ length: 1000 }, (_, i) => ({ productid: `A${i}` }));
     const q = jest.fn().mockResolvedValueOnce(full).mockResolvedValueOnce([{ productid: "LAST" }]);
