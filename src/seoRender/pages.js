@@ -2,6 +2,7 @@
 // Content comes from the same modules the React pages use, so the two cannot drift apart.
 
 import { COLLECTIONS, getCollection } from "../storefront/lib/collections";
+import { HERO_SLIDES } from "../storefront/lib/heroSlides";
 import {
   GOOGLE_MAPS_URL,
   NAV_LINKS,
@@ -261,6 +262,19 @@ const NOT_FOUND = {
   bodyHtml: frame(`<h1>Page not found</h1><p>${link("/shop", "Shop all products")}</p>`),
 };
 
+// The first hero slide is the largest thing on the home page, and the app only asks for it after its
+// code has run. The breakpoint is the one HeroSlider's <picture> uses, so each device fetches one file.
+function heroPreloads() {
+  const { url, mobileUrl } = HERO_SLIDES[0].images[0];
+  if (!url) return [];
+  return mobileUrl
+    ? [
+        { href: mobileUrl, media: "(max-width: 767px)" },
+        { href: url, media: "(min-width: 768px)" },
+      ]
+    : [{ href: url }];
+}
+
 async function homePage(rest) {
   const products = await rest(
     `products?select=${LIST_FIELDS}&order=productid.desc&limit=${LISTED_PRODUCTS}`
@@ -271,6 +285,7 @@ async function homePage(rest) {
     title: HOME_TITLE,
     description: HOME_DESCRIPTION,
     canonical: "/",
+    preloadImages: heroPreloads(),
     bodyHtml: frame(
       `<h1>Bindal's Creation: handpicked Indian ethnic wear and custom tailoring</h1>` +
         `<p>${esc(ABOUT.lede)}</p><ul>${collections}</ul>${productList(products)}`

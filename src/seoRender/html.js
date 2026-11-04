@@ -13,6 +13,10 @@ export const esc = (value) =>
 const jsonLdTag = (data) =>
   `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
 
+// Not data-ssr: the app removes those on start, and these must outlast that for it to use the download.
+const preloadTag = ({ href, media }) =>
+  `<link rel="preload" as="image" href="${esc(href)}"${media ? ` media="${esc(media)}"` : ""} fetchpriority="high"/>`;
+
 function headTags({ title, description, canonical, image, type, noindex }) {
   const fullTitle = title ? `${title} — ${SITE_NAME}` : SITE_NAME;
   const ogImage = image || `${SITE_URL}/logo512.png`;
@@ -50,7 +54,11 @@ export function renderHtml(shell, page) {
     throw new Error("shell is missing the root div or </head>");
   }
   const stripped = SHELL_HEAD_TAGS.reduce((html, tag) => html.replace(tag, ""), shell);
-  const head = HIDE_WHEN_JS + headTags(page) + (page.jsonLd || []).map(jsonLdTag).join("");
+  const head =
+    HIDE_WHEN_JS +
+    (page.preloadImages || []).map(preloadTag).join("") +
+    headTags(page) +
+    (page.jsonLd || []).map(jsonLdTag).join("");
   // Function replacers: page text may hold "$&", which a plain string replacement would expand.
   return stripped
     .replace("</head>", () => `${head}</head>`)

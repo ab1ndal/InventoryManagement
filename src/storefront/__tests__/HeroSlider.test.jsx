@@ -40,6 +40,20 @@ function renderSlider() {
   );
 }
 
+// Slide images are decorative (alt="") and <picture>/<source> have no role, so
+// these select them directly.
+/* eslint-disable testing-library/no-node-access */
+function loadedImages() {
+  return [...document.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+}
+
+// The clock and the next slide both wait for the first image to finish.
+async function finishFirstImage() {
+  await act(async () => {});
+  fireEvent.load(document.querySelector('img[src="https://img.test/BC1.webp"]'));
+}
+/* eslint-enable testing-library/no-node-access */
+
 // The active slide is the only one not hidden from assistive tech.
 function activeHeadline() {
   const slides = screen.getAllByRole("group", { hidden: true });
@@ -52,8 +66,6 @@ describe("HeroSlider", () => {
   beforeEach(() => mockReducedMotion(false));
   afterEach(() => jest.useRealTimers());
 
-  // Slide images are decorative (alt="") and <picture>/<source> have no role,
-  // so the next two tests select them directly.
   /* eslint-disable testing-library/no-container, testing-library/no-node-access */
   it("renders every slide from the config with its CTA link", async () => {
     const { container } = renderSlider();
@@ -62,9 +74,8 @@ describe("HeroSlider", () => {
     });
     expect(screen.getByRole("link", { name: "Shop A" })).toHaveAttribute("href", "/a");
     expect(activeHeadline()).toBe("Slide A");
-    // Static urls render at once; product photos resolve asynchronously.
+    // Product photos resolve asynchronously.
     // Images are decorative (alt=""): the headline and CTA carry the meaning.
-    expect(container.querySelector('img[src="/hero/c.jpg"]')).not.toBeNull();
     await waitFor(() =>
       expect(container.querySelector('img[src="https://img.test/BC1.webp"]')).not.toBeNull()
     );
@@ -72,12 +83,45 @@ describe("HeroSlider", () => {
 
   it("serves a slide's mobileUrl below md and its url above", () => {
     const { container } = renderSlider();
+    fireEvent.click(screen.getByRole("button", { name: /go to slide 3/i }));
+    fireEvent.click(screen.getByRole("button", { name: /go to slide 4/i }));
     const source = container.querySelector('picture source[srcset="/hero/d-mobile.webp"]');
     expect(source).not.toBeNull();
     expect(source).toHaveAttribute("media", "(max-width: 767px)");
     expect(source.parentElement.querySelector("img")).toHaveAttribute("src", "/hero/d-desktop.webp");
     // Slides without a mobileUrl render a bare <img>.
     expect(container.querySelector('img[src="/hero/c.jpg"]').closest("picture")).toBeNull();
+  });
+
+  it("asks for only the first slide's image, at high priority, until that image is done", async () => {
+    const { container } = renderSlider();
+    await act(async () => {});
+    expect(loadedImages()).toEqual(["https://img.test/BC1.webp"]);
+    expect(container.querySelector("img")).toHaveAttribute("fetchpriority", "high");
+  });
+
+  it("then fetches the next slide only, at normal priority", async () => {
+    const { container } = renderSlider();
+    await finishFirstImage();
+    expect(loadedImages()).toContain("https://img.test/BC2.webp");
+    expect(loadedImages()).not.toContain("/hero/c.jpg");
+    expect(container.querySelector('img[src="https://img.test/BC2.webp"]')).not.toHaveAttribute("fetchpriority");
+  });
+
+  it("moves on if the first image fails", async () => {
+    const { container } = renderSlider();
+    await act(async () => {});
+    fireEvent.error(container.querySelector('img[src="https://img.test/BC1.webp"]'));
+    expect(loadedImages()).toContain("https://img.test/BC2.webp");
+  });
+
+  it("shows a slide's image at once when the visitor jumps to it, and keeps the ones already fetched", async () => {
+    renderSlider();
+    await finishFirstImage();
+    fireEvent.click(screen.getByRole("button", { name: /go to slide 3/i }));
+    expect(loadedImages()).toEqual(
+      expect.arrayContaining(["https://img.test/BC1.webp", "https://img.test/BC2.webp", "/hero/c.jpg", "/hero/d-desktop.webp"])
+    );
   });
   /* eslint-enable testing-library/no-container, testing-library/no-node-access */
 
@@ -97,25 +141,38 @@ describe("HeroSlider", () => {
     expect(screen.getByRole("button", { name: /go to slide 3/i })).toHaveAttribute("aria-current", "true");
   });
 
-  it("autoplays every 5 seconds", () => {
+  it("autoplays every 5 seconds once the first image is done", async () => {
     jest.useFakeTimers();
     renderSlider();
+    act(() => jest.advanceTimersByTime(5000));
+    expect(activeHeadline()).toBe("Slide A");
+    await finishFirstImage();
     act(() => jest.advanceTimersByTime(5000));
     expect(activeHeadline()).toBe("Slide B");
   });
 
-  it("pauses autoplay on hover", () => {
+  it("still autoplays if the first image never reports back", () => {
     jest.useFakeTimers();
     renderSlider();
+    act(() => jest.advanceTimersByTime(8000));
+    act(() => jest.advanceTimersByTime(5000));
+    expect(activeHeadline()).toBe("Slide B");
+  });
+
+  it("pauses autoplay on hover", async () => {
+    jest.useFakeTimers();
+    renderSlider();
+    await finishFirstImage();
     fireEvent.mouseEnter(screen.getByRole("region", { name: "Featured collections" }));
     act(() => jest.advanceTimersByTime(15000));
     expect(activeHeadline()).toBe("Slide A");
   });
 
-  it("does not autoplay when the visitor prefers reduced motion", () => {
+  it("does not autoplay when the visitor prefers reduced motion", async () => {
     mockReducedMotion(true);
     jest.useFakeTimers();
     renderSlider();
+    await finishFirstImage();
     act(() => jest.advanceTimersByTime(15000));
     expect(activeHeadline()).toBe("Slide A");
   });
