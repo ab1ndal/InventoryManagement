@@ -319,6 +319,14 @@ export default function ExchangePage() {
       });
       if (exErr) throw new Error(`Exchange record failed: ${exErr.message}`);
 
+      // Fire-and-forget: the helper never throws, so a logging problem cannot undo the saved exchange.
+      logActivity({
+        action: "create",
+        entityType: "bill",
+        entityId: loadedBill.bill_number || loadedBill.billid,
+        summary: `Exchange recorded on bill #${loadedBill.bill_number || loadedBill.billid} — ${selected.length} ${selected.length === 1 ? "item" : "items"}, ₹${totalCredit.toFixed(2)} credit`,
+      });
+
       // Print return receipt
       flushSync(() => {
         setReceiptReadyItems(selected);
