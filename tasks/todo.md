@@ -36,6 +36,8 @@ Plan and rules: `tasks/seo-aeo-plan.md`. PRs below are not merged unless marked.
 - [ ] #138: Rich Results Test on a product and a collection. Read one product page and one collection in a browser.
 - [ ] Request indexing: kurta-pajama, about, contact, all-products. Held until #138 so Google reads the new titles.
 - [ ] Saree titles LIVE 2026-11-04: all 89 unique, final list in `tasks/title-drafts/sarees.json`. Wait 4 weeks of Search Console data, then decide on other categories. Check recorded colours against photos first.
+- [ ] New photos will go live with shared titles such as "Silk Saree", because `title_detail` is empty until someone fills it. 731 visible products have none, and about 2,860 more have no photo yet. Have the mockup-generator draft `title_detail` when a product is approved.
+- [ ] Add photos in batches and watch Search Console: "Crawled, not indexed" rising means slow down and improve the thinnest pages. Sitemap, feed and all-products pick up new products automatically.
 - [ ] Order snapshots still store `name`, so order pages and emails show the old title.
 - [ ] Needs title list in admin.
 - [ ] Collection intro text, plan step 2.5: layout is simple, buying advice must come from the owner.
