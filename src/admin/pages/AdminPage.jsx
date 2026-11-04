@@ -4,6 +4,8 @@ import CategoriesPage from "./CategoriesPage";
 import SalespersonsPage from "./SalespersonsPage";
 import AttributesTab from "../components/attributes/AttributesTab";
 import AdminInvites from "../components/AdminInvites";
+import FiguresDidNotLoad from "../components/FiguresDidNotLoad";
+import { fetchInChunks } from "../lib/fetchInChunks";
 import {
   Table,
   TableBody,
@@ -45,9 +47,10 @@ function getFinancialYear(year, month) {
   return month >= 3 ? year : year - 1;
 }
 
-function MonthlySales() {
+export function MonthlySales() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     fetchMonthlySales();
@@ -75,22 +78,21 @@ function MonthlySales() {
       )];
 
       // Fetch purchase prices in parallel
-      const [manualRes, variantRes] = await Promise.all([
+      const [manualRes, variantCosts] = await Promise.all([
         manualCodes.length > 0
           ? supabase.from("manual_items").select("manual_item_id, purchase_price").in("manual_item_id", manualCodes)
           : { data: [], error: null },
-        variantIds.length > 0
-          ? supabase.from("variant_costs").select("variantid, purchaseprice").in("variantid", variantIds)
-          : { data: [], error: null },
+        fetchInChunks(variantIds, (chunk) =>
+          supabase.from("variant_costs").select("variantid, purchaseprice").in("variantid", chunk)
+        ),
       ]);
       if (manualRes.error) throw manualRes.error;
-      if (variantRes.error) throw variantRes.error;
 
       const manualPriceMap = Object.fromEntries(
         (manualRes.data || []).map((r) => [r.manual_item_id, r.purchase_price || 0])
       );
       const variantPriceMap = Object.fromEntries(
-        (variantRes.data || []).map((r) => [r.variantid, r.purchaseprice || 0])
+        variantCosts.map((r) => [r.variantid, r.purchaseprice || 0])
       );
 
       // Sum purchase cost per bill
@@ -128,6 +130,7 @@ function MonthlySales() {
     } catch (err) {
       console.error("Error fetching monthly sales:", err);
       toast({ variant: "destructive", title: "Error", description: err.message });
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -140,6 +143,8 @@ function MonthlySales() {
       </div>
     );
   }
+
+  if (loadFailed) return <FiguresDidNotLoad />;
 
   let lastFY = null;
 

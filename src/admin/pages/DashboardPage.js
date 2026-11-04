@@ -15,6 +15,8 @@ import CategoryBreakdown from "../components/dashboard/CategoryBreakdown";
 import SalespersonTable from "../components/dashboard/SalespersonTable";
 import DiscountTable from "../components/dashboard/DiscountTable";
 import HistoricalTrends from "../components/dashboard/HistoricalTrends";
+import FiguresDidNotLoad from "../components/FiguresDidNotLoad";
+import { fetchInChunks } from "../lib/fetchInChunks";
 
 const PAGE = 1000;
 const EMPTY = { bills: [], items: [] };
@@ -73,22 +75,21 @@ async function fetchPeriod({ start, end }) {
     rawItems.filter((i) => !i.product_code?.startsWith("BCX") && i.variantid).map((i) => i.variantid)
   )];
 
-  const [manualRes, variantRes] = await Promise.all([
+  const [manualRes, variantCosts] = await Promise.all([
     manualCodes.length > 0
       ? supabase.from("manual_items").select("manual_item_id, purchase_price").in("manual_item_id", manualCodes)
       : { data: [], error: null },
-    variantIds.length > 0
-      ? supabase.from("variant_costs").select("variantid, purchaseprice").in("variantid", variantIds)
-      : { data: [], error: null },
+    fetchInChunks(variantIds, (chunk) =>
+      supabase.from("variant_costs").select("variantid, purchaseprice").in("variantid", chunk)
+    ),
   ]);
   if (manualRes.error) throw manualRes.error;
-  if (variantRes.error) throw variantRes.error;
 
   const manualPriceMap = Object.fromEntries(
     (manualRes.data || []).map((r) => [r.manual_item_id, r.purchase_price || 0])
   );
   const variantPriceMap = Object.fromEntries(
-    (variantRes.data || []).map((r) => [r.variantid, r.purchaseprice || 0])
+    variantCosts.map((r) => [r.variantid, r.purchaseprice || 0])
   );
 
   const items = rawItems.map((i) => {
@@ -115,6 +116,7 @@ export default function DashboardPage() {
   const [showComparison, setShowComparison] = useState(false);
   const [salespersonsById, setSalespersonsById] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Build FY tabs from earliest/latest finalized bill, and load salespersons (once).
   useEffect(() => {
@@ -145,6 +147,7 @@ export default function DashboardPage() {
       } catch (e) {
         console.error(e);
         toast.error("Failed to load dashboard setup");
+        setLoadFailed(true);
         setLoading(false);
       }
     })();
@@ -162,6 +165,7 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setLoadFailed(false);
       try {
         const [cur, pri] = await Promise.all([
           fetchPeriod(ranges.cur),
@@ -172,7 +176,9 @@ export default function DashboardPage() {
         setPrior(pri);
       } catch (e) {
         console.error(e);
+        if (cancelled) return;
         toast.error("Failed to load dashboard data");
+        setLoadFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -195,17 +201,24 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <KpiCards current={current} prior={prior} loading={loading} showComparison={showComparison} />
+      {/* The figures are hidden on failure, so a failed load cannot be read as a period with no sales. */}
+      {loadFailed ? (
+        <FiguresDidNotLoad />
+      ) : (
+        <>
+          <KpiCards current={current} prior={prior} loading={loading} showComparison={showComparison} />
 
-      <div className="grid grid-cols-[2fr_1fr] gap-4">
-        <RevenueChart current={current} prior={prior} range={filter ?? { startYear: 0, fromIdx: 0, toIdx: 11 }} loading={loading} showComparison={showComparison} />
-        <CategoryBreakdown current={current} loading={loading} />
-      </div>
+          <div className="grid grid-cols-[2fr_1fr] gap-4">
+            <RevenueChart current={current} prior={prior} range={filter ?? { startYear: 0, fromIdx: 0, toIdx: 11 }} loading={loading} showComparison={showComparison} />
+            <CategoryBreakdown current={current} loading={loading} />
+          </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <SalespersonTable current={current} salespersonsById={salespersonsById} loading={loading} />
-        <DiscountTable current={current} loading={loading} />
-      </div>
+          <div className="grid grid-cols-2 gap-4">
+            <SalespersonTable current={current} salespersonsById={salespersonsById} loading={loading} />
+            <DiscountTable current={current} loading={loading} />
+          </div>
+        </>
+      )}
 
       <HistoricalTrends />
     </div>
