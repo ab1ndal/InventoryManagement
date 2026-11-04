@@ -29,7 +29,7 @@ const SYNONYM_GROUPS = {
   gown: ["gown", "gowns"],
   sherwani: ["sherwani", "sherwanis", "shervani", "shervanis"],
   anarkali: ["anarkali", "anarkalis", "anarkalee"],
-  child: ["kid", "kids", "child", "children", "kiddies"],
+  kid: ["kid", "kids", "child", "children", "kiddies"],
 };
 const SYNONYM_LOOKUP = Object.fromEntries(
   Object.entries(SYNONYM_GROUPS).flatMap(([canonical, spellings]) =>
