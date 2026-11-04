@@ -184,17 +184,29 @@ budget decision.
 
 ## Current state
 
-- Branch `feat/seo-render`, pushed and checked on a Vercel preview, not merged. Done there: 1.1, 1.2, 1.3, 1.4 (except
-  Rich Results Test), 1.6, 1.8.
-- Server text is hidden when JS runs, because swapping it for the app shifted the page (CLS 0.94). Readers without JS still see it.
-- Sitemap has no `lastmod`: products have no change date, and a made-up date is worse than none.
-- Open:
-  - 1.5 shipping and return policy markup.
-  - 1.7 crawlable links past the first 48 products. The app has no URL pagination, so server page links would not match it.
-    Sitemap covers discovery until then.
-  - 1.9 product pages shift about 0.94 on production today, before this branch (footer, then the product info column).
-- After merge, check `curl -I` on a public page shows no `X-Robots-Tag`. Vercel adds noindex to all preview pages, so this
-  cannot be checked earlier. Rollback is a Vercel promote of the previous deployment.
+Updated 2026-11-03. Rendering is live (PR #131).
+
+Done:
+- 0.2 Sitemap submitted in Search Console: Success, 843 pages. 0.5 Bare domain is a permanent 308.
+- 1.1, 1.2, 1.3, 1.6, 1.8 live. 1.4 checked on one product with Google's live test: Product, Merchant listing and Breadcrumb valid.
+- 1.5 Return policy markup, from the policy text. Shipping markup still waits on 0.1.
+- 1.7 `/all-products` lists every product in plain links, in the app and in server HTML, linked from every footer.
+- 1.9 Product page layout shift fixed. Field data still to be read in Search Console.
+- 10 pages sent to Google's priority queue: home, shop, customize, lehengas, suits, kurtis, gowns, men, sherwani, plus-size.
+
+Baseline, 2026-11-03: 9 pages indexed, 4 not indexed, 14 web clicks over about 3 months. Core Web Vitals had no data.
+
+Google Maps listing as of 2026-11-03: 3.8 stars from 25 reviews. Its website link is `http://wwwbindalscreations.com/`, missing a dot, and that domain does not resolve. The address reads "58, Sihani Gate, Richalpuri, Naya Ganj" against the site's "58 Sihani Gate Market, Near Durga Bhabhi Chowk". Listing not managed from the account that owns Search Console.
+
+Open, needs the owner:
+- 0.1 Delivery area. 0.4 and 3.1 Find who manages the listing, then fix its website link and address.
+- 0.6 Bing Webmaster Tools. 3.2 Review link and QR. 3.4 Merchant Center.
+
+Open, dev:
+- Request indexing for kurta-pajama, about, contact, all-products, after Google's daily limit resets.
+- 2.1 onward: keyword research, titles, descriptions, collection text.
+
+Sitemap has no `lastmod`: products have no change date, and a made-up date is worse than none.
 
 ## Sources
 
