@@ -26,6 +26,14 @@ describe("ContactPage", () => {
     );
   });
 
+  it("links to the shop's Google review form", () => {
+    render(<ContactPage />);
+    expect(screen.getByRole("link", { name: /review us on google/i })).toHaveAttribute(
+      "href",
+      "https://g.page/r/CayP03i6bmA3EBE/review"
+    );
+  });
+
   it("shows the real shop photos", () => {
     render(<ContactPage />);
     expect(screen.getByRole("img", { name: /shop front/i })).toHaveAttribute("src", "/store/store-front.webp");
