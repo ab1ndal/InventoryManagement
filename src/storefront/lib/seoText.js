@@ -2,9 +2,9 @@
 // Pure, and free of app imports, because the server renderer loads it too.
 
 // Ordered by what the shop stocks most, not by what has a photo yet: photos are still being added.
-export const HOME_TITLE = "Indian Ethnic Wear for Women & Men in Ghaziabad";
+export const HOME_TITLE = "Indian Ethnic Wear for Women, Men & Kids in Ghaziabad";
 export const HOME_DESCRIPTION =
-  "Sarees, lehengas, suits, gowns and kurtis for women; kurta pajamas, sherwanis, shirts and blazers for men. Custom tailoring at Bindal's Creation, Ghaziabad.";
+  "Sarees, lehengas, suits, gowns and kurtis for women; kurta pajamas, sherwanis and shirts for men; kids' wear too. Custom tailoring in Ghaziabad.";
 export const SHOP_TITLE = "Shop Indian Ethnic Wear";
 export const SHOP_DESCRIPTION =
   "Browse sarees, lehengas, suits, gowns and kurtis for women, plus kurta pajamas, sherwanis, shirts and Nehru jackets for men, from Bindal's Creation, Ghaziabad.";
