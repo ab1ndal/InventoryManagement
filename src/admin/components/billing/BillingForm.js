@@ -148,8 +148,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [effectiveBillId, setEffectiveBillId] = useState(null);
   const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
   const [isBackdated, setIsBackdated] = useState(false);
+  // An existing bill starts blank, not today: today's date looks real, and saving
+  // before the bill loads would overwrite the saved date with it.
   const [backdatedDate, setBackdatedDate] = useState(
-    () => todayIST(),
+    () => (billId ? "" : todayIST()),
   );
   const [appliedStoreCredit, setAppliedStoreCredit] = useState(0);
   const [exchangeCredit, setExchangeCredit] = useState(null); // { amount: number, label: string, exchangeIds: number[] }
@@ -212,7 +214,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setVoucherLoading(false);
       setSalesLocationId(null);
       setSalesMethodId(null);
-      setBackdatedDate(todayIST());
+      setBackdatedDate(billId ? "" : todayIST());
       setBillPaymentStatus("draft");
       setBillPayments([]);
       setAddPaymentAmount("");
@@ -323,11 +325,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const { data: bill, error: billErr } = await supabase
           .from("bills")
           .select(
-            "customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, totalamount, exchange_credit_used, exchange_source_bill, document_type",
+            "orderdate, customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, finalized, pdf_url, paymentstatus, net_amount, totalamount, exchange_credit_used, exchange_source_bill, document_type",
           )
           .eq("billid", billId)
           .single();
         if (billErr) throw billErr;
+        setBackdatedDate(bill.orderdate ? bill.orderdate.slice(0, 10) : todayIST());
         setEffectiveBillNumber(bill.bill_number || null);
         setDocType(bill.document_type || 'bos');
         setIsFinalizedBill(!!bill.finalized);
@@ -401,15 +404,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setSalesMethodId(bill.salesmethodid || null);
         setPaymentAmount(bill.payment_amount ?? "");
         setFinalAmount(bill.final_amount != null ? String(bill.final_amount) : "");
-        // Restore the saved bill date (from DB orderdate) into the date picker
-        const { data: dateRow } = await supabase
-          .from("bills")
-          .select("orderdate")
-          .eq("billid", billId)
-          .single();
-        if (dateRow?.orderdate) {
-          setBackdatedDate(dateRow.orderdate.slice(0, 10));
-        }
 
         // Always set codes from saved state — prevents auto-codes racing in from loadDiscounts
         const savedCodes = codesRow?.applied_codes;
@@ -2056,8 +2050,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               {/* Bill date + stock control */}
               <section className="space-y-2">
                 <div className="grid gap-1">
-                  <Label>Bill Date</Label>
+                  <Label htmlFor="bill-date">Bill Date</Label>
                   <Input
+                    id="bill-date"
                     type="date"
                     value={backdatedDate}
                     max={todayIST()}
@@ -2416,7 +2411,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             docType={docType}
             billId={effectiveBillId ?? billId}
             billNumber={effectiveBillNumber}
-            billDate={new Date(backdatedDate)}
+            billDate={backdatedDate}
             customerName={customerName}
             salespersonNames={salespersonNames}
             items={items}
