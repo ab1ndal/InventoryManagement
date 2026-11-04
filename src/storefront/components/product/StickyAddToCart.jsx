@@ -57,9 +57,9 @@ export default function StickyAddToCart({ targetRef, image, name, price, soldOut
           type="button"
           disabled={disabled}
           onClick={onClick}
-          className="flex items-center justify-center gap-2 bg-storefront-gold text-white font-sans text-[11px] tracking-[0.15em] uppercase px-5 sm:px-10 py-3.5 hover:bg-storefront-gold-dark transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+          className="flex items-center justify-center gap-2 bg-storefront-gold text-white font-sans text-[11px] tracking-[0.15em] uppercase px-5 sm:px-10 py-3.5 hover:bg-storefront-gold-dark transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 max-w-[55%] text-center leading-snug"
         >
-          {!soldOut && <ShoppingBag size={15} aria-hidden="true" />}
+          {!soldOut && <ShoppingBag size={15} className="flex-shrink-0" aria-hidden="true" />}
           {label}
         </button>
       </div>

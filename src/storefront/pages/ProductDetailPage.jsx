@@ -28,7 +28,9 @@ import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote, heldNote } from "../lib/deliveryEstimate";
-import { stripMarkdown, whatsappProductUrl } from "../lib/productText";
+import { stripMarkdown, whatsappProductUrl, whatsappColourQuestionUrl } from "../lib/productText";
+import { missingChoiceLabel, missingChoiceRow } from "../lib/variantChoice";
+import { colourPhotoNote } from "../lib/colourPhoto";
 import { productImageAlt, productMetaDescription } from "../lib/seoText";
 import { categoryGroup } from "../lib/similarProducts";
 import { isSoldOut } from "../lib/stock";
@@ -43,6 +45,8 @@ const TRUST_POINTS = [
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
+
+const HIGHLIGHT_MS = 2500;
 
 // The main photo's frame, shared with the loading state so the page holds the
 // same space before and after the product arrives. Beside the thumbnail rail
@@ -222,6 +226,9 @@ export default function ProductDetailPage() {
 function ProductDetail({ productid }) {
   const { product, variants, loading, error } = useProduct(productid);
   const [selectedVariant, setSelectedVariant] = useState(null);
+  const [pickedSize, setPickedSize] = useState(null);
+  // Picker row ringed after a tap on a button that is waiting for a choice.
+  const [highlightRow, setHighlightRow] = useState(null);
   const [quantity, setQuantity] = useState(1);
   // null until known: the thumbnail rail sits above the info column on phones,
   // so the page waits for it rather than pushing the content down when it lands.
@@ -255,6 +262,12 @@ function ProductDetail({ productid }) {
       active = false;
     };
   }, [productid]);
+
+  useEffect(() => {
+    if (!highlightRow) return;
+    const timer = setTimeout(() => setHighlightRow(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlightRow]);
 
   if (loading || (product && !imagePaths)) {
     return <ProductLoading />;
@@ -301,7 +314,28 @@ function ProductDetail({ productid }) {
     soldOut,
   });
 
+  // Soft-disabled while a choice is missing: the button stays tappable and
+  // points at the row to fill instead of adding anything.
+  const missingChoice =
+    !soldOut && !selectedVariant && variants.length > 0
+      ? { hasSize: pickedSize !== null, hasColour: false }
+      : null;
+  const missingLabel = missingChoice && missingChoiceLabel(missingChoice);
+
+  const photoColours = imagePaths.map(imageColor);
+  const photoNote = colourPhotoNote({
+    selected: selectedVariant?.color,
+    shown: imageColor(imagePaths[activeImage]),
+    photoColours,
+  });
+
+  function handleSizeChange(size) {
+    setPickedSize(size);
+    setHighlightRow(null);
+  }
+
   function handleVariantSelect(variant) {
+    setHighlightRow(null);
     setSelectedVariant(variant);
     setQuantity(1);
     showColourPhoto(variant?.color);
@@ -357,11 +391,15 @@ function ProductDetail({ productid }) {
     });
   }
 
-  // The sticky bar can't host the size picker, so until a variant is chosen
-  // its button takes the shopper back up to the picker instead.
-  function handleStickyClick(event) {
-    if (canAddToCart) handleAddToCart(event);
-    else if (!heldByOthers) pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Until a variant is chosen both Add to Cart buttons take the shopper to the
+  // picker and ring the row still missing; nothing is added.
+  function handleAddOrChoose(event) {
+    if (canAddToCart) {
+      handleAddToCart(event);
+    } else if (missingChoice) {
+      setHighlightRow(missingChoiceRow(missingChoice));
+      pickerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }
 
   return (
@@ -387,6 +425,19 @@ function ProductDetail({ productid }) {
               onSelect={setActiveImage}
               onEnlarge={() => setLightboxOpen(true)}
             />
+            {photoNote && (
+              <p className="mt-3 text-xs text-storefront-charcoal font-sans leading-relaxed">
+                {photoNote}{" "}
+                <a
+                  href={whatsappColourQuestionUrl({ productid, colour: selectedVariant.color })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-[#25D366] text-storefront-charcoal px-2.5 py-1 tracking-wide hover:opacity-90 transition-opacity"
+                >
+                  Ask about this colour on WhatsApp
+                </a>
+              </p>
+            )}
           </div>
 
           {/* Info */}
@@ -418,6 +469,8 @@ function ProductDetail({ productid }) {
                   <VariantPicker
                     variants={variants}
                     onVariantSelect={handleVariantSelect}
+                    onSizeChange={handleSizeChange}
+                    highlight={highlightRow}
                     sizeAction={<SizeGuideDialog />}
                   />
                 ) : (
@@ -462,8 +515,8 @@ function ProductDetail({ productid }) {
             {/* Add to Cart — the sticky bar takes over once this leaves view */}
             <button
               ref={addToCartRef}
-              disabled={!canAddToCart}
-              onClick={handleAddToCart}
+              disabled={!canAddToCart && !missingChoice}
+              onClick={handleAddOrChoose}
               className="w-full flex items-center justify-center gap-2 bg-storefront-gold text-white font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-gold-dark transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {!soldOut && <ShoppingBag size={15} aria-hidden="true" />}
@@ -473,7 +526,7 @@ function ProductDetail({ productid }) {
                   ? "Add to Cart"
                   : heldByOthers
                     ? "In someone's cart"
-                    : "Select Size & Colour"}
+                    : missingLabel ?? "Choose a size and colour"}
             </button>
             {stockLabel && (
               <p className="text-xs text-center text-storefront-muted font-sans mt-2.5">
@@ -562,9 +615,9 @@ function ProductDetail({ productid }) {
         name={product.name}
         price={price}
         soldOut={soldOut}
-        label={soldOut ? "Sold out" : canAddToCart ? "Add to Cart" : heldByOthers ? "In someone's cart" : "Select size"}
+        label={soldOut ? "Sold out" : canAddToCart ? "Add to Cart" : heldByOthers ? "In someone's cart" : missingLabel ?? "Choose a size and colour"}
         disabled={heldByOthers || soldOut}
-        onClick={handleStickyClick}
+        onClick={handleAddOrChoose}
       />
     </>
   );

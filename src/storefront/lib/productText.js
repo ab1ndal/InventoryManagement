@@ -15,3 +15,9 @@ export function whatsappProductUrl({ name, productid, pageUrl, soldOut = false }
     : `Hi, I'm interested in ${name} (${productid}). ${pageUrl}`;
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
+
+// Asks the shop about a colour the product page has no picture of. It promises no photo, because the shop may not be able to send one quickly.
+export function whatsappColourQuestionUrl({ productid, colour }) {
+  const message = `Hi, can you tell me about ${productid} in ${colour}?`;
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}

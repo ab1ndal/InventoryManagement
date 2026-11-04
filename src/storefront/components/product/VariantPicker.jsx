@@ -13,9 +13,13 @@ function optionClass(selected, available) {
   }`;
 }
 
+const HIGHLIGHT_CLASS = "ring-2 ring-storefront-gold ring-offset-4 transition-shadow";
+
 // `sizeAction` renders beside the Size label (the PDP puts its size-guide
-// trigger there, next to the options it explains).
-export default function VariantPicker({ variants, onVariantSelect, sizeAction = null }) {
+// trigger there, next to the options it explains). `onSizeChange` tells the
+// page which size is picked (it can't see this state); `highlight`
+// ("size" | "colour") rings the row the shopper still has to fill.
+export default function VariantPicker({ variants, onVariantSelect, onSizeChange, highlight = null, sizeAction = null }) {
   const [selectedSize, setSelectedSize] = useState(null);
   const [selectedColor, setSelectedColor] = useState(null);
 
@@ -41,6 +45,7 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
   function handleSizeClick(size, available) {
     if (!available) return;
     setSelectedSize(size);
+    onSizeChange?.(size);
     // With a single in-stock colour there is nothing to choose: select it so
     // Add to Cart is ready instead of waiting on a click with one option.
     const inStock = variants.filter((v) => v.size === size && v.stock > 0);
@@ -74,7 +79,7 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
   return (
     <div className="space-y-5">
       {/* Sizes */}
-      <div>
+      <div className={highlight === "size" ? HIGHLIGHT_CLASS : undefined}>
         <div className="flex items-center justify-between gap-4 mb-2.5">
           <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal font-sans">
             Size
@@ -104,7 +109,7 @@ export default function VariantPicker({ variants, onVariantSelect, sizeAction = 
 
       {/* Colours — only shown after a size is selected */}
       {selectedSize && (
-        <div>
+        <div className={highlight === "colour" ? HIGHLIGHT_CLASS : undefined}>
           <p className="text-[10px] font-medium tracking-[0.15em] uppercase text-storefront-charcoal mb-2.5 font-sans">
             Colour
             {selectedColor && (

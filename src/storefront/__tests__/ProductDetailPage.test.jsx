@@ -218,11 +218,34 @@ describe("ProductDetailPage", () => {
     });
   });
 
-  it("keeps the size prompt and delivery line while something is in stock", async () => {
+  it("keeps the delivery line while something is in stock, and asks only for the colour when the size is set", async () => {
     await renderPage();
-    expect(screen.getByRole("button", { name: /select size & colour/i })).toBeDisabled();
+    // The single size is pre-selected, so only the colour is missing.
+    expect(screen.getByRole("button", { name: "Choose a colour" })).toBeEnabled();
     expect(screen.getByText(DELIVERY_ESTIMATE)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /ask on whatsapp/i })).toBeInTheDocument();
+  });
+
+  it("asks for a size and colour when the product has several sizes", async () => {
+    await renderPage(PRODUCT, [
+      { variantid: "v1", size: "M", color: "Green", stock: 1 },
+      { variantid: "v2", size: "L", color: "Green", stock: 1 },
+    ]);
+    expect(screen.getByRole("button", { name: "Choose a size and colour" })).toBeEnabled();
+  });
+
+  it("tapping the button while a choice is missing points at the picker and adds nothing", async () => {
+    const scrollIntoView = jest.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Choose a colour" }));
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(mockAddItem).not.toHaveBeenCalled();
+    // The colour row is ringed until the shopper picks one.
+    expect(screen.getByText("Colour").parentElement).toHaveClass("ring-2");
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(screen.getByText("Colour").parentElement).not.toHaveClass("ring-2");
+    delete window.HTMLElement.prototype.scrollIntoView;
   });
 
   it("keeps the price when only some variants are sold out", async () => {
@@ -265,7 +288,7 @@ describe("ProductDetailPage", () => {
 
   it("renders one add-to-cart button until the sticky bar is needed", async () => {
     await renderPage();
-    expect(screen.getAllByRole("button", { name: /select size/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /choose a/i })).toHaveLength(1);
   });
 });
 
@@ -350,6 +373,21 @@ describe("ProductDetailPage — colour photos", () => {
     await screen.findByRole("button", { name: /enlarge image/i });
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     expect(mainImageSrc()).toContain("green.png");
+    expect(screen.getByText("Photo shows Green. You picked Peach.")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /ask about this colour/i });
+    expect(link).toHaveClass("text-storefront-charcoal");
+    expect(decodeURIComponent(link.getAttribute("href").split("?text=")[1])).toBe(
+      "Hi, can you tell me about BC252742 in Peach?"
+    );
+  });
+
+  it("says nothing about photos when the picked colour has one", async () => {
+    getProductImagePaths.mockResolvedValue(["green.png", "peach.png"]);
+    await renderPage();
+    await screen.findByRole("button", { name: /enlarge image/i });
+    expect(screen.queryByText(/you picked|no photo of/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    expect(screen.queryByText(/you picked|no photo of/i)).not.toBeInTheDocument();
   });
 });
 
