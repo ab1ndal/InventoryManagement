@@ -698,7 +698,12 @@ export default function BillTable({ onEdit }) {
                     {b.orderdate ? formatDate(b.orderdate) : "—"}
                   </td>
                   <td className="p-2 text-right whitespace-nowrap">
-                    {formatINR((b.totalamount || 0) + (b.discount_total || 0), 2)}
+                    {formatINR(b.totalamount || 0, 2)}
+                    {b.discount_total > 0 && (
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        {formatINR(b.discount_total, 0)} off
+                      </div>
+                    )}
                   </td>
                   <td className="p-2 text-right hidden xl:table-cell">
                     {formatINR(b.gst_total || 0, 2)}
