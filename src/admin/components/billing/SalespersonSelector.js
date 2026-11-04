@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "../../../components/ui/input";
 import { Label } from "../../../components/ui/label";
 import { Checkbox } from "../../../components/ui/checkbox";
-import { supabase } from "../../../lib/supabaseClient";
+import { loadActiveSalespeople } from "./billingLookups";
 import { useToast } from "../../../components/hooks/use-toast";
 
 export default function SalespersonSelector({ selectedIds, setSelectedIds }) {
@@ -16,11 +16,7 @@ export default function SalespersonSelector({ selectedIds, setSelectedIds }) {
 
   useEffect(() => {
     const loadSalespersons = async () => {
-      const { data, error } = await supabase
-        .from("salespersons")
-        .select("salesperson_id, name")
-        .eq("active", true)
-        .order("name");
+      const { data, error } = await loadActiveSalespeople();
 
       if (error) {
         toast({

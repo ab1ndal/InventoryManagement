@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import BillTable from "../components/BillTable";
 import BillingForm from "../components/billing/BillingForm";
+import { clearBillingLookups, preloadBillingLookups } from "../components/billing/billingLookups";
 import { Button } from "../../components/ui/button";
 
 export default function BillingPage() {
@@ -12,6 +13,12 @@ export default function BillingPage() {
   const [refreshTable, setRefreshTable] = useState(0);
   const [exchangeCredit, setExchangeCredit] = useState(null);         // { amount, label } | null
   const [prefilledCustomerId, setPrefilledCustomerId] = useState(null);
+
+  // Discounts, salespeople and categories are edited on other admin pages.
+  useEffect(() => {
+    clearBillingLookups();
+    preloadBillingLookups();
+  }, []);
 
   // Consume route state from ExchangePage (Plan 02 handoff). Auto-open BillingForm with exchange credit.
   // Pitfall 4: clear window.history state after reading so back-nav does not re-open.
@@ -61,7 +68,7 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-2 lg:p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Billing</h1>
         <Button onClick={handleNewBill}>New Bill</Button>

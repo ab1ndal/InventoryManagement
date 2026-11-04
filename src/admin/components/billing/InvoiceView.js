@@ -593,7 +593,7 @@ const InvoiceView = forwardRef(function InvoiceView(
             <tbody>
               {billPayments.map((p, i) => (
                 <tr key={p.payment_id ?? i} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td style={{ padding: "2px 4px" }}>{formatDate(p.recorded_at)}</td>
+                  <td style={{ padding: "2px 4px" }}>{formatDate(String(p.recorded_at).slice(0, 10))}</td>
                   <td style={{ padding: "2px 4px" }}>
                     {p.salesmethods?.methodname || p.methodname || "—"}
                   </td>

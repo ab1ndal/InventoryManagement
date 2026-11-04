@@ -31,6 +31,45 @@ describe("hasAdminAccess", () => {
     expect(client.calls).toEqual(["claim_admin_invite", "profile"]);
   });
 
+  it("reads the role again after the claim, so an invited person's first sign-in gets in", async () => {
+    let claimed = false;
+    const client = {
+      rpc: () =>
+        new Promise((resolve) =>
+          setTimeout(() => {
+            claimed = true;
+            resolve({ error: null });
+          }, 5)
+        ),
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: async () =>
+              claimed
+                ? { data: { role: "admin", is_active: true }, error: null }
+                : { data: { role: "user", is_active: true }, error: null },
+          }),
+        }),
+      }),
+    };
+    await expect(hasAdminAccess(client, "u1")).resolves.toBe(true);
+    expect(claimed).toBe(true);
+  });
+
+  it("does not make an existing admin wait for the claim", async () => {
+    const client = {
+      rpc: () => new Promise(() => {}),
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: async () => ({ data: { role: "admin", is_active: true }, error: null }),
+          }),
+        }),
+      }),
+    };
+    await expect(hasAdminAccess(client, "u1")).resolves.toBe(true);
+  });
+
   it("refuses a customer with no invite", async () => {
     const client = clientWith({ profile: { data: { role: "user", is_active: true }, error: null } });
     await expect(hasAdminAccess(client, "u1")).resolves.toBe(false);

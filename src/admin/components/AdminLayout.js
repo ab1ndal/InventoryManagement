@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 import { countQueue } from "./onlineOrders/onlineOrdersApi";
+import { lastCheckedRole } from "../lib/adminAccess";
 import { Toaster } from "../../components/ui/toaster";
 
 const navItems = [
@@ -28,11 +29,18 @@ export default function AdminLayout() {
 
   useEffect(() => {
     (async () => {
+      // The route guard has already verified this session, and these only label the menu.
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        data: { session },
+      } = await supabase.auth.getSession();
+      const user = session?.user;
       if (user) {
         setUserEmail(user.email);
+        const checkedRole = lastCheckedRole(user.id);
+        if (checkedRole) {
+          setUserRole(checkedRole);
+          return;
+        }
         const { data } = await supabase
           .from("profiles")
           .select("role")
@@ -92,7 +100,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Top Navigation Bar */}
-      <nav className="sticky top-0 z-[60] bg-white border-b shadow px-6 py-4 flex items-center gap-6">
+      <nav className="sticky top-0 z-40 bg-white border-b shadow px-3 sm:px-6 py-4 flex items-center gap-3 sm:gap-6">
         <div className="flex space-x-6 overflow-x-auto whitespace-nowrap flex-1 min-w-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {visibleNavItems.map((item) => (
             <NavLink
@@ -132,7 +140,7 @@ export default function AdminLayout() {
       </nav>
 
       {/* Content Area */}
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-2 sm:p-6">
         <Outlet context={{ refreshOrdersNeedingAction }} />
       </main>
       <Toaster />

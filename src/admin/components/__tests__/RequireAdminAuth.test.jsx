@@ -8,7 +8,6 @@ let mockProfile;
 let mockAuthListener;
 const mockSignOut = jest.fn();
 
-jest.mock("../UserRegistration", () => () => null);
 jest.mock("../../../lib/supabaseClient", () => ({
   supabase: {
     auth: {

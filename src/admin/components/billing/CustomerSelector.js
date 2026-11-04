@@ -24,7 +24,8 @@ export default function CustomerSelector({
   useEffect(() => {
     const run = async () => {
       const q = customerQuery.trim();
-      if (!q) {
+      // The prefilled name of an opened bill is not a search.
+      if (!q || (selectedCustomerId && customerQuery === displayName)) {
         setCustomerOptions([]);
         return;
       }
@@ -37,7 +38,7 @@ export default function CustomerSelector({
     };
     const t = setTimeout(run, 300);
     return () => clearTimeout(t);
-  }, [customerQuery]);
+  }, [customerQuery, displayName, selectedCustomerId]);
 
   const handleSelect = (cust) => {
     setSelectedCustomerId(cust.customerid);
@@ -46,9 +47,10 @@ export default function CustomerSelector({
   };
 
   return (
-    <div className="flex items-start gap-2">
-      <div className="relative w-[280px]">
+    <div className="flex flex-wrap items-start gap-2">
+      <div className="relative w-full max-w-[280px]">
         <Input
+          id="bill-customer"
           placeholder="Search by name or phone"
           value={customerQuery}
           onChange={(e) => {
@@ -61,13 +63,14 @@ export default function CustomerSelector({
         {showDropdown && customerOptions.length > 0 && (
           <div className="absolute z-10 w-full mt-1 bg-white border rounded shadow">
             {customerOptions.map((c) => (
-              <div
+              <button
+                type="button"
                 key={c.customerid}
-                className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                className="block w-full px-3 py-2 text-left hover:bg-gray-100 focus-visible:bg-gray-100"
                 onClick={() => handleSelect(c)}
               >
                 {customerLabel(c)}
-              </div>
+              </button>
             ))}
           </div>
         )}
