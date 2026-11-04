@@ -6,10 +6,29 @@ import { Pencil, Trash2, Code } from "lucide-react";
 import { formatINR } from "../../utility/formatCurrency";
 import { formatDate } from "../../utility/dateFormat";
 import { logActivity } from "../../lib/activityLog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
+import { toast } from "sonner";
+
+// Usage is recorded in three places: bills and orders hold the code as plain text, so nothing
+// in the database stops a delete. Any failed check throws, so an unknown answer never allows one.
+async function isDiscountCodeUsed(code) {
+  if (!code) return false;
+  const checks = await Promise.all([
+    supabase.from("discount_usage").select("id").eq("code", code).limit(1),
+    // Quoted as an array element, so a code containing a comma is still one code.
+    supabase.from("bills").select("billid").filter("applied_codes", "cs", `{${JSON.stringify(code)}}`).limit(1),
+    supabase.from("orders").select("id").eq("promo_code", code).limit(1),
+  ]);
+  const failed = checks.find((check) => check.error);
+  if (failed) throw failed.error;
+  return checks.some((check) => check.data?.length > 0);
+}
 
 export default function DiscountTable({ onEdit, refresh }) {
   const [discounts, setDiscounts] = useState([]);
   const [categoryMap, setCategoryMap] = useState({});
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     supabase
@@ -24,15 +43,46 @@ export default function DiscountTable({ onEdit, refresh }) {
     fetchDiscounts();
   }, [refresh]);
 
-  const handleDelete = async (id) => {
-    const { error } = await supabase.from("discounts").delete().eq("id", id);
-    if (!error) {
-      const old = discounts.find((d) => d.id === id);
-      logActivity({ action: "delete", entityType: "discount", entityId: id, summary: `Deleted discount code ${old?.code || id}` });
-      fetchDiscounts();
-    } else {
-      console.error("Error deleting discount:", error.message);
+  const handleSetActive = async (discount, active) => {
+    const name = discount.code || "Discount";
+    const { error } = await supabase.from("discounts").update({ active }).eq("id", discount.id);
+    if (error) {
+      toast.error(`Could not switch ${active ? "on" : "off"} ${name}`, { description: error.message });
+      return;
     }
+    logActivity({ action: "update", entityType: "discount", entityId: discount.id, summary: `Switched ${active ? "on" : "off"} discount code ${name}` });
+    setDiscounts((prev) => prev.map((d) => (d.id === discount.id ? { ...d, active } : d)));
+    toast.success(`${name} switched ${active ? "on" : "off"}`);
+  };
+
+  // Only a code that was never used can be deleted. Deleting a used one would also remove its usage history.
+  const handleDeleteClick = async (discount) => {
+    try {
+      if (await isDiscountCodeUsed(discount.code)) {
+        toast.error(`${discount.code} has been used, so it cannot be deleted`, {
+          description: "Switch it off instead.",
+        });
+        return;
+      }
+      setDeleteTarget(discount);
+    } catch (e) {
+      toast.error("Could not check whether this code has been used", { description: e.message });
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    const { id, code } = deleteTarget;
+    setDeleting(true);
+    const { error } = await supabase.from("discounts").delete().eq("id", id);
+    setDeleting(false);
+    if (error) {
+      toast.error(`Could not delete ${code || "discount"}`, { description: error.message });
+      return;
+    }
+    logActivity({ action: "delete", entityType: "discount", entityId: id, summary: `Deleted discount code ${code || id}` });
+    toast.success(`${code || "Discount"} deleted`);
+    setDeleteTarget(null);
+    fetchDiscounts();
   };
 
   const discountTypeLabels = {
@@ -157,8 +207,17 @@ export default function DiscountTable({ onEdit, refresh }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDelete(d.id)}
+                  onClick={() => handleSetActive(d, !d.active)}
+                >
+                  {d.active ? "Switch off" : "Switch on"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteClick(d)}
                   className="group"
+                  title="Delete (only if never used)"
+                  aria-label={`Delete ${d.code || "discount"}`}
                 >
                   <Trash2 className="h-4 w-4 text-red-500 group-hover:text-red-700 transition-colors duration-200" />
                 </Button>
@@ -177,6 +236,30 @@ export default function DiscountTable({ onEdit, refresh }) {
           )}
         </tbody>
       </table>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {deleteTarget?.code || "this discount"}?</DialogTitle>
+            <DialogDescription>
+              It has never been used. It will be removed for good.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+              Keep
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={handleConfirmDelete}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
