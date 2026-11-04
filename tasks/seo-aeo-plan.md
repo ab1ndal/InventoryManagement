@@ -206,7 +206,7 @@ Open, dev:
 - Request indexing for kurta-pajama, about, contact, all-products, after PR #138 is live.
 - 2.1 keyword research needs an Ads account. 2.3 descriptions, 2.5 collection text.
 
-In review, not live (2026-11-04):
+Live 2026-11-04:
 - PR #139, photos: Storage sent `x-robots-tag: none` on every image, so none could reach Google Images. Found after the audit.
 - PR #138, 2.4 alt text, plus titles, descriptions, product links and store markup.
 - PR #140, 1.9 page speed: main.js 846 KB to 664 KB. Public pages stay eager to protect layout stability.

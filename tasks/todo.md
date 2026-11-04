@@ -22,21 +22,17 @@ Refund leg of this test not exercised (order is being shipped instead).
 
 ## SEO / AEO (updated 2026-11-04)
 
-Plan and rules: `tasks/seo-aeo-plan.md`. PRs below are not merged unless marked.
+Plan and rules: `tasks/seo-aeo-plan.md`.
 
-**Waiting on the owner: review and merge, in this order**
-1. [ ] PR #139 Let Google index product photos. Supabase sends `x-robots-tag: none` on every image, so no photo can reach
-   Google Images. Before merging, note current Vercel bandwidth: all photos now pass through Vercel.
-2. [ ] PR #138 Titles, descriptions, alt text, product links. Read the wording in `src/storefront/lib/collections.js`.
-3. [ ] PR #141 Merchant Center feed. Stacked on #138, retargets to main when #138 merges.
-4. [ ] PR #140 Load private pages on demand (main.js 846 KB to 664 KB). Touches checkout, so try one checkout after merging.
+**Live 2026-11-04:** PRs #139 photos, #140 lazy private pages, #138 titles and alt text, #141 Merchant feed. Checked on production: photos
+return `x-robots-tag: all`, sitemap lists 1,028 photos, feed has 778 valid items, no page errors or failed requests across 8 pages.
 
-**Dev, after those merge**
-- [ ] #139: `curl -I` a photo on production shows `x-robots-tag: all`; resubmit the sitemap; check Vercel bandwidth after a few days.
-- [ ] #138: Rich Results Test on a product and a collection. Read one product page and one collection in a browser.
-- [ ] Request indexing: kurta-pajama, about, contact, all-products. Held until #138 so Google reads the new titles.
+**Dev, next**
+- [ ] Check Vercel bandwidth in the dashboard around 2026-11-08, now that photos pass through Vercel. Try one real checkout, because it now loads on demand.
+- [ ] Rich Results Test on a product and a collection.
+- [ ] Request indexing: kurta-pajama, about, contact, all-products. Now unblocked.
 - [ ] Saree titles LIVE 2026-11-04: all 89 unique, final list in `tasks/title-drafts/sarees.json`. Wait 4 weeks of Search Console data, then decide on other categories. Check recorded colours against photos first.
-- [ ] New photos will go live with shared titles such as "Silk Saree", because `title_detail` is empty until someone fills it. 731 visible products have none, and about 2,860 more have no photo yet. Have the mockup-generator draft `title_detail` when a product is approved.
+- [ ] New photos will go live with shared titles such as "Silk Saree", because `title_detail` is empty until someone fills it. 731 visible products have none, and about 2,860 more have no photo yet. mockup-generator is getting `title_detail` drafting on branch `feat/title-detail` (started 2026-11-04).
 - [ ] Add a Kids collection and nav link when the first kids' photos go live. `collections.js` has none, so they would only appear under Shop All.
 - [ ] Add photos in batches and watch Search Console: "Crawled, not indexed" rising means slow down and improve the thinnest pages. Sitemap, feed and all-products pick up new products automatically.
 - [ ] Order snapshots still store `name`, so order pages and emails show the old title.
@@ -46,7 +42,7 @@ Plan and rules: `tasks/seo-aeo-plan.md`. PRs below are not merged unless marked.
 **Owner**
 - [ ] Decide delivery area (0.1). Blocks shipping markup, Merchant Center shipping settings, and national searches.
 - [ ] Google Ads account, for Keyword Planner volumes (2.1).
-- [ ] Create a Merchant Center account, then give it `https://www.bindalscreations.com/feeds/google-products.xml` (after #141).
+- [ ] Create a Merchant Center account, then give it `https://www.bindalscreations.com/feeds/google-products.xml` (feed is live).
 - [ ] Watch the Business Profile account's inbox for Google's reply to the listing appeal (dead website link on Maps).
 - [ ] Bing Webmaster Tools import from Search Console. Review QR counter card. Real shop and tailoring photos.
 
