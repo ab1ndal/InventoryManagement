@@ -765,6 +765,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     );
   }, [allDiscounts, usedCodeSet, selectedCustomerId, selectedCodes]);
 
+  // Same 30% limit as the per-item discount warning, applied to the discount a Final Amount creates.
+  // Display only: nothing here changes an amount or what is saved.
+  const finalAmountDiscountOverLimit = useMemo(() => {
+    if (!(Number(finalAmount) > 0)) return false;
+    const { effectiveTotal } = computeCreditsApplied(
+      computed.grandTotal,
+      appliedStoreCredit,
+      exchangeCredit?.amount
+    );
+    if (!(effectiveTotal > 0)) return false;
+    return ((effectiveTotal - Number(finalAmount)) / effectiveTotal) * 100 > 30;
+  }, [finalAmount, computed, appliedStoreCredit, exchangeCredit]);
+
   const showPartialButton = useMemo(() => {
     if (isFinalizedBill) return false;
     if (billPaymentStatus === "partial") return false;
@@ -2354,6 +2367,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                       onChange={(e) => setFinalAmount(e.target.value)}
                     />
                   </div>
+                  {finalAmountDiscountOverLimit && (
+                    <div className="rounded bg-yellow-50 border border-yellow-300 text-yellow-800 text-sm px-3 py-2 font-semibold">
+                      Warning: This Final Amount gives a discount above 30%.
+                    </div>
+                  )}
                 </section>
               )}
 
