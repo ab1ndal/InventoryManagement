@@ -13,6 +13,14 @@ function renderPage() {
 }
 
 describe("CustomizePage", () => {
+  it("uses dark text on the WhatsApp button, which white fails on green", () => {
+    renderPage();
+    screen.getAllByRole("link", { name: /send your photo on whatsapp/i }).forEach((link) => {
+      expect(link).toHaveClass("text-storefront-charcoal");
+      expect(link).not.toHaveClass("text-white");
+    });
+  });
+
   it("sends design requests to the shop's WhatsApp with a request template", () => {
     renderPage();
     const [whatsapp] = screen.getAllByRole("link", { name: /send your photo on whatsapp/i });

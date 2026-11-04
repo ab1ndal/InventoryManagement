@@ -40,6 +40,14 @@ it("lists items, shows subtotal, and revalidates on mount", async () => {
   expect(screen.getByRole("link", { name: /^checkout$/i })).toHaveAttribute("href", "/checkout");
 });
 
+it("uses dark text on the WhatsApp button, which white fails on green", async () => {
+  render(<MemoryRouter><CartPage /></MemoryRouter>);
+  const link = screen.getByRole("link", { name: /order on whatsapp/i });
+  expect(link).toHaveClass("text-storefront-charcoal");
+  expect(link).not.toHaveClass("text-white");
+  await waitFor(() => expect(mockRevalidate).toHaveBeenCalled());
+});
+
 it("passes the subtotal to the free-shipping nudge", async () => {
   render(<MemoryRouter><CartPage /></MemoryRouter>);
   expect(screen.getByTestId("free-shipping-nudge")).toHaveAttribute("data-amount", "3000");

@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import StorefrontFooter from "../components/StorefrontFooter";
+import tailwind from "../../../tailwind.config";
 
 function renderFooter() {
   render(
@@ -10,6 +11,34 @@ function renderFooter() {
     </MemoryRouter>
   );
 }
+
+// WCAG 2 relative luminance and contrast ratio.
+function luminance(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a, b) {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+describe("WhatsApp green", () => {
+  const { charcoal, whatsapp } = tailwind.theme.extend.colors.storefront;
+
+  it("passes WCAG AA with the charcoal text, as white does not", () => {
+    expect(contrast(charcoal, whatsapp)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast("#FFFFFF", whatsapp)).toBeLessThan(4.5);
+  });
+
+  it("the floating button uses the charcoal", () => {
+    renderFooter();
+    expect(screen.getByRole("link", { name: /chat on whatsapp/i })).toHaveClass("text-storefront-charcoal");
+  });
+});
 
 describe("StorefrontFooter", () => {
   it("links to all four policy pages", () => {
