@@ -2,9 +2,24 @@
 // Content comes from the same modules the React pages use, so the two cannot drift apart.
 
 import { COLLECTIONS, getCollection } from "../storefront/lib/collections";
-import { NAV_LINKS, SHOP_ADDRESS } from "../storefront/lib/siteConfig";
+import {
+  GOOGLE_MAPS_URL,
+  NAV_LINKS,
+  SHOP_ADDRESS,
+  STORE_LATITUDE,
+  STORE_LONGITUDE,
+} from "../storefront/lib/siteConfig";
 import { imageUrl } from "../storefront/lib/imageVariant";
 import { stripMarkdown } from "../storefront/lib/productText";
+import {
+  HOME_DESCRIPTION,
+  HOME_TITLE,
+  SHOP_DESCRIPTION,
+  SHOP_TITLE,
+  productImageAlt,
+  productMetaDescription,
+} from "../storefront/lib/seoText";
+import { categoryGroup, rankSimilar } from "../storefront/lib/similarProducts";
 import { ABOUT } from "../storefront/pages/aboutContent";
 import { CUSTOMIZE } from "../storefront/pages/customizeContent";
 import { FAQ_ITEMS } from "../storefront/pages/faqContent";
@@ -19,7 +34,10 @@ import { SITE_NAME, SITE_URL, esc } from "./html";
 
 const LISTED_PRODUCTS = 48;
 const PRODUCT_ID_RE = /^[A-Za-z0-9-]{1,40}$/;
-const LIST_FIELDS = "productid,name:display_title,retailprice,productimages(imageurl,displayorder)";
+const LIST_FIELDS = "productid,name:display_title,retailprice,productimages(imageurl,displayorder,productcolor)";
+// The same pool the product page's "More like this" ranks.
+const SIMILAR_CANDIDATES = 200;
+const SIMILAR_FIELDS = `${LIST_FIELDS},fabric,categoryid,productsizecolors(stock,color)`;
 
 // States only what /policies/returns says: 7 days from delivery, sent back at the customer's cost or
 // brought to the shop.
@@ -41,7 +59,7 @@ const STORE_JSON_LD = {
   legalName: "Bindals Creation",
   url: `${SITE_URL}/`,
   logo: `${SITE_URL}/logo512.png`,
-  image: `${SITE_URL}/logo512.png`,
+  image: [`${SITE_URL}/store/store-front.webp`, `${SITE_URL}/store/store-interior.webp`],
   telephone: "+919810873280",
   email: "bindalscreations@gmail.com",
   foundingDate: "2017",
@@ -53,13 +71,15 @@ const STORE_JSON_LD = {
     postalCode: "201001",
     addressCountry: "IN",
   },
+  geo: { "@type": "GeoCoordinates", latitude: STORE_LATITUDE, longitude: STORE_LONGITUDE },
+  hasMap: GOOGLE_MAPS_URL,
   openingHoursSpecification: {
     "@type": "OpeningHoursSpecification",
     dayOfWeek: ["Monday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
     opens: "10:00",
     closes: "20:30",
   },
-  sameAs: ["https://instagram.com/bindals_creation_shop"],
+  sameAs: ["https://instagram.com/bindals_creation_shop", GOOGLE_MAPS_URL],
   hasMerchantReturnPolicy: RETURN_POLICY,
 };
 
@@ -77,11 +97,12 @@ const breadcrumbs = (...crumbs) => ({
 const paragraphs = (items) => items.map((text) => `<p>${esc(text)}</p>`).join("");
 const link = (to, label) => `<a href="${esc(to)}">${esc(label)}</a>`;
 
+const sortedImages = (product) =>
+  [...(product.productimages || [])].sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0));
+
 function firstImage(product, width) {
-  const images = [...(product.productimages || [])].sort(
-    (a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0)
-  );
-  return images[0] ? imageUrl(images[0].imageurl, { width }) : null;
+  const [first] = sortedImages(product);
+  return first ? imageUrl(first.imageurl, { width }) : null;
 }
 
 const rupees = (n) => `₹${Number(n).toLocaleString("en-IN")}`;
@@ -90,7 +111,8 @@ function productList(products) {
   if (!products.length) return "";
   const cards = products.map((p) => {
     const src = firstImage(p, 150);
-    const img = src ? `<img src="${esc(src)}" alt="${esc(p.name)}" width="150" loading="lazy"/>` : "";
+    const alt = productImageAlt(p.name, sortedImages(p)[0]?.productcolor);
+    const img = src ? `<img src="${esc(src)}" alt="${esc(alt)}" width="150" loading="lazy"/>` : "";
     return `<li><a href="/product/${esc(p.productid)}">${img}${esc(p.name)}</a> ${esc(rupees(p.retailprice))}</li>`;
   });
   return `<ul>${cards.join("")}</ul>`;
@@ -246,8 +268,8 @@ async function homePage(rest) {
   const collections = COLLECTIONS.map((c) => `<li>${link(`/collections/${c.slug}`, c.title)}</li>`).join("");
   return {
     status: 200,
-    description:
-      "Handpicked sarees, lehengas, suits and sherwanis from Bindal's Creation in Ghaziabad. Seen a look you love? Our in-house tailors can make it for you.",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
     canonical: "/",
     bodyHtml: frame(
       `<h1>Bindal's Creation: handpicked Indian ethnic wear and custom tailoring</h1>` +
@@ -276,8 +298,8 @@ async function shopPage(rest) {
   );
   return {
     status: 200,
-    title: "Shop",
-    description: "Browse our handpicked sarees, lehengas, suits, and ethnic wear.",
+    title: SHOP_TITLE,
+    description: SHOP_DESCRIPTION,
     canonical: "/shop",
     bodyHtml: frame(`<h1>Shop</h1>${productList(products)}`),
     jsonLd: [itemList(products)],
@@ -323,8 +345,8 @@ async function collectionPage(slug, rest) {
   const products = await rest(`products?${collectionQuery(collection)}&order=productid.desc&limit=${LISTED_PRODUCTS}`);
   return {
     status: 200,
-    title: collection.title,
-    description: collection.subtitle,
+    title: collection.seoTitle,
+    description: collection.description,
     canonical: path,
     bodyHtml: frame(`<h1>${esc(collection.title)}</h1><p>${esc(collection.subtitle)}</p>${productList(products)}`),
     jsonLd: [
@@ -337,8 +359,8 @@ async function collectionPage(slug, rest) {
 async function productPage(id, rest) {
   if (!PRODUCT_ID_RE.test(id)) return NOT_FOUND;
   const rows = await rest(
-    `products?productid=eq.${id}&select=productid,name:display_title,description,retailprice,fabric,` +
-      `categories(name),productimages(imageurl,displayorder),productsizecolors(stock)`
+    `products?productid=eq.${id}&select=productid,name:display_title,description,retailprice,fabric,categoryid,` +
+      `categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color)`
   );
   const product = rows[0];
   if (!product) return NOT_FOUND;
@@ -348,8 +370,21 @@ async function productPage(id, rest) {
   const category = product.categories?.name;
   const price = Number(product.retailprice);
   const inStock = (product.productsizecolors || []).some((v) => Number(v.stock) > 0);
+  const images = sortedImages(product);
   const image = firstImage(product, 1200);
-  const fallback = `${product.name}${category ? ` — ${category}` : ""} · ${rupees(price)}`;
+  const description = productMetaDescription({ name: product.name, text, price });
+  const colours = [...new Set((product.productsizecolors || []).map((v) => v.color).filter(Boolean))];
+  const group = categoryGroup(product.categoryid);
+  const similar = product.categoryid
+    ? rankSimilar(
+        product,
+        colours,
+        await rest(
+          `products?select=${SIMILAR_FIELDS}&categoryid=in.(${(group?.categoryIds ?? [product.categoryid]).join(",")})` +
+            `&productid=neq.${product.productid}&order=productid.desc&limit=${SIMILAR_CANDIDATES}`
+        )
+      )
+    : [];
   const facts = [
     category && `Category: ${category}`,
     product.fabric && `Fabric: ${product.fabric}`,
@@ -360,24 +395,39 @@ async function productPage(id, rest) {
   return {
     status: 200,
     title: product.name,
-    description: text ? text.slice(0, 160) : fallback,
+    description,
     canonical: path,
     type: "product",
     image,
     bodyHtml: frame(
-      `<h1>${esc(product.name)}</h1>` +
-        (image ? `<img src="${esc(firstImage(product, 600))}" alt="${esc(product.name)}" width="600"/>` : "") +
+      link(group ? `/collections/${group.slug}` : "/shop", group ? group.title : "Shop") +
+        `<h1>${esc(product.name)}</h1>` +
+        images
+          .map((img, i) => {
+            const alt = productImageAlt(product.name, img.productcolor, i + 1, images.length);
+            return `<img src="${esc(imageUrl(img.imageurl, { width: 600 }))}" alt="${esc(alt)}" width="600"/>`;
+          })
+          .join("") +
         `<ul>${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` +
-        (text ? `<p>${esc(text)}</p>` : "")
+        (text ? `<p>${esc(text)}</p>` : "") +
+        (similar.length
+          ? `<h2>More like this</h2>${productList(similar)}` +
+            (group ? link(`/collections/${group.slug}`, `View all ${group.title}`) : "")
+          : "")
     ),
     jsonLd: [
-      breadcrumbs(["Home", "/"], ["Shop", "/shop"], [product.name, path]),
+      breadcrumbs(
+        ["Home", "/"],
+        group ? [group.title, `/collections/${group.slug}`] : ["Shop", "/shop"],
+        [product.name, path]
+      ),
       {
         "@context": "https://schema.org",
         "@type": "Product",
         name: product.name,
-        image: image ? [image] : undefined,
-        description: text || fallback,
+        image: images.length ? images.map((img) => imageUrl(img.imageurl, { width: 1200 })) : undefined,
+        description: text || description,
+        color: colours.length === 1 ? colours[0] : undefined,
         sku: product.productid,
         category: category || undefined,
         material: product.fabric || undefined,

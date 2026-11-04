@@ -6,6 +6,7 @@ import ProductCard from "../components/ProductCard";
 const mockImagePaths = jest.fn();
 jest.mock("../lib/productImage", () => ({
   getProductImagePaths: (...args) => mockImagePaths(...args),
+  imageColor: () => null,
 }));
 jest.mock("../components/BlurFillImage", () => ({ alt }) => <img alt={alt} />);
 jest.mock("../context/WishlistContext", () => ({
@@ -55,8 +56,8 @@ describe("ProductCard", () => {
   it("carries the de-hyphenated name in image alt text, not as sr-only text", async () => {
     mockImagePaths.mockResolvedValue(["a.png", "b.png"]);
     renderCard(base);
-    expect(await screen.findByAltText("Silk Saree — view 1")).toBeInTheDocument();
-    expect(screen.getByAltText("Silk Saree — view 2")).toBeInTheDocument();
+    expect(await screen.findByAltText("Silk Saree, view 1")).toBeInTheDocument();
+    expect(screen.getByAltText("Silk Saree, view 2")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("Silk Saree")).not.toBeInTheDocument());
     expect(screen.getByRole("link", { name: /silk saree/i })).toBeInTheDocument();
   });

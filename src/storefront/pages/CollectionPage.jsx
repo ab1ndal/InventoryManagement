@@ -17,6 +17,8 @@ export default function CollectionPage() {
         key={slug}
         title={collection.title}
         subtitle={collection.subtitle}
+        seoTitle={collection.seoTitle}
+        seoDescription={collection.description}
         scopeCategoryIds={collection.productIds ? null : collection.categoryIds}
         scopeProductIds={collection.productIds || null}
         scopeSizes={collection.sizes || null}
@@ -49,7 +51,7 @@ function EmptyCollection({ collection }) {
 
   return (
     <div className="min-h-screen bg-storefront-cream">
-      <Seo title={collection.title} description={collection.subtitle} />
+      <Seo title={collection.seoTitle} description={collection.description} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
         <h1 className="font-display font-semibold text-4xl sm:text-5xl text-storefront-charcoal leading-tight mb-3">

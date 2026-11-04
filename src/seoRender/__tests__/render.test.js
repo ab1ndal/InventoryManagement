@@ -3,6 +3,7 @@ import path from "path";
 import { CACHE_DEGRADED, CACHE_RENDERED, renderResponse } from "../handler";
 import { renderHtml } from "../html";
 import { describePage } from "../pages";
+import { COLLECTIONS } from "../../storefront/lib/collections";
 import { buildSitemap, sitemapResponse } from "../sitemap";
 
 const shell = fs.readFileSync(path.join(__dirname, "../../../public/index.html"), "utf8");
@@ -81,6 +82,75 @@ describe("describePage", () => {
     expect(page.bodyHtml).not.toContain("<script>");
     const html = renderHtml(shell, page);
     expect(html).not.toContain("<script>alert(1)");
+  });
+
+  test("a thin description is built up from the product's facts, a long one cut at a word", async () => {
+    const thin = await describePage("product/BC1", rest([{ ...product, description: "Yellow Green" }]));
+    expect(thin.description).toBe("Silk Saree, ₹2,195, from Bindal's Creation in Ghaziabad. Yellow Green");
+    const words = "word ".repeat(60).trim();
+    const long = await describePage("product/BC1", rest([{ ...product, description: words }]));
+    expect(long.description.length).toBeLessThanOrEqual(160);
+    expect(long.description).toMatch(/word…$/);
+  });
+
+  test("every photo is shown and described by its colour and view", async () => {
+    const images = [
+      { imageurl: IMG, displayorder: 1, productcolor: "Green" },
+      { imageurl: IMG, displayorder: 0, productcolor: "Yellow" },
+    ];
+    const page = await describePage("product/BC1", rest([{ ...product, productimages: images }]));
+    expect(page.bodyHtml).toContain('alt="Silk Saree in Yellow, view 1"');
+    expect(page.bodyHtml).toContain('alt="Silk Saree in Green, view 2"');
+    expect(ld(page, "Product").image).toHaveLength(2);
+  });
+
+  test("a colour already in the name is not repeated", async () => {
+    const page = await describePage(
+      "product/BC1",
+      rest([{ ...product, name: "Green Silk Saree", productimages: [{ imageurl: IMG, productcolor: "Green" }] }])
+    );
+    expect(page.bodyHtml).toContain('alt="Green Silk Saree"');
+  });
+
+  test("a product names its colour only when it has one", async () => {
+    const one = [{ stock: 1, color: "Red" }, { stock: 0, color: "Red" }];
+    const two = [{ stock: 1, color: "Red" }, { stock: 1, color: "Blue" }];
+    expect(ld(await describePage("product/BC1", rest([{ ...product, productsizecolors: one }])), "Product").color).toBe("Red");
+    expect(ld(await describePage("product/BC1", rest([{ ...product, productsizecolors: two }])), "Product").color).toBeUndefined();
+  });
+
+  test("a product links its collection and similar pieces, leaving out sold-out ones", async () => {
+    const inStock = { productid: "BC2", name: "Other Saree", retailprice: 2000, productsizecolors: [{ stock: 1 }], productimages: [] };
+    const soldOut = { productid: "BC3", name: "Gone Saree", retailprice: 2000, productsizecolors: [{ stock: 0 }], productimages: [] };
+    const q = jest
+      .fn()
+      .mockResolvedValueOnce([{ ...product, categoryid: "SA" }])
+      .mockResolvedValueOnce([inStock, soldOut]);
+    const page = await describePage("product/BC1", q);
+    expect(q.mock.calls[1][0]).toContain("categoryid=in.(SA)");
+    expect(q.mock.calls[1][0]).toContain("productid=neq.BC1");
+    expect(page.bodyHtml).toContain('href="/product/BC2"');
+    expect(page.bodyHtml).not.toContain('href="/product/BC3"');
+    expect(page.bodyHtml).toContain("View all Sarees");
+    expect(ld(page, "BreadcrumbList").itemListElement[1].item).toBe("https://www.bindalscreations.com/collections/sarees");
+  });
+
+  test("every collection has its own search title and a full description", async () => {
+    const titles = COLLECTIONS.map((c) => c.seoTitle);
+    expect(new Set(titles).size).toBe(COLLECTIONS.length);
+    COLLECTIONS.forEach((c) => {
+      expect(c.description.length).toBeGreaterThanOrEqual(80);
+      expect(c.description.length).toBeLessThanOrEqual(160);
+    });
+    const page = await describePage("collections/lehengas", rest());
+    expect(page.title).toBe("Bridal & Festive Lehengas in Ghaziabad");
+  });
+
+  test("the store shows real shop photos, its map and its pin", async () => {
+    const store = ld(await describePage("", rest()), "ClothingStore");
+    expect(store.image[0]).toBe("https://www.bindalscreations.com/store/store-front.webp");
+    expect(store.geo.latitude).toBeCloseTo(28.67, 2);
+    expect(store.hasMap).toContain("maps.google.com");
   });
 
   test("the FAQ answers are structured data", async () => {

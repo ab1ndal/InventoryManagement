@@ -28,6 +28,8 @@ import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote, heldNote } from "../lib/deliveryEstimate";
 import { stripMarkdown, whatsappProductUrl } from "../lib/productText";
+import { productImageAlt, productMetaDescription } from "../lib/seoText";
+import { categoryGroup } from "../lib/similarProducts";
 import { isSoldOut } from "../lib/stock";
 
 const TRUST_POINTS = [
@@ -49,14 +51,14 @@ function unique(values) {
 const GALLERY_FRAME =
   "flex-1 sm:self-start aspect-[3/4] md:max-w-[calc((100svh-182px)*0.75)] bg-storefront-cream";
 
-function BackToShopLink() {
+function BackToShopLink({ group }) {
   return (
     <Link
-      to="/shop"
+      to={group ? `/collections/${group.slug}` : "/shop"}
       className="inline-flex items-center gap-1.5 text-[10px] font-sans tracking-[0.15em] uppercase text-storefront-muted hover:text-storefront-charcoal transition-colors mb-8"
     >
       <ArrowLeft size={11} />
-      Shop
+      {group ? group.title : "Shop"}
     </Link>
   );
 }
@@ -165,7 +167,7 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
             <BlurFillImage
               key={paths[active]}
               path={paths[active]}
-              alt={name}
+              alt={productImageAlt(name, imageColor(paths[active]), active + 1, paths.length)}
               width={1000}
               fit="cover"
               eager
@@ -363,17 +365,13 @@ function ProductDetail({ productid }) {
     <>
       <Seo
         title={product.name}
-        description={
-          description
-            ? description.slice(0, 160)
-            : `${product.name}${categoryName ? ` — ${categoryName}` : ""} · ₹${price.toLocaleString("en-IN")}`
-        }
+        description={productMetaDescription({ name: product.name, text: description, price })}
         type="product"
         image={ogImage}
       />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28">
         {/* Breadcrumb */}
-        <BackToShopLink />
+        <BackToShopLink group={categoryGroup(product.categoryid)} />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-16">
           {/* Gallery — stays in view on desktop while the info column scrolls.

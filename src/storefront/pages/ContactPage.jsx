@@ -1,15 +1,15 @@
 import React from "react";
 import StaticPage from "../components/StaticPage";
 import { MapPin, Phone, Mail, MessageCircle, Clock, Star } from "lucide-react";
-import { GOOGLE_REVIEW_URL } from "../lib/siteConfig";
+import { GOOGLE_MAPS_URL, GOOGLE_REVIEW_URL, STORE_LATITUDE, STORE_LONGITUDE } from "../lib/siteConfig";
 
 const ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001";
 // Map and directions use the verified Google listing's pin, not the address
 // text: Google geocodes Indian market addresses unreliably and drops the pin
 // in the wrong lane. ADDRESS stays the human-readable wording customers know.
-const STORE_LAT_LNG = "28.6658525,77.4270128";
+const STORE_LAT_LNG = `${STORE_LATITUDE},${STORE_LONGITUDE}`;
 const MAP_SRC = `https://www.google.com/maps?q=${STORE_LAT_LNG}&z=17&output=embed`;
-const DIRECTIONS_URL = "https://maps.google.com/?cid=3990311017020362668";
+const DIRECTIONS_URL = GOOGLE_MAPS_URL;
 const STORE_PHOTOS = [
   { src: "/store/store-front.webp", alt: "Bindal's Creation shop front at Sihani Gate Market, Ghaziabad" },
   { src: "/store/store-interior.webp", alt: "Inside the shop: saree shelves and a suit on display" },

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Heart, ChevronLeft, ChevronRight } from "lucide-react";
-import { getProductImagePaths } from "../lib/productImage";
+import { getProductImagePaths, imageColor } from "../lib/productImage";
+import { productImageAlt } from "../lib/seoText";
 import { isSoldOut } from "../lib/stock";
 import { useWishlist } from "../context/WishlistContext";
 import BlurFillImage from "./BlurFillImage";
@@ -115,7 +116,7 @@ export default function ProductCard({ product, priority = false }) {
               <div key={path} className="w-full h-full flex-shrink-0">
                 <BlurFillImage
                   path={path}
-                  alt={`${displayName}${count > 1 ? ` — view ${i + 1}` : ""}`}
+                  alt={productImageAlt(displayName, imageColor(path), i + 1, count)}
                   width={600}
                   eager={priority && i === 0}
                   fit="cover"
