@@ -26,6 +26,7 @@ import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
 import { TooltipProvider } from "components/ui/tooltip";
+import RouteErrorBoundary from "components/RouteErrorBoundary";
 import { lazyWithReload } from "lib/lazyWithReload";
 
 const AdminLayout = lazy(() => import("./admin/components/AdminLayout"));
@@ -69,6 +70,8 @@ function App() {
   return (
     <TooltipProvider>
       <Router>
+        {/* Last resort: the layouts' own boundaries keep their menus on screen for a failed page. */}
+        <RouteErrorBoundary>
         <Suspense fallback={null}>
         <Routes>
           {/* Storefront */}
@@ -134,6 +137,7 @@ function App() {
           </Route>
         </Routes>
         </Suspense>
+        </RouteErrorBoundary>
       </Router>
       <Toaster position="bottom-right" richColors closeButton duration={2000} />
     </TooltipProvider>

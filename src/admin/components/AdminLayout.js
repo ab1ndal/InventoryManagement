@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { countQueue } from "./onlineOrders/onlineOrdersApi";
 import { lastCheckedRole } from "../lib/adminAccess";
 import { Toaster } from "../../components/ui/toaster";
+import RouteErrorBoundary from "../../components/RouteErrorBoundary";
 
 const navItems = [
   { label: "Dashboard", path: "/admin/dashboard", superadminOnly: true },
@@ -141,7 +142,9 @@ export default function AdminLayout() {
 
       {/* Content Area */}
       <main className="flex-1 p-2 sm:p-6">
-        <Outlet context={{ refreshOrdersNeedingAction }} />
+        <RouteErrorBoundary>
+          <Outlet context={{ refreshOrdersNeedingAction }} />
+        </RouteErrorBoundary>
       </main>
       <Toaster />
     </div>
