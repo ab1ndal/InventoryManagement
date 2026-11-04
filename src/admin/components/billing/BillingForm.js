@@ -78,7 +78,7 @@ const CUSTOMER_SELECT =
 // Everything the form needs about a bill, in one request, so opening one costs one round trip.
 const BILL_SELECT =
   "orderdate, customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, " +
-  "finalized, pdf_url, paymentstatus, net_amount, totalamount, exchange_credit_used, exchange_source_bill, " +
+  "finalized, pdf_url, paymentstatus, net_amount, totalamount, store_credit_used, exchange_credit_used, exchange_source_bill, " +
   `document_type, applied_codes, customers(${CUSTOMER_SELECT}), ` +
   "bill_payments(payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)), " +
   "bill_items(*, productsizecolors(size, color)), " +
@@ -275,6 +275,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setExchangeCredit(null);
       setExchangeBalanceMode(null);
       setExchangeBalanceAcknowledged(false);
+      setIsBackdated(false);
       setCustomerStoreCreditBalance(0);
       setVoucherCode("");
       setAppliedVoucher(null);
@@ -473,6 +474,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           applyCustomer(bill.customers);
           setLoadedCustomerId(bill.customerid);
         }
+        // A finalized bill has already taken its credit from the customer, so it keeps that amount
+        // rather than today's balance. A draft has taken none yet, so it offers the balance like a new bill.
+        if (bill.finalized) setAppliedStoreCredit(Number(bill.store_credit_used ?? 0));
         setSelectedCustomerId(bill.customerid || null);
         setNotes(bill.notes || "");
         setSalesLocationId(bill.saleslocationid || null);
@@ -1194,7 +1198,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
     }
 
-    if (effectiveGrandTotal > 0 && !isBackdated && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
+    if (effectiveGrandTotal > 0 && Math.abs(paidAmt - effectiveGrandTotal) > 100) {
       const diff = (paidAmt - effectiveGrandTotal).toFixed(2);
       const msg =
         diff > 0
@@ -2123,7 +2127,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     htmlFor="backdated-bill"
                     className="cursor-pointer text-sm font-normal text-muted-foreground"
                   >
-                    Don't reduce stock (entering an old bill)
+                    Don't reduce stock (already corrected by hand for this sale)
                   </Label>
                 </div>
               </section>

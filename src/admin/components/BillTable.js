@@ -31,6 +31,9 @@ const SORTABLE_COLUMNS = {
   paymentstatus: "paymentstatus",
 };
 
+// A cancelled draft has already had its stock put back, so deleting it would put it back again.
+const isDeletableDraft = (bill) => !bill.finalized && bill.paymentstatus !== "cancelled";
+
 export default function BillTable({ onEdit }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -306,9 +309,13 @@ export default function BillTable({ onEdit }) {
       }
     }
 
-    // Atomic stock + qty in the DB (online orders change the same stock concurrently).
-    // A failure warns rather than aborts: aborting mid-loop would make a retry
-    // restock the already-restored variants twice.
+    await restockItems(billId, billItems, exchangedQtyMap);
+  };
+
+  // Atomic stock + qty in the DB (online orders change the same stock concurrently).
+  // A failure warns rather than aborts: aborting mid-loop would make a retry
+  // restock the already-restored variants twice.
+  const restockItems = async (billId, billItems, exchangedQtyMap) => {
     const stockFailures = [];
     for (const bi of billItems || []) {
       const netQty = bi.quantity - (exchangedQtyMap[bi.bill_item_id] || 0);
@@ -540,30 +547,39 @@ export default function BillTable({ onEdit }) {
     setResolveOpen(true);
   };
 
+  // Drafts only. A finalized bill is kept as a record and goes through Cancel.
   const handleDelete = async (bill) => {
-    const { billid: billId, finalized, customerid, pdf_url } = bill;
-    const confirmMsg = finalized
-      ? `Delete finalized Bill #${billId}? This will restore stock and reverse customer spend. This cannot be undone.`
-      : `Delete draft Bill #${billId}? This will restore stock.`;
-    if (!window.confirm(confirmMsg)) return;
+    const { billid: billId } = bill;
+    if (!window.confirm(`Delete draft Bill #${bill.bill_number || billId} for ${customerName(bill.customers)}? This will restore stock.`)) return;
 
     // Optimistic removal
     setBills((prev) => prev.filter((b) => b.billid !== billId));
 
     try {
-      await restoreStockForBill(billId);
-
-      // For finalized bills: refund store credit + delete discount_usage + remove PDF
-      if (finalized && customerid) {
-        await refundStoreCreditForBill(billId, customerid);
-        await supabase.from("discount_usage").delete().eq("billid", billId);
-        if (pdf_url) {
-          await supabase.storage.from("invoices").remove([`bill-${billId}.pdf`]);
-        }
+      // This list can be out of date: the bill may have been finalized or cancelled since it loaded.
+      const { data: current, error: readErr } = await supabase
+        .from("bills")
+        .select("finalized, paymentstatus")
+        .eq("billid", billId)
+        .single();
+      if (readErr) throw readErr;
+      if (!isDeletableDraft(current)) {
+        throw new Error("This bill is no longer a draft. Refresh the page to see it.");
       }
 
-      await supabase.from("bill_items").delete().eq("billid", billId);
-      await supabase.from("bill_salespersons").delete().eq("billid", billId);
+      // Stock follows the rows this call actually removed, and a row can only be removed once,
+      // so trying again after a failure further down cannot restore the same stock twice.
+      const { data: removedItems, error: itemsErr } = await supabase
+        .from("bill_items")
+        .delete()
+        .eq("billid", billId)
+        .select("bill_item_id, variantid, quantity");
+      if (itemsErr) throw itemsErr;
+      // Only finalized bills can be exchanged, so a draft has no exchanged quantity to allow for.
+      await restockItems(billId, (removedItems || []).filter((bi) => bi.variantid), {});
+
+      const { error: spErr } = await supabase.from("bill_salespersons").delete().eq("billid", billId);
+      if (spErr) throw spErr;
       const { error } = await supabase.from("bills").delete().eq("billid", billId);
       if (error) throw error;
 
@@ -819,16 +835,12 @@ export default function BillTable({ onEdit }) {
                           <Ban className="h-4 w-4" />
                         </Button>
                       )}
-                      {!isWebsiteMethod(b.salesmethods) && (
+                      {isDeletableDraft(b) && !isWebsiteMethod(b.salesmethods) && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          title={
-                            b.finalized
-                              ? "Delete finalized bill (restores stock)"
-                              : "Delete draft"
-                          }
-                          aria-label="Delete bill"
+                          title="Delete draft"
+                          aria-label="Delete draft"
                           onClick={() => handleDelete(b)}
                         >
                           <Trash2 className="h-4 w-4" />
