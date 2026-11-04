@@ -20,6 +20,41 @@ kurti). Webhook, paid status, shop + customer confirmation emails all worked. â‚
 Owner retries Process on 2026-10-31.
 Refund leg of this test not exercised (order is being shipped instead).
 
+## SEO / AEO (updated 2026-11-04)
+
+Plan and rules: `tasks/seo-aeo-plan.md`. Nothing below is merged unless marked.
+
+**Waiting on the owner: review and merge, in this order**
+0. [ ] PR for this docs update (`feat/saree-title-drafts`), so this list reaches main.
+1. [ ] PR #139 Let Google index product photos. Supabase sends `x-robots-tag: none` on every image, so no photo can reach
+   Google Images. Before merging, note current Vercel bandwidth: all photos now pass through Vercel.
+2. [ ] PR #138 Titles, descriptions, alt text, product links. Read the wording in `src/storefront/lib/collections.js`.
+3. [ ] PR #141 Merchant Center feed. Stacked on #138, retargets to main when #138 merges.
+4. [ ] PR #140 Load private pages on demand (main.js 846 KB to 664 KB). Touches checkout, so try one checkout after merging.
+5. [ ] Saree titles: answer 12 questions and approve drafts at https://claude.ai/artifact/CA3Ec3XAQfjwDseP7FXyzX
+   (drafts in `tasks/title-drafts/sarees.json`). 16 titles become 89. Nothing written to the database yet.
+
+**Dev, after those merge**
+- [ ] #139: `curl -I` a photo on production shows `x-robots-tag: all`; resubmit the sitemap; check Vercel bandwidth after a few days.
+- [ ] #138: Rich Results Test on a product and a collection. Read one product page and one collection in a browser.
+- [ ] Request indexing: kurta-pajama, about, contact, all-products. Held until #138 so Google reads the new titles.
+- [ ] Saree titles once approved: fix or leave the flagged colours as the owner says, then guarded update of
+  `products.title_detail` for 89 sarees (never touch `name`), needs owner OK to write to prod.
+- [ ] Wait 4 weeks of Search Console data on sarees, then decide on other categories.
+- [ ] Order snapshots still store `name`, so order pages and emails show the old title.
+- [ ] Needs title list in admin.
+- [ ] Collection intro text, plan step 2.5: layout is simple, buying advice must come from the owner.
+
+**Owner**
+- [ ] Decide delivery area (0.1). Blocks shipping markup, Merchant Center shipping settings, and national searches.
+- [ ] Google Ads account, for Keyword Planner volumes (2.1).
+- [ ] Create a Merchant Center account, then give it `https://www.bindalscreations.com/feeds/google-products.xml` (after #141).
+- [ ] Watch the Business Profile account's inbox for Google's reply to the listing appeal (dead website link on Maps).
+- [ ] Bing Webmaster Tools import from Search Console. Review QR counter card. Real shop and tailoring photos.
+
+Decided, 2026-11-04: Vercel's edge cache does not engage for the image rewrite (always MISS, even with
+`x-vercel-enable-rewrite-caching` and `CDN-Cache-Control`), so those headers were dropped. Speed matches direct Storage.
+
 ## ONLINE ORDERS: go-live
 
 State 2026-10-29: everything built, deployed, configured. Cashfree on PRODUCTION keys (+ prod webhook, domain
