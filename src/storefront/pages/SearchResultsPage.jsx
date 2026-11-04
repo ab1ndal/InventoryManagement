@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
+import SearchNoResults from "../components/SearchNoResults";
 import Seo from "../components/Seo";
 import { SEARCH_PAGE_SIZE, useProductSearch } from "../hooks/useProductSearch";
 import { SEARCH_MIN_CHARS, sanitizeSearchQuery } from "../lib/searchUtils";
@@ -59,9 +60,7 @@ function SearchResults({ q }) {
             )}
 
             {!loading && results.length === 0 && (
-              <p className="font-sans text-sm text-storefront-charcoal py-12 text-center">
-                No products match “{clean}”.
-              </p>
+              <SearchNoResults query={clean} />
             )}
 
             {results.length > 0 && (

@@ -4,6 +4,7 @@ import { Search, X } from "lucide-react";
 import { useProductSearch } from "../hooks/useProductSearch";
 import { SEARCH_MIN_CHARS } from "../lib/searchUtils";
 import { isSoldOut } from "../lib/stock";
+import SearchNoResults from "./SearchNoResults";
 
 // Command-palette style product search. Debounced name/category match; results
 // link straight to the PDP. Keyboard: ↑/↓ to move, Enter to open, Esc to close.
@@ -115,9 +116,7 @@ export default function SearchOverlay({ open, onClose }) {
           )}
 
           {!loading && clean.length >= SEARCH_MIN_CHARS && results.length === 0 && (
-            <p className="px-4 py-6 text-sm font-sans text-storefront-charcoal">
-              No products match “{clean}”.
-            </p>
+            <SearchNoResults query={clean} onNavigate={onClose} />
           )}
 
           {!loading &&
