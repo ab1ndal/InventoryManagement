@@ -31,6 +31,7 @@ beforeEach(() => {
 const MOCKUP_DIR =
   "https://epotsxdugwfhyeiudjox.supabase.co/storage/v1/object/public/mockups/BC25054";
 const MOCKUP = `${MOCKUP_DIR}/mahroon_89462790.webp`;
+const SERVED_DIR = "https://www.bindalscreations.com/images/BC25054";
 
 describe("imageUrl", () => {
   it("returns null for a falsy url", () => {
@@ -40,11 +41,11 @@ describe("imageUrl", () => {
 
   it("returns the raw url when no transform is given", () => {
     expect(imageUrl("https://x/img.png")).toBe("https://x/img.png");
-    expect(imageUrl(MOCKUP)).toBe(MOCKUP);
+    expect(imageUrl(MOCKUP)).toBe(`${SERVED_DIR}/mahroon_89462790.webp`);
   });
 
   it("returns the raw url when the transform has no width", () => {
-    expect(imageUrl(MOCKUP, {})).toBe(MOCKUP);
+    expect(imageUrl(MOCKUP, {})).toBe(`${SERVED_DIR}/mahroon_89462790.webp`);
   });
 
   it.each([
@@ -58,22 +59,22 @@ describe("imageUrl", () => {
     [1600, 1200],
   ])("maps width %i to the _%i.webp variant", (width, variant) => {
     expect(imageUrl(MOCKUP, { width })).toBe(
-      `${MOCKUP_DIR}/mahroon_89462790_${variant}.webp`
+      `${SERVED_DIR}/mahroon_89462790_${variant}.webp`
     );
   });
 
   it("matches the .webp extension case-insensitively", () => {
     expect(imageUrl(`${MOCKUP_DIR}/a.WEBP`, { width: 400 })).toBe(
-      `${MOCKUP_DIR}/a_600.webp`
+      `${SERVED_DIR}/a_600.webp`
     );
   });
 
-  it("returns non-webp, other-bucket and other-host urls unchanged", () => {
+  it("serves a non-webp from the site without a variant, and leaves other buckets and hosts alone", () => {
     const png = `${MOCKUP_DIR}/a.png`;
     const otherBucket =
       "https://epotsxdugwfhyeiudjox.supabase.co/storage/v1/object/public/lifestyle/a.webp";
     const otherHost = "https://cdn.example.com/mockups/a.webp";
-    expect(imageUrl(png, { width: 400 })).toBe(png);
+    expect(imageUrl(png, { width: 400 })).toBe(`${SERVED_DIR}/a.png`);
     expect(imageUrl(otherBucket, { width: 400 })).toBe(otherBucket);
     expect(imageUrl(otherHost, { width: 400 })).toBe(otherHost);
   });
@@ -154,8 +155,8 @@ describe("getProductImages / getProductImageUrl", () => {
       ],
     });
     expect(await getProductImages("PIMG_MAP", { width: 400 })).toEqual([
-      `${MOCKUP_DIR}/a_600.webp`,
-      `${MOCKUP_DIR}/b_600.webp`,
+      `${SERVED_DIR}/a_600.webp`,
+      `${SERVED_DIR}/b_600.webp`,
     ]);
   });
 

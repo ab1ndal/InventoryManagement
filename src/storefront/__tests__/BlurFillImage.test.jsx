@@ -18,11 +18,11 @@ describe("BlurFillImage", () => {
     const { container } = render(<BlurFillImage path={PATH} alt="Saree" />);
     expect(screen.getByAltText("Saree")).toHaveAttribute(
       "src",
-      "https://example.supabase.co/storage/v1/object/public/mockups/BC1/a_600.webp"
+      "https://www.bindalscreations.com/images/BC1/a_600.webp"
     );
     expect(container.querySelector('img[aria-hidden="true"]')).toHaveAttribute(
       "src",
-      "https://example.supabase.co/storage/v1/object/public/mockups/BC1/a_150.webp"
+      "https://www.bindalscreations.com/images/BC1/a_150.webp"
     );
   });
 
