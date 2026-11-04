@@ -184,7 +184,7 @@ budget decision.
 
 ## Current state
 
-Updated 2026-11-03. Rendering is live (PR #131).
+Updated 2026-11-04. Rendering is live (PR #131). Open work and merge order: `tasks/todo.md`, SEO / AEO section.
 
 Done:
 - 0.2 Sitemap submitted in Search Console: Success, 843 pages. 0.5 Bare domain is a permanent 308.
@@ -200,11 +200,21 @@ Google Maps listing as of 2026-11-03: 3.8 stars from 25 reviews. Its website lin
 
 Open, needs the owner:
 - 0.1 Delivery area. 0.4 and 3.1 Find who manages the listing, then fix its website link and address.
-- 0.6 Bing Webmaster Tools. 3.2 Review link and QR. 3.4 Merchant Center.
+- 0.6 Bing Webmaster Tools. 3.2 Counter QR card (review link is live, PR #137). 3.4 Merchant Center account (feed is PR #141).
 
 Open, dev:
-- Request indexing for kurta-pajama, about, contact, all-products, after Google's daily limit resets.
-- 2.1 onward: keyword research, titles, descriptions, collection text.
+- Request indexing for kurta-pajama, about, contact, all-products, after PR #138 is live.
+- 2.1 keyword research needs an Ads account. 2.3 descriptions, 2.5 collection text.
+
+In review, not live (2026-11-04):
+- PR #139, photos: Storage sent `x-robots-tag: none` on every image, so none could reach Google Images. Found after the audit.
+- PR #138, 2.4 alt text, plus titles, descriptions, product links and store markup.
+- PR #140, 1.9 page speed: main.js 846 KB to 664 KB. Public pages stay eager to protect layout stability.
+- PR #141, 3.4 Merchant Center feed, 778 in-stock items.
+- 2.2 saree titles: 89 drafts for owner review, `tasks/title-drafts/sarees.json`. 16 titles become 89.
+
+Found while drafting: colours recorded on some products do not match their photos, such as BC25875 (Off White, photo magenta).
+Titles and alt text state these colours, so check colours before rolling titles out to other categories.
 
 Sitemap has no `lastmod`: products have no change date, and a made-up date is worse than none.
 

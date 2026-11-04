@@ -19,6 +19,10 @@
 
 - **Playwright is installed globally** (`/opt/homebrew/lib/node_modules/playwright`), not as a project dep. ESM `import` ignores `NODE_PATH`, so a scratch `.mjs` must `import { chromium } from "/opt/homebrew/lib/node_modules/playwright/index.mjs"` (absolute path). Per user CLAUDE.md: use Playwright CLI/Bash, never the MCP playwright tools.
 - **Vercel preview deployments sit behind Deployment Protection (SSO).** Anonymous `curl`/Playwright gets a 302 → `vercel.com/...sso` or a 401/403 login wall — you cannot probe a preview URL without a protection-bypass secret (none set on this project). To integration-test rewrites without risking prod, run `vercel dev` locally (it applies `vercel.json` rewrites) and curl the paths, or deploy to prod and verify with rollback ready.
+- `vercel curl /path --deployment <url> -- -sS -D - -o /dev/null` reaches a protected preview, so the "cannot probe a preview" note above no longer holds. With an empty `--deployment` it hits **production** without warning, so check the variable first. `vercel ls` prints its table to stderr: use `2>&1` when parsing.
+- A `vercel.json` header overrides an external rewrite's response header (used to replace Storage's `x-robots-tag: none`). Vercel's edge did not cache that rewrite: always `MISS`, even with `x-vercel-enable-rewrite-caching` and `CDN-Cache-Control`.
+- CRA's jest has no global `fetch`, even with `@jest-environment node`. To run `src/seoRender` against live data, use a temp test whose `rest` shells out to `curl`, and delete it afterwards.
+- The build renames `index.html` to `shell.html`. A local static server for `build/` must fall back to that.
 - When rewriting a JS regex literal with `sed`, unescaped `/` inside the pattern breaks it ("Invalid regular expression flags"). Use Python or write the file directly instead of `sed` for anything containing slashes.
 
 ## Storefront: Supabase / Cloudflare (see also memory project_supabase_cloudflare_cookie)
