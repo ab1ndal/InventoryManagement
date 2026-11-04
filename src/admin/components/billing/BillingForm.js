@@ -211,6 +211,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [addPaymentDate, setAddPaymentDate] = useState(() => todayIST());
   const [firstPaymentDate, setFirstPaymentDate] = useState("");
   const cleanSnapshotRef = useRef(null);
+  const cleanPricingRef = useRef(null);
   // Set when the bill's own response already carried this customer, so no second fetch is needed.
   const preloadedCustomerRef = useRef(null);
   const [effectiveBillId, setEffectiveBillId] = useState(null);
@@ -246,7 +247,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [salespersonsList, setSalespersonsList] = useState([]);
   const [categoryMap, setCategoryMap] = useState({});
   const [loadedNetAmount, setLoadedNetAmount] = useState(null); // net_amount from DB for loaded bills
-  const [loadedTotalAmount, setLoadedTotalAmount] = useState(null); // totalamount from DB — used to detect unsaved item edits before recording a payment
 
   // Document type is immutable once the bill row exists: the bill number
   // series (BoS vs invoice) is assigned by a DB trigger on first insert and
@@ -432,7 +432,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (bill.net_amount != null) {
           setLoadedNetAmount(Number(bill.net_amount));
         }
-        setLoadedTotalAmount(bill.totalamount != null ? Number(bill.totalamount) : null);
 
         // Fetch installment history regardless of current paymentstatus — a bill that
         // started "partial" flips to "finalized" once fully paid (handleAddPayment), but
@@ -678,11 +677,16 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     billId ? salesLocationId : null,
   ]);
 
+  // What a bill's PDF is priced from, so recording a payment can tell whether it was edited.
+  const pricingSnapshot = JSON.stringify([items, selectedCodes, docType, appliedVoucher, finalAmount]);
+
   useEffect(() => {
     if (!open) {
       cleanSnapshotRef.current = null;
+      cleanPricingRef.current = null;
     } else if (cleanSnapshotRef.current === null && (!billId || billLoaded)) {
       cleanSnapshotRef.current = formSnapshot;
+      cleanPricingRef.current = pricingSnapshot;
     }
   }, [open, billId, billLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1930,7 +1934,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     // unsaved item edits: this handler renders the PDF from live in-memory `items`/`computed`
     // state, not from bill_items in the DB. If items were changed here but "Save Draft" was
     // never clicked, the PDF would show items/totals that were never persisted.
-    if (loadedTotalAmount != null && Math.abs(computed.grandTotal - loadedTotalAmount) > 0.01) {
+    // Compares the edits themselves, not totals: reopening rounds each item's discount to 2 decimals,
+    // so an untouched bill's items can add up a few paise away from its stored total.
+    if (cleanPricingRef.current !== null && cleanPricingRef.current !== pricingSnapshot) {
       toast.error("Unsaved item changes", {
         description: "Save the bill before recording a payment — item edits haven't been saved yet.",
       });
