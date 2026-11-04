@@ -8,9 +8,6 @@ import {
 import StorefrontLayout from "./storefront/components/StorefrontLayout";
 import HomePage from "./storefront/pages/HomePage";
 import ShopPage from "./storefront/pages/ShopPage";
-import CartPage from "./storefront/pages/CartPage";
-import CheckoutPage from "./storefront/pages/CheckoutPage";
-import WishlistPage from "./storefront/pages/WishlistPage";
 import ProductDetailPage from "./storefront/pages/ProductDetailPage";
 import FaqPage from "./storefront/pages/FaqPage";
 import NotFoundPage from "./storefront/pages/NotFoundPage";
@@ -23,19 +20,13 @@ import AllProductsPage from "./storefront/pages/AllProductsPage";
 import CustomizePage from "./storefront/pages/CustomizePage";
 import ContactPage from "./storefront/pages/ContactPage";
 import SizeGuidePage from "./storefront/pages/SizeGuidePage";
-import LoginPage from "./storefront/pages/LoginPage";
-import AccountPage from "./storefront/pages/AccountPage";
-import AccountOrdersPage from "./storefront/pages/AccountOrdersPage";
-import SearchResultsPage from "./storefront/pages/SearchResultsPage";
 import CollectionsIndexPage from "./storefront/pages/CollectionsIndexPage";
 import CollectionPage from "./storefront/pages/CollectionPage";
-import TrackOrderPage from "./storefront/pages/TrackOrderPage";
-import OrderPage from "./storefront/pages/OrderPage";
-import RefundChoicePage from "./storefront/pages/RefundChoicePage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 import { Toaster } from "sonner";
 import "react-datepicker/dist/react-datepicker.css";
 import { TooltipProvider } from "components/ui/tooltip";
+import { lazyWithReload } from "lib/lazyWithReload";
 
 const AdminLayout = lazy(() => import("./admin/components/AdminLayout"));
 const InventoryPage = lazy(() => import("./admin/pages/InventoryPage"));
@@ -55,6 +46,25 @@ const DashboardPage = lazy(() => import("./admin/pages/DashboardPage"));
 const HistoryPage = lazy(() => import("./admin/pages/HistoryPage"));
 const OnlineOrdersPage = lazy(() => import("./admin/pages/OnlineOrdersPage"));
 
+// Pages no search visitor lands on: they stay out of the first download, which also keeps zod and
+// react-hook-form away from shoppers who never reach checkout. Public pages stay eager, because a late
+// page would shift the layout that Google scores.
+const CartPage = lazyWithReload(() => import("./storefront/pages/CartPage"));
+const CheckoutPage = lazyWithReload(() => import("./storefront/pages/CheckoutPage"));
+const WishlistPage = lazyWithReload(() => import("./storefront/pages/WishlistPage"));
+const LoginPage = lazyWithReload(() => import("./storefront/pages/LoginPage"));
+const AccountPage = lazyWithReload(() => import("./storefront/pages/AccountPage"));
+const AccountOrdersPage = lazyWithReload(() => import("./storefront/pages/AccountOrdersPage"));
+const SearchResultsPage = lazyWithReload(() => import("./storefront/pages/SearchResultsPage"));
+const TrackOrderPage = lazyWithReload(() => import("./storefront/pages/TrackOrderPage"));
+const OrderPage = lazyWithReload(() => import("./storefront/pages/OrderPage"));
+const RefundChoicePage = lazyWithReload(() => import("./storefront/pages/RefundChoicePage"));
+
+// Keeps the header in place and the footer below the fold while the page's code arrives.
+function PrivatePage({ children }) {
+  return <Suspense fallback={<div className="min-h-screen" />}>{children}</Suspense>;
+}
+
 function App() {
   return (
     <TooltipProvider>
@@ -65,9 +75,9 @@ function App() {
           <Route path="/" element={<StorefrontLayout />}>
             <Route index element={<HomePage />} />
             <Route path="shop" element={<ShopPage />} />
-            <Route path="cart" element={<CartPage />} />
-            <Route path="checkout" element={<CheckoutPage />} />
-            <Route path="wishlist" element={<WishlistPage />} />
+            <Route path="cart" element={<PrivatePage><CartPage /></PrivatePage>} />
+            <Route path="checkout" element={<PrivatePage><CheckoutPage /></PrivatePage>} />
+            <Route path="wishlist" element={<PrivatePage><WishlistPage /></PrivatePage>} />
             <Route path="product/:productid" element={<ProductDetailPage />} />
             <Route path="faq" element={<FaqPage />} />
             <Route path="policies/shipping" element={<ShippingPolicyPage />} />
@@ -79,15 +89,15 @@ function App() {
             <Route path="customize" element={<CustomizePage />} />
             <Route path="contact" element={<ContactPage />} />
             <Route path="size-guide" element={<SizeGuidePage />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="account" element={<AccountPage />} />
-            <Route path="account/orders" element={<AccountOrdersPage />} />
-            <Route path="search" element={<SearchResultsPage />} />
+            <Route path="login" element={<PrivatePage><LoginPage /></PrivatePage>} />
+            <Route path="account" element={<PrivatePage><AccountPage /></PrivatePage>} />
+            <Route path="account/orders" element={<PrivatePage><AccountOrdersPage /></PrivatePage>} />
+            <Route path="search" element={<PrivatePage><SearchResultsPage /></PrivatePage>} />
             <Route path="collections" element={<CollectionsIndexPage />} />
             <Route path="collections/:slug" element={<CollectionPage />} />
-            <Route path="track" element={<TrackOrderPage />} />
-            <Route path="order/:ref" element={<OrderPage />} />
-            <Route path="refund-choice/:token" element={<RefundChoicePage />} />
+            <Route path="track" element={<PrivatePage><TrackOrderPage /></PrivatePage>} />
+            <Route path="order/:ref" element={<PrivatePage><OrderPage /></PrivatePage>} />
+            <Route path="refund-choice/:token" element={<PrivatePage><RefundChoicePage /></PrivatePage>} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
 
