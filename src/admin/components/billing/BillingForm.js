@@ -275,6 +275,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setExchangeCredit(null);
       setExchangeBalanceMode(null);
       setExchangeBalanceAcknowledged(false);
+      setIsBackdated(false);
       setCustomerStoreCreditBalance(0);
       setVoucherCode("");
       setAppliedVoucher(null);
@@ -2123,7 +2124,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     htmlFor="backdated-bill"
                     className="cursor-pointer text-sm font-normal text-muted-foreground"
                   >
-                    Don't reduce stock (entering an old bill)
+                    Don't reduce stock (already corrected by hand for this sale)
                   </Label>
                 </div>
               </section>
