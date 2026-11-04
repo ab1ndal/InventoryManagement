@@ -28,7 +28,7 @@ import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote, heldNote } from "../lib/deliveryEstimate";
-import { stripMarkdown, whatsappProductUrl, whatsappPhotoRequestUrl } from "../lib/productText";
+import { stripMarkdown, whatsappProductUrl, whatsappColourQuestionUrl } from "../lib/productText";
 import { missingChoiceLabel, missingChoiceRow } from "../lib/variantChoice";
 import { colourPhotoNote } from "../lib/colourPhoto";
 import { productImageAlt, productMetaDescription } from "../lib/seoText";
@@ -429,12 +429,12 @@ function ProductDetail({ productid }) {
               <p className="mt-3 text-xs text-storefront-charcoal font-sans leading-relaxed">
                 {photoNote}{" "}
                 <a
-                  href={whatsappPhotoRequestUrl({ productid, colour: selectedVariant.color })}
+                  href={whatsappColourQuestionUrl({ productid, colour: selectedVariant.color })}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block bg-[#25D366] text-storefront-charcoal px-2.5 py-1 tracking-wide hover:opacity-90 transition-opacity"
                 >
-                  Ask for a photo on WhatsApp
+                  Ask about this colour on WhatsApp
                 </a>
               </p>
             )}

@@ -1,6 +1,6 @@
 import { missingChoiceLabel, missingChoiceRow } from "../lib/variantChoice";
 import { colourPhotoNote } from "../lib/colourPhoto";
-import { whatsappPhotoRequestUrl } from "../lib/productText";
+import { whatsappColourQuestionUrl } from "../lib/productText";
 
 describe("missingChoiceLabel", () => {
   it("names what is really missing", () => {
@@ -45,10 +45,10 @@ describe("colourPhotoNote", () => {
   });
 });
 
-describe("whatsappPhotoRequestUrl", () => {
+describe("whatsappColourQuestionUrl", () => {
   it("pre-fills the product code and colour", () => {
-    const url = whatsappPhotoRequestUrl({ productid: "BC25001", colour: "Red" });
+    const url = whatsappColourQuestionUrl({ productid: "BC25001", colour: "Red" });
     expect(url).toContain("https://wa.me/");
-    expect(decodeURIComponent(url.split("?text=")[1])).toBe("Please send a photo of BC25001 in Red");
+    expect(decodeURIComponent(url.split("?text=")[1])).toBe("Hi, can you tell me about BC25001 in Red?");
   });
 });

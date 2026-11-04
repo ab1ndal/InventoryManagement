@@ -374,10 +374,10 @@ describe("ProductDetailPage — colour photos", () => {
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     expect(mainImageSrc()).toContain("green.png");
     expect(screen.getByText("Photo shows Green. You picked Peach.")).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: /ask for a photo/i });
+    const link = screen.getByRole("link", { name: /ask about this colour/i });
     expect(link).toHaveClass("text-storefront-charcoal");
     expect(decodeURIComponent(link.getAttribute("href").split("?text=")[1])).toBe(
-      "Please send a photo of BC252742 in Peach"
+      "Hi, can you tell me about BC252742 in Peach?"
     );
   });
 
