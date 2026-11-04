@@ -8,7 +8,7 @@ describe("ContactPage", () => {
     render(<ContactPage />);
     expect(screen.getByRole("heading", { name: /visit us|contact/i })).toBeInTheDocument();
     expect(screen.getByText(/58 Sihani Gate/i)).toBeInTheDocument();
-    expect(screen.getByText(/closed tuesdays/i)).toBeInTheDocument();
+    expect(screen.getByText(/usually closed tuesdays/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /whatsapp/i })).toHaveAttribute(
       "href",
       expect.stringContaining("wa.me/919810873280")

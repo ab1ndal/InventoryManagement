@@ -5,9 +5,9 @@
 // AI-written). Facts unchanged from the owner's 2026-07-11 text.
 export const ABOUT = {
   title: "Our Story",
-  lede: "Bindal's Creation is a family-run ethnic wear shop in Ghaziabad. We've been selling sarees, lehengas, suits and more since 2018.",
+  lede: "Bindal's Creation is a family-run ethnic wear shop in Ghaziabad. We've been selling sarees, lehengas, suits and more since 2017.",
   story: [
-    "When we opened in 2018, we wanted every garment in the shop to be one we had chosen ourselves. That hasn't changed. We pick each piece by hand instead of ordering in bulk from a catalogue.",
+    "When we opened in 2017, we wanted every garment in the shop to be one we had chosen ourselves. That hasn't changed. We pick each piece by hand instead of ordering in bulk from a catalogue.",
     "We're proud of our collection and of the people who shop with us. If you're looking for something particular, tell us. Often we can find it for you.",
   ],
   craftsmanship: {

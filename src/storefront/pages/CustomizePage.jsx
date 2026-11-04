@@ -162,7 +162,7 @@ export default function CustomizePage() {
             <p className="font-sans text-sm text-storefront-warm leading-relaxed flex items-start gap-2 max-w-xl">
               <MapPin size={16} className="mt-0.5 flex-shrink-0 text-storefront-gold" />
               <span>
-                Bring your photos or fabric to 58 Sihani Gate Market, Ghaziabad. Open 10 AM to 8:30 PM, closed
+                Bring your photos or fabric to 58 Sihani Gate Market, Ghaziabad. Open 10 AM to 8:30 PM, usually closed
                 Tuesdays. Call{" "}
                 <a href="tel:+919810873280" className={`text-storefront-charcoal underline underline-offset-2 ${FOCUS}`}>
                   +91 98108 73280

@@ -44,7 +44,7 @@ const STORE_JSON_LD = {
   image: `${SITE_URL}/logo512.png`,
   telephone: "+919810873280",
   email: "bindalscreations@gmail.com",
-  foundingDate: "2018",
+  foundingDate: "2017",
   address: {
     "@type": "PostalAddress",
     streetAddress: "58 Sihani Gate Market, Near Durga Bhabhi Chowk",
@@ -125,7 +125,7 @@ function frame(main) {
     `<div data-ssr-body style="max-width:72rem;margin:0 auto;padding:1rem;font-family:sans-serif">` +
     `<header>${link("/", SITE_NAME)}<nav>${nav}</nav></header>` +
     `<main>${main}</main>` +
-    `<footer><p>${more}</p><p>${esc(SHOP_ADDRESS)} · +91 98108 73280 · 10 AM–8:30 PM, closed Tuesdays</p></footer>` +
+    `<footer><p>${more}</p><p>${esc(SHOP_ADDRESS)} · +91 98108 73280 · 10 AM–8:30 PM, usually closed Tuesdays</p></footer>` +
     `</div>`
   );
 }
@@ -193,7 +193,7 @@ const STATIC_PAGES = {
     staticPage(
       "/contact",
       "Visit Us",
-      "Visit Bindal's Creation at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (closed Tuesdays).",
+      "Visit Bindal's Creation at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad. Call or WhatsApp us 10 AM–8:30 PM (usually closed Tuesdays).",
       `<p>${esc(SHOP_ADDRESS)}</p><p><a href="tel:+919810873280">+91 98108 73280</a></p><p><a href="mailto:bindalscreations@gmail.com">bindalscreations@gmail.com</a></p>`,
       [STORE_JSON_LD],
       "Contact & Store"

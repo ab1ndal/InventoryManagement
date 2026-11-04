@@ -34,7 +34,7 @@ export default function BrandStory() {
               STORE_PHOTO_URL ? "max-w-md" : "max-w-xl mx-auto"
             }`}
           >
-            A family-run shop in Ghaziabad since 2018. We pick every saree,
+            A family-run shop in Ghaziabad since 2017. We pick every saree,
             lehenga and suit ourselves. Visit us at Sihani Gate Market, or shop
             online.
           </p>
