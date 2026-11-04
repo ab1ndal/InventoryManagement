@@ -13,7 +13,8 @@ function ActiveChips({ filters, categoryOptions, sizeDisplayMap, onClearOne, onC
 
   filters.categories.forEach((id) => {
     const cat = categoryOptions.find((c) => c.categoryid === id);
-    if (cat) chips.push({ label: cat.name, field: "categories", value: id });
+    // An old link can name a category that has gone: it still needs a chip, or it could not be removed.
+    if (cat || categoryOptions.length) chips.push({ label: cat?.name ?? id, field: "categories", value: id });
   });
   filters.colors.forEach((v) => chips.push({ label: v, field: "colors", value: v }));
   filters.sizes.forEach((v) => chips.push({ label: sizeDisplayMap[v] ?? v, field: "sizes", value: v }));
