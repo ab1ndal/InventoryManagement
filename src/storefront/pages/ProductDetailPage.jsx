@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useProduct } from "../hooks/useProduct";
 import { useVariantAvailability } from "../hooks/useVariantAvailability";
 import { getProductImagePaths, imageUrl, imageColor } from "../lib/productImage";
+import { PRODUCT_PHOTO_WIDTH } from "../lib/imageVariant";
 import BlurFillImage from "../components/BlurFillImage";
 import VariantPicker from "../components/product/VariantPicker";
 import ProductSpecs from "../components/product/ProductSpecs";
@@ -168,9 +169,10 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
               key={paths[active]}
               path={paths[active]}
               alt={productImageAlt(name, imageColor(paths[active]), active + 1, paths.length)}
-              width={1000}
+              width={PRODUCT_PHOTO_WIDTH}
               fit="cover"
               eager
+              priority={active === 0}
             />
             <span className="pointer-events-none absolute top-3 right-3 p-2 bg-white/85 text-storefront-charcoal opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden sm:flex">
               <Expand size={15} aria-hidden="true" />
@@ -296,6 +298,7 @@ function ProductDetail({ productid }) {
     name: product.name,
     productid,
     pageUrl: `${window.location.origin}/product/${productid}`,
+    soldOut,
   });
 
   function handleVariantSelect(variant) {
@@ -408,22 +411,25 @@ function ProductDetail({ productid }) {
               </>
             )}
 
-            <div ref={pickerRef} className="border-t border-storefront-border pt-6 mb-6">
-              {variants.length > 0 ? (
-                <VariantPicker
-                  variants={variants}
-                  onVariantSelect={handleVariantSelect}
-                  sizeAction={<SizeGuideDialog />}
-                />
-              ) : (
-                <div className="flex items-center justify-between gap-4">
-                  <p className="text-xs text-storefront-muted font-sans">
-                    No variants available.
-                  </p>
-                  <SizeGuideDialog />
-                </div>
-              )}
-            </div>
+            {/* Nothing to choose when sold out: every size would be struck through. */}
+            {!soldOut && (
+              <div ref={pickerRef} className="border-t border-storefront-border pt-6 mb-6">
+                {variants.length > 0 ? (
+                  <VariantPicker
+                    variants={variants}
+                    onVariantSelect={handleVariantSelect}
+                    sizeAction={<SizeGuideDialog />}
+                  />
+                ) : (
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="text-xs text-storefront-muted font-sans">
+                      No variants available.
+                    </p>
+                    <SizeGuideDialog />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Quantity selector */}
             {canAddToCart && (
@@ -460,8 +466,14 @@ function ProductDetail({ productid }) {
               onClick={handleAddToCart}
               className="w-full flex items-center justify-center gap-2 bg-storefront-gold text-white font-sans text-xs tracking-widest uppercase py-4 hover:bg-storefront-gold-dark transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ShoppingBag size={15} aria-hidden="true" />
-              {canAddToCart ? "Add to Cart" : heldByOthers ? "In someone's cart" : "Select Size & Colour"}
+              {!soldOut && <ShoppingBag size={15} aria-hidden="true" />}
+              {soldOut
+                ? "Sold out"
+                : canAddToCart
+                  ? "Add to Cart"
+                  : heldByOthers
+                    ? "In someone's cart"
+                    : "Select Size & Colour"}
             </button>
             {stockLabel && (
               <p className="text-xs text-center text-storefront-muted font-sans mt-2.5">
@@ -473,16 +485,22 @@ function ProductDetail({ productid }) {
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-3 w-full flex items-center justify-center gap-2 border border-storefront-charcoal text-storefront-charcoal font-sans text-xs tracking-widest uppercase py-3.5 hover:bg-storefront-charcoal hover:text-storefront-cream transition-colors duration-150"
+              className={`mt-3 w-full flex items-center justify-center gap-2 border border-storefront-charcoal font-sans text-xs tracking-widest uppercase py-3.5 transition-colors duration-150 ${
+                soldOut
+                  ? "bg-storefront-charcoal text-storefront-cream hover:bg-storefront-warm"
+                  : "text-storefront-charcoal hover:bg-storefront-charcoal hover:text-storefront-cream"
+              }`}
             >
               <MessageCircle size={15} aria-hidden="true" />
-              Ask on WhatsApp
+              {soldOut ? "Ask us to make this" : "Ask on WhatsApp"}
             </a>
 
-            <p className="flex items-center gap-2 text-xs text-storefront-charcoal font-sans tracking-wide mt-5">
-              <Truck size={15} className="text-storefront-gold flex-shrink-0" aria-hidden="true" />
-              {DELIVERY_ESTIMATE}
-            </p>
+            {!soldOut && (
+              <p className="flex items-center gap-2 text-xs text-storefront-charcoal font-sans tracking-wide mt-5">
+                <Truck size={15} className="text-storefront-gold flex-shrink-0" aria-hidden="true" />
+                {DELIVERY_ESTIMATE}
+              </p>
+            )}
             <p className="text-xs text-storefront-muted font-sans mt-2">
               Want it in another colour or size?{" "}
               <Link to="/customize" className="text-storefront-charcoal underline underline-offset-2 hover:text-storefront-gold">
@@ -544,8 +562,8 @@ function ProductDetail({ productid }) {
         name={product.name}
         price={price}
         soldOut={soldOut}
-        label={canAddToCart ? "Add to Cart" : heldByOthers ? "In someone's cart" : "Select size"}
-        disabled={heldByOthers}
+        label={soldOut ? "Sold out" : canAddToCart ? "Add to Cart" : heldByOthers ? "In someone's cart" : "Select size"}
+        disabled={heldByOthers || soldOut}
         onClick={handleStickyClick}
       />
     </>

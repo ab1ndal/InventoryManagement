@@ -18,6 +18,19 @@ describe("stripMarkdown", () => {
 });
 
 describe("whatsappProductUrl", () => {
+  it("asks about making a sold-out piece, naming its code", () => {
+    const url = whatsappProductUrl({
+      name: "Silk-Lehenga",
+      productid: "BC252742",
+      pageUrl: "https://example.com/product/BC252742",
+      soldOut: true,
+    });
+    const text = decodeURIComponent(url.split("?text=")[1]);
+    expect(text).toContain("BC252742");
+    expect(text).toMatch(/sold out/i);
+    expect(text).toMatch(/make it/i);
+  });
+
   it("prefills a message with the product name, id and page URL", () => {
     const url = whatsappProductUrl({
       name: "Silk-Lehenga",

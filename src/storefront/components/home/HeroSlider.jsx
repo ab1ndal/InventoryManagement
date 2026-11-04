@@ -6,6 +6,9 @@ import { HERO_SLIDES } from "../../lib/heroSlides";
 
 const AUTOPLAY_MS = 5000;
 const SWIPE_THRESHOLD_PX = 40;
+// Slides wait for the first image. This only matters if it never reports back,
+// such as a slide whose product has no photo.
+const FIRST_IMAGE_WAIT_MS = 8000;
 // Width must be whitelisted in vercel.json images.sizes.
 const IMAGE_TRANSFORM = { width: 1000 };
 
@@ -42,13 +45,16 @@ function useImageSources(slides) {
 
 // A portrait mobileSrc is chosen by <picture> below md, so each device
 // downloads only its own file.
-function SlideImage({ src, mobileSrc, className = "" }) {
+function SlideImage({ src, mobileSrc, priority = false, onDone, className = "" }) {
   if (!src) return <div className={`bg-storefront-gold/10 ${className}`} />;
   const img = (
     <img
       src={src}
       alt=""
-      decoding="async"
+      decoding={priority ? "sync" : "async"}
+      fetchPriority={priority ? "high" : undefined}
+      onLoad={onDone}
+      onError={onDone}
       className={`object-cover object-top ${className}`}
     />
   );
@@ -61,9 +67,10 @@ function SlideImage({ src, mobileSrc, className = "" }) {
   );
 }
 
-function Slide({ slide, index, count, active, srcFor }) {
+function Slide({ slide, index, count, active, loadImages, onImageDone, srcFor }) {
   // Several product photos -> side-by-side panel on desktop; one image -> full-bleed.
   const panel = slide.images.length > 1;
+  const imageSrc = (img) => (loadImages ? srcFor(img) : null);
 
   return (
     <div
@@ -83,8 +90,11 @@ function Slide({ slide, index, count, active, srcFor }) {
 
       {/* Full-bleed lead image: always on mobile, on desktop only for single-image slides. */}
       <SlideImage
-        src={srcFor(slide.images[0])}
+        src={imageSrc(slide.images[0])}
         mobileSrc={slide.images[0].mobileUrl}
+        // Matches the preload in the server's home page (src/seoRender/pages.js).
+        priority={index === 0}
+        onDone={onImageDone}
         className={`absolute inset-0 h-full w-full ${panel ? "md:hidden" : ""}`}
       />
 
@@ -95,7 +105,11 @@ function Slide({ slide, index, count, active, srcFor }) {
               key={img.productid || img.url}
               className={`relative flex-1 overflow-hidden rounded-sm bg-white ${i > 1 ? "hidden lg:block" : ""}`}
             >
-              <SlideImage src={srcFor(img)} className="absolute inset-0 h-full w-full" />
+              <SlideImage
+                src={imageSrc(img)}
+                onDone={onImageDone}
+                className="absolute inset-0 h-full w-full"
+              />
             </div>
           ))}
         </div>
@@ -153,15 +167,28 @@ export default function HeroSlider({ slides = HERO_SLIDES }) {
   const [reducedMotion] = useState(prefersReducedMotion);
   const touchStart = useRef(null);
   const srcFor = useImageSources(slides);
+  const [firstImageDone, setFirstImageDone] = useState(false);
+  // Only grows, so a slide fading out keeps its image and a return visit is instant.
+  const slidesToLoad = useRef(new Set());
 
   const autoplaying = !paused && !reducedMotion && count > 1;
 
+  useEffect(() => {
+    const t = setTimeout(() => setFirstImageDone(true), FIRST_IMAGE_WAIT_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Downloading every slide at once made a phone wait about 10 seconds for the first. The next slide
+  // starts only after the first image is done, and so does the clock, so it has time to arrive first.
+  slidesToLoad.current.add(index);
+  if (firstImageDone && count > 0) slidesToLoad.current.add((index + 1) % count);
+
   // Re-armed on every slide change, so manual navigation restarts the clock.
   useEffect(() => {
-    if (!autoplaying) return undefined;
+    if (!autoplaying || !firstImageDone) return undefined;
     const t = setTimeout(() => setIndex((i) => (i + 1) % count), AUTOPLAY_MS);
     return () => clearTimeout(t);
-  }, [autoplaying, index, count]);
+  }, [autoplaying, firstImageDone, index, count]);
 
   const go = (dir) => setIndex((i) => (i + dir + count) % count);
 
@@ -205,6 +232,8 @@ export default function HeroSlider({ slides = HERO_SLIDES }) {
             index={i}
             count={count}
             active={i === index}
+            loadImages={slidesToLoad.current.has(i)}
+            onImageDone={i === 0 ? () => setFirstImageDone(true) : undefined}
             srcFor={srcFor}
           />
         ))}

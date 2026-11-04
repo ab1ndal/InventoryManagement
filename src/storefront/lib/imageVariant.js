@@ -4,6 +4,9 @@ import { SITE_URL } from "../../seoRender/html";
 // bucket as `{stem}_{w}.webp` (never upscaled). Serving these directly from
 // Storage replaced Vercel Image Optimization, whose Hobby quota ran out.
 const VARIANT_WIDTHS = [150, 600, 1200];
+// The product page's main photo. The server's preload and the app must ask for this same file, or a phone
+// downloads the photo twice.
+export const PRODUCT_PHOTO_WIDTH = 1200;
 const MOCKUP_FILE = /^https:\/\/[^/]+\.supabase\.co\/storage\/v1\/object\/public\/mockups\/(.+)$/;
 const WEBP = /\.webp$/i;
 

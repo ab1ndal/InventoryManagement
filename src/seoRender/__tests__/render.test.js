@@ -4,6 +4,7 @@ import { CACHE_DEGRADED, CACHE_RENDERED, renderResponse } from "../handler";
 import { renderHtml } from "../html";
 import { describePage } from "../pages";
 import { COLLECTIONS } from "../../storefront/lib/collections";
+import { HERO_SLIDES } from "../../storefront/lib/heroSlides";
 import { buildSitemap, sitemapResponse } from "../sitemap";
 
 const shell = fs.readFileSync(path.join(__dirname, "../../../public/index.html"), "utf8");
@@ -22,6 +23,36 @@ const rest = (rows = [product]) => jest.fn(() => Promise.resolve(rows));
 const ld = (page, type) => page.jsonLd.find((j) => j["@type"] === type);
 
 describe("describePage", () => {
+  test("the home page preloads the first hero slide, one file per device, matching the app's breakpoint", async () => {
+    const html = renderHtml(shell, await describePage("", rest()));
+    const { url, mobileUrl } = HERO_SLIDES[0].images[0];
+    expect(html).toContain(`<link rel="preload" as="image" href="${mobileUrl}" media="(max-width: 767px)" fetchpriority="high"/>`);
+    expect(html).toContain(`<link rel="preload" as="image" href="${url}" media="(min-width: 768px)" fetchpriority="high"/>`);
+    expect(html.match(/rel="preload"/g)).toHaveLength(2);
+  });
+
+  test("a product preloads its first photo and its text copies stay lazy, so one file is downloaded", async () => {
+    const images = [
+      { imageurl: IMG, displayorder: 0 },
+      { imageurl: IMG.replace("a.webp", "b.webp"), displayorder: 1 },
+    ];
+    const html = renderHtml(shell, await describePage("product/BC1", rest([{ ...product, productimages: images }])));
+    const first = "https://www.bindalscreations.com/images/BC1/a_1200.webp";
+    expect(html.match(/rel="preload"[^>]*>/g)).toEqual([
+      `rel="preload" as="image" href="${first}" fetchpriority="high"/>`,
+    ]);
+    expect(html).toContain(`<img src="${first}"`);
+    expect(html).not.toContain("_600.webp");
+    const photos = html.match(/<img src="[^"]*BC1\/[^>]*>/g);
+    expect(photos).toHaveLength(2);
+    photos.forEach((tag) => expect(tag).toContain('loading="lazy"'));
+  });
+
+  test("a product with no photo preloads nothing", async () => {
+    const html = renderHtml(shell, await describePage("product/BC1", rest([{ ...product, productimages: [] }])));
+    expect(html).not.toContain('rel="preload"');
+  });
+
   test("a product gives real text, an offer in rupees and a canonical URL", async () => {
     const page = await describePage("product/BC1", rest());
     expect(page.status).toBe(200);

@@ -13,7 +13,7 @@ function RequestCta() {
         href={WHATSAPP_REQUEST_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className={`inline-flex items-center justify-center gap-2.5 bg-storefront-whatsapp text-white font-sans text-sm font-medium tracking-widest uppercase px-8 py-4 shadow-[0_8px_24px_-12px_rgba(37,211,102,0.7)] hover:brightness-95 active:scale-[0.98] transition duration-200 ${FOCUS}`}
+        className={`inline-flex items-center justify-center gap-2.5 bg-storefront-whatsapp text-storefront-charcoal font-sans text-sm font-medium tracking-widest uppercase px-8 py-4 shadow-[0_8px_24px_-12px_rgba(37,211,102,0.7)] hover:brightness-95 active:scale-[0.98] transition duration-200 ${FOCUS}`}
       >
         <MessageCircle size={18} />
         Send your photo on WhatsApp

@@ -7,14 +7,18 @@ import {
   buildNameCategoryOr,
 } from "../lib/searchUtils";
 
-const LIMIT = 20;
+export const SEARCH_PAGE_SIZE = 20;
 const DEBOUNCE_MS = 150;
 
 // Client-initiated product search: debounced Supabase `ilike` over name +
 // category. No backend/edge function, no full-catalog cache (3.5k rows exceed
 // the 1000-row cap and go stale) — each keystroke burst runs one small query.
-export function useProductSearch(query) {
+//
+// `limit` grows rather than paging by offset: the sort is by title, which repeats, so offset pages could
+// show a piece twice or skip it. `results` stays on screen while a larger limit loads.
+export function useProductSearch(query, limit = SEARCH_PAGE_SIZE) {
   const [results, setResults] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   // Category list is tiny and stable — fetch once, reuse across keystrokes.
   const categoriesRef = useRef(null);
@@ -23,6 +27,7 @@ export function useProductSearch(query) {
     const clean = sanitizeSearchQuery(query);
     if (clean.length < SEARCH_MIN_CHARS) {
       setResults([]);
+      setTotal(0);
       setLoading(false);
       return;
     }
@@ -37,15 +42,19 @@ export function useProductSearch(query) {
       }
       const categoryIds = matchCategoryIds(clean, categoriesRef.current);
 
-      const { data } = await supabase
+      const { data, count } = await supabase
         .from("products")
-        .select("productid, name:display_title, retailprice, categoryid, categories(name), productsizecolors(stock)")
+        .select(
+          "productid, name:display_title, retailprice, categoryid, categories(name), productsizecolors(stock)",
+          { count: "exact" }
+        )
         .or(buildNameCategoryOr(clean, categoryIds))
         .order("display_title")
-        .limit(LIMIT);
+        .limit(limit);
 
       if (!cancelled) {
         setResults(data || []);
+        setTotal(count ?? data?.length ?? 0);
         setLoading(false);
       }
     }, DEBOUNCE_MS);
@@ -54,7 +63,7 @@ export function useProductSearch(query) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, limit]);
 
-  return { results, loading };
+  return { results, total, loading };
 }

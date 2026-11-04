@@ -55,11 +55,13 @@ function BandIcon({ to, label, src }) {
   );
 }
 
+// The label placeholder is exactly as tall as the real label (11px at leading-tight). When it was shorter,
+// the hero moved down as the labels arrived, and the hero's next slide then counted as a new, later LCP.
 function IconSkeleton() {
   return (
     <div className="flex w-[76px] flex-shrink-0 flex-col items-center gap-1.5" aria-hidden="true">
       <div className="h-[72px] w-[72px] animate-pulse rounded-xl bg-storefront-border/50" />
-      <div className="h-2.5 w-12 animate-pulse rounded bg-storefront-border/50" />
+      <div className="h-[13.75px] w-12 animate-pulse rounded bg-storefront-border/50" />
     </div>
   );
 }

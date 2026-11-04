@@ -2,6 +2,7 @@
 // Content comes from the same modules the React pages use, so the two cannot drift apart.
 
 import { COLLECTIONS, getCollection } from "../storefront/lib/collections";
+import { HERO_SLIDES } from "../storefront/lib/heroSlides";
 import {
   GOOGLE_MAPS_URL,
   NAV_LINKS,
@@ -9,7 +10,7 @@ import {
   STORE_LATITUDE,
   STORE_LONGITUDE,
 } from "../storefront/lib/siteConfig";
-import { imageUrl } from "../storefront/lib/imageVariant";
+import { PRODUCT_PHOTO_WIDTH, imageUrl } from "../storefront/lib/imageVariant";
 import { stripMarkdown } from "../storefront/lib/productText";
 import {
   HOME_DESCRIPTION,
@@ -261,6 +262,19 @@ const NOT_FOUND = {
   bodyHtml: frame(`<h1>Page not found</h1><p>${link("/shop", "Shop all products")}</p>`),
 };
 
+// The first hero slide is the largest thing on the home page, and the app only asks for it after its
+// code has run. The breakpoint is the one HeroSlider's <picture> uses, so each device fetches one file.
+function heroPreloads() {
+  const { url, mobileUrl } = HERO_SLIDES[0].images[0];
+  if (!url) return [];
+  return mobileUrl
+    ? [
+        { href: mobileUrl, media: "(max-width: 767px)" },
+        { href: url, media: "(min-width: 768px)" },
+      ]
+    : [{ href: url }];
+}
+
 async function homePage(rest) {
   const products = await rest(
     `products?select=${LIST_FIELDS}&order=productid.desc&limit=${LISTED_PRODUCTS}`
@@ -271,6 +285,7 @@ async function homePage(rest) {
     title: HOME_TITLE,
     description: HOME_DESCRIPTION,
     canonical: "/",
+    preloadImages: heroPreloads(),
     bodyHtml: frame(
       `<h1>Bindal's Creation: handpicked Indian ethnic wear and custom tailoring</h1>` +
         `<p>${esc(ABOUT.lede)}</p><ul>${collections}</ul>${productList(products)}`
@@ -371,7 +386,7 @@ async function productPage(id, rest) {
   const price = Number(product.retailprice);
   const inStock = (product.productsizecolors || []).some((v) => Number(v.stock) > 0);
   const images = sortedImages(product);
-  const image = firstImage(product, 1200);
+  const image = firstImage(product, PRODUCT_PHOTO_WIDTH);
   const description = productMetaDescription({ name: product.name, text, price });
   const colours = [...new Set((product.productsizecolors || []).map((v) => v.color).filter(Boolean))];
   const group = categoryGroup(product.categoryid);
@@ -399,13 +414,16 @@ async function productPage(id, rest) {
     canonical: path,
     type: "product",
     image,
+    preloadImages: image ? [{ href: image }] : [],
     bodyHtml: frame(
       link(group ? `/collections/${group.slug}` : "/shop", group ? group.title : "Shop") +
         `<h1>${esc(product.name)}</h1>` +
         images
           .map((img, i) => {
             const alt = productImageAlt(product.name, img.productcolor, i + 1, images.length);
-            return `<img src="${esc(imageUrl(img.imageurl, { width: 600 }))}" alt="${esc(alt)}" width="600"/>`;
+            // Lazy: the app hides this text, and a hidden lazy image is never fetched. Crawlers still read src.
+            const src = imageUrl(img.imageurl, { width: PRODUCT_PHOTO_WIDTH });
+            return `<img src="${esc(src)}" alt="${esc(alt)}" width="600" loading="lazy"/>`;
           })
           .join("") +
         `<ul>${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` +

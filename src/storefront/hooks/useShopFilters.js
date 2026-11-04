@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import { buildFamilyIndex } from "../../utility/attributeFamilies";
 import { CURATED_SORT, sortByCuratedOrder, sortOptionsFor, sortOrderClause } from "./sortOptions";
@@ -10,6 +11,7 @@ import {
   fabricCodesFor,
   mapAvailability,
 } from "./shopAvailability";
+import { readFilters, readSort, writeFilters, writeSort } from "./shopUrlState";
 
 const PAGE_SIZE = 24;
 
@@ -95,14 +97,20 @@ export default function useShopFilters({
     );
   }
 
-  const [filters, setFilters] = useState(INITIAL_FILTERS);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Compared as text, so a change to any other parameter does not re-run the queries.
+  const filtersKey = JSON.stringify(readFilters(searchParams, { scopeCategoryIds, scopeSizes }));
+  const filters = useMemo(() => JSON.parse(filtersKey), [filtersKey]);
+  const defaultSort = scopeProductIds ? CURATED_SORT : "newest";
+  const sortOptions = sortOptionsFor(Boolean(scopeProductIds));
+  const sortBy = readSort(searchParams, sortOptions, defaultSort);
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [sortBy, setSortBy] = useState(scopeProductIds ? CURATED_SORT : "newest");
   const [error, setError] = useState(null); // user-facing product load failure
 
   const [categoryOptions, setCategoryOptions] = useState([]);
@@ -115,6 +123,9 @@ export default function useShopFilters({
 
   const [availableOptions, setAvailableOptions] = useState(null);
   const [baseOptions, setBaseOptions] = useState(null);
+  // The colour and fabric maps below have loaded, or failed to. A link can arrive with those filters
+  // already set, and asking before then would look like no product matches.
+  const [optionsReady, setOptionsReady] = useState(false);
   const debounceRef = useRef(null);
   // Incremented per filter change; responses carrying an older id are stale.
   const availabilityRequestRef = useRef(0);
@@ -143,7 +154,10 @@ export default function useShopFilters({
         scopeProductIds ? fetchScopeRows(scopeProductIds) : undefined,
       ]);
       scopeRowsRef.current = scopeRows;
-      if (error || !data) return;
+      if (error || !data) {
+        setOptionsReady(true);
+        return;
+      }
 
       // Inside a category page or curated list, offer only the categories it
       // covers, and none when there is just one (a single always-on checkbox
@@ -209,6 +223,8 @@ export default function useShopFilters({
         setFabricOptions(orderedFamilies);
       }
 
+      setOptionsReady(true);
+
       if (data.price_max != null) {
         const max = Math.ceil(Number(data.price_max) / 500) * 500;
         setPriceBounds({ min: 0, max: max || 25000 });
@@ -254,6 +270,7 @@ export default function useShopFilters({
       setAvailableOptions(null);
       return;
     }
+    if (!optionsReady) return;
 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
@@ -268,7 +285,7 @@ export default function useShopFilters({
     }, 200);
 
     return () => clearTimeout(debounceRef.current);
-  }, [filters, scopeCategoryIds, scopeSizes]);
+  }, [filters, optionsReady, scopeCategoryIds, scopeSizes]);
 
   const runQuery = useCallback(async (requestedFilters, currentOffset, append, currentSort) => {
     const currentFilters = scopeFilters(requestedFilters, scopeCategoryIds, scopeSizes);
@@ -360,10 +377,14 @@ export default function useShopFilters({
     }
   }, [scopeCategoryIds, scopeProductIds, scopeSizes]);
 
+  // A plain list does not wait, and does not run twice when the options arrive.
+  const queryReady = optionsReady || (filters.colors.length === 0 && filters.fabrics.length === 0);
+
   useEffect(() => {
+    if (!queryReady) return;
     setOffset(0);
     runQuery(filters, 0, false, sortBy);
-  }, [filters, sortBy, runQuery]);
+  }, [filters, sortBy, runQuery, queryReady]);
 
   // Re-runs the current query from the first page (after a load failure).
   const retry = useCallback(() => {
@@ -377,6 +398,35 @@ export default function useShopFilters({
     runQuery(filters, next, true, sortBy);
   }, [filters, offset, runQuery, sortBy]);
 
+  // The router applies a URL change a moment later, so a second quick tap would otherwise start from the
+  // old URL and undo the first. Replace, not push: Back leaves the list instead of undoing each tap in turn.
+  const latestParams = useRef(searchParams);
+  useEffect(() => {
+    latestParams.current = searchParams;
+  }, [searchParams]);
+
+  const updateParams = useCallback(
+    (change) => {
+      latestParams.current = change(latestParams.current);
+      setSearchParams(latestParams.current, { replace: true });
+    },
+    [setSearchParams]
+  );
+
+  const setFilters = useCallback(
+    (change) => {
+      updateParams((params) =>
+        writeFilters(params, change(readFilters(params, { scopeCategoryIds, scopeSizes })))
+      );
+    },
+    [updateParams, scopeCategoryIds, scopeSizes]
+  );
+
+  const setSortBy = useCallback(
+    (sort) => updateParams((params) => writeSort(params, sort, defaultSort)),
+    [updateParams, defaultSort]
+  );
+
   const toggle = useCallback((field, value) => {
     setFilters((prev) => {
       const arr = prev[field];
@@ -385,17 +435,17 @@ export default function useShopFilters({
         [field]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value],
       };
     });
-  }, []);
+  }, [setFilters]);
 
   const setPrice = useCallback((min, max) => {
     setFilters((prev) => ({ ...prev, priceMin: min, priceMax: max }));
-  }, []);
+  }, [setFilters]);
 
   const clearField = useCallback((field) => {
     setFilters((prev) => ({ ...prev, [field]: [] }));
-  }, []);
+  }, [setFilters]);
 
-  const clearAll = useCallback(() => setFilters(INITIAL_FILTERS), []);
+  const clearAll = useCallback(() => setFilters(() => INITIAL_FILTERS), [setFilters]);
 
   const clearOne = useCallback((field, value) => {
     if (field === "price") {
@@ -406,7 +456,7 @@ export default function useShopFilters({
         [field]: prev[field].filter((v) => v !== value),
       }));
     }
-  }, []);
+  }, [setFilters]);
 
   const activeCount =
     filters.categories.length +
@@ -425,7 +475,7 @@ export default function useShopFilters({
     fetchNextPage,
     sortBy,
     setSortBy,
-    sortOptions: sortOptionsFor(Boolean(scopeProductIds)),
+    sortOptions,
     toggle,
     setPrice,
     clearAll,

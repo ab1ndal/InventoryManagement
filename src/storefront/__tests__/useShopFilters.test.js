@@ -1,4 +1,5 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import useShopFilters from "../hooks/useShopFilters";
 
 jest.mock("lib/supabaseClient", () => ({
@@ -15,6 +16,17 @@ function deferred() {
   let resolve;
   const promise = new Promise((r) => (resolve = r));
   return { promise, resolve };
+}
+
+function renderShop(options, url = "/shop") {
+  const wrapper = ({ children }) => <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>;
+  return renderHook(
+    () => {
+      const location = useLocation();
+      return { ...useShopFilters(options), search: location.search };
+    },
+    { wrapper }
+  );
 }
 
 function product(id) {
@@ -49,7 +61,7 @@ beforeEach(() => {
 });
 
 test("a slower response for older filters does not overwrite newer results", async () => {
-  const { result } = renderHook(() => useShopFilters());
+  const { result } = renderShop();
   await waitFor(() => expect(pending).toHaveLength(1));
 
   act(() => result.current.toggle("categories", "SA"));
@@ -64,7 +76,7 @@ test("a slower response for older filters does not overwrite newer results", asy
 });
 
 test("a next page for older filters is not appended to newer results", async () => {
-  const { result } = renderHook(() => useShopFilters());
+  const { result } = renderShop();
   await waitFor(() => expect(pending).toHaveLength(1));
 
   const firstPage = Array.from({ length: 24 }, (_, i) => `P${i}`);
@@ -117,7 +129,7 @@ test("a category scope limits queries until the shopper picks a category", async
     )
   );
   const scope = ["ST", "RMS"];
-  const { result } = renderHook(() => useShopFilters({ scopeCategoryIds: scope }));
+  const { result } = renderShop({ scopeCategoryIds: scope });
 
   await waitFor(() => expect(inCalls).toContainEqual(["categoryid", scope]));
   await waitFor(() =>
@@ -154,7 +166,7 @@ test("a size scope limits queries until the shopper picks a size", async () => {
     )
   );
   const scope = ["4XL|48", "5XL|50"];
-  const { result } = renderHook(() => useShopFilters({ scopeSizes: scope }));
+  const { result } = renderShop({ scopeSizes: scope });
 
   await waitFor(() => expect(inCalls).toContainEqual(["match.size", scope]));
   expect(supabase.rpc).toHaveBeenCalledWith(
@@ -175,7 +187,7 @@ test("a single-category scope hides the category filter", async () => {
     )
   );
   const scope = ["LE"];
-  const { result } = renderHook(() => useShopFilters({ scopeCategoryIds: scope }));
+  const { result } = renderShop({ scopeCategoryIds: scope });
   await waitFor(() => expect(supabase.rpc).toHaveBeenCalledWith("get_shop_filter_options"));
   await waitFor(() => expect(result.current.categoryOptions).toEqual([]));
 });
@@ -239,7 +251,7 @@ describe("product-id scope (curated collections)", () => {
     const queries = mockProducts((calls) =>
       isOptionsQuery(calls) ? { data: ROWS, error: null } : { data: ROWS, count: ROWS.length, error: null }
     );
-    const { result } = renderHook(() => useShopFilters({ scopeProductIds: IDS }));
+    const { result } = renderShop({ scopeProductIds: IDS });
 
     expect(result.current.sortBy).toBe("featured");
     expect(result.current.sortOptions.map((o) => o.value)).toEqual([
@@ -267,7 +279,7 @@ describe("product-id scope (curated collections)", () => {
     const queries = mockProducts((calls) =>
       isOptionsQuery(calls) ? { data: ROWS, error: null } : { data: [], count: 0, error: null }
     );
-    const { result } = renderHook(() => useShopFilters({ scopeProductIds: IDS }));
+    const { result } = renderShop({ scopeProductIds: IDS });
     act(() => result.current.setSortBy("price_asc"));
     await waitFor(() =>
       expect(queries.some((c) => c.some(([m, col]) => m === "order" && col === "retailprice"))).toBe(true)
@@ -281,7 +293,7 @@ describe("product-id scope (curated collections)", () => {
     mockProducts((calls) =>
       isOptionsQuery(calls) ? { data: ROWS, error: null } : { data: [], count: 0, error: null }
     );
-    const { result } = renderHook(() => useShopFilters({ scopeProductIds: IDS }));
+    const { result } = renderShop({ scopeProductIds: IDS });
 
     await waitFor(() =>
       expect(result.current.categoryOptions.map((c) => c.categoryid)).toEqual(["LE", "SA"])
@@ -298,7 +310,7 @@ describe("product-id scope (curated collections)", () => {
   test("rejects a product list too large to load client-side", () => {
     const tooMany = Array.from({ length: 201 }, (_, i) => `BC${i}`);
     jest.spyOn(console, "error").mockImplementation(() => {});
-    expect(() => renderHook(() => useShopFilters({ scopeProductIds: tooMany }))).toThrow(/at most 200/);
+    expect(() => renderShop({ scopeProductIds: tooMany })).toThrow(/at most 200/);
     console.error.mockRestore();
   });
 });
@@ -327,7 +339,7 @@ describe("size options", () => {
   test("lists only sizes a shop product has, never the raw variant sizes first", async () => {
     const availability = deferred();
     mockRpc(availability);
-    const { result } = renderHook(() => useShopFilters());
+    const { result } = renderShop();
 
     await waitFor(() =>
       expect(supabase.rpc).toHaveBeenCalledWith("get_shop_available_options", expect.anything())
@@ -345,7 +357,7 @@ describe("size options", () => {
     const availability = deferred();
     mockRpc(availability);
     const scope = ["XL|42", "28"];
-    const { result } = renderHook(() => useShopFilters({ scopeSizes: scope }));
+    const { result } = renderShop({ scopeSizes: scope });
 
     // Availability ignores the size dimension's own filter, so it reports
     // sizes outside the scope too; the hook must cut them.
@@ -358,7 +370,7 @@ describe("size options", () => {
   test("falls back to every variant size when availability fails", async () => {
     const availability = deferred();
     mockRpc(availability);
-    const { result } = renderHook(() => useShopFilters());
+    const { result } = renderShop();
     jest.spyOn(console, "error").mockImplementation(() => {});
 
     await act(async () => {
@@ -368,5 +380,106 @@ describe("size options", () => {
       expect(result.current.sizeOptions).toEqual(["XS|34", "S|36", "XL|42", "28"])
     );
     console.error.mockRestore();
+  });
+});
+
+describe("filters and sort in the URL", () => {
+  function recordQueries() {
+    const queries = [];
+    supabase.from.mockImplementation(() => {
+      const calls = [];
+      queries.push(calls);
+      const builder = {};
+      ["select", "in", "gte", "lte", "order", "range"].forEach((m) => {
+        builder[m] = (...a) => {
+          calls.push([m, ...a]);
+          return builder;
+        };
+      });
+      builder.then = (ok, fail) => Promise.resolve({ data: [], count: 0, error: null }).then(ok, fail);
+      return builder;
+    });
+    return queries;
+  }
+
+  test("a filter and a sort change the URL, and clearing returns it to plain", async () => {
+    recordQueries();
+    const { result } = renderShop();
+
+    act(() => result.current.toggle("sizes", "XL|42"));
+    act(() => result.current.setSortBy("price_asc"));
+    await waitFor(() => expect(result.current.search).toBe("?size=XL%7C42&sort=price_asc"));
+    expect(result.current.filters.sizes).toEqual(["XL|42"]);
+    expect(result.current.sortBy).toBe("price_asc");
+
+    act(() => result.current.setSortBy("newest"));
+    act(() => result.current.clearAll());
+    await waitFor(() => expect(result.current.search).toBe(""));
+    expect(result.current.activeCount).toBe(0);
+  });
+
+  test("quick taps in the same moment all count", async () => {
+    recordQueries();
+    const { result } = renderShop();
+    act(() => {
+      result.current.toggle("colors", "Blue");
+      result.current.toggle("colors", "Red");
+      result.current.setSortBy("price_asc");
+    });
+    await waitFor(() => expect(result.current.search).toBe("?color=Blue&color=Red&sort=price_asc"));
+  });
+
+  test("opening a link applies its filters and sort to the first query", async () => {
+    const queries = recordQueries();
+    const { result } = renderShop(undefined, "/shop?size=XL%7C42&min=500&sort=price_desc");
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.activeCount).toBe(2);
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContainEqual(["in", "match.size", ["XL|42"]]);
+    expect(queries[0]).toContainEqual(["gte", "retailprice", 500]);
+    expect(queries[0]).toContainEqual(["order", "retailprice", { ascending: false }]);
+  });
+
+  test("a colour from a link waits for the colour map, so it is not read as no match", async () => {
+    const queries = recordQueries();
+    const options = deferred();
+    supabase.rpc.mockImplementation((name) =>
+      name === "get_shop_filter_options" ? options.promise : Promise.resolve({ data: null, error: null })
+    );
+    const { result } = renderShop(undefined, "/shop?color=Blue");
+    await act(async () => {});
+    expect(queries).toHaveLength(0);
+    expect(result.current.loading).toBe(true);
+
+    await act(async () => {
+      options.resolve({ data: { colors: [{ code: "NAVY", families: ["Blue"] }] }, error: null });
+    });
+    await waitFor(() => expect(queries).toHaveLength(1));
+    expect(queries[0]).toContainEqual(["in", "match.color", ["NAVY"]]);
+  });
+
+  test("a colour from a link still finishes if the colour map fails to load", async () => {
+    recordQueries();
+    const { result } = renderShop(undefined, "/shop?color=Blue");
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.filters.colors).toEqual(["Blue"]);
+  });
+
+  test("a plain list asks once, whether or not the options have arrived", async () => {
+    const queries = recordQueries();
+    supabase.rpc.mockResolvedValue({ data: { colors: [] }, error: null });
+    const { result } = renderShop();
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {});
+    expect(queries).toHaveLength(1);
+  });
+
+  test("a link cannot show products from outside a collection", async () => {
+    const queries = recordQueries();
+    const { result } = renderShop({ scopeCategoryIds: ["SA"] }, "/collections/sarees?category=LE");
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.filters.categories).toEqual([]);
+    expect(queries[0]).toContainEqual(["in", "categoryid", ["SA"]]);
   });
 });

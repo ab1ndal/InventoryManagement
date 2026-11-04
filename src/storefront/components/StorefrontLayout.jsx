@@ -7,6 +7,7 @@ import { WishlistProvider } from "../context/WishlistContext";
 import { StorefrontAuthProvider } from "../context/StorefrontAuthContext";
 import CartDrawer from "./cart/CartDrawer";
 import { initAnalytics, trackPageView } from "../lib/analytics";
+import RouteErrorBoundary from "components/RouteErrorBoundary";
 
 export default function StorefrontLayout() {
   const location = useLocation();
@@ -34,7 +35,9 @@ export default function StorefrontLayout() {
           <div className="min-h-dvh bg-storefront-cream font-sans text-storefront-charcoal">
             <StorefrontHeader />
             <main>
-              <Outlet />
+              <RouteErrorBoundary>
+                <Outlet />
+              </RouteErrorBoundary>
             </main>
             <StorefrontFooter />
             <CartDrawer />

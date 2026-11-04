@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import Seo from "../components/Seo";
-import { useProductSearch } from "../hooks/useProductSearch";
+import { SEARCH_PAGE_SIZE, useProductSearch } from "../hooks/useProductSearch";
 import { SEARCH_MIN_CHARS, sanitizeSearchQuery } from "../lib/searchUtils";
 
 function ProductSkeleton() {
@@ -17,11 +17,18 @@ function ProductSkeleton() {
   );
 }
 
+// Keyed by the search, so a new search starts at the first page with no old results on screen.
 export default function SearchResultsPage() {
   const [searchParams] = useSearchParams();
   const q = searchParams.get("q") || "";
+  return <SearchResults key={q} q={q} />;
+}
+
+function SearchResults({ q }) {
+  const [limit, setLimit] = useState(SEARCH_PAGE_SIZE);
   const clean = sanitizeSearchQuery(q);
-  const { results, loading } = useProductSearch(q);
+  const { results, total, loading } = useProductSearch(q, limit);
+  const firstLoad = loading && results.length === 0;
 
   return (
     <div className="min-h-screen bg-storefront-cream">
@@ -37,13 +44,13 @@ export default function SearchResultsPage() {
           </p>
         ) : (
           <>
-            {!loading && (
+            {!firstLoad && (
               <p className="font-sans text-sm text-storefront-muted mb-6">
-                {results.length} {results.length === 1 ? "result" : "results"}
+                {total.toLocaleString("en-IN")} {total === 1 ? "result" : "results"}
               </p>
             )}
 
-            {loading && (
+            {firstLoad && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <ProductSkeleton key={i} />
@@ -57,11 +64,27 @@ export default function SearchResultsPage() {
               </p>
             )}
 
-            {!loading && results.length > 0 && (
+            {results.length > 0 && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
                 {results.map((p, i) => (
                   <ProductCard key={p.productid} product={p} priority={i < 4} />
                 ))}
+              </div>
+            )}
+
+            {total > results.length && results.length > 0 && (
+              <div className="mt-8 text-center">
+                <p className="font-sans text-xs text-storefront-muted tabular-nums mb-3">
+                  Showing {results.length} of {total.toLocaleString("en-IN")}
+                </p>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setLimit((n) => n + SEARCH_PAGE_SIZE)}
+                  className="bg-storefront-charcoal text-storefront-cream font-sans text-[11px] font-medium tracking-widest uppercase px-8 py-3 hover:bg-storefront-warm transition-colors duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-storefront-gold focus-visible:ring-offset-2"
+                >
+                  {loading ? "Loading…" : "Show more"}
+                </button>
               </div>
             )}
           </>

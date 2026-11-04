@@ -114,7 +114,7 @@ export default function CartPage() {
               quantity: items.reduce((s, i) => s + i.quantity, 0),
             })
           }
-          className="w-full sm:w-auto text-center bg-[#25D366] text-white font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"
+          className="w-full sm:w-auto text-center bg-[#25D366] text-storefront-charcoal font-sans text-xs tracking-widest uppercase py-4 px-8 hover:opacity-90 transition-opacity"
         >
           Order on WhatsApp
         </a>
