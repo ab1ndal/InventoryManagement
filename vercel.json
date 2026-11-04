@@ -5,11 +5,7 @@
   "headers": [
     {
       "source": "/images/:path*",
-      "headers": [
-        { "key": "X-Robots-Tag", "value": "all" },
-        { "key": "CDN-Cache-Control", "value": "public, max-age=86400" },
-        { "key": "x-vercel-enable-rewrite-caching", "value": "1" }
-      ]
+      "headers": [{ "key": "X-Robots-Tag", "value": "all" }]
     },
     {
       "source": "/(admin(?:/.*)?|unauthorized|cart|checkout|wishlist|login|account(?:/.*)?|search|track|order/.*|refund-choice/.*|shell\\.html)",
