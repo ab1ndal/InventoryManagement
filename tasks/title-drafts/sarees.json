@@ -10,8 +10,7 @@
    "Magenta",
    "Red",
    "Yellow-Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25003",
@@ -21,8 +20,7 @@
   "colours": [
    "Mehendi Green - Pink",
    "Pink White"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25004",
@@ -32,18 +30,16 @@
   "colours": [
    "Olive",
    "Pink"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25005",
   "current": "Silk Saree",
   "title_detail": "Woven Motif Pallu",
-  "proposed": "Yellow Green & Green Yellow Silk Saree with Woven Motif Pallu",
+  "proposed": "Yellow-Green Silk Saree with Woven Motif Pallu",
   "colours": [
    "Yellow Green & Green Yellow"
-  ],
-  "flag": "Colour name reads badly in a title: Yellow Green & Green Yellow."
+  ]
  },
  {
   "productid": "BC25006",
@@ -53,8 +49,7 @@
   "colours": [
    "Green & Black",
    "Steel Grey & Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25007",
@@ -64,8 +59,7 @@
   "colours": [
    "Gazari",
    "Lavender"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25008",
@@ -75,8 +69,7 @@
   "colours": [
    "Bottle Green",
    "Falsa"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25011",
@@ -86,8 +79,7 @@
   "colours": [
    "Magenta",
    "Purple"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25012",
@@ -98,8 +90,7 @@
    "Blue",
    "Pink",
    "Wine"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25024",
@@ -109,8 +100,7 @@
   "colours": [
    "Light Peach",
    "Yellow"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25030",
@@ -120,8 +110,7 @@
   "colours": [
    "Green",
    "Pink"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25031",
@@ -130,8 +119,7 @@
   "proposed": "Green Synthetic Saree with Golden Zari and Mirror Work",
   "colours": [
    "Green"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25047",
@@ -145,8 +133,7 @@
    "Purple",
    "Rama Green",
    "Rust"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25050",
@@ -161,8 +148,7 @@
    "Orange",
    "Parrot Green",
    "Sky Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25051",
@@ -173,8 +159,7 @@
    "Bottle Green",
    "Golden",
    "Maroon"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25053",
@@ -183,8 +168,7 @@
   "proposed": "Red Cotton Saree with Patola Pallu and Tassels",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25054",
@@ -196,8 +180,7 @@
    "Golden",
    "Maroon",
    "Rama Green"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25056",
@@ -209,8 +192,7 @@
    "Lavender",
    "Light Brown",
    "Pink"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25057",
@@ -219,8 +201,7 @@
   "proposed": "Firozi Cotton Saree with Tant Weave and Patola Border",
   "colours": [
    "Firozi"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25059",
@@ -229,8 +210,7 @@
   "proposed": "Pista Green Cotton Saree with Tussar Weave",
   "colours": [
    "Pista Green"
-  ],
-  "flag": "Recorded Pista Green, photo looks beige with a green border."
+  ]
  },
  {
   "productid": "BC25060",
@@ -240,8 +220,7 @@
   "colours": [
    "Cream With Sky Blue",
    "Fawn With Black"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25061",
@@ -252,8 +231,7 @@
    "Grey",
    "Light Green",
    "Pink"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25062",
@@ -263,8 +241,7 @@
   "colours": [
    "Grey",
    "Yellow"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25063",
@@ -273,8 +250,7 @@
   "proposed": "White South Cotton Saree with Red Border",
   "colours": [
    "White"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25064",
@@ -283,8 +259,7 @@
   "proposed": "White Cotton Saree with Tant Weave and Red Border",
   "colours": [
    "White"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251579",
@@ -293,8 +268,7 @@
   "proposed": "Navy Blue Fawn Chiffon Saree with Aari Work and Golden Lace",
   "colours": [
    "Navy Blue Fawn"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251584",
@@ -305,8 +279,7 @@
    "Firozi",
    "Green",
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251593",
@@ -315,8 +288,7 @@
   "proposed": "Red Chiffon Saree with Hand Work Buti and Golden Lace Border",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251597",
@@ -325,8 +297,7 @@
   "proposed": "Red Off White Chiffon Saree with Swarovski Work and Golden Brocade Border",
   "colours": [
    "Red Off White"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251712",
@@ -336,8 +307,7 @@
   "colours": [
    "Charcoal Black",
    "Navy Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251716",
@@ -346,8 +316,7 @@
   "proposed": "Navy Blue Georgette Saree with Floral Sequin Lace Border",
   "colours": [
    "Navy Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251717",
@@ -356,8 +325,7 @@
   "proposed": "Navy Blue Crepe Saree with Resham Embroidery and Velvet Lace Border",
   "colours": [
    "Navy Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251721",
@@ -366,8 +334,7 @@
   "proposed": "Rust Chiffon Saree with Zari and Resham Border",
   "colours": [
    "Rust"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251745",
@@ -377,8 +344,7 @@
   "colours": [
    "Sea Green",
    "Wine"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251756",
@@ -388,18 +354,16 @@
   "colours": [
    "Rama Green",
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251758",
   "current": "Chiffon Saree",
   "title_detail": "Hand Work and Sequin Buti",
-  "proposed": "Parrot Green Chiffon Saree with Hand Work and Sequin Buti",
+  "proposed": "Mustard Chiffon Saree with Hand Work and Sequin Buti",
   "colours": [
    "Parrot Green"
-  ],
-  "flag": "Recorded Parrot Green, photo is mustard yellow. Title would say Parrot Green."
+  ]
  },
  {
   "productid": "BC251760",
@@ -408,8 +372,7 @@
   "proposed": "Pink Jimmy Choo Saree with Zari Embroidery and Zarkan Work",
   "colours": [
    "Pink"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251761",
@@ -419,8 +382,7 @@
   "colours": [
    "Mustard",
    "Pink"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251762",
@@ -429,8 +391,7 @@
   "proposed": "Magenta Silk Saree with Zari Embroidery and Swarovski Work",
   "colours": [
    "Magenta"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251764",
@@ -440,8 +401,7 @@
   "colours": [
    "Grey",
    "Mustard"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251765",
@@ -450,8 +410,7 @@
   "proposed": "Pista Green Chiffon Saree with Resham Embroidery and Zarkan Border",
   "colours": [
    "Pista Green"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251766",
@@ -461,8 +420,7 @@
   "colours": [
    "Lavender",
    "Sky Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251767",
@@ -473,8 +431,7 @@
    "Black",
    "Green",
    "Peacock Green"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251768",
@@ -484,8 +441,7 @@
   "colours": [
    "Firozi",
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251770",
@@ -495,8 +451,7 @@
   "colours": [
    "Pista Green",
    "Yellow"
-  ],
-  "flag": "Description spells it \"gatt chola\". Is Gharchola right?"
+  ]
  },
  {
   "productid": "BC251771",
@@ -505,8 +460,7 @@
   "proposed": "Lavender Silk Saree with Zari Work and Swarovski Embroidery",
   "colours": [
    "Lavender"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251772",
@@ -515,8 +469,7 @@
   "proposed": "Pink Sweety Chiffon Saree with Zari and Swarovski Work",
   "colours": [
    "Pink"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251773",
@@ -525,8 +478,7 @@
   "proposed": "Magenta Chiffon Chinon Saree with Zari Work and Swarovski Buti",
   "colours": [
    "Magenta"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251774",
@@ -537,8 +489,7 @@
    "Green",
    "Lavender",
    "Yellow"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251775",
@@ -547,18 +498,16 @@
   "proposed": "Firozi Silk Saree with Gharchola Work and Swarovski Embroidery",
   "colours": [
    "Firozi"
-  ],
-  "flag": "Description spells it \"ghat cholla\". Is Gharchola right?"
+  ]
  },
  {
   "productid": "BC251776",
   "current": "Georgette Saree",
   "title_detail": "Bandhej Print and Resham Border",
-  "proposed": "Yellow Georgette Saree with Bandhej Print and Resham Border",
+  "proposed": "Red and Yellow Georgette Saree with Bandhej Print and Resham Border",
   "colours": [
    "Yellow"
-  ],
-  "flag": "Recorded Yellow, photo is red and yellow."
+  ]
  },
  {
   "productid": "BC251778",
@@ -567,8 +516,7 @@
   "proposed": "Blue Silk Saree with Swarovski and Zari Embroidery",
   "colours": [
    "Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251780",
@@ -577,8 +525,7 @@
   "proposed": "Blue Georgette Saree with Zari and Swarovski Border and Buti",
   "colours": [
    "Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251781",
@@ -587,8 +534,7 @@
   "proposed": "Red Georgette Saree with Heavy Zari and Swarovski Border",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251792",
@@ -597,8 +543,7 @@
   "proposed": "Peach Georgette Saree with Thread Embroidery Border",
   "colours": [
    "Peach"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251795",
@@ -607,8 +552,7 @@
   "proposed": "Red Georgette Saree with Mirror and Swarovski Border",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251797",
@@ -617,8 +561,7 @@
   "proposed": "Gazari Cream Georgette Saree with Velvet and Zari Border",
   "colours": [
    "Gazari Cream"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251799",
@@ -627,8 +570,7 @@
   "proposed": "Red Georgette Saree with Zari Embroidery and Moti Work",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251817",
@@ -637,8 +579,7 @@
   "proposed": "Orange Net Saree with Zari and Mirror Work, Lehenga Style",
   "colours": [
    "Orange"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251897",
@@ -648,8 +589,7 @@
   "colours": [
    "Peach",
    "Pista Green"
-  ],
-  "flag": "Description says \"katha work\". Is Kantha right?"
+  ]
  },
  {
   "productid": "BC251977",
@@ -659,8 +599,7 @@
   "colours": [
    "Gazari",
    "Orange"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC251981",
@@ -669,18 +608,16 @@
   "proposed": "Magenta Silk Saree with Floral Self Brocade and Swarovski Work",
   "colours": [
    "Magenta"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252082",
   "current": "Net Saree",
   "title_detail": "Scalloped Sequin Border and Floral Embroidery",
-  "proposed": "Black Net Saree with Scalloped Sequin Border and Floral Embroidery",
+  "proposed": "Cream and Black Net Saree with Scalloped Sequin Border and Floral Embroidery",
   "colours": [
    "Black"
-  ],
-  "flag": "Recorded Black, photo is cream with black embroidery."
+  ]
  },
  {
   "productid": "BC252083",
@@ -690,8 +627,7 @@
   "colours": [
    "Red",
    "Sea Green"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252085",
@@ -700,8 +636,7 @@
   "proposed": "Golden Beige Net Saree with Multicolour Floral Embroidery",
   "colours": [
    "Golden Beige"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252087",
@@ -710,8 +645,7 @@
   "proposed": "Light Yellow Brasso Saree with Geometric Brocade and Embroidered Border",
   "colours": [
    "Light Yellow"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252088",
@@ -720,8 +654,7 @@
   "proposed": "Red Georgette Saree with Geometric Brocade and Embroidered Border",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252089",
@@ -730,8 +663,7 @@
   "proposed": "Red Silk Saree with Gold Embroidered Motifs and Border",
   "colours": [
    "Red"
-  ],
-  "flag": "Description says geometric brocade, but the photo shows floral motifs. Draft follows the photo."
+  ]
  },
  {
   "productid": "BC252090",
@@ -740,8 +672,7 @@
   "proposed": "Peacock Green Silk Saree with Gold Paisley Embroidery",
   "colours": [
    "Peacock Green"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252092",
@@ -750,8 +681,7 @@
   "proposed": "Red Silk Saree with Heavy Gold Embroidered Border",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252094",
@@ -760,8 +690,7 @@
   "proposed": "Peach Net Saree with Embroidered Net Overlay and Black Border",
   "colours": [
    "Peach"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252095",
@@ -770,8 +699,7 @@
   "proposed": "Yellow Georgette Saree with Gold Sequins and Beaded Motifs",
   "colours": [
    "Yellow"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252116",
@@ -780,8 +708,7 @@
   "proposed": "Firozi Net Saree with Beaded Embroidered Border",
   "colours": [
    "Firozi"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252621",
@@ -791,8 +718,7 @@
   "colours": [
    "Red",
    "Royal Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252622",
@@ -801,20 +727,18 @@
   "proposed": "Printed Chiffon Saree with Embroidered Pallu and Border",
   "colours": [
    "Printed"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252624",
   "current": "Georgette Saree",
-  "title_detail": "Embroidered Border and Stone Work",
-  "proposed": "Georgette Saree with Embroidered Border and Stone Work",
+  "title_detail": "Embroidered Border and Paisley Pallu",
+  "proposed": "Georgette Saree with Embroidered Border and Paisley Pallu",
   "colours": [
    "Black",
    "Blue",
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252662",
@@ -825,8 +749,7 @@
    "Firozi",
    "Golden",
    "Navy Blue"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252664",
@@ -837,8 +760,7 @@
    "Gazari",
    "Navy Blue",
    "Orange"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252676",
@@ -853,8 +775,7 @@
    "Pink",
    "Red",
    "Wine"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252677",
@@ -865,8 +786,7 @@
    "Firozi",
    "Magenta",
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252680",
@@ -877,8 +797,7 @@
    "Black",
    "Blue",
    "Pista"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252681",
@@ -888,8 +807,7 @@
   "colours": [
    "Pink",
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC252682",
@@ -898,8 +816,7 @@
   "proposed": "Gazari Chiffon Saree with Gold Paisley Motifs",
   "colours": [
    "Gazari"
-  ],
-  "flag": "Recorded Gazari, photo and description are red. Title would say Gazari."
+  ]
  },
  {
   "productid": "BC25657",
@@ -908,8 +825,7 @@
   "proposed": "Mustard Silk Saree with Ikat Pattern and Red Patola Border",
   "colours": [
    "Mustard"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25659",
@@ -918,8 +834,7 @@
   "proposed": "Off White Silk Saree with Magenta Zari Border and Pallu",
   "colours": [
    "Off White"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25742",
@@ -928,28 +843,25 @@
   "proposed": "Red Silk Saree with Zari Border and Tassels",
   "colours": [
    "Red"
-  ],
-  "flag": null
+  ]
  },
  {
   "productid": "BC25743",
   "current": "Silk Saree",
-  "title_detail": "Zari Work on Border and Pallu",
-  "proposed": "Red Silk Saree with Zari Work on Border and Pallu",
+  "title_detail": "Banarasi Zari Work",
+  "proposed": "Red Silk Saree with Banarasi Zari Work",
   "colours": [
    "Red"
-  ],
-  "flag": "Description says Banarasi. Left out until you confirm it is genuine Banarasi."
+  ]
  },
  {
   "productid": "BC25875",
   "current": "Silk Saree",
   "title_detail": "Jamawar Weave",
-  "proposed": "Off White Silk Saree with Jamawar Weave",
+  "proposed": "Magenta Silk Saree with Jamawar Weave",
   "colours": [
    "Off White"
-  ],
-  "flag": "Recorded Off White, photo is magenta. Title would say Off White."
+  ]
  },
  {
   "productid": "BC25876",
@@ -961,7 +873,6 @@
    "Pink",
    "Sea Green",
    "Yellow"
-  ],
-  "flag": null
+  ]
  }
 ]
