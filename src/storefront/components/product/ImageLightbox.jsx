@@ -1,7 +1,8 @@
 import React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { imageUrl } from "../../lib/productImage";
+import { imageColor, imageUrl } from "../../lib/productImage";
+import { productImageAlt } from "../../lib/seoText";
 
 // Full-screen, uncropped view of the gallery. Controlled by the PDP so the
 // lightbox and the page gallery stay on the same photo.
@@ -33,7 +34,7 @@ export default function ImageLightbox({ open, onOpenChange, paths, index, onInde
           <img
             key={paths[index]}
             src={imageUrl(paths[index], { width: 1200 })}
-            alt={`${name} — view ${index + 1} of ${count}`}
+            alt={productImageAlt(name, imageColor(paths[index]), index + 1, count)}
             className="max-w-full max-h-full object-contain"
           />
           {hasMany && (

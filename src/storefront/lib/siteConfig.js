@@ -34,6 +34,9 @@ export const DRAWER_LINKS = [
 // From the shop's Google Business Profile. Offered to every customer: Google does not allow asking
 // only happy ones, or offering anything in return.
 export const GOOGLE_REVIEW_URL = "https://g.page/r/CayP03i6bmA3EBE/review";
+export const STORE_LATITUDE = 28.6658525;
+export const STORE_LONGITUDE = 77.4270128;
+export const GOOGLE_MAPS_URL = "https://maps.google.com/?cid=3990311017020362668";
 
 // Where store-pickup orders are collected (checkout and order pages).
 export const SHOP_ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001";

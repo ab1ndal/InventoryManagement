@@ -8,6 +8,7 @@ import CategoryRail from "../components/home/CategoryRail";
 import TrustBar from "../components/home/TrustBar";
 import BrandStory from "../components/home/BrandStory";
 import Seo from "../components/Seo";
+import { HOME_DESCRIPTION, HOME_TITLE } from "../lib/seoText";
 
 // Products first: category shortcuts and the hero, then product rails;
 // reassurance and the brand story come after the products.
@@ -23,7 +24,7 @@ const CATEGORY_RAILS = [
 export default function HomePage() {
   return (
     <>
-      <Seo description="Handpicked sarees, lehengas, suits and sherwanis from Bindal's Creation in Ghaziabad. Seen a look you love? Our in-house tailors can make it for you." />
+      <Seo title={HOME_TITLE} description={HOME_DESCRIPTION} />
       <h1 className="sr-only">Bindal's Creation: handpicked Indian ethnic wear and custom tailoring</h1>
       <CategoryBand />
       <HeroSlider />
