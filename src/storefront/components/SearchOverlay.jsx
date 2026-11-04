@@ -10,7 +10,7 @@ import { isSoldOut } from "../lib/stock";
 export default function SearchOverlay({ open, onClose }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const { results, loading } = useProductSearch(query);
+  const { results, total, loading } = useProductSearch(query);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -154,7 +154,12 @@ export default function SearchOverlay({ open, onClose }) {
         </div>
 
         {!loading && results.length > 0 && (
-          <div className="border-t border-storefront-border px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-storefront-border px-4 py-3">
+            {total > results.length && (
+              <p className="text-xs font-sans text-storefront-muted tabular-nums">
+                First {results.length} of {total.toLocaleString("en-IN")}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -163,7 +168,7 @@ export default function SearchOverlay({ open, onClose }) {
               }}
               className="text-xs font-sans text-storefront-charcoal hover:text-storefront-warm underline underline-offset-2 transition-colors"
             >
-              See all results for “{clean}”
+              See all {total.toLocaleString("en-IN")} results for “{clean}”
             </button>
           </div>
         )}
