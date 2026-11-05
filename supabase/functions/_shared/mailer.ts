@@ -15,6 +15,9 @@
 
 export const GMAIL_SMTP_HOST = "smtp.gmail.com";
 export const GMAIL_SMTP_PORT = 465;
+// Nodemailer otherwise greets Gmail as "[127.0.0.1]", and that greeting is stamped into the
+// Received header of every email. Gmail filed real order emails as spam (WEB-000006, 2026-11-04).
+export const SMTP_CLIENT_NAME = "bindalscreations.com";
 
 export type MailMessage = { to: string; subject: string; text: string; html?: string };
 export type SendResult = { sent: true; messageId: string | null } | { sent: false; reason: "not_configured" };
@@ -36,6 +39,7 @@ export function gmailTransportOptions(user: string, appPassword: string) {
     port: GMAIL_SMTP_PORT,
     secure: true,
     auth: { user, pass: appPassword },
+    name: SMTP_CLIENT_NAME,
   };
 }
 
@@ -50,12 +54,15 @@ async function nodemailerTransport(user: string, appPassword: string): Promise<M
 export function createMailer(config: {
   user: string | undefined;
   appPassword: string | undefined;
+  /** Shown beside the address in the recipient's inbox. */
+  fromName?: string;
   transport?: MailTransport;
   logger?: Logger;
 }): Mailer {
   const logger = config.logger ?? console;
   const user = config.user?.trim() ?? "";
   const pass = config.appPassword?.trim() ?? "";
+  const from = config.fromName ? `"${config.fromName}" <${user}>` : user;
   let transport: Promise<MailTransport> | null = config.transport ? Promise.resolve(config.transport) : null;
 
   return {
@@ -71,7 +78,7 @@ export function createMailer(config: {
         throw err;
       });
       const info = await (await transport).sendMail({
-        from: user,
+        from,
         to: msg.to,
         subject: msg.subject,
         text: msg.text,

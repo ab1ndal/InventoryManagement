@@ -4,6 +4,7 @@
  * nothing from the order is ever interpreted as markup.
  */
 
+import { customerFooter, SHOP_NAME } from "./emails.ts";
 import type { RefundNotice } from "./refunds.ts";
 
 export type Email = { subject: string; text: string };
@@ -102,9 +103,9 @@ export function refundChoiceEmail(n: RefundNotice, siteUrl: string): Email {
     "original payment method automatically.",
     ...(similar ? ["", `Looking for something similar? ${similar}`] : []),
     "",
-    "Bindals Creation",
+    ...customerFooter(),
   ].join("\n");
-  return { subject: `Your refund for order ${n.orderRef}: please choose`, text };
+  return { subject: `${SHOP_NAME}: please choose your refund for order ${n.orderRef}`, text };
 }
 
 export function refundCompletedEmail(n: RefundNotice, siteUrl: string): Email {
@@ -131,7 +132,7 @@ export function refundCompletedEmail(n: RefundNotice, siteUrl: string): Email {
       : []),
     ...(similar ? ["", `Looking for something similar? ${similar}`] : []),
     "",
-    "Bindals Creation",
+    ...customerFooter(),
   ].join("\n");
-  return { subject: `Refund completed for order ${n.orderRef}`, text };
+  return { subject: `${SHOP_NAME}: refund completed for order ${n.orderRef}`, text };
 }
