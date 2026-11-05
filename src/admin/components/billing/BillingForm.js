@@ -78,7 +78,7 @@ const CUSTOMER_SELECT =
 // Everything the form needs about a bill, in one request, so opening one costs one round trip.
 const BILL_SELECT =
   "orderdate, customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, " +
-  "finalized, pdf_url, paymentstatus, net_amount, totalamount, store_credit_used, exchange_credit_used, exchange_source_bill, " +
+  "finalized, pdf_url, paymentstatus, stock_reduced, net_amount, totalamount, store_credit_used, exchange_credit_used, exchange_source_bill, " +
   `document_type, applied_codes, customers(${CUSTOMER_SELECT}), ` +
   "bill_payments(payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)), " +
   "bill_items(*, productsizecolors(size, color)), " +
@@ -222,6 +222,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [effectiveBillId, setEffectiveBillId] = useState(null);
   const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
   const [isBackdated, setIsBackdated] = useState(false);
+  // A saved bill that moved no stock must keep moving none, or cancelling it could not tell what to restore.
+  const [stockChoiceLocked, setStockChoiceLocked] = useState(false);
   // An existing bill starts blank, not today: today's date looks real, and saving
   // before the bill loads would overwrite the saved date with it.
   const [backdatedDate, setBackdatedDate] = useState(
@@ -281,6 +283,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setExchangeBalanceMode(null);
       setExchangeBalanceAcknowledged(false);
       setIsBackdated(false);
+      setStockChoiceLocked(false);
       setCustomerStoreCreditBalance(0);
       setVoucherCode("");
       setAppliedVoucher(null);
@@ -436,6 +439,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setEffectiveBillNumber(bill.bill_number || null);
         setDocType(bill.document_type || 'bos');
         setIsFinalizedBill(!!bill.finalized);
+        setIsBackdated(bill.stock_reduced === false);
+        setStockChoiceLocked(bill.stock_reduced === false);
         setBillPaymentStatus(bill.paymentstatus || "draft");
         if (bill.net_amount != null) {
           setLoadedNetAmount(Number(bill.net_amount));
@@ -1126,6 +1131,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         .from("bills")
         .insert({
           customerid: selectedCustomerId || null,
+          stock_reduced: !isBackdated,
           notes: notes || null,
           document_type: docType,
           totalamount: computed.grandTotal,
@@ -1356,6 +1362,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bills")
           .insert({
             customerid: selectedCustomerId || null,
+            stock_reduced: !isBackdated,
             notes: notes || null,
             document_type: docType,
             totalamount: balanceAdjustedComputed.grandTotal,
@@ -1454,6 +1461,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         flushSync(() => {
           setBillPaymentStatus("finalized");
           setEffectiveBillId(activeBillId);
+          if (isBackdated) setStockChoiceLocked(true);
         });
       } else {
         // Existing bill (draft or re-finalization): full update
@@ -1631,6 +1639,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       flushSync(() => {
         setBillPaymentStatus("finalized");
         setEffectiveBillId(activeBillId);
+        if (isBackdated) setStockChoiceLocked(true);
       });
 
       // Steps 5-7: PDF generate + upload + pdf_url update
@@ -1727,6 +1736,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bills")
           .insert({
             customerid: selectedCustomerId || null,
+            stock_reduced: !isBackdated,
             notes: notes || null,
             document_type: docType,
             totalamount: billComputed.grandTotal,
@@ -1963,6 +1973,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setBillPayments(paymentRecord ? [paymentRecord] : []);
         setBillPaymentStatus("partial");
         setEffectiveBillId(activeBillId);
+        if (isBackdated) setStockChoiceLocked(true);
       });
       let pdfUrl = null;
       try {
@@ -2189,7 +2200,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     id="backdated-bill"
                     checked={isBackdated}
                     onChange={(e) => setIsBackdated(e.target.checked)}
-                    className="h-4 w-4 cursor-pointer"
+                    disabled={stockChoiceLocked}
+                    className="h-4 w-4 cursor-pointer disabled:cursor-not-allowed"
                   />
                   <Label
                     htmlFor="backdated-bill"

@@ -95,6 +95,21 @@ test("the tick does not describe itself as being for old bills", () => {
   expect(stockTick().labels[0].textContent).not.toMatch(/old bill/i);
 });
 
+test("a saved bill that moved no stock keeps the tick on and locked", async () => {
+  mockBill = { ...baseBill, stock_reduced: false };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(stockTick()).toBeChecked());
+  expect(stockTick()).toBeDisabled();
+});
+
+test.each([[true], [null]])("a saved bill with stock_reduced %s leaves the tick off and free", async (stock_reduced) => {
+  mockBill = { ...baseBill, stock_reduced };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(finalize()).toBeEnabled());
+  expect(stockTick()).not.toBeChecked();
+  expect(stockTick()).toBeEnabled();
+});
+
 test("a wrong amount is refused when the stock tick is on", async () => {
   render(<BillingForm billId={330} open onOpenChange={() => {}} />);
   await waitFor(() => expect(finalize()).toBeEnabled());

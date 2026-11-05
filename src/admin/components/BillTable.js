@@ -34,6 +34,11 @@ const SORTABLE_COLUMNS = {
 // A cancelled draft has already had its stock put back, so deleting it would put it back again.
 const isDeletableDraft = (bill) => !bill.finalized && bill.paymentstatus !== "cancelled";
 
+// stock_reduced is null on bills saved before it existed: nobody recorded whether they moved stock,
+// so whoever cancels one decides.
+const billGivesStockBack = (bill, restoreOlderBill) =>
+  bill.stock_reduced == null ? restoreOlderBill : bill.stock_reduced;
+
 export default function BillTable({ onEdit }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -50,6 +55,7 @@ export default function BillTable({ onEdit }) {
   const [resolveFigures, setResolveFigures] = useState({ received: 0, storeCreditUsed: 0 });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
+  const [restoreOlderBill, setRestoreOlderBill] = useState(true);
   const [receiptBill, setReceiptBill] = useState(null);
   const receiptRef = useRef(null);
   const { generate: generateBillPdf, offscreen: billPdfOffscreen } = useBillPdf();
@@ -180,7 +186,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, pdf_url, document_type, salesmethods(methodname), bill_payments(amount)"
+          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, stock_reduced, pdf_url, document_type, salesmethods(methodname), bill_payments(amount)"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
@@ -279,11 +285,17 @@ export default function BillTable({ onEdit }) {
     sort.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "";
 
   const openCancelFlow = (bill) => {
+    setRestoreOlderBill(true);
     setCancelBill(bill);
     setConfirmOpen(true);
   };
 
-  const restoreStockForBill = async (billId) => {
+  const stockOutcome = (bill) =>
+    billGivesStockBack(bill, restoreOlderBill) ? "Stock restored." : "Stock not changed.";
+
+  const restoreStockForBill = async (bill) => {
+    if (!billGivesStockBack(bill, restoreOlderBill)) return;
+    const billId = bill.billid;
     const { data: billItems } = await supabase
       .from("bill_items")
       .select("bill_item_id, variantid, quantity")
@@ -359,7 +371,7 @@ export default function BillTable({ onEdit }) {
     const { billid: billId, customerid } = bill;
     setCancelSaving(true);
     try {
-      await restoreStockForBill(billId);
+      await restoreStockForBill(bill);
       await refundStoreCreditForBill(billId, customerid);
       const { error } = await supabase
         .from("bills")
@@ -367,7 +379,7 @@ export default function BillTable({ onEdit }) {
         .eq("billid", billId);
       if (error) throw error;
       logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Cancelled draft bill #${bill.bill_number || "(no number)"} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
-      toast({ title: `Bill #${billId} cancelled. Stock restored.` });
+      toast({ title: `Bill #${billId} cancelled. ${stockOutcome(bill)}` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
       );
@@ -399,7 +411,7 @@ export default function BillTable({ onEdit }) {
     const { billid: billId, customerid } = bill;
     setCancelSaving(true);
     try {
-      await restoreStockForBill(billId);
+      await restoreStockForBill(bill);
       await refundStoreCreditForBill(billId, customerid);
       await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
@@ -409,7 +421,7 @@ export default function BillTable({ onEdit }) {
         .eq("billid", billId);
       if (error) throw error;
       logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Voided bill #${bill.bill_number || "(no number)"} — ${money(bill.totalamount)}` });
-      toast({ title: `Bill #${billId} cancelled. Stock restored. No customer on record.` });
+      toast({ title: `Bill #${billId} cancelled. ${stockOutcome(bill)} No customer on record.` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
       );
@@ -427,7 +439,7 @@ export default function BillTable({ onEdit }) {
     const { billid: billId, customerid } = cancelBill;
     setCancelSaving(true);
     try {
-      await restoreStockForBill(billId);
+      await restoreStockForBill(cancelBill);
       await refundStoreCreditForBill(billId, customerid);
       await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
@@ -437,7 +449,7 @@ export default function BillTable({ onEdit }) {
         .eq("billid", billId);
       if (error) throw error;
       logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || "(no number)"} for ${customerName(cancelBill.customers)} (cash refund) — ${money(cancelBill.totalamount)}` });
-      toast({ title: `Bill #${billId} cancelled. Stock restored.` });
+      toast({ title: `Bill #${billId} cancelled. ${stockOutcome(cancelBill)}` });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
       );
@@ -459,7 +471,7 @@ export default function BillTable({ onEdit }) {
       : "";
     setCancelSaving(true);
     try {
-      await restoreStockForBill(billId);
+      await restoreStockForBill(cancelBill);
       await refundStoreCreditForBill(billId, customerid);
       if (creditAmount > 0) {
         const { error: creditErr } = await supabase.rpc("store_credit_adjust", {
@@ -561,7 +573,9 @@ export default function BillTable({ onEdit }) {
   // Drafts only. A finalized bill is kept as a record and goes through Cancel.
   const handleDelete = async (bill) => {
     const { billid: billId } = bill;
-    if (!window.confirm(`Delete draft Bill #${bill.bill_number || billId} for ${customerName(bill.customers)}? This will restore stock.`)) return;
+    // Only a bill known to have moved no stock skips the restore: an older draft cannot ask here.
+    const givesStockBack = bill.stock_reduced !== false;
+    if (!window.confirm(`Delete draft Bill #${bill.bill_number || billId} for ${customerName(bill.customers)}? ${givesStockBack ? "This will restore stock." : "Stock will not change."}`)) return;
 
     // Optimistic removal
     setBills((prev) => prev.filter((b) => b.billid !== billId));
@@ -587,7 +601,9 @@ export default function BillTable({ onEdit }) {
         .select("bill_item_id, variantid, quantity");
       if (itemsErr) throw itemsErr;
       // Only finalized bills can be exchanged, so a draft has no exchanged quantity to allow for.
-      await restockItems(billId, (removedItems || []).filter((bi) => bi.variantid), {});
+      if (givesStockBack) {
+        await restockItems(billId, (removedItems || []).filter((bi) => bi.variantid), {});
+      }
 
       const { error: spErr } = await supabase.from("bill_salespersons").delete().eq("billid", billId);
       if (spErr) throw spErr;
@@ -922,9 +938,28 @@ export default function BillTable({ onEdit }) {
                 : `Cancel Draft Bill #${cancelBill?.billid}?`}
             </DialogTitle>
             <DialogDescription>
-              This will restore stock for all items. This cannot be undone.
+              {cancelBill?.stock_reduced === false
+                ? "This bill did not reduce stock, so stock will not change. This cannot be undone."
+                : cancelBill?.stock_reduced == null
+                  ? "This cannot be undone."
+                  : "This will restore stock for all items. This cannot be undone."}
             </DialogDescription>
           </DialogHeader>
+          {cancelBill && cancelBill.stock_reduced == null && (
+            <div className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                id="restore-older-bill"
+                checked={restoreOlderBill}
+                onChange={(e) => setRestoreOlderBill(e.target.checked)}
+                className="mt-0.5 h-4 w-4 cursor-pointer"
+              />
+              <label htmlFor="restore-older-bill" className="cursor-pointer">
+                Put this bill's items back in stock. This is an older bill, so the website does not know whether it
+                reduced stock. Untick if it did not.
+              </label>
+            </div>
+          )}
           {cancelBill && (
             <div className="space-y-2 text-sm">
               <div>
