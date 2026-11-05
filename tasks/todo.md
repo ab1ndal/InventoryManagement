@@ -3,6 +3,31 @@
 Pruned 2026-10-29. Finished work lives in git history / PRs; this file keeps only what is open plus the
 reference facts still needed.
 
+## ▶ RIGHT NOW (2026-11-05)
+
+Nothing is broken or urgent. Newest changes are live but not all proven on real use.
+
+Owner:
+- [ ] Real test order (~10 min): cheap item, `+91` phone, then refund or cancel. Proves Pay, the Cashfree return, the
+      order page address with no `?t=` and refresh still working, the email link opening `/track` with the number
+      filled in, and `purchase` in Analytics Realtime with the right amount.
+- [ ] Admin check (~5 min) at `/admin/bills`: full-name customer search; wrong payment shows the red box; Final Amount
+      over 30% off shows the warning. Do not confirm a real bill.
+- [ ] Send the shop questions as one WhatsApp batch (ask Claude to format them).
+- [ ] Later: one accountant session; name one complaints contact for the website.
+
+Waiting, nothing to do:
+- Google Business Profile website link, due by about the evening of 2026-11-05 US time.
+- Merchant Center review of the 25 test products (feed `?sample=25`). "Found by Google" is hidden on purpose. Do not
+  turn on automatic image improvements.
+- First real courier lookup by `tracking-sweeper`, about 09:17 UTC on 2026-11-05.
+
+Claude, next:
+- [ ] Transactional bill save, step 1: new database step unused by any screen, proved locally and in a rolled-back
+      production test. Plan is in the owner's private audit folder.
+- [ ] Confirm the tracking sweep's first real lookup worked.
+- [ ] Merchant Center: fix what Google flags, then point the source at the full feed (778 items).
+
 ## ⏭ NEXT, HIGH PRIORITY: real-money payment test on production
 
 Removes the biggest go-live risk without shipping anything. Owner at /admin/online-orders + phone for UPI (~10 min):
