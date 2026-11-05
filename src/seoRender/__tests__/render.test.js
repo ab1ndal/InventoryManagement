@@ -190,6 +190,62 @@ describe("describePage", () => {
     expect(page.bodyHtml).toContain("<h2>");
   });
 
+  test("a FAQ answer with a link ends with its label, in the text and in the structured answer", async () => {
+    const page = await describePage("faq", rest());
+    expect(page.bodyHtml).toMatch(/See our <a href="\/policies\/returns">Returns &amp; Exchange policy<\/a>\.<\/p>/);
+    const answers = ld(page, "FAQPage").mainEntity.map((q) => q.acceptedAnswer.text);
+    expect(answers.find((a) => a.startsWith("Damaged or wrong items"))).toMatch(/See our Returns & Exchange policy\.$/);
+    expect(answers.some((a) => /See our$/.test(a))).toBe(false);
+  });
+
+  test("the custom tailoring page shows the Hinglish line and the occasions the app shows", async () => {
+    const { bodyHtml } = await describePage("customize", rest());
+    expect(bodyHtml).toContain('<p lang="hi-Latn">Photo bhejiye, hum bana denge.</p>');
+    expect(bodyHtml).toContain("Shaadi · Sangeet · Mehendi · Haldi · Reception · Festivals");
+  });
+
+  test("every page links collections, privacy and terms in plain HTML", async () => {
+    const { bodyHtml } = await describePage("about", rest());
+    ["/collections", "/policies/privacy", "/policies/terms"].forEach((to) =>
+      expect(bodyHtml).toContain(`<a href="${to}">`)
+    );
+  });
+
+  test("the website names its alternate spellings and promises no site search", async () => {
+    const site = ld(await describePage("", rest()), "WebSite");
+    expect(site.alternateName).toEqual(["Bindals Creation", "Bindal's Creations"]);
+    expect(site.potentialAction).toBeUndefined();
+  });
+
+  test("a product lists its in-stock sizes, delivery and returns, and says so in structured data", async () => {
+    const variants = [
+      { stock: 1, color: "Red", size: "XL|42" },
+      { stock: 2, color: "Red", size: "S|36" },
+      { stock: 0, color: "Red", size: "M|38" },
+    ];
+    const page = await describePage("product/BC1", rest([{ ...product, categoryid: "SA", productsizecolors: variants }]));
+    expect(page.bodyHtml).toContain("<li>Sizes: S (36), XL (42)</li>");
+    expect(page.bodyHtml).toContain("Dispatches in 2 days · Delivered in 5–7 days · 7-day returns &amp; exchange");
+    const p = ld(page, "Product");
+    expect(p.size).toEqual(["S (36)", "XL (42)"]);
+    expect(p.audience).toEqual({ "@type": "PeopleAudience", suggestedGender: "female", suggestedAgeGroup: "adult" });
+    expect(p.offers.seller).toEqual({ "@id": "https://www.bindalscreations.com/#store", name: "Bindal's Creation" });
+    expect(p.offers.shippingDetails).toBeUndefined();
+    expect(p.offers.priceValidUntil).toBeUndefined();
+  });
+
+  test("a sold-out product lists no sizes and no dispatch promise, and an unknown category no audience", async () => {
+    const page = await describePage(
+      "product/BC1",
+      rest([{ ...product, categoryid: "JNS", productsizecolors: [{ stock: 0, size: "M|38" }] }])
+    );
+    expect(page.bodyHtml).not.toContain("Sizes:");
+    expect(page.bodyHtml).not.toContain("Dispatches");
+    expect(page.bodyHtml).toContain("7-day returns");
+    const p = ld(page, "Product");
+    expect([p.size, p.audience]).toEqual([undefined, undefined]);
+  });
+
   test("the home page describes the store, with the shop's closed day left out", async () => {
     const store = ld(await describePage("", rest()), "ClothingStore");
     expect(store.address.postalCode).toBe("201001");
@@ -273,6 +329,29 @@ describe("renderHtml", () => {
     expect(html).toContain('.js [data-ssr-body]{display:none}');
     expect(html).toContain('classList.add("js")');
     expect(html).not.toMatch(/<div data-ssr-body[^>]*display:\s*none/);
+  });
+
+  test("server text comes back if the app's main bundle fails to load, and only then", () => {
+    const html = renderHtml(shell, { title: "T" });
+    const script = html.match(/<script>(document\.documentElement[\s\S]*?)<\/script>/)[1];
+    expect(html.indexOf(script)).toBeLessThan(html.indexOf("</head>") / 2);
+    const root = { classList: new Set() };
+    root.classList.add = (c) => Set.prototype.add.call(root.classList, c);
+    root.classList.remove = (c) => Set.prototype.delete.call(root.classList, c);
+    let onError;
+    new Function("document", "addEventListener", script)(
+      { documentElement: root },
+      (type, fn, capture) => {
+        expect([type, capture]).toEqual(["error", true]);
+        onError = fn;
+      }
+    );
+    expect(root.classList.has("js")).toBe(true);
+    onError({ target: { tagName: "SCRIPT", src: "https://x/static/js/123.abc.chunk.js" } });
+    onError({ target: { tagName: "IMG", src: "https://x/static/js/main.abc.js" } });
+    expect(root.classList.has("js")).toBe(true);
+    onError({ target: { tagName: "SCRIPT", src: "https://x/static/js/main.abc123.js" } });
+    expect(root.classList.has("js")).toBe(false);
   });
 
   test("page text with $ patterns stays literal", () => {

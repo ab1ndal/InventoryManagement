@@ -27,7 +27,7 @@ import { flyToCart } from "../lib/flyToCart";
 import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
-import { DELIVERY_ESTIMATE, PRICE_NOTE, stockNote, heldNote } from "../lib/deliveryEstimate";
+import { DELIVERY_ESTIMATE, PRICE_NOTE, RETURNS_BADGE, stockNote, heldNote } from "../lib/deliveryEstimate";
 import { stripMarkdown, whatsappProductUrl, whatsappColourQuestionUrl } from "../lib/productText";
 import { missingChoiceLabel, missingChoiceRow } from "../lib/variantChoice";
 import { colourPhotoNote } from "../lib/colourPhoto";
@@ -37,7 +37,7 @@ import { isSoldOut } from "../lib/stock";
 
 const TRUST_POINTS = [
   { icon: Heart, label: "Handpicked with love" },
-  { icon: RefreshCw, label: "7-day returns & exchange" },
+  { icon: RefreshCw, label: RETURNS_BADGE },
   { icon: MessageCircle, label: "WhatsApp help" },
 ];
 
