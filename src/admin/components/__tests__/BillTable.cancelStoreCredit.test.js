@@ -132,6 +132,13 @@ test("failed payment read writes nothing and does not open the dialog", async ()
   expect(mockDb.writes).toEqual([]);
 });
 
+test("the send button says WhatsApp, which is what it opens", async () => {
+  render(<BillTable onEdit={() => {}} />);
+  await screen.findByText("FY26-000217");
+  expect(screen.getByLabelText("Send bill on WhatsApp")).toHaveAttribute("title", "Finalize bill first to send on WhatsApp");
+  expect(screen.queryByLabelText(/SMS/)).not.toBeInTheDocument();
+});
+
 describe("stock on cancel follows bills.stock_reduced", () => {
   const stockWrites = () =>
     mockDb.writes.filter((w) => w.kind === "rpc" && w.fn === "stock_adjust").map((w) => [w.args.p_variant, w.args.p_delta]);

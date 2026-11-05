@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageSquare, Globe } from "lucide-react";
+import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageCircle, Globe } from "lucide-react";
 import { isWebsiteMethod, receivedAmount } from "./billing/paymentHelpers";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
@@ -827,13 +827,13 @@ export default function BillTable({ onEdit }) {
                         variant="ghost"
                         disabled={!b.pdf_url || sendingSms.has(b.billid)}
                         className={!b.pdf_url ? "opacity-40 cursor-not-allowed" : ""}
-                        title={b.pdf_url ? "Send bill via SMS" : "Finalize bill first to send via SMS"}
-                        aria-label="Send bill via SMS"
+                        title={b.pdf_url ? "Send bill on WhatsApp" : "Finalize bill first to send on WhatsApp"}
+                        aria-label="Send bill on WhatsApp"
                         onClick={() => handleSendSms(b)}
                       >
                         {sendingSms.has(b.billid)
                           ? <Loader2 className="h-4 w-4 animate-spin" />
-                          : <MessageSquare className="h-4 w-4" />}
+                          : <MessageCircle className="h-4 w-4" />}
                       </Button>
                       {b.finalized && (
                         <Button
