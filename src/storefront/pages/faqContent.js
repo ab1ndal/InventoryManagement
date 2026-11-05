@@ -1,6 +1,6 @@
 // All answers are real (owner-confirmed 2026-07-09). A few are "draft" wording
-// the owner may polish; none assert anything speculative. No COD is offered, so
-// COD is not mentioned at all.
+// the owner may polish; none assert anything speculative. Cash on delivery is not
+// offered yet; the answer says so plainly, so change it if that changes.
 export const FAQ_ITEMS = [
   {
     q: "How long does delivery take?",
@@ -9,6 +9,14 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods do you accept?",
     a: "We accept UPI, credit and debit cards, and net banking through a secure payment gateway.",
+  },
+  {
+    q: "Do you offer cash on delivery?",
+    a: "Not yet. Online orders are paid online (UPI, cards and net banking).",
+  },
+  {
+    q: "Is shipping free?",
+    a: "Shipping is free on orders of ₹5,000 and above. Below that, the courier charge for your pincode is shown at checkout before you pay.",
   },
   {
     q: "What is your return and exchange policy?",
@@ -32,6 +40,11 @@ export const FAQ_ITEMS = [
     a: "Each product lists its available sizes. If you're unsure, message us on WhatsApp with your measurements and we'll help you pick the right fit.",
   },
   {
+    q: "Do you have plus sizes?",
+    a: "Yes. We keep sizes from 2XL to 6XL, and our size guide has the measurements for each size. Message us on WhatsApp if you would like help choosing. To see every piece in 3XL and up, open our",
+    link: { to: "/collections/plus-size", label: "Plus Size collection" },
+  },
+  {
     q: "How do I care for silk and embroidered pieces?",
     a: "Silk and embroidered garments are best dry-cleaned. Store them folded in a cool, dry place and keep perfume and deodorant off the fabric. Follow any specific care note on the product.",
   },
@@ -42,6 +55,10 @@ export const FAQ_ITEMS = [
   {
     q: "Can I visit your store and buy in person?",
     a: "Yes — visit us at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001. You're welcome to browse and buy in person.",
+  },
+  {
+    q: "What are your shop hours?",
+    a: "The shop is open 10 AM to 8:30 PM. It is usually closed on Tuesdays, so please call first.",
   },
   {
     q: "Are these real photographs?",

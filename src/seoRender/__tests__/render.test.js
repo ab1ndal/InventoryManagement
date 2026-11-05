@@ -5,6 +5,7 @@ import { renderHtml } from "../html";
 import { describePage } from "../pages";
 import { COLLECTIONS } from "../../storefront/lib/collections";
 import { HERO_SLIDES } from "../../storefront/lib/heroSlides";
+import { CATEGORY_RAILS, RAIL_SIZE } from "../../storefront/lib/homeRails";
 import { buildSitemap, sitemapResponse } from "../sitemap";
 
 const shell = fs.readFileSync(path.join(__dirname, "../../../public/index.html"), "utf8");
@@ -196,6 +197,33 @@ describe("describePage", () => {
     const answers = ld(page, "FAQPage").mainEntity.map((q) => q.acceptedAnswer.text);
     expect(answers.find((a) => a.startsWith("Damaged or wrong items"))).toMatch(/See our Returns & Exchange policy\.$/);
     expect(answers.some((a) => /See our$/.test(a))).toBe(false);
+  });
+
+  test("the FAQ answers cash on delivery, free shipping, plus sizes and shop hours, in text and structured data", async () => {
+    const page = await describePage("faq", rest());
+    const answers = Object.fromEntries(ld(page, "FAQPage").mainEntity.map((q) => [q.name, q.acceptedAnswer.text]));
+    expect(answers["Do you offer cash on delivery?"]).toMatch(/^Not yet\. Online orders are paid online/);
+    expect(answers["Is shipping free?"]).toContain("₹5,000 and above");
+    expect(answers["Do you have plus sizes?"]).toContain("2XL to 6XL");
+    expect(answers["What are your shop hours?"]).toBe(
+      "The shop is open 10 AM to 8:30 PM. It is usually closed on Tuesdays, so please call first."
+    );
+    expect(page.bodyHtml).toContain("<h2>Do you offer cash on delivery?</h2><p>Not yet. Online orders are paid online");
+    expect(page.bodyHtml).toContain("<h2>What are your shop hours?</h2><p>The shop is open 10 AM to 8:30 PM.");
+  });
+
+  test("the home page lists the same rails the app shows, with the app's limit", async () => {
+    const q = rest();
+    const page = await describePage("", q);
+    const queries = q.mock.calls.map(([query]) => query);
+    expect(queries).toHaveLength(1 + CATEGORY_RAILS.length);
+    expect(queries.every((query) => query.endsWith(`&limit=${RAIL_SIZE}`))).toBe(true);
+    expect(queries[0]).not.toContain("categoryid");
+    expect(queries[1]).toContain("categoryid=in.(SA)");
+    for (const { slug, title } of CATEGORY_RAILS) {
+      expect(page.bodyHtml).toContain(`<h2><a href="/collections/${slug}">${title}</a></h2>`);
+    }
+    expect(page.bodyHtml).toContain('<h2><a href="/shop">New Arrivals</a></h2>');
   });
 
   test("the custom tailoring page shows the Hinglish line and the occasions the app shows", async () => {
