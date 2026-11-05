@@ -4,6 +4,8 @@ import { restClient } from "../src/seoRender/rest";
 
 export default async function handler(req, res) {
   const { status, body } = await feedResponse({
+    // ?sample=25 serves a small test feed for a first Merchant Center review.
+    sample: Number(req.query?.sample) || undefined,
     rest: restClient(process.env.REACT_APP_SUPABASE_URL, process.env.REACT_APP_SUPABASE_ANON_KEY),
     log: (event, fields) => console.error(JSON.stringify({ level: "error", event, ...fields })),
   });

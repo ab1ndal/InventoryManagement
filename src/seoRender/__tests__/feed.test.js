@@ -1,4 +1,4 @@
-import { buildFeed, feedColour, feedResponse } from "../feed";
+import { buildFeed, feedColour, feedResponse, sampleItems } from "../feed";
 
 const IMG = "https://x.supabase.co/storage/v1/object/public/mockups/BC1";
 const product = {
@@ -95,4 +95,19 @@ test("an outage is a 503 and logged, never an empty feed", async () => {
   const r = await feedResponse({ rest: jest.fn(() => Promise.reject(new Error("timeout"))), log });
   expect(r.status).toBe(503);
   expect(log).toHaveBeenCalledWith("merchant_feed_failed", { error: "timeout" });
+});
+
+test("a sample is evenly spaced and never more than asked", () => {
+  const items = Array.from({ length: 100 }, (_, i) => i);
+  const picked = sampleItems(items, 25);
+  expect(picked).toHaveLength(25);
+  expect(picked.slice(0, 3)).toEqual([0, 4, 8]);
+});
+
+test("no sample, or a sample too large or invalid, keeps every item", () => {
+  const items = [1, 2, 3];
+  expect(sampleItems(items, undefined)).toEqual(items);
+  expect(sampleItems(items, 10)).toEqual(items);
+  expect(sampleItems(items, -1)).toEqual(items);
+  expect(sampleItems(items, 1.5)).toEqual(items);
 });
