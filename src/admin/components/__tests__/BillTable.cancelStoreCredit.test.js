@@ -28,7 +28,7 @@ const mockChain = (table) => {
     then: (res, rej) => {
       if (s.op !== "select") mockDb.writes.push({ kind: "table", table, op: s.op });
       const data =
-        s.op !== "select" ? null : table === "bills" ? [bill()] : [];
+        s.op !== "select" ? null : table === "bills" ? [bill()] : table === "bill_items" ? mockDb.items : [];
       return Promise.resolve({ data, error: null }).then(res, rej);
     },
   };
@@ -50,6 +50,7 @@ jest.mock("../billing/generateInvoicePdf", () => ({
 }));
 
 const bill = () => ({
+  ...mockDb.billExtra,
   billid: 1,
   bill_number: "FY26-000217",
   customerid: 7,
@@ -69,6 +70,8 @@ const creditWrites = () =>
 beforeEach(() => {
   mockDb.writes = [];
   mockDb.readError = null;
+  mockDb.billExtra = {};
+  mockDb.items = [];
   mockDb.current = { store_credit_used: 0, payment_amount: null, bill_payments: [] };
 });
 
@@ -127,4 +130,52 @@ test("failed payment read writes nothing and does not open the dialog", async ()
   await waitFor(() => expect(screen.queryByRole("button", { name: "Continue" })).not.toBeDisabled());
   expect(screen.queryByText("Issue store credit")).toBeNull();
   expect(mockDb.writes).toEqual([]);
+});
+
+describe("stock on cancel follows bills.stock_reduced", () => {
+  const stockWrites = () =>
+    mockDb.writes.filter((w) => w.kind === "rpc" && w.fn === "stock_adjust").map((w) => [w.args.p_variant, w.args.p_delta]);
+  const item = { bill_item_id: 11, variantid: "v1", quantity: 2 };
+  const openStep1 = async () => {
+    mockDb.items = [item];
+    render(<BillTable onEdit={() => {}} />);
+    await screen.findByText("FY26-000217");
+    fireEvent.click(screen.getByLabelText("Cancel bill"));
+  };
+  const finishCancel = async () => {
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    await issueCredit();
+  };
+
+  test("a bill that reduced stock gets it back", async () => {
+    mockDb.billExtra = { stock_reduced: true };
+    await openStep1();
+    await screen.findByText(/This will restore stock for all items/);
+    await finishCancel();
+    expect(stockWrites()).toEqual([["v1", 2]]);
+  });
+
+  test("a bill that did not reduce stock adds none back and says so", async () => {
+    mockDb.billExtra = { stock_reduced: false };
+    await openStep1();
+    await screen.findByText(/did not reduce stock, so stock will not change/);
+    await finishCancel();
+    expect(stockWrites()).toEqual([]);
+  });
+
+  test("an older bill restores by default", async () => {
+    mockDb.billExtra = { stock_reduced: null };
+    await openStep1();
+    expect(await screen.findByLabelText(/Put this bill's items back in stock/)).toBeChecked();
+    await finishCancel();
+    expect(stockWrites()).toEqual([["v1", 2]]);
+  });
+
+  test("an older bill restores nothing when unticked", async () => {
+    mockDb.billExtra = { stock_reduced: null };
+    await openStep1();
+    fireEvent.click(await screen.findByLabelText(/Put this bill's items back in stock/));
+    await finishCancel();
+    expect(stockWrites()).toEqual([]);
+  });
 });
