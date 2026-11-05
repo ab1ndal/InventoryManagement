@@ -201,6 +201,16 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
     setSubmitting(false);
   }
 
+  // Back from Cashfree can restore this page from the browser's memory, with the
+  // attempt still marked as running, which would leave Pay dead.
+  useEffect(() => {
+    function onPageShow(event) {
+      if (event.persisted) endAttempt();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   // Shows every field's error (handleSubmit has already set them) and takes
   // the shopper to the first one.
   function onInvalid(errors) {
@@ -236,7 +246,8 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
       }
       const cashfree = await loadCashfree(res.cashfreeMode);
       // Redirects this tab to Cashfree; it returns to /order/:ref?t=… afterwards.
-      await cashfree.checkout({ paymentSessionId: res.paymentSessionId, redirectTarget: "_self" });
+      const result = await cashfree.checkout({ paymentSessionId: res.paymentSessionId, redirectTarget: "_self" });
+      if (result?.error) throw new Error(result.error.message || "Payment page could not open");
     } catch (error) {
       console.warn("create-order failed", { code: error.code, status: error.status, message: error.message });
       endAttempt();

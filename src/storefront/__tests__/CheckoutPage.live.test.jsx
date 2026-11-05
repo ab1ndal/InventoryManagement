@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import CheckoutPage from "../pages/CheckoutPage";
@@ -276,6 +276,34 @@ it("a second tap while the order request runs sends it once", async () => {
   expect(mockApi.createOrder).toHaveBeenCalledTimes(1);
   finish({ orderRef: "WEB-000009", accessToken: "tok", paymentSessionId: "session_1", cashfreeMode: "sandbox", paid: false });
   await waitFor(() => expect(mockApi.loadCashfree).toHaveBeenCalledTimes(1));
+});
+
+it("Pay works again when Back restores the page from the browser's memory", async () => {
+  mockApi.loadCashfree.mockResolvedValue({ checkout: jest.fn().mockResolvedValue({}) });
+  mockApi.createOrder.mockResolvedValue({ orderRef: "WEB-000010", accessToken: "tok", paymentSessionId: "s", cashfreeMode: "sandbox", paid: false });
+  renderPage();
+  fillAddress();
+  const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
+  await waitFor(() => expect(pay).toBeEnabled());
+  userEvent.click(pay);
+  await waitFor(() => expect(mockApi.loadCashfree).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(pay).toBeDisabled());
+  const restored = new Event("pageshow");
+  restored.persisted = true;
+  act(() => { window.dispatchEvent(restored); });
+  await waitFor(() => expect(pay).toBeEnabled());
+});
+
+it("shows a message and frees Pay when the payment page cannot open", async () => {
+  mockApi.loadCashfree.mockResolvedValue({ checkout: jest.fn().mockResolvedValue({ error: { message: "bad session" } }) });
+  mockApi.createOrder.mockResolvedValue({ orderRef: "WEB-000011", accessToken: "tok", paymentSessionId: "s", cashfreeMode: "sandbox", paid: false });
+  renderPage();
+  fillAddress();
+  const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
+  await waitFor(() => expect(pay).toBeEnabled());
+  userEvent.click(pay);
+  expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument();
+  await waitFor(() => expect(pay).toBeEnabled());
 });
 
 it("accepts a +91 number with spaces and sends the bare 10 digits", async () => {
