@@ -20,10 +20,12 @@ export default function StorefrontFooter() {
             {/* Native gold: the asset is now transparent, so the old
                 brightness-0 invert would only turn the brand gold white. */}
             <img
-              src="/logo-bindals-creation.png"
+              src="/logo-bindals-creation.webp"
               alt="Bindal's Creation"
-              width={600}
-              height={373}
+              width={320}
+              height={199}
+              loading="lazy"
+              decoding="async"
               className="h-24 w-auto object-contain mb-4"
             />
             <p className="font-display text-lg text-storefront-cream/80 leading-relaxed mb-5">
