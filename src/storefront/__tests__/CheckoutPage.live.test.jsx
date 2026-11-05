@@ -236,7 +236,64 @@ it("warns about unavailable items and blocks payment", async () => {
   renderPage();
   fillAddress();
   expect(await screen.findByText(/Only 1 left of Silk Saree \(FREE\/Red\)/)).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /pay ₹/i })).toBeDisabled();
+  const pay = screen.getByRole("button", { name: /pay ₹/i });
+  expect(pay).toBeEnabled();
+  userEvent.click(pay);
+  expect(await screen.findByText(/Some items in your cart aren't available/)).toBeInTheDocument();
+  expect(mockApi.createOrder).not.toHaveBeenCalled();
+});
+
+it("tapping Pay with a blank form shows every error, focuses the first and sends nothing", async () => {
+  renderPage();
+  await screen.findByTestId("quote-shipping");
+  const pay = screen.getByRole("button", { name: /pay|place order/i });
+  expect(pay).toBeEnabled();
+  userEvent.type(screen.getByPlaceholderText(/full name/i), "Priya Sharma");
+  userEvent.click(pay);
+  expect(await screen.findByText("Enter a valid 10-digit Indian mobile number")).toBeInTheDocument();
+  expect(screen.getByText("Enter a valid 6-digit pincode")).toBeInTheDocument();
+  expect(screen.getByText("Enter your flat, house no. or building")).toBeInTheDocument();
+  expect(screen.getByText("Enter your area, street or village")).toBeInTheDocument();
+  expect(screen.getByPlaceholderText(/^phone/i)).toHaveFocus();
+  expect(mockApi.createOrder).not.toHaveBeenCalled();
+  expect(mockApi.loadCashfree).not.toHaveBeenCalled();
+});
+
+it("a second tap while the order request runs sends it once", async () => {
+  let finish;
+  mockApi.createOrder.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  mockApi.loadCashfree.mockResolvedValue({ checkout: jest.fn().mockResolvedValue({}) });
+  renderPage();
+  fillAddress();
+  const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
+  await waitFor(() => expect(pay).toBeEnabled());
+  userEvent.click(pay);
+  userEvent.click(pay);
+  userEvent.click(pay);
+  await waitFor(() => expect(mockApi.createOrder).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(pay).toBeDisabled());
+  userEvent.click(pay);
+  expect(mockApi.createOrder).toHaveBeenCalledTimes(1);
+  finish({ orderRef: "WEB-000009", accessToken: "tok", paymentSessionId: "session_1", cashfreeMode: "sandbox", paid: false });
+  await waitFor(() => expect(mockApi.loadCashfree).toHaveBeenCalledTimes(1));
+});
+
+it("accepts a +91 number with spaces and sends the bare 10 digits", async () => {
+  mockApi.loadCashfree.mockResolvedValue({ checkout: jest.fn().mockResolvedValue({}) });
+  mockApi.createOrder.mockResolvedValue({ orderRef: "WEB-000008", accessToken: "tok", paymentSessionId: "s", cashfreeMode: "sandbox", paid: false });
+  renderPage();
+  fillAddress();
+  const phone = screen.getByPlaceholderText(/^phone/i);
+  expect(phone).toHaveAttribute("type", "tel");
+  expect(phone).toHaveAttribute("inputmode", "tel");
+  expect(phone).toHaveAttribute("autocomplete", "tel-national");
+  userEvent.clear(phone);
+  userEvent.type(phone, "+91 98108 73280");
+  const pay = await screen.findByRole("button", { name: "Pay ₹3,080" });
+  await waitFor(() => expect(pay).toBeEnabled());
+  userEvent.click(pay);
+  await waitFor(() => expect(mockApi.createOrder).toHaveBeenCalled());
+  expect(mockApi.createOrder.mock.calls[0][0].address.phone).toBe("9810873280");
 });
 
 it("navigates to the order page when credit or a voucher covered everything", async () => {
@@ -266,7 +323,7 @@ describe("Indian address format", () => {
     expect(ids).toEqual(["name", "phone", "email", "ship", "pincode", "city", "state", "line1", "line2", "landmark", "pickup"]);
     expect(screen.getByRole("radio", { name: /pick up at the shop \(no shipping fees\)/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Flat, House no., Building, Apartment")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Area, Street, Sector, Village")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Area, Street, Sector, Village (required)")).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/^Landmark \(optional\)/)).toBeInTheDocument();
   });
 
@@ -445,7 +502,7 @@ describe("store pickup", () => {
     });
   });
 
-  it("keeps Pay disabled until the quote on screen is a pickup quote", async () => {
+  it("refuses to pay, with a reason, until the quote on screen is a pickup quote", async () => {
     // A server that ignores `fulfilment` answers with a ship quote and no pincode.
     mockApi.quote.mockImplementation(async () => quoteResponse({ pincode: null }));
     renderPage();
@@ -457,6 +514,10 @@ describe("store pickup", () => {
     userEvent.type(screen.getByPlaceholderText(/^phone/i), "9810873280");
     await waitFor(() => expect(mockApi.quote).toHaveBeenLastCalledWith(expect.objectContaining({ fulfilment: "pickup" })));
     await waitFor(() => expect(screen.getByTestId("quote-to-pay")).not.toHaveTextContent("Calculating…"));
-    expect(screen.getByRole("button", { name: /pay ₹/i })).toBeDisabled();
+    const pay = screen.getByRole("button", { name: /pay ₹/i });
+    expect(pay).toBeEnabled();
+    userEvent.click(pay);
+    expect(await screen.findByText(/still working out your total/)).toBeInTheDocument();
+    expect(mockApi.createOrder).not.toHaveBeenCalled();
   });
 });
