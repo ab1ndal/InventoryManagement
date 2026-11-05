@@ -373,22 +373,10 @@ describe("ProductDetailPage — colour photos", () => {
     await screen.findByRole("button", { name: /enlarge image/i });
     fireEvent.click(screen.getByRole("button", { name: "Peach" }));
     expect(mainImageSrc()).toContain("green.png");
-    expect(screen.getByText("Photo shows Green. You picked Peach.")).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: /ask about this colour/i });
-    expect(link).toHaveClass("text-storefront-charcoal");
-    expect(decodeURIComponent(link.getAttribute("href").split("?text=")[1])).toBe(
-      "Hi, can you tell me about BC252742 in Peach?"
-    );
+    expect(screen.queryByText(/you picked|no photo of/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /ask about this colour/i })).not.toBeInTheDocument();
   });
 
-  it("says nothing about photos when the picked colour has one", async () => {
-    getProductImagePaths.mockResolvedValue(["green.png", "peach.png"]);
-    await renderPage();
-    await screen.findByRole("button", { name: /enlarge image/i });
-    expect(screen.queryByText(/you picked|no photo of/i)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
-    expect(screen.queryByText(/you picked|no photo of/i)).not.toBeInTheDocument();
-  });
 });
 
 describe("ProductDetailPage — stock limit", () => {
