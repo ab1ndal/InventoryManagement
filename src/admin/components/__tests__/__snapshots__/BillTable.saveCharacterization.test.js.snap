@@ -1,0 +1,334 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`pins current behaviour: cancel a draft 1`] = `
+Array [
+  Object {
+    "args": Object {
+      "p_delta": 2,
+      "p_reason": "bill_cancel",
+      "p_ref": "1",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "paymentstatus": "cancelled",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-000217",
+      "entityType": "bill",
+      "summary": "Cancelled draft bill #FY26-000217 for Asha — ₹300",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`pins current behaviour: cancel a finalized bill and issue store credit 1`] = `
+Array [
+  Object {
+    "args": Object {
+      "p_delta": 2,
+      "p_reason": "bill_cancel",
+      "p_ref": "1",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "args": Object {
+      "p_customer": 7,
+      "p_delta": 100,
+      "p_reason": "bill_cancel_refund",
+      "p_ref": "1",
+    },
+    "fn": "store_credit_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "args": Object {
+      "p_customer": 7,
+      "p_delta": 200,
+      "p_reason": "bill_cancel_credit",
+      "p_ref": "1",
+    },
+    "fn": "store_credit_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "voucher_id",
+        "VOUCH1",
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "redeemed": false,
+      "redeemed_at": null,
+      "redeemed_billid": null,
+    },
+    "table": "vouchers",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "discount_usage",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "paymentstatus": "cancelled",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-000217",
+      "entityType": "bill",
+      "summary": "Voided bill #FY26-000217 for Asha (store credit ₹200)",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`pins current behaviour: cancel a finalized bill and return the payment 1`] = `
+Array [
+  Object {
+    "args": Object {
+      "p_delta": 2,
+      "p_reason": "bill_cancel",
+      "p_ref": "1",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "args": Object {
+      "p_customer": 7,
+      "p_delta": 100,
+      "p_reason": "bill_cancel_refund",
+      "p_ref": "1",
+    },
+    "fn": "store_credit_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "voucher_id",
+        "VOUCH1",
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "redeemed": false,
+      "redeemed_at": null,
+      "redeemed_billid": null,
+    },
+    "table": "vouchers",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "discount_usage",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "paymentstatus": "cancelled",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-000217",
+      "entityType": "bill",
+      "summary": "Voided bill #FY26-000217 for Asha (cash refund) — ₹300",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`pins current behaviour: cancel a finalized bill that has no customer 1`] = `
+Array [
+  Object {
+    "args": Object {
+      "p_delta": 2,
+      "p_reason": "bill_cancel",
+      "p_ref": "1",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "voucher_id",
+        "VOUCH1",
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "redeemed": false,
+      "redeemed_at": null,
+      "redeemed_billid": null,
+    },
+    "table": "vouchers",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "discount_usage",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "paymentstatus": "cancelled",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-000217",
+      "entityType": "bill",
+      "summary": "Voided bill #FY26-000217 — ₹300",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`pins current behaviour: delete a draft 1`] = `
+Array [
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": 2,
+      "p_reason": "bill_cancel",
+      "p_ref": "1",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        1,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "delete",
+      "entityId": "FY26-000217",
+      "entityType": "bill",
+      "summary": "Deleted bill #FY26-000217 for Asha — ₹300",
+    },
+    "kind": "activity_log",
+  },
+]
+`;

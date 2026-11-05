@@ -1,0 +1,2546 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`path A, new draft (pins current behaviour) pins current behaviour: backdated draft on a tax invoice with a code discount 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [
+        "TEN",
+      ],
+      "customerid": 7,
+      "discount_total": 30,
+      "document_type": "invoice",
+      "final_amount": null,
+      "finalized": false,
+      "gst_total": 13.5,
+      "notes": null,
+      "orderdate": "2026-03-31T00:00:00+05:30",
+      "payment_amount": null,
+      "paymentstatus": "draft",
+      "saleslocationid": null,
+      "salesmethodid": null,
+      "taxable_total": 270,
+      "totalamount": 283.5,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 30,
+        "gst_amount": 13.5,
+        "gst_rate": 5,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 270,
+        "total": 283.5,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_draft_create",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Created draft bill #FY26-SG0042 for Asha — ₹283.5, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path A, new draft (pins current behaviour) pins current behaviour: draft with Don't reduce stock ticked 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "final_amount": null,
+      "finalized": false,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": null,
+      "paymentstatus": "draft",
+      "saleslocationid": null,
+      "salesmethodid": null,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Created draft bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path A, new draft (pins current behaviour) pins current behaviour: plain draft 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "final_amount": null,
+      "finalized": false,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": null,
+      "paymentstatus": "draft",
+      "saleslocationid": null,
+      "salesmethodid": null,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_draft_create",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Created draft bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path B, edit draft (pins current behaviour) pins current behaviour: Save Draft on a finalized bill keeps it finalized and moves no stock 1`] = `
+Array [
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 330,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "final_amount": null,
+      "finalized": true,
+      "gst_total": 0,
+      "net_amount": 200,
+      "notes": null,
+      "orderdate": "2026-09-30T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+      "saleslocationid": 1,
+      "salesmethodid": 1,
+      "store_credit_used": 100,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Edited draft bill #FY26-SG0330 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path B, edit draft (pins current behaviour) pins current behaviour: save an untouched draft with a salesperson 1`] = `
+Array [
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 330,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "final_amount": null,
+      "finalized": false,
+      "gst_total": 0,
+      "net_amount": 300,
+      "notes": null,
+      "orderdate": "2026-09-30T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "draft",
+      "saleslocationid": 1,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "billid": 330,
+        "salesperson_id": 3,
+      },
+    ],
+    "table": "bill_salespersons",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Edited draft bill #FY26-SG0330 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: Don't reduce stock ticked moves no stock 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: backdated to 2026-03-31 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "2026-03-31T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: backdated to 2026-04-01 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "2026-04-01T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: code discount writes a discount_usage row 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [
+        "TEN",
+      ],
+      "customerid": 7,
+      "discount_total": 30,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 270,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 270,
+      "totalamount": 270,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 30,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 270,
+        "total": 270,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "billid": 42,
+        "code": "TEN",
+        "customerid": 7,
+      },
+    ],
+    "table": "discount_usage",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹270, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: plain bill paid by cash 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: store credit above the total covers it, no payment entered 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": null,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": null,
+      "store_credit_used": 300,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "args": Object {
+      "p_customer": 7,
+      "p_delta": -300,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+    },
+    "fn": "store_credit_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: store credit below the total, rest paid in cash 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 200,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 1,
+      "store_credit_used": 100,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "args": Object {
+      "p_customer": 7,
+      "p_delta": -100,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+    },
+    "fn": "store_credit_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: tax invoice paid by UPI 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 14.29,
+      "document_type": "invoice",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 14.29,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 2,
+      "store_credit_used": 0,
+      "taxable_total": 285.71,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 14.29,
+        "gst_amount": 14.29,
+        "gst_rate": 5,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 285.71,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path C, finalize new (pins current behaviour) pins current behaviour: voucher is redeemed 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_cash_refund": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 200,
+      "paymentstatus": "finalized",
+      "saleslocationid": null,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 200,
+      "totalamount": 200,
+    },
+    "table": "bills",
+  },
+  Object {
+    "args": Object {
+      "p_bill": 42,
+      "p_voucher": "VOUCH1",
+    },
+    "fn": "voucher_redeem",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill #FY26-SG0042 for Asha — ₹200, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path D, finalize existing (pins current behaviour) pins current behaviour: draft to finalized 1`] = `
+Array [
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "exchange_cash_refund": 0,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "2026-09-30T00:00:00+05:30",
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+      "saleslocationid": 1,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 330,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0330.pdf",
+      "bill-330.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0330-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0330-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Re-finalized bill #FY26-SG0330 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path D, finalize existing (pins current behaviour) pins current behaviour: draft to finalized with a voucher 1`] = `
+Array [
+  Object {
+    "args": Object {
+      "p_bill": 330,
+      "p_voucher": "VOUCH1",
+    },
+    "fn": "voucher_redeem",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "exchange_cash_refund": 0,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "2026-09-30T00:00:00+05:30",
+      "payment_amount": 200,
+      "paymentstatus": "finalized",
+      "saleslocationid": 1,
+      "salesmethodid": 1,
+      "store_credit_used": 0,
+      "taxable_total": 200,
+      "totalamount": 200,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 330,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0330.pdf",
+      "bill-330.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0330-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0330-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Re-finalized bill #FY26-SG0330 for Asha — ₹200, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path D, finalize existing (pins current behaviour) pins current behaviour: re-finalize a bill that has a code and store credit 1`] = `
+Array [
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "applied_codes": Array [
+        "TEN",
+      ],
+      "customerid": 7,
+      "discount_total": 30,
+      "exchange_cash_refund": 0,
+      "finalized": true,
+      "gst_total": 0,
+      "notes": null,
+      "orderdate": "2026-09-30T00:00:00+05:30",
+      "payment_amount": 170,
+      "paymentstatus": "finalized",
+      "saleslocationid": 1,
+      "salesmethodid": 1,
+      "store_credit_used": 100,
+      "taxable_total": 270,
+      "totalamount": 270,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 330,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 30,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 270,
+        "total": 270,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "discount_usage",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "billid": 330,
+        "code": "TEN",
+        "customerid": 7,
+      },
+    ],
+    "table": "discount_usage",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0330.pdf",
+      "bill-330.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0330-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0330-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Re-finalized bill #FY26-SG0330 for Asha — ₹270, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path E, partial finalize new (pins current behaviour) pins current behaviour: nothing paid 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "final_amount": null,
+      "finalized": true,
+      "gst_total": 0,
+      "net_amount": 300,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 0,
+      "paymentstatus": "partial",
+      "saleslocationid": null,
+      "salesmethodid": null,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_partial_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill (partial) #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path E, partial finalize new (pins current behaviour) pins current behaviour: with a deposit 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "final_amount": null,
+      "finalized": true,
+      "gst_total": 0,
+      "net_amount": 300,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 100,
+      "paymentstatus": "partial",
+      "saleslocationid": null,
+      "salesmethodid": 2,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "args": Object {
+      "p_delta": -2,
+      "p_reason": "bill_partial_finalize",
+      "p_ref": "42",
+      "p_variant": "v1",
+    },
+    "fn": "stock_adjust",
+    "kind": "rpc",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "amount": 100,
+      "billid": 42,
+      "salesmethodid": 2,
+    },
+    "table": "bill_payments",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill (partial) #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path E, partial finalize new (pins current behaviour) pins current behaviour: with a deposit, Don't reduce stock ticked 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "document_type": "bos",
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "final_amount": null,
+      "finalized": true,
+      "gst_total": 0,
+      "net_amount": 300,
+      "notes": null,
+      "orderdate": "<today>T00:00:00+05:30",
+      "payment_amount": 100,
+      "paymentstatus": "partial",
+      "saleslocationid": null,
+      "salesmethodid": 2,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 42,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "amount": 100,
+      "billid": 42,
+      "salesmethodid": 2,
+    },
+    "table": "bill_payments",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0042.pdf",
+      "bill-42.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0042-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        42,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0042-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "create",
+      "entityId": "FY26-SG0042",
+      "entityType": "bill",
+      "summary": "Finalized bill (partial) #FY26-SG0042 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path F, partial finalize existing draft (pins current behaviour) pins current behaviour: nothing paid 1`] = `
+Array [
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "final_amount": null,
+      "finalized": true,
+      "gst_total": 0,
+      "net_amount": 300,
+      "notes": null,
+      "orderdate": "2026-09-30T00:00:00+05:30",
+      "payment_amount": 0,
+      "paymentstatus": "partial",
+      "saleslocationid": 1,
+      "salesmethodid": null,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 330,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0330.pdf",
+      "bill-330.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0330-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0330-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Finalized bill (partial) #FY26-SG0330 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path F, partial finalize existing draft (pins current behaviour) pins current behaviour: with a deposit and a salesperson 1`] = `
+Array [
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "applied_codes": Array [],
+      "customerid": 7,
+      "discount_total": 0,
+      "exchange_credit_used": 0,
+      "exchange_source_bill": null,
+      "final_amount": null,
+      "finalized": true,
+      "gst_total": 0,
+      "net_amount": 300,
+      "notes": null,
+      "orderdate": "2026-09-30T00:00:00+05:30",
+      "payment_amount": 100,
+      "paymentstatus": "partial",
+      "saleslocationid": 1,
+      "salesmethodid": 2,
+      "store_credit_used": 0,
+      "taxable_total": 300,
+      "totalamount": 300,
+    },
+    "table": "bills",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "alteration_charge": 0,
+        "billid": 330,
+        "category": null,
+        "cost_price": null,
+        "discount_total": 0,
+        "gst_amount": 0,
+        "gst_rate": null,
+        "mrp": 150,
+        "product_code": "BC25001",
+        "product_name": "Kurti",
+        "quantity": 2,
+        "salesperson_id": null,
+        "stitch_type": "unstitched",
+        "subtotal": 300,
+        "total": 300,
+        "unit_type": "piece",
+        "variantid": "v1",
+      },
+    ],
+    "table": "bill_items",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "delete",
+    "table": "bill_salespersons",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Array [
+      Object {
+        "billid": 330,
+        "salesperson_id": 3,
+      },
+    ],
+    "table": "bill_salespersons",
+  },
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "amount": 100,
+      "billid": 330,
+      "recorded_at": "2026-09-30T12:00:00",
+      "salesmethodid": 2,
+    },
+    "table": "bill_payments",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0330.pdf",
+      "bill-330.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0330-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0330-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Finalized bill (partial) #FY26-SG0330 for Asha — ₹300, 1 items",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path G, record payment (pins current behaviour) pins current behaviour: payment that leaves a balance 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "amount": 50,
+      "billid": 330,
+      "salesmethodid": 2,
+    },
+    "table": "bill_payments",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "payment_amount": 150,
+      "paymentstatus": "partial",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Recorded payment of ₹50 on bill #FY26-SG0330",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
+
+exports[`path G, record payment (pins current behaviour) pins current behaviour: payment that settles the bill 1`] = `
+Array [
+  Object {
+    "filters": Array [],
+    "kind": "table",
+    "op": "insert",
+    "payload": Object {
+      "amount": 200,
+      "billid": 330,
+      "salesmethodid": 1,
+    },
+    "table": "bill_payments",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "payment_amount": 300,
+      "paymentstatus": "finalized",
+    },
+    "table": "bills",
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "remove",
+    "paths": Array [
+      "bill-FY26-SG0330.pdf",
+      "bill-330.pdf",
+    ],
+  },
+  Object {
+    "bucket": "invoices",
+    "kind": "storage",
+    "op": "upload",
+    "path": "bill-FY26-SG0330-v<time>.pdf",
+  },
+  Object {
+    "filters": Array [
+      Array [
+        "eq",
+        "billid",
+        330,
+      ],
+    ],
+    "kind": "table",
+    "op": "update",
+    "payload": Object {
+      "pdf_url": "bill-FY26-SG0330-v<time>.pdf",
+    },
+    "table": "bills",
+  },
+  Object {
+    "entry": Object {
+      "action": "update",
+      "entityId": "FY26-SG0330",
+      "entityType": "bill",
+      "summary": "Recorded payment of ₹200 on bill #FY26-SG0330 (now fully paid)",
+    },
+    "kind": "activity_log",
+  },
+]
+`;
