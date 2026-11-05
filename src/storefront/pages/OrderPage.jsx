@@ -178,6 +178,12 @@ export default function OrderPage() {
         </p>
       )}
 
+      {confirmed && (
+        <p className="text-sm font-sans text-storefront-muted">
+          If you gave us your email, your confirmation is on its way from bindalscreations@gmail.com. Not in your inbox? Check Spam and mark it "Not spam".
+        </p>
+      )}
+
       {order.leftoverVoucher && (
         <p className="border border-storefront-border px-4 py-3 text-sm font-sans text-storefront-charcoal">
           ₹{formatRupees(order.leftoverVoucher.value)} left on your voucher is now a new voucher,{" "}

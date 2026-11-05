@@ -73,7 +73,7 @@ Deno.test(":completed job: refund-completed email with the original-method amoun
   assertEquals(await notify(deps, job(`refund_notify:${r.id}:completed`)), "nothing_to_send", "not completed yet");
   await db.setLegStatus(r.legs[0].id, "completed", "cf1", "SUCCESS");
   assertEquals(await notify(deps, job(`refund_notify:${r.id}:completed`)), "sent_completed");
-  assertStringIncludes(sent[0].subject, "Refund completed");
+  assertStringIncludes(sent[0].subject, "refund completed");
   assertStringIncludes(sent[0].text, "₹1,000 has been refunded to your original payment method");
 });
 

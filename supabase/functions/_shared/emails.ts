@@ -32,6 +32,8 @@ export type Email = { subject: string; text: string };
 
 export const SHOP_NAME = "Bindals Creation";
 export const SHOP_ADDRESS = "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001";
+const SHOP_DOMAIN = "bindalscreations.com";
+const SHOP_WEBSITE = `www.${SHOP_DOMAIN}`;
 
 const inr = (n: number) =>
   "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
@@ -54,7 +56,7 @@ function moneyLines(o: EmailOrder): string[] {
   lines.push(`Shipping: ${o.fulfilment === "pickup" ? "Free (store pickup)" : o.shipping > 0 ? inr(o.shipping) : "Free"}`);
   if (o.voucherApplied > 0) lines.push(`Voucher: -${inr(o.voucherApplied)}`);
   if (o.creditApplied > 0) lines.push(`Store credit: -${inr(o.creditApplied)}`);
-  lines.push(`Total paid: ${inr(o.subtotal - o.promoDiscount + o.shipping)}` +
+  lines.push(`Order total: ${inr(o.subtotal - o.promoDiscount + o.shipping)}` +
     (o.voucherApplied + o.creditApplied > 0 ? ` (${inr(o.gatewayAmount)} paid online)` : ""));
   return lines;
 }
@@ -76,6 +78,22 @@ function inUp(a: Record<string, unknown>): boolean {
 }
 
 /**
+ * Says who is writing and why they are writing. Our emails come from a free Gmail address, and
+ * Gmail has filed them as spam, so each one names the shop, its address and the reason for the email.
+ */
+export function customerFooter(): string[] {
+  return [
+    `- ${SHOP_NAME}`,
+    SHOP_ADDRESS,
+    SHOP_WEBSITE,
+    "",
+    `You're getting this email because you placed an order at ${SHOP_DOMAIN}.`,
+  ];
+}
+
+const customerSubject = (rest: string) => `${SHOP_NAME}: ${rest}`;
+
+/**
  * Every order link in an email goes to /track with the number filled in. The order page needs an
  * access token, but only its hash is stored, so an email cannot carry one; /track takes the
  * order number plus the phone used at checkout, which works for guests and survives a retried checkout.
@@ -93,7 +111,7 @@ export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",
-    `Thank you for shopping with ${SHOP_NAME}. Your order ${o.orderRef} is confirmed.`,
+    `Thank you for your order from ${SHOP_NAME}, our shop in Ghaziabad. We've received order ${o.orderRef}.`,
     "",
     ...o.items.map(itemLine),
     "",
@@ -106,9 +124,9 @@ export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
     "",
     orderLinkLine(o.orderRef, siteUrl),
     "",
-    `- ${SHOP_NAME}`,
+    ...customerFooter(),
   ].join("\n");
-  return { subject: `Order ${o.orderRef} confirmed`, text };
+  return { subject: customerSubject(`order ${o.orderRef} confirmed`), text };
 }
 
 export function shopNewOrder(o: EmailOrder, siteUrl: string): Email {
@@ -155,9 +173,9 @@ export function shipped(o: EmailOrder, siteUrl: string): Email {
     "",
     orderLinkLine(o.orderRef, siteUrl),
     "",
-    `- ${SHOP_NAME}`,
+    ...customerFooter(),
   ].join("\n");
-  const subject = manual ? `Order ${o.orderRef} has been picked up for delivery` : `Order ${o.orderRef} has shipped`;
+  const subject = customerSubject(`order ${o.orderRef} ${manual ? "has been picked up for delivery" : "has shipped"}`);
   return { subject, text };
 }
 
@@ -176,9 +194,9 @@ export function readyForPickup(o: EmailOrder, siteUrl: string): Email {
     "",
     orderLinkLine(o.orderRef, siteUrl),
     "",
-    `- ${SHOP_NAME}`,
+    ...customerFooter(),
   ].join("\n");
-  return { subject: `Order ${o.orderRef} is ready for pickup`, text };
+  return { subject: customerSubject(`order ${o.orderRef} is ready for pickup`), text };
 }
 
 export function delivered(o: EmailOrder, siteUrl: string): Email {
@@ -193,7 +211,7 @@ export function delivered(o: EmailOrder, siteUrl: string): Email {
     "",
     `Shop again: ${siteUrl}`,
     "",
-    `- ${SHOP_NAME}`,
+    ...customerFooter(),
   ].join("\n");
-  return { subject: `Order ${o.orderRef} ${pickup ? "collected" : "delivered"}`, text };
+  return { subject: customerSubject(`order ${o.orderRef} ${pickup ? "collected" : "delivered"}`), text };
 }

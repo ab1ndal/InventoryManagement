@@ -19,6 +19,7 @@ import { type ReturnsStorage, supabaseReturnsStorage } from "./returns.ts";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { type CashfreeClient, type CashfreeEnv, createCashfree } from "./cashfree.ts";
 import { createShiprocket, type ShiprocketClient, type TokenStore } from "./shiprocket.ts";
+import { SHOP_NAME } from "./emails.ts";
 import { createMailer } from "./mailer.ts";
 import {
   corsHeaders,
@@ -455,7 +456,7 @@ export function appDeps(get: EnvGet = (n) => Deno.env.get(n)): AppDeps & { db: S
     store: createStore(db),
     cashfree: cashfreeFromEnv(get, env.cashfreeMode),
     shiprocket: shiprocketFromEnv(get, dbTokenStore(db)),
-    mailer: createMailer({ user: get("GMAIL_USER"), appPassword: get("GMAIL_APP_PASSWORD") }),
+    mailer: createMailer({ user: get("GMAIL_USER"), appPassword: get("GMAIL_APP_PASSWORD"), fromName: SHOP_NAME }),
     verifyJwt: supabaseVerifier(db),
     env,
     now: () => new Date(),

@@ -119,6 +119,18 @@ it("shows totals and a leftover voucher, and no save-number note when signed in"
   expect(mockClearCart).not.toHaveBeenCalled();
 });
 
+it("tells a confirmed order to look in Spam, and not an order that failed", async () => {
+  mockOrderStatus.mockResolvedValue(order("paid"));
+  const { unmount } = renderAt("/order/WEB-000001");
+  expect(await screen.findByText(/Check Spam and mark it "Not spam"/)).toBeInTheDocument();
+  unmount();
+
+  mockOrderStatus.mockResolvedValue(order("payment_failed"));
+  renderAt("/order/WEB-000001");
+  expect(await screen.findByText("Payment didn't go through")).toBeInTheDocument();
+  expect(screen.queryByText(/Check Spam/)).not.toBeInTheDocument();
+});
+
 it("says not found for an unknown ref or bad token", async () => {
   mockOrderStatus.mockRejectedValue(new OrdersApiError("not found", { status: 404 }));
   renderAt("/order/WEB-000404?t=bad");

@@ -33,13 +33,13 @@ const o: EmailOrder = {
   leftoverVoucher: null,
 };
 
-Deno.test("orderConfirmed: items, total paid, ref, link and the UP line", () => {
+Deno.test("orderConfirmed: items, order total, ref, link and the UP line", () => {
   const m = orderConfirmed(o, SITE);
-  assertEquals(m.subject, "Order WEB-000042 confirmed");
+  assertEquals(m.subject, "Bindals Creation: order WEB-000042 confirmed");
   assertStringIncludes(m.text, "Hi Asha,");
   assertStringIncludes(m.text, "- Silk Kurti (M, Red) x 2");
   assertStringIncludes(m.text, "- Lehenga (L) x 1 (out of stock");
-  assertStringIncludes(m.text, "Total paid: ₹4,130 (₹3,630 paid online)");
+  assertStringIncludes(m.text, "Order total: ₹4,130 (₹3,630 paid online)");
   assertStringIncludes(m.text, "Store credit: -₹500");
   assertStringIncludes(m.text, "We'll email you again when your parcel ships.");
   assert(!m.text.includes("confirm delivery"), "no doubt about delivery inside UP");
@@ -70,18 +70,18 @@ Deno.test("shopNewOrder: landmark line when present", () => {
 
 Deno.test("shipped: AWB and tracking link; delivered", () => {
   const m = shipped({ ...o, awb: "AWB123", courierName: "Delhivery" }, SITE);
-  assertEquals(m.subject, "Order WEB-000042 has shipped");
+  assertEquals(m.subject, "Bindals Creation: order WEB-000042 has shipped");
   assertStringIncludes(m.text, "with Delhivery");
   assertStringIncludes(m.text, "AWB): AWB123");
   assertStringIncludes(m.text, "https://shiprocket.co/tracking/AWB123");
   assertStringIncludes(m.text, `${SITE}/track?order=WEB-000042`);
   assert(!m.text.includes("/order/"), "no tokenless order-page link");
-  assertEquals(delivered(o, SITE).subject, "Order WEB-000042 delivered");
+  assertEquals(delivered(o, SITE).subject, "Bindals Creation: order WEB-000042 delivered");
 });
 
 Deno.test("shipped: Porter is picked up for delivery, follows on /track; Shiprocket without an AWB throws", () => {
   const m = shipped({ ...o, courier: "porter", courierName: "Porter" }, SITE);
-  assertEquals(m.subject, "Order WEB-000042 has been picked up for delivery");
+  assertEquals(m.subject, "Bindals Creation: order WEB-000042 has been picked up for delivery");
   assertStringIncludes(m.text, "Your order WEB-000042 is on its way with Porter.");
   assertStringIncludes(m.text, `Follow it at ${SITE}/track with your order number and phone number.`);
   assert(!/AWB|WhatsApp|Track it here/.test(m.text), "no link, no WhatsApp");
@@ -91,7 +91,7 @@ Deno.test("shipped: Porter is picked up for delivery, follows on /track; Shiproc
 
 Deno.test("shipped: self delivery names no courier", () => {
   const m = shipped({ ...o, courier: "self", courierName: "Bindal's Creation" }, SITE);
-  assertEquals(m.subject, "Order WEB-000042 has been picked up for delivery");
+  assertEquals(m.subject, "Bindals Creation: order WEB-000042 has been picked up for delivery");
   assertStringIncludes(m.text, "Your order WEB-000042 is on its way.");
   assertEquals(m.text.includes("Bindal's Creation"), false);
   assertStringIncludes(m.text, `${SITE}/track`);
@@ -116,13 +116,30 @@ Deno.test("store pickup: shop alert says Store pickup and to mark it ready", () 
 
 Deno.test("store pickup: ready email has the shop address and the order number; collected wording", () => {
   const m = readyForPickup(pickup, SITE);
-  assertEquals(m.subject, "Order WEB-000042 is ready for pickup");
+  assertEquals(m.subject, "Bindals Creation: order WEB-000042 is ready for pickup");
   assertStringIncludes(m.text, "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001");
   assertStringIncludes(m.text, "Please bring your order number (WEB-000042)");
   assertStringIncludes(m.text, "WhatsApp us");
   assertStringIncludes(m.text, `${SITE}/track?order=WEB-000042`);
   assert(!m.text.includes("/order/"), "no tokenless order-page link");
   const d = delivered(pickup, SITE);
-  assertEquals(d.subject, "Order WEB-000042 collected");
+  assertEquals(d.subject, "Bindals Creation: order WEB-000042 collected");
   assertStringIncludes(d.text, "You've collected your order WEB-000042.");
+});
+
+Deno.test("customer emails say who is writing and why; the shop's own alert does not", () => {
+  const shippedOrder = { ...o, awb: "AWB123" };
+  for (const m of [orderConfirmed(o, SITE), shipped(shippedOrder, SITE), readyForPickup(pickup, SITE), delivered(o, SITE)]) {
+    assert(m.subject.startsWith("Bindals Creation: order WEB-000042"), m.subject);
+    assertStringIncludes(m.text, `- Bindals Creation\n${SHOP_ADDRESS}\nwww.bindalscreations.com`);
+    assertStringIncludes(m.text, "You're getting this email because you placed an order at bindalscreations.com.");
+  }
+  assertEquals(shopNewOrder(o, SITE).text.includes("You're getting this email"), false);
+});
+
+Deno.test("orderConfirmed: opens by naming the shop and its town", () => {
+  assertStringIncludes(
+    orderConfirmed(o, SITE).text,
+    "Thank you for your order from Bindals Creation, our shop in Ghaziabad. We've received order WEB-000042.",
+  );
 });

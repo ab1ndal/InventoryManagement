@@ -25,6 +25,7 @@ Deno.test("Gmail transport options: smtp.gmail.com:465, secure hard-coded true",
     port: 465,
     secure: true,
     auth: { user: "shop@gmail.com", pass: "app-pw" },
+    name: "bindalscreations.com",
   });
 });
 
@@ -63,4 +64,11 @@ Deno.test("transport failure propagates; empty recipient refused", async () => {
   const m = createMailer({ user: "shop@gmail.com", appPassword: "pw", transport: failing });
   await assertRejects(() => m.send(msg), Error, "535");
   await assertRejects(() => m.send({ ...msg, to: " " }), RangeError);
+});
+
+Deno.test("send: fromName shows the shop's name beside the Gmail address", async () => {
+  const t = fakeTransport();
+  const m = createMailer({ user: "shop@gmail.com", appPassword: "app-pw", fromName: "Bindals Creation", transport: t.transport });
+  await m.send(msg);
+  assertEquals(t.sent[0].from, '"Bindals Creation" <shop@gmail.com>');
 });
