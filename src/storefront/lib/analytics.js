@@ -4,6 +4,14 @@
 const GA4_ID = process.env.REACT_APP_GA4_ID;
 const ENABLED = !!GA4_ID && process.env.NODE_ENV === "production";
 
+// GA4 reports the full address by default. Order pages carry an access token in
+// `t`, which must never reach a third party; campaign parameters stay.
+export function safePageLocation(href) {
+  const url = new URL(href);
+  url.searchParams.delete("t");
+  return url.toString();
+}
+
 let initialized = false;
 
 export function initAnalytics() {
@@ -18,6 +26,7 @@ export function initAnalytics() {
   window.gtag("js", new Date());
   // send_page_view:false — page views are sent manually via trackPageView on
   // route change, so the config call must not also auto-fire one (double-count).
+  window.gtag("set", { page_location: safePageLocation(window.location.href) });
   window.gtag("config", GA4_ID, { send_page_view: false });
 
   const script = document.createElement("script");
@@ -28,7 +37,9 @@ export function initAnalytics() {
 
 export function trackPageView(path) {
   if (!ENABLED || typeof window.gtag !== "function") return;
-  window.gtag("event", "page_view", { page_path: path });
+  const pageLocation = safePageLocation(window.location.href);
+  window.gtag("set", { page_location: pageLocation });
+  window.gtag("event", "page_view", { page_path: path, page_location: pageLocation });
 }
 
 export function trackEvent(name, params) {
