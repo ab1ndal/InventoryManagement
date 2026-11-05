@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Seo from "../components/Seo";
 import OrderDelivery from "../components/OrderDelivery";
 import OrderDetails from "../components/OrderDetails";
@@ -9,7 +10,9 @@ import { WHATSAPP_URL, lookupOrder, packedPhotosFor } from "../lib/ordersApi";
 import { PACKED_PHOTO_STATUSES, statusLabel } from "../lib/orderStatus";
 
 export default function TrackOrderPage() {
-  const [orderRef, setOrderRef] = useState("");
+  // Order emails link to /track?order=WEB-… so the guest only types a phone number.
+  const [searchParams] = useSearchParams();
+  const [orderRef, setOrderRef] = useState(() => searchParams.get("order")?.slice(0, 30) ?? "");
   const [phone, setPhone] = useState("");
   // idle | loading | found | not_found | error
   const [result, setResult] = useState({ kind: "idle", order: null });

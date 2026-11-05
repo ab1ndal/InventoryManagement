@@ -47,7 +47,8 @@ Deno.test("orderConfirmed: items, total paid, ref, link and the UP line", () => 
   const out = orderConfirmed({ ...o, address: { ...o.address, state: "Maharashtra", pincode: "400001" } }, SITE);
   assertStringIncludes(out.text, "We'll confirm delivery to your address on WhatsApp before dispatch.");
   assert(!out.text.includes("Uttar Pradesh"), "no UP promise outside UP");
-  assertStringIncludes(m.text, `${SITE}/order/WEB-000042`);
+  assertStringIncludes(m.text, `${SITE}/track?order=WEB-000042`);
+  assert(!m.text.includes("/order/"), "no tokenless order-page link");
   assert(!/GST/i.test(m.text), "composition dealer: no GST");
   const v = orderConfirmed({ ...o, leftoverVoucher: { code: "ABCD2345EFGH6789", value: 1250 } }, SITE);
   assertStringIncludes(v.text, "₹1,250 left over. Use this new code next time: ABCD2345EFGH6789");
@@ -73,6 +74,8 @@ Deno.test("shipped: AWB and tracking link; delivered", () => {
   assertStringIncludes(m.text, "with Delhivery");
   assertStringIncludes(m.text, "AWB): AWB123");
   assertStringIncludes(m.text, "https://shiprocket.co/tracking/AWB123");
+  assertStringIncludes(m.text, `${SITE}/track?order=WEB-000042`);
+  assert(!m.text.includes("/order/"), "no tokenless order-page link");
   assertEquals(delivered(o, SITE).subject, "Order WEB-000042 delivered");
 });
 
@@ -117,7 +120,8 @@ Deno.test("store pickup: ready email has the shop address and the order number; 
   assertStringIncludes(m.text, "58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, UP 201001");
   assertStringIncludes(m.text, "Please bring your order number (WEB-000042)");
   assertStringIncludes(m.text, "WhatsApp us");
-  assertStringIncludes(m.text, `${SITE}/order/WEB-000042`);
+  assertStringIncludes(m.text, `${SITE}/track?order=WEB-000042`);
+  assert(!m.text.includes("/order/"), "no tokenless order-page link");
   const d = delivered(pickup, SITE);
   assertEquals(d.subject, "Order WEB-000042 collected");
   assertStringIncludes(d.text, "You've collected your order WEB-000042.");

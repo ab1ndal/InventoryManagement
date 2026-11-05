@@ -19,9 +19,9 @@ const DELIVERED = {
   items: [{ name: "Silk Saree", size: "FREE", color: "Red", qty: 2, unit_price: 1500, status: "shipped", refunded_qty: 0 }],
 };
 
-function renderPage() {
+function renderPage(url = "/track") {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <TrackOrderPage />
     </MemoryRouter>
   );
@@ -34,6 +34,12 @@ function submit(ref, phone) {
 }
 
 describe("TrackOrderPage", () => {
+  it("prefills the order number from an email link, leaving only the phone to type", () => {
+    renderPage("/track?order=WEB-000007");
+    expect(screen.getByLabelText(/order number/i)).toHaveValue("WEB-000007");
+    expect(screen.getByLabelText(/phone/i)).toHaveValue("");
+  });
+
   it("adds packed photos once found, asking with the same order and phone", async () => {
     supabase.rpc.mockResolvedValue({ data: DELIVERED, error: null });
     supabase.functions.invoke.mockResolvedValue({ data: { photos: ["https://x.test/a.jpg"] }, error: null });
