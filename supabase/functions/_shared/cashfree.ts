@@ -94,6 +94,8 @@ export type CfOrder = {
   amount: number;
   currency: string;
   paymentSessionId: string | null;
+  /** order_meta.return_url from Get Order; a retry reuses the order token inside it. */
+  returnUrl?: string | null;
 };
 
 export type CfPayment = {
@@ -215,6 +217,9 @@ export function createCashfree(config: CashfreeConfig): CashfreeClient {
       // resume a session after an ambiguous create).
       paymentSessionId: typeof d.payment_session_id === "string" && d.payment_session_id
         ? d.payment_session_id
+        : null,
+      returnUrl: typeof (d.order_meta as Record<string, unknown> | null | undefined)?.return_url === "string"
+        ? (d.order_meta as Record<string, string>).return_url
         : null,
     };
   }

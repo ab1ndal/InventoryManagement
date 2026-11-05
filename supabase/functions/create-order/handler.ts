@@ -16,6 +16,7 @@
 
 import { CashfreeError, type CfOrder } from "../_shared/cashfree.ts";
 import { hashIp, optionalUser } from "../_shared/http.ts";
+import { sha256Hex } from "../_shared/context.ts";
 import { holderKeyFor, parseGuestKey } from "../_shared/holds.ts";
 import {
   ApiError,
@@ -126,16 +127,8 @@ async function sessionFor(
   order: OrderRow,
   attemptKey: string,
   returnUrl: string,
+  cf: CfOrder | null,
 ): Promise<{ paymentSessionId: string | null; paid: boolean }> {
-  const cashfree = deps.cashfree;
-  if (!cashfree) throw new ApiError(502, "gateway_error", "payments are not available right now");
-  let cf: CfOrder | null;
-  try {
-    cf = await cashfree.getOrder(order.order_ref);
-  } catch (err) {
-    logEvent("error", "cashfree_get_order_failed", { orderRef: order.order_ref, error: errorMessage(err) });
-    throw new ApiError(502, "gateway_error", "payment service unavailable, please try again");
-  }
   if (!cf) {
     // No Cashfree order yet (the first attempt failed before creating it).
     return { paymentSessionId: await createCashfreeOrder(deps, order, attemptKey, returnUrl), paid: false };
@@ -204,21 +197,60 @@ async function createCashfreeOrder(deps: CreateOrderDeps, order: OrderRow, attem
   }
 }
 
+async function lookUpCashfreeOrder(deps: CreateOrderDeps, order: OrderRow): Promise<CfOrder | null> {
+  if (!deps.cashfree) throw new ApiError(502, "gateway_error", "payments are not available right now");
+  try {
+    return await deps.cashfree.getOrder(order.order_ref);
+  } catch (err) {
+    logEvent("error", "cashfree_get_order_failed", { orderRef: order.order_ref, error: errorMessage(err) });
+    throw new ApiError(502, "gateway_error", "payment service unavailable, please try again");
+  }
+}
+
+/**
+ * An active Cashfree session returns the shopper to the URL it was created with, so that URL's token
+ * must stay valid. Only its hash is stored, so the token is read back from Cashfree. Null when the
+ * session has no usable token, and the caller then issues a fresh one as before.
+ */
+async function tokenInActiveSession(deps: CreateOrderDeps, order: OrderRow, cf: CfOrder | null): Promise<string | null> {
+  if (cf?.status !== "ACTIVE" || !cf.paymentSessionId || !cf.returnUrl) return null;
+  let token: string | null;
+  try {
+    token = new URL(cf.returnUrl).searchParams.get("t");
+  } catch {
+    logEvent("warn", "cashfree_return_url_unparsable", { orderRef: order.order_ref });
+    return null;
+  }
+  if (!token) return null;
+  const valid = await deps.store.rpc<boolean>("online_order_access_ok", {
+    p_order_ref: order.order_ref,
+    p_token_hash: await sha256Hex(token),
+  });
+  return valid ? token : null;
+}
+
+async function issueAccessToken(deps: CreateOrderDeps, order: OrderRow): Promise<string> {
+  const { token, hash } = await newAccessToken(deps.randomBytes);
+  await deps.store.setAccessTokenHash(order.id, hash);
+  return token;
+}
+
 async function respondForExisting(
   deps: CreateOrderDeps,
   order: OrderRow,
   attemptKey: string,
 ): Promise<CreateOrderResponse> {
-  const { token, hash } = await newAccessToken(deps.randomBytes);
-  await deps.store.setAccessTokenHash(order.id, hash);
-  const base = { orderRef: order.order_ref, accessToken: token, cashfreeMode: deps.env.cashfreeMode };
-  if (order.status === "pending_payment") {
-    if (order.gateway_amount === 0) {
-      await confirmNoGateway(deps, order.order_ref);
-      return { ...base, paymentSessionId: null, paid: true };
-    }
+  const baseFor = (token: string) => ({ orderRef: order.order_ref, accessToken: token, cashfreeMode: deps.env.cashfreeMode });
+  if (order.status === "pending_payment" && order.gateway_amount !== 0) {
+    const cf = await lookUpCashfreeOrder(deps, order);
+    const token = (await tokenInActiveSession(deps, order, cf)) ?? (await issueAccessToken(deps, order));
     const returnUrl = `${deps.env.siteUrl}/order/${order.order_ref}?t=${token}`;
-    return { ...base, ...(await sessionFor(deps, order, attemptKey, returnUrl)) };
+    return { ...baseFor(token), ...(await sessionFor(deps, order, attemptKey, returnUrl, cf)) };
+  }
+  const base = baseFor(await issueAccessToken(deps, order));
+  if (order.status === "pending_payment") {
+    await confirmNoGateway(deps, order.order_ref);
+    return { ...base, paymentSessionId: null, paid: true };
   }
   if (order.status === "payment_failed" || order.status === "expired") {
     throw new ApiError(502, "gateway_error", "this payment attempt has ended, please start again");
