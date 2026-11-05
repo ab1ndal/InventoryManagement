@@ -90,6 +90,9 @@ const ProductTable = forwardRef(
           if (matchingCatIds.length === 0) return null; // signal: no matches possible
           q = q.in("categoryid", matchingCatIds);
         }
+        // Same blank test the storefront title uses: no detail means a shared title like "Silk Saree".
+        if (debouncedFilters.needsTitle)
+          q = q.or("title_detail.is.null,title_detail.eq.");
         return q;
       };
 
@@ -163,6 +166,27 @@ const ProductTable = forwardRef(
 
         for (const id of Array.from(allIds)) {
           if (!matchingFromVariants.has(id)) allIds.delete(id);
+        }
+      }
+
+      // Only photographed products are live, so those are the titles worth filling first.
+      if (debouncedFilters.needsTitle) {
+        const withPhoto = new Set();
+        let imgFrom = 0;
+        let imgDone = false;
+        while (!imgDone) {
+          const { data: images, error: imgError } = await supabase
+            .from("productimages")
+            .select("productid")
+            .order("productid")
+            .range(imgFrom, imgFrom + batchSize - 1);
+          if (imgError || !images) break;
+          for (const i of images) withPhoto.add(i.productid);
+          if (images.length < batchSize) imgDone = true;
+          else imgFrom += batchSize;
+        }
+        for (const id of Array.from(allIds)) {
+          if (!withPhoto.has(id)) allIds.delete(id);
         }
       }
 

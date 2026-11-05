@@ -26,6 +26,7 @@ const INITIAL_FILTERS = {
   discountPriceMax: "",
   stockMin: "",
   stockMax: "",
+  needsTitle: false,
 };
 
 const InventoryPage = () => {
@@ -155,9 +156,18 @@ const InventoryPage = () => {
     <div>
       <div className="flex justify-between items-center m-4 gap-4">
         <Button onClick={() => setAddDialogOpen(true)}>+ Add Product</Button>
-        <Button variant="secondary" onClick={resetFilters}>
-          Clear Filters
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button
+            variant={filters.needsTitle ? "default" : "secondary"}
+            aria-pressed={filters.needsTitle}
+            onClick={() => setFilters((f) => ({ ...f, needsTitle: !f.needsTitle }))}
+          >
+            Live products needing a title
+          </Button>
+          <Button variant="secondary" onClick={resetFilters}>
+            Clear Filters
+          </Button>
+        </div>
       </div>
       <ProductTable
         ref={tableRef}
