@@ -15,16 +15,13 @@ import {
 } from "../lib/ordersApi";
 import { rememberPendingOrder } from "../lib/pendingOrder";
 import { guestHolderKey } from "../lib/holder";
-import { INDIAN_STATES, UP_STATE } from "../lib/checkout";
+import { INDIAN_STATES } from "../lib/checkout";
 
 const QUOTE_DEBOUNCE_MS = 300;
 const PINCODE = /^\d{6}$/;
 
 // DOM order of the form's inputs, so the first invalid one is found top-down.
 const FIELD_ORDER = ["name", "phone", "email", "pincode", "city", "state", "line1", "line2", "landmark"];
-
-const OUTSIDE_UP_NOTE =
-  "We'll confirm delivery to your address on WhatsApp before dispatch.";
 
 const CODE_MESSAGES = {
   ok: "Code applied",
@@ -265,10 +262,6 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
   }
 
   const q = response?.quote;
-  // Soft note only: out-of-UP orders are accepted and the owner confirms fulfilment (2026-10-30).
-  const stateValue = watch("state");
-  const outsideUp =
-    !pickup && (response?.pincode?.inUp === false || (Boolean(stateValue) && stateValue !== UP_STATE));
   const unavailable = response?.unavailable ?? [];
   // Why payment cannot start even though the form is valid, in words for the
   // shopper. Null means go ahead. Shown when Pay is tapped.
@@ -368,9 +361,6 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
         </div>
       )}
 
-      {outsideUp && (
-        <p className="mt-4 text-sm font-sans text-storefront-muted">{OUTSIDE_UP_NOTE}</p>
-      )}
       {unavailable.length > 0 && (
         <div role="alert" className="mt-4 text-sm font-sans text-red-600 space-y-1">
           {unavailable.map((u) => (

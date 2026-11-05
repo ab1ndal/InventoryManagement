@@ -10,7 +10,7 @@ const SIGNALS = [
   { icon: Heart, title: "Handpicked with love", desc: "Every piece chosen by our family" },
   // 2XL–6XL: ~140 of the visible products in stock (2026-10-14).
   { icon: Ruler, title: "Plus sizes up to 6XL", desc: "Hard to find in stores; we keep 2XL to 6XL" },
-  { icon: RefreshCw, title: "7-day returns & exchange", desc: "Within 7 days of delivery or purchase" },
+  { icon: RefreshCw, title: "7-day returns", desc: "Online orders: return in 7 days. Exchange in store with your bill" },
   { icon: MessageCircle, title: "WhatsApp help", desc: "Ask us about size, fabric or fit", href: WHATSAPP_URL },
   { icon: Truck, title: "Free shipping over ₹5,000", desc: "Delivered to your door" },
 ];

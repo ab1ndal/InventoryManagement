@@ -37,7 +37,7 @@ import { isSoldOut } from "../lib/stock";
 
 const TRUST_POINTS = [
   { icon: Heart, label: "Handpicked with love" },
-  { icon: RefreshCw, label: RETURNS_BADGE },
+  { icon: RefreshCw, label: RETURNS_BADGE, to: "/policies/returns" },
   { icon: MessageCircle, label: "WhatsApp help" },
 ];
 
@@ -562,13 +562,19 @@ function ProductDetail({ productid }) {
             </p>
 
             <ul className="grid grid-cols-3 gap-2 border-y border-storefront-border/70 py-4 mt-5 mb-8">
-              {TRUST_POINTS.map(({ icon: Icon, label }) => (
+              {TRUST_POINTS.map(({ icon: Icon, label, to }) => (
                 <li
                   key={label}
                   className="flex flex-col items-center text-center gap-1.5 text-[11px] leading-snug text-storefront-muted font-sans"
                 >
                   <Icon size={16} className="text-storefront-gold" aria-hidden="true" />
-                  {label}
+                  {to ? (
+                    <Link to={to} className="underline underline-offset-2 hover:text-storefront-charcoal">
+                      {label}
+                    </Link>
+                  ) : (
+                    label
+                  )}
                 </li>
               ))}
             </ul>

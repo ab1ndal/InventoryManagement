@@ -62,7 +62,8 @@ export const RETURNS = [
   {
     heading: "Exchanges",
     body: [
-      "Exchanges are accepted within 7 days of purchase, in-store only, with the original bill. For online orders, the 7 days count from the day of delivery.",
+      "Exchanges are accepted within 7 days of purchase, in-store only, after 12 PM, with the original bill. For online orders, the 7 days count from the day of delivery.",
+      "Purchases made in our shop can be exchanged but not returned.",
       "The garment must be unworn, unwashed and in original condition with tags intact.",
     ],
   },
@@ -153,7 +154,7 @@ export const TERMS = [
     heading: "Orders and payment",
     body: [
       "An order is confirmed once we receive your payment.",
-      "We may decline or cancel an order if an item is out of stock, the delivery address is outside our delivery area, or we suspect fraud. Any amount paid is refunded in full, to the original payment method or as instant store credit if you choose.",
+      "We may decline or cancel an order if an item is out of stock, we cannot deliver to your address, or we suspect fraud. Any amount paid is refunded in full, to the original payment method or as instant store credit if you choose.",
       "Payments are processed securely by Cashfree Payments (UPI, cards and net banking). We do not store your payment details.",
     ],
   },

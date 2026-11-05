@@ -50,11 +50,6 @@ export function shippingFee(subtotal) {
   return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
 }
 
-// The business is a GST composition dealer (CGST Act s.10(2)(c)) and usually
-// delivers within Uttar Pradesh, but checkout accepts any state: the owner
-// decides fulfilment for out-of-UP orders (owner decision 2026-10-30).
-export const UP_STATE = "Uttar Pradesh";
-
 // Shoppers type or paste "+91 98765 43210", "098765 43210" and so on. Strip
 // spaces and dashes, then a leading +91, a 91 only when 12 digits are left,
 // or a single leading 0, so the value validated and sent is the bare 10

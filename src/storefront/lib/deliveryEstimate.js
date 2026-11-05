@@ -1,5 +1,5 @@
 export const DELIVERY_ESTIMATE = "Dispatches in 2 days · Delivered in 5–7 days";
-export const RETURNS_BADGE = "7-day returns & exchange";
+export const RETURNS_BADGE = "7-day returns, exchange in store";
 
 // Generic, always-true care guidance — no per-product care data exists in the
 // DB, so this stays universal to ethnic wear rather than faking specifics.
