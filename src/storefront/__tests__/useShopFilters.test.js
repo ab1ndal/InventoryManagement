@@ -1,6 +1,7 @@
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import useShopFilters from "../hooks/useShopFilters";
+import { clearFilterOptionsCache } from "../hooks/filterOptionsCache";
 
 jest.mock("lib/supabaseClient", () => ({
   supabase: { from: jest.fn(), rpc: jest.fn() },
@@ -41,6 +42,7 @@ function respond(index, ids) {
 
 beforeEach(() => {
   pending = [];
+  clearFilterOptionsCache();
   // Filter vocabularies and availability are irrelevant here.
   supabase.rpc.mockResolvedValue({ data: null, error: null });
   supabase.from.mockImplementation(() => {

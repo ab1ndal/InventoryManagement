@@ -11,6 +11,7 @@ import {
   fabricCodesFor,
   mapAvailability,
 } from "./shopAvailability";
+import { fetchFilterOptions } from "./filterOptionsCache";
 import { readFilters, readSort, writeFilters, writeSort } from "./shopUrlState";
 
 const PAGE_SIZE = 24;
@@ -150,7 +151,7 @@ export default function useShopFilters({
       // The fetch layer (src/lib/supabaseFetch.js) adds timeout + retry; on
       // failure the filters simply stay at their defaults.
       const [{ data, error }, scopeRows] = await Promise.all([
-        supabase.rpc("get_shop_filter_options"),
+        fetchFilterOptions(),
         scopeProductIds ? fetchScopeRows(scopeProductIds) : undefined,
       ]);
       scopeRowsRef.current = scopeRows;

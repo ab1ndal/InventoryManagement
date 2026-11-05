@@ -3,6 +3,7 @@
 
 import { COLLECTIONS, getCollection } from "../storefront/lib/collections";
 import { HERO_SLIDES } from "../storefront/lib/heroSlides";
+import { CATEGORY_RAILS, RAIL_SIZE } from "../storefront/lib/homeRails";
 import {
   GOOGLE_MAPS_URL,
   NAV_LINKS,
@@ -286,10 +287,21 @@ function heroPreloads() {
     : [{ href: url }];
 }
 
+// The same rails the app shows: newest products, then the newest in each category rail.
 async function homePage(rest) {
-  const products = await rest(
-    `products?select=${LIST_FIELDS}&order=productid.desc&limit=${LISTED_PRODUCTS}`
-  );
+  const newest = `products?select=${LIST_FIELDS}&order=productid.desc&limit=${RAIL_SIZE}`;
+  const [arrivals, ...railProducts] = await Promise.all([
+    rest(newest),
+    ...CATEGORY_RAILS.map(({ slug }) =>
+      rest(`products?${collectionQuery(getCollection(slug))}&order=productid.desc&limit=${RAIL_SIZE}`)
+    ),
+  ]);
+  const rails = [
+    `<h2>${link("/shop", "New Arrivals")}</h2>${productList(arrivals)}`,
+    ...CATEGORY_RAILS.map(
+      ({ slug, title }, i) => `<h2>${link(`/collections/${slug}`, title)}</h2>${productList(railProducts[i])}`
+    ),
+  ].join("");
   const collections = COLLECTIONS.map((c) => `<li>${link(`/collections/${c.slug}`, c.title)}</li>`).join("");
   return {
     status: 200,
@@ -299,7 +311,7 @@ async function homePage(rest) {
     preloadImages: heroPreloads(),
     bodyHtml: frame(
       `<h1>Bindal's Creation: handpicked Indian ethnic wear and custom tailoring</h1>` +
-        `<p>${esc(ABOUT.lede)}</p><ul>${collections}</ul>${productList(products)}`
+        `<p>${esc(ABOUT.lede)}</p><ul>${collections}</ul>${rails}`
     ),
     jsonLd: [
       STORE_JSON_LD,
