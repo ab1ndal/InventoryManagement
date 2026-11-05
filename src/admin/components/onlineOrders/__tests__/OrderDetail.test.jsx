@@ -108,6 +108,12 @@ beforeEach(() => {
 const processButton = () => screen.getByRole("button", { name: "Process" });
 const line = (id) => within(screen.getByTestId(`line-${id}`));
 
+test("the customer's phone number can be tapped to call", async () => {
+  mockDetail = detail();
+  render(<OrderDetail orderId="o1" />);
+  expect(await screen.findByRole("link", { name: "+919999999999" })).toHaveAttribute("href", "tel:+919999999999");
+});
+
 test("shows the money breakdown", async () => {
   mockDetail = detail({
     order: { promo_code: "DIWALI", promo_discount: 200, voucher_code: "V1", voucher_applied: 100, credit_applied: 50, gateway_amount: 1749 },

@@ -388,7 +388,10 @@ export default function OrderDetail({ orderId, onChanged }) {
         <div>
           <h3 className="text-lg font-semibold">{order.order_ref}</h3>
           <div className="text-sm text-muted-foreground">
-            {formatDateTime(order.created_at)} · {order.contact_name} · {order.contact_phone}
+            {formatDateTime(order.created_at)} · {order.contact_name} ·{" "}
+            <a href={`tel:${order.contact_phone}`} className="underline underline-offset-2">
+              {order.contact_phone}
+            </a>
             {order.contact_email ? ` · ${order.contact_email}` : ""}
           </div>
           <div className="text-sm text-muted-foreground">{addressText(order.address, order.fulfilment)}</div>
