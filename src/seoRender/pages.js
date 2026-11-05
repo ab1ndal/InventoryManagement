@@ -31,6 +31,9 @@ import {
   ALL_PRODUCTS_PAGE,
   ALL_PRODUCTS_TITLE,
 } from "../storefront/pages/allProductsContent";
+import { DELIVERY_ESTIMATE, RETURNS_BADGE } from "../storefront/lib/deliveryEstimate";
+import { compareSizes, formatSize } from "../storefront/lib/sizes";
+import { categoryAudience } from "./audience";
 import { SITE_NAME, SITE_URL, esc } from "./html";
 
 const LISTED_PRODUCTS = 48;
@@ -98,6 +101,10 @@ const breadcrumbs = (...crumbs) => ({
 const paragraphs = (items) => items.map((text) => `<p>${esc(text)}</p>`).join("");
 const link = (to, label) => `<a href="${esc(to)}">${esc(label)}</a>`;
 
+// The app adds a link's label after the answer text, so the server does too.
+const faqAnswerHtml = (f) => (f.link ? `${esc(f.a)} ${link(f.link.to, f.link.label)}.` : esc(f.a));
+const faqAnswerText = (f) => (f.link ? `${f.a} ${f.link.label}.` : f.a);
+
 const sortedImages = (product) =>
   [...(product.productimages || [])].sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0));
 
@@ -139,8 +146,11 @@ function frame(main) {
     ["/faq", "FAQ"],
     ["/size-guide", "Size guide"],
     ["/all-products", ALL_PRODUCTS_TITLE],
+    ["/collections", "Collections"],
     ["/policies/shipping", "Shipping"],
     ["/policies/returns", "Returns"],
+    ["/policies/privacy", "Privacy"],
+    ["/policies/terms", "Terms"],
   ]
     .map(([to, label]) => link(to, label))
     .join(" · ");
@@ -177,7 +187,7 @@ const STATIC_PAGES = {
       "/faq",
       "Frequently Asked Questions",
       "Answers to common questions about delivery, exchanges, payments, sizing, and visiting Bindal's Creation.",
-      FAQ_ITEMS.map((f) => `<h2>${esc(f.q)}</h2><p>${esc(f.a)}</p>`).join(""),
+      FAQ_ITEMS.map((f) => `<h2>${esc(f.q)}</h2><p>${faqAnswerHtml(f)}</p>`).join(""),
       [
         {
           "@context": "https://schema.org",
@@ -185,7 +195,7 @@ const STATIC_PAGES = {
           mainEntity: FAQ_ITEMS.map((f) => ({
             "@type": "Question",
             name: f.q,
-            acceptedAnswer: { "@type": "Answer", text: f.a },
+            acceptedAnswer: { "@type": "Answer", text: faqAnswerText(f) },
           })),
         },
       ],
@@ -205,7 +215,8 @@ const STATIC_PAGES = {
       "/customize",
       CUSTOMIZE.title,
       "Seen a lehenga, saree or sherwani you love? Send us the photo and our in-house tailors in Ghaziabad will make it in your size. Get a quote on WhatsApp.",
-      `<p>${esc(CUSTOMIZE.lede)}</p><p>${esc(CUSTOMIZE.pitch)}</p>` +
+      `<p lang="hi-Latn">${esc(CUSTOMIZE.hinglish)}</p><p>${esc(CUSTOMIZE.lede)}</p>` +
+        `<p>Made for every function: ${esc(CUSTOMIZE.occasions.join(" · "))}</p><p>${esc(CUSTOMIZE.pitch)}</p>` +
         CUSTOMIZE.makes.map((m) => `<h2>${esc(m.group)}</h2><p>${esc(m.items.join(", "))}</p>`).join("") +
         `<h2>How it works</h2><ol>${CUSTOMIZE.steps.map((s) => `<li>${esc(s.title)}: ${esc(s.desc)}</li>`).join("")}</ol>` +
         `<ul>${CUSTOMIZE.facts.map((f) => `<li>${esc(f.value)}: ${esc(f.label)}</li>`).join("")}</ul>`,
@@ -296,12 +307,8 @@ async function homePage(rest) {
         "@context": "https://schema.org",
         "@type": "WebSite",
         name: SITE_NAME,
+        alternateName: ["Bindals Creation", "Bindal's Creations"],
         url: `${SITE_URL}/`,
-        potentialAction: {
-          "@type": "SearchAction",
-          target: `${SITE_URL}/search?q={search_term_string}`,
-          "query-input": "required name=search_term_string",
-        },
       },
     ],
   };
@@ -375,7 +382,7 @@ async function productPage(id, rest) {
   if (!PRODUCT_ID_RE.test(id)) return NOT_FOUND;
   const rows = await rest(
     `products?productid=eq.${id}&select=productid,name:display_title,description,retailprice,fabric,categoryid,` +
-      `categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color)`
+      `categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color,size)`
   );
   const product = rows[0];
   if (!product) return NOT_FOUND;
@@ -389,6 +396,13 @@ async function productPage(id, rest) {
   const image = firstImage(product, PRODUCT_PHOTO_WIDTH);
   const description = productMetaDescription({ name: product.name, text, price });
   const colours = [...new Set((product.productsizecolors || []).map((v) => v.color).filter(Boolean))];
+  // The product page's Details sizes: in-stock variants only.
+  const sizes = [
+    ...new Set((product.productsizecolors || []).filter((v) => Number(v.stock) > 0).map((v) => v.size).filter(Boolean)),
+  ]
+    .sort(compareSizes)
+    .map(formatSize);
+  const { gender, ageGroup } = categoryAudience(product.categoryid);
   const group = categoryGroup(product.categoryid);
   const similar = product.categoryid
     ? rankSimilar(
@@ -403,9 +417,12 @@ async function productPage(id, rest) {
   const facts = [
     category && `Category: ${category}`,
     product.fabric && `Fabric: ${product.fabric}`,
+    sizes.length > 0 && `Sizes: ${sizes.join(", ")}`,
     `Price: ${rupees(price)}`,
     inStock ? "In stock" : "Sold out",
   ].filter(Boolean);
+  // The product page's delivery line and returns badge, which it shows on the same terms.
+  const service = [inStock && DELIVERY_ESTIMATE, RETURNS_BADGE].filter(Boolean).join(" · ");
 
   return {
     status: 200,
@@ -427,6 +444,7 @@ async function productPage(id, rest) {
           })
           .join("") +
         `<ul>${facts.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` +
+        `<p>${esc(service)}</p>` +
         (text ? `<p>${esc(text)}</p>` : "") +
         (similar.length
           ? `<h2>More like this</h2>${productList(similar)}` +
@@ -446,6 +464,11 @@ async function productPage(id, rest) {
         image: images.length ? images.map((img) => imageUrl(img.imageurl, { width: 1200 })) : undefined,
         description: text || description,
         color: colours.length === 1 ? colours[0] : undefined,
+        size: sizes.length > 1 ? sizes : sizes[0],
+        audience:
+          gender || ageGroup
+            ? { "@type": "PeopleAudience", suggestedGender: gender, suggestedAgeGroup: ageGroup }
+            : undefined,
         sku: product.productid,
         category: category || undefined,
         material: product.fabric || undefined,
@@ -457,7 +480,7 @@ async function productPage(id, rest) {
           priceCurrency: "INR",
           itemCondition: "https://schema.org/NewCondition",
           availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-          seller: { "@id": `${SITE_URL}/#store` },
+          seller: { "@id": `${SITE_URL}/#store`, name: SITE_NAME },
           hasMerchantReturnPolicy: RETURN_POLICY,
         },
       },

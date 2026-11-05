@@ -45,22 +45,28 @@ const SHELL_HEAD_TAGS = [
 const ROOT_DIV = '<div id="root"></div>';
 // Swapping this text for the app would shift the whole page, which Google scores as poor. Anything
 // that runs JS gets the app and skips it; anything that does not (many crawlers) reads it as normal.
+// If the app's main bundle fails to load, the text comes back: otherwise the page would be blank. Only
+// main is watched, because a failed lazy chunk happens while the app is already on screen. Capturing,
+// since script load errors do not bubble. This sits first in <head> so it is listening before the
+// bundle's <script> can fail.
 const HIDE_WHEN_JS =
-  `<script>document.documentElement.classList.add("js")</script>` +
+  `<script>document.documentElement.classList.add("js");` +
+  `addEventListener("error",function(e){var s=e.target;` +
+  `if(s&&s.tagName==="SCRIPT"&&s.src.indexOf("/static/js/main.")>-1)document.documentElement.classList.remove("js")},true)</script>` +
   `<style>.js [data-ssr-body]{display:none}</style>`;
 
 export function renderHtml(shell, page) {
-  if (!shell.includes(ROOT_DIV) || !shell.includes("</head>")) {
-    throw new Error("shell is missing the root div or </head>");
+  if (!shell.includes(ROOT_DIV) || !shell.includes("<head>") || !shell.includes("</head>")) {
+    throw new Error("shell is missing the root div or head");
   }
   const stripped = SHELL_HEAD_TAGS.reduce((html, tag) => html.replace(tag, ""), shell);
   const head =
-    HIDE_WHEN_JS +
     (page.preloadImages || []).map(preloadTag).join("") +
     headTags(page) +
     (page.jsonLd || []).map(jsonLdTag).join("");
   // Function replacers: page text may hold "$&", which a plain string replacement would expand.
   return stripped
+    .replace("<head>", () => `<head>${HIDE_WHEN_JS}`)
     .replace("</head>", () => `${head}</head>`)
     .replace(ROOT_DIV, () => `<div id="root">${page.bodyHtml || ""}</div>`);
 }
