@@ -4,8 +4,22 @@
 const GA4_ID = process.env.REACT_APP_GA4_ID;
 const ENABLED = !!GA4_ID && process.env.NODE_ENV === "production";
 
-// GA4 reports the full address by default. Order pages carry an access token in
-// `t`, which must never reach a third party; campaign parameters stay.
+// GA4 reports the full address by default, and its automatic hits ignore a
+// page_location we set. Order pages carry an access token in `t`, which must never
+// reach a third party, so analytics does not run on them at all.
+export function isPrivateAddress(pathname, search = "") {
+  return /^\/order(\/|$)/.test(pathname) || new URLSearchParams(search).has("t");
+}
+
+function setPaused(paused) {
+  if (GA4_ID) window[`ga-disable-${GA4_ID}`] = paused;
+}
+
+// Call before moving within the app to an address that carries a token.
+export function pauseAnalytics() {
+  setPaused(true);
+}
+
 export function safePageLocation(href) {
   const url = new URL(href);
   url.searchParams.delete("t");
@@ -16,6 +30,10 @@ let initialized = false;
 
 export function initAnalytics() {
   if (!ENABLED || initialized) return;
+  if (isPrivateAddress(window.location.pathname, window.location.search)) {
+    setPaused(true);
+    return;
+  }
   initialized = true;
 
   window.dataLayer = window.dataLayer || [];
@@ -36,7 +54,11 @@ export function initAnalytics() {
 }
 
 export function trackPageView(path) {
-  if (!ENABLED || typeof window.gtag !== "function") return;
+  if (!ENABLED) return;
+  const isPrivate = isPrivateAddress(window.location.pathname, window.location.search);
+  setPaused(isPrivate);
+  if (isPrivate) return;
+  initAnalytics();
   const pageLocation = safePageLocation(window.location.href);
   window.gtag("set", { page_location: pageLocation });
   window.gtag("event", "page_view", { page_path: path, page_location: pageLocation });
