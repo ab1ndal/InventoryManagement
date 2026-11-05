@@ -15,7 +15,7 @@ import {
 } from "../lib/ordersApi";
 import { rememberPendingOrder } from "../lib/pendingOrder";
 import { guestHolderKey } from "../lib/holder";
-import { pauseAnalytics } from "../lib/analytics";
+import { pauseAnalytics, trackEvent } from "../lib/analytics";
 import { INDIAN_STATES } from "../lib/checkout";
 
 const QUOTE_DEBOUNCE_MS = 300;
@@ -96,6 +96,8 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
   // Set at the tap, before validation finishes, so a second tap while the
   // first is still validating or in flight cannot start a second order.
   const attemptInFlight = useRef(false);
+  const beginTracked = useRef(false);
+  const shippingTracked = useRef(false);
   const autofilled = useRef({ pincode: "", city: "", state: "" });
 
   const fulfilment = watch("fulfilment");
@@ -226,6 +228,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
       return;
     }
     setSubmitting(true);
+    trackEvent("add_payment_info", { value: q.subtotal - q.promoDiscount, currency: "INR" });
     try {
       const payload = {
         attemptKey,
@@ -287,6 +290,22 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
     setNotice(null);
     return handleSubmit(placeOrder, onInvalid)(event);
   }
+  const shippingReady = Boolean(q) && (pickup ? response.shippingSource === "pickup" : response.pincode?.ok === true);
+  const itemsValue = q ? q.subtotal - q.promoDiscount : null;
+  useEffect(() => {
+    if (beginTracked.current) return;
+    beginTracked.current = true;
+    trackEvent("begin_checkout", {
+      value: items.reduce((s, i) => s + i.price * i.quantity, 0),
+      currency: "INR",
+      items: items.map((i) => ({ item_id: i.product_id, item_variant: i.variant_id, quantity: i.quantity, price: i.price })),
+    });
+  }, [items]);
+  useEffect(() => {
+    if (!shippingReady || shippingTracked.current) return;
+    shippingTracked.current = true;
+    trackEvent("add_shipping_info", { shipping_tier: pickup ? "pickup" : "delivery", value: itemsValue, currency: "INR" });
+  }, [shippingReady, pickup, itemsValue]);
   const nudgeAmount = q ? q.subtotal - q.promoDiscount : items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
