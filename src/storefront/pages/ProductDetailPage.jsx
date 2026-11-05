@@ -28,9 +28,8 @@ import MoreLikeThis from "../components/product/MoreLikeThis";
 import { useCart } from "../context/CartContext";
 import Seo from "../components/Seo";
 import { DELIVERY_ESTIMATE, PRICE_NOTE, RETURNS_BADGE, stockNote, heldNote } from "../lib/deliveryEstimate";
-import { stripMarkdown, whatsappProductUrl, whatsappColourQuestionUrl } from "../lib/productText";
+import { stripMarkdown, whatsappProductUrl } from "../lib/productText";
 import { missingChoiceLabel, missingChoiceRow } from "../lib/variantChoice";
-import { colourPhotoNote } from "../lib/colourPhoto";
 import { productImageAlt, productMetaDescription } from "../lib/seoText";
 import { categoryGroup } from "../lib/similarProducts";
 import { isSoldOut } from "../lib/stock";
@@ -322,13 +321,6 @@ function ProductDetail({ productid }) {
       : null;
   const missingLabel = missingChoice && missingChoiceLabel(missingChoice);
 
-  const photoColours = imagePaths.map(imageColor);
-  const photoNote = colourPhotoNote({
-    selected: selectedVariant?.color,
-    shown: imageColor(imagePaths[activeImage]),
-    photoColours,
-  });
-
   function handleSizeChange(size) {
     setPickedSize(size);
     setHighlightRow(null);
@@ -425,19 +417,6 @@ function ProductDetail({ productid }) {
               onSelect={setActiveImage}
               onEnlarge={() => setLightboxOpen(true)}
             />
-            {photoNote && (
-              <p className="mt-3 text-xs text-storefront-charcoal font-sans leading-relaxed">
-                {photoNote}{" "}
-                <a
-                  href={whatsappColourQuestionUrl({ productid, colour: selectedVariant.color })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-[#25D366] text-storefront-charcoal px-2.5 py-1 tracking-wide hover:opacity-90 transition-opacity"
-                >
-                  Ask about this colour on WhatsApp
-                </a>
-              </p>
-            )}
           </div>
 
           {/* Info */}
