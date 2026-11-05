@@ -2,13 +2,15 @@
 import { imageUrl } from "../storefront/lib/imageVariant";
 import { stripMarkdown } from "../storefront/lib/productText";
 import { productMetaDescription } from "../storefront/lib/seoText";
+import { formatSize } from "../storefront/lib/sizes";
+import { categoryAudience } from "./audience";
 import { SITE_NAME, SITE_URL, esc } from "./html";
 
 export const CACHE_FEED = "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400";
 
 const PAGE = 1000;
 const FIELDS =
-  "productid,name:display_title,description,retailprice,productimages(imageurl,displayorder),productsizecolors(stock,color)";
+  "productid,name:display_title,description,retailprice,categoryid,productimages(imageurl,displayorder),productsizecolors(stock,color,size)";
 // Google's category "Apparel & Accessories > Clothing".
 const GOOGLE_CATEGORY_CLOTHING = 1604;
 // Merchant Center allows 10 extra photos per item.
@@ -21,6 +23,19 @@ async function allProducts(rest) {
     products.push(...rows);
     if (rows.length < PAGE) return products;
   }
+}
+
+// Stock-room words that say a piece has no single colour. Google wants a colour, so these state none.
+const NOT_A_COLOUR = /^(multi|multi[\s-]?colou?r(ed)?|printed|assorted|mixed?)$/i;
+// Google allows up to 3 colours in one value.
+const MAX_COLOURS = 3;
+
+// Google asks for "Red/Pink/Blue". Null when the stock-room value is not a colour or names too many.
+export function feedColour(raw) {
+  const value = String(raw ?? "").trim();
+  if (!value || NOT_A_COLOUR.test(value)) return null;
+  const parts = value.split(/\s*(?:[-/,&+]|\band\b)\s*/i).filter(Boolean);
+  return parts.length > 0 && parts.length <= MAX_COLOURS ? parts.join("/") : null;
 }
 
 const tag = (name, value) => `<g:${name}>${esc(value)}</g:${name}>`;
@@ -36,6 +51,11 @@ function feedItem(product) {
   const price = Number(product.retailprice);
   const text = stripMarkdown(product.description);
   const colours = [...new Set(variants.map((v) => v.color).filter(Boolean))];
+  // One item covers the whole product, so a value is stated only when every buyable variant shares it.
+  // Several sizes or colours would need one item per variant, which Google requires for them.
+  const sizes = [...new Set(variants.filter((v) => Number(v.stock) > 0).map((v) => v.size).filter(Boolean))];
+  const colour = colours.length === 1 ? feedColour(colours[0]) : null;
+  const { gender, ageGroup } = categoryAudience(product.categoryid);
   return [
     "<item>",
     tag("id", product.productid),
@@ -51,7 +71,10 @@ function feedItem(product) {
     // These are the shop's own pieces, with no manufacturer barcode to state.
     tag("identifier_exists", "no"),
     tag("google_product_category", GOOGLE_CATEGORY_CLOTHING),
-    ...(colours.length === 1 ? [tag("color", colours[0])] : []),
+    ...(colour ? [tag("color", colour)] : []),
+    ...(sizes.length === 1 ? [tag("size", formatSize(sizes[0]))] : []),
+    ...(gender ? [tag("gender", gender)] : []),
+    ...(ageGroup ? [tag("age_group", ageGroup)] : []),
     "</item>",
   ].join("");
 }

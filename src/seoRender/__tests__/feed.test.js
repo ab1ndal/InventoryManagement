@@ -1,4 +1,4 @@
-import { buildFeed, feedResponse } from "../feed";
+import { buildFeed, feedColour, feedResponse } from "../feed";
 
 const IMG = "https://x.supabase.co/storage/v1/object/public/mockups/BC1";
 const product = {
@@ -26,6 +26,35 @@ test("an in-stock product has the fields Merchant Center needs", async () => {
   expect(xml).toContain("<g:price>2195.00 INR</g:price>");
   expect(xml).toContain("<g:identifier_exists>no</g:identifier_exists>");
   expect(xml).toContain("<g:color>Yellow</g:color>");
+});
+
+test("colours use Google's separator, and a value that is not a colour states none", async () => {
+  expect(feedColour("Yellow-Red-Green")).toBe("Yellow/Red/Green");
+  expect(feedColour("Red and Yellow")).toBe("Red/Yellow");
+  expect(feedColour("Navy Blue")).toBe("Navy Blue");
+  expect(feedColour("Red-Yellow-Green-Blue")).toBeNull();
+  ["Multi Color", "multicolour", "Multi-Color", "Printed", " ", null].forEach((v) => expect(feedColour(v)).toBeNull());
+  const one = (color) => buildFeed(rest([{ ...product, productsizecolors: [{ stock: 1, color }] }]));
+  expect(await one("Yellow-Green")).toContain("<g:color>Yellow/Green</g:color>");
+  expect(await one("Multi Color")).not.toContain("<g:color>");
+});
+
+test("size is stated only when the in-stock pieces share one, and gender and age come from the category", async () => {
+  const feed = (categoryid, variants) =>
+    buildFeed(rest([{ ...product, categoryid, productsizecolors: variants }]));
+  const sold = await feed("SA", [{ stock: 1, color: "Red", size: "FREE-SIZE" }, { stock: 0, color: "Red", size: "M|38" }]);
+  expect(sold).toContain("<g:size>Free Size</g:size>");
+  expect(sold).toContain("<g:gender>female</g:gender>");
+  expect(sold).toContain("<g:age_group>adult</g:age_group>");
+  const many = await feed("SA", [{ stock: 1, size: "S|36" }, { stock: 1, size: "M|38" }]);
+  expect(many).not.toContain("<g:size>");
+  const boy = await feed("C-SW", [{ stock: 1, size: "10|30" }]);
+  expect(boy).toContain("<g:gender>male</g:gender>");
+  expect(boy).toContain("<g:age_group>kids</g:age_group>");
+  const unknown = await feed("JNS", [{ stock: 1 }]);
+  expect(unknown).not.toContain("<g:gender>");
+  expect(unknown).not.toContain("<g:age_group>");
+  expect(unknown).not.toContain("item_group_id");
 });
 
 test("sold-out and photo-less products are left out", async () => {
