@@ -109,3 +109,32 @@ test("Save never fails silently: an invalid field is named", async () => {
   fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
   expect(await screen.findByRole("alert")).toHaveTextContent("Not saved: check producturl");
 });
+
+test("closing with no changes closes straight away", () => {
+  let closed = 0;
+  render(<Harness onClose={() => { closed += 1; }} onSave={async () => {}} />);
+  fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" });
+  expect(closed).toBe(1);
+  expect(screen.queryByText("Discard Unsaved Changes?")).not.toBeInTheDocument();
+});
+
+test("closing after a change asks first; Keep Editing keeps the text, Discard closes", async () => {
+  let closed = 0;
+  render(<Harness onClose={() => { closed += 1; }} onSave={async () => {}} />);
+  const box = descriptionBox();
+  fireEvent.change(box, { target: { value: "Edited text" } });
+  await waitFor(() => {
+    fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" });
+    expect(screen.getByText("Discard Unsaved Changes?")).toBeInTheDocument();
+  });
+  expect(closed).toBe(0);
+
+  fireEvent.click(screen.getByRole("button", { name: "Keep Editing" }));
+  await waitFor(() => expect(screen.queryByText("Discard Unsaved Changes?")).not.toBeInTheDocument());
+  expect(closed).toBe(0);
+  expect(box).toHaveValue("Edited text");
+
+  fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" });
+  fireEvent.click(await screen.findByRole("button", { name: "Discard Changes" }));
+  expect(closed).toBe(1);
+});
