@@ -225,7 +225,7 @@ describe("describePage", () => {
     ];
     const page = await describePage("product/BC1", rest([{ ...product, categoryid: "SA", productsizecolors: variants }]));
     expect(page.bodyHtml).toContain("<li>Sizes: S (36), XL (42)</li>");
-    expect(page.bodyHtml).toContain("Dispatches in 2 days · Delivered in 5–7 days · 7-day returns &amp; exchange");
+    expect(page.bodyHtml).toContain("Dispatches in 2 days · Delivered in 5–7 days · 7-day returns, exchange in store");
     const p = ld(page, "Product");
     expect(p.size).toEqual(["S (36)", "XL (42)"]);
     expect(p.audience).toEqual({ "@type": "PeopleAudience", suggestedGender: "female", suggestedAgeGroup: "adult" });

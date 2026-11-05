@@ -41,7 +41,8 @@ describe("Policy pages", () => {
   it("returns page states 7-day in-store exchange counted from delivery for online orders", () => {
     render(<ReturnsPolicyPage />);
     expect(screen.getByRole("heading", { name: /returns.*exchange/i })).toBeInTheDocument();
-    expect(screen.getByText(/exchange.*within 7 days/i)).toBeInTheDocument();
+    expect(screen.getByText(/exchange.*within 7 days.*after 12 PM/i)).toBeInTheDocument();
+    expect(screen.getByText(/can be exchanged but not returned/i)).toBeInTheDocument();
     expect(screen.getByText(/in-store only/i)).toBeInTheDocument();
     expect(screen.getByText(/online orders, the 7 days count from the day of delivery/i)).toBeInTheDocument();
   });

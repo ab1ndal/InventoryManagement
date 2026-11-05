@@ -169,7 +169,7 @@ describe("ProductDetailPage", () => {
       screen.getByText("Final price · Free shipping above ₹5,000")
     ).toBeInTheDocument();
     expect(screen.getByText(/handpicked with love/i)).toBeInTheDocument();
-    expect(screen.getByText(/7-day returns & exchange/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "7-day returns, exchange in store" })).toHaveAttribute("href", "/policies/returns");
     // Composition dealer: no tax claim anywhere on the page.
     expect(document.body.textContent).not.toMatch(/inclusive of all taxes/i);
   });
