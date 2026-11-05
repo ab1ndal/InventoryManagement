@@ -8,13 +8,13 @@ export const COLLECTION_INTROS = {
     lead: "Silk, georgette, chiffon, net and cotton sarees, many with zari, embroidery or a contrast border, for weddings, festivals and everyday wear.",
     more: [
       "Whether you search for a saree or a sari, this page lists the ones we stock at our shop in Ghaziabad. The fabrics include silk, georgette, chiffon, net, crepe, satin and cotton, and some carry zari, sequin, embroidery or mirror work. Most designs come in very small numbers, so a piece you like may not return.",
-      "Where a blouse piece comes with a saree, the product page says so, and it is unstitched unless stated. For stitching or alterations, or help choosing a colour, message us on WhatsApp.",
+      "For stitching or alterations, or help choosing a colour, message us on WhatsApp.",
     ],
   },
   lehengas: {
     lead: "Lehengas, or lehenga cholis, for weddings and festivals, in silk, net and other fabrics, many with embroidery, sequins or wide borders.",
     more: [
-      "Each lehenga is looked over by hand at the shop before it is listed. You will find silk and net, with embroidery, sequin, zari and mirror work. Sizes differ by piece, so check the size list on each product page, and see our size guide for measurements.",
+      "Each lehenga is looked over by hand at the shop before it is dispatched. You will find silk and net, with embroidery, sequin, zari and mirror work. Sizes differ by piece, so check the size list on each product page, and see our size guide for measurements.",
       "Do you have a lehenga in mind from a photo? Our in-house tailors can make one for you; send the picture, your size and your budget on WhatsApp for a quote and a ready-by date, usually 2 to 4 weeks. Made-to-order pieces cannot be returned or exchanged.",
     ],
   },
