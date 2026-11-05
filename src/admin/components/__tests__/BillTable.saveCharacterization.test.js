@@ -79,7 +79,7 @@ const logged = () => waitFor(() => expect(mockDb.writes.some((w) => w.kind === "
 beforeEach(() => {
   mockDb.writes = [];
   mockDb.rows = [bill()];
-  mockDb.current = { finalized: true, paymentstatus: "finalized", store_credit_used: 100, net_amount: 200 };
+  mockDb.current = { finalized: true, paymentstatus: "finalized", store_credit_used: 100, net_amount: 200, payment_amount: 200 };
   mockDb.items = items();
   mockDb.voucher = { voucher_id: "VOUCH1" };
   window.confirm = jest.fn(() => true);
