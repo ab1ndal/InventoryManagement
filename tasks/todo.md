@@ -26,7 +26,9 @@ Claude, next:
 - [ ] Transactional bill save, step 1: new database step unused by any screen, proved locally and in a rolled-back
       production test. Plan is in the owner's private audit folder.
 - [ ] Confirm the tracking sweep's first real lookup worked.
-- [ ] Merchant Center: fix what Google flags, then point the source at the full feed (778 items).
+- [ ] Merchant Center: fix what Google flags, then point the source at the full feed (778 items). Held 2026-11-04: review still running, and AI image metadata (audit LEGAL-8) needs the owner's decision first.
+- [ ] Order emails: Gmail filed a real order's emails in Spam. PR #172 is live but unproven: both formats reached the Inbox on the one test account. Check placement on the next real orders. Own-domain sending is the lasting fix, not possible for now.
+- [ ] Shiprocket Brand Name set to Bindals Creation 2026-11-04: confirm on the next Shiprocket email.
 
 ## ⏭ NEXT, HIGH PRIORITY: real-money payment test on production
 
@@ -54,14 +56,14 @@ return `x-robots-tag: all`, sitemap lists 1,028 photos, feed has 778 valid items
 
 **Dev, next**
 - [ ] Check Vercel bandwidth in the dashboard around 2026-11-08, now that photos pass through Vercel. Try one real checkout, because it now loads on demand.
-- [ ] Rich Results Test on a product and a collection.
-- [ ] Request indexing: kurta-pajama, about, contact, all-products. Now unblocked.
+- [x] Rich Results Test 2026-11-04: collection (Breadcrumbs, Carousels) and product (Product, Merchant, Breadcrumbs) valid; product has non-critical warnings.
+- [x] Indexing requested 2026-11-04: kurta-pajama, about, contact, all-products. Search Console's page report was still dated 2026-10-22.
 - [ ] Saree titles LIVE 2026-11-04: all 89 unique, final list in `tasks/title-drafts/sarees.json`. Wait 4 weeks of Search Console data, then decide on other categories. Check recorded colours against photos first.
 - [ ] New photos will go live with shared titles such as "Silk Saree", because `title_detail` is empty until someone fills it. 731 visible products have none, and about 2,860 more have no photo yet. mockup-generator is getting `title_detail` drafting on branch `feat/title-detail` (started 2026-11-04).
 - [ ] Add a Kids collection and nav link when the first kids' photos go live. `collections.js` has none, so they would only appear under Shop All.
 - [ ] Add photos in batches and watch Search Console: "Crawled, not indexed" rising means slow down and improve the thinnest pages. Sitemap, feed and all-products pick up new products automatically.
 - [ ] Order snapshots still store `name`, so order pages and emails show the old title.
-- [ ] Needs title list in admin.
+- [x] Needs title list in admin: Inventory toggle, PR #173.
 - [ ] Collection intro text, plan step 2.5: layout is simple, buying advice must come from the owner.
 
 **Owner**
