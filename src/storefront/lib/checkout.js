@@ -55,11 +55,25 @@ export function shippingFee(subtotal) {
 // decides fulfilment for out-of-UP orders (owner decision 2026-10-30).
 export const UP_STATE = "Uttar Pradesh";
 
+// Shoppers type or paste "+91 98765 43210", "098765 43210" and so on. Strip
+// spaces and dashes, then a leading +91, a 91 only when 12 digits are left,
+// or a single leading 0, so the value validated and sent is the bare 10
+// digits the server expects. Anything else is returned stripped but
+// otherwise untouched, so non-Indian or short numbers still fail validation.
+export function normalizePhone(raw) {
+  const compact = String(raw ?? "").replace(/[\s-]/g, "");
+  if (compact.startsWith("+91")) return compact.slice(3);
+  if (/^91\d{10}$/.test(compact)) return compact.slice(2);
+  if (/^0\d{10}$/.test(compact)) return compact.slice(1);
+  return compact;
+}
+
 const contactSchema = z.object({
   name: z.string().min(2, "Enter your full name"),
   phone: z
     .string()
-    .regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number"),
+    .transform(normalizePhone)
+    .pipe(z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit Indian mobile number")),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
 });
 

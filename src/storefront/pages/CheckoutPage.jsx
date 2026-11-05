@@ -150,6 +150,9 @@ export default function CheckoutPage() {
                 <label htmlFor="phone" className="sr-only">Phone</label>
                 <input
                   id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel-national"
                   {...register("phone")}
                   placeholder="Phone (10-digit mobile)"
                   className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
@@ -244,11 +247,12 @@ export default function CheckoutPage() {
                       {errors.line1 && <p className="text-xs text-red-600 mt-1">{errors.line1.message}</p>}
                     </div>
                     <div>
-                      <label htmlFor="line2" className="sr-only">Area, Street, Sector, Village</label>
+                      <label htmlFor="line2" className="sr-only">Area, Street, Sector, Village (required)</label>
                       <input
                         id="line2"
                         {...register("line2")}
-                        placeholder="Area, Street, Sector, Village"
+                        aria-required="true"
+                        placeholder="Area, Street, Sector, Village (required)"
                         className="w-full border border-storefront-border px-3 py-2 text-sm font-sans"
                       />
                       {errors.line2 && <p className="text-xs text-red-600 mt-1">{errors.line2.message}</p>}

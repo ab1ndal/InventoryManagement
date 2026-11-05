@@ -20,6 +20,9 @@ import { INDIAN_STATES, UP_STATE } from "../lib/checkout";
 const QUOTE_DEBOUNCE_MS = 300;
 const PINCODE = /^\d{6}$/;
 
+// DOM order of the form's inputs, so the first invalid one is found top-down.
+const FIELD_ORDER = ["name", "phone", "email", "pincode", "city", "state", "line1", "line2", "landmark"];
+
 const OUTSIDE_UP_NOTE =
   "We'll confirm delivery to your address on WhatsApp before dispatch.";
 
@@ -77,7 +80,7 @@ function unavailableText(entry, items) {
 export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlace }) {
   const { user } = useStorefrontAuth();
   const navigate = useNavigate();
-  const { watch, setValue, getValues, handleSubmit, formState } = form;
+  const { watch, setValue, getValues, handleSubmit } = form;
 
   // One key per checkout visit, reused on retries, so a double click or a
   // retry after a timeout never creates two orders (plan R6).
@@ -92,6 +95,9 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
   const [requoteTick, setRequoteTick] = useState(0);
   const [notice, setNotice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  // Set at the tap, before validation finishes, so a second tap while the
+  // first is still validating or in flight cannot start a second order.
+  const attemptInFlight = useRef(false);
   const autofilled = useRef({ pincode: "", city: "", state: "" });
 
   const fulfilment = watch("fulfilment");
@@ -190,9 +196,38 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
     setCreditInput(String(n > creditAvailable ? creditAvailable : raw));
   }
 
+  function endAttempt() {
+    attemptInFlight.current = false;
+    setSubmitting(false);
+  }
+
+  // Back from Cashfree can restore this page from the browser's memory, with the
+  // attempt still marked as running, which would leave Pay dead.
+  useEffect(() => {
+    function onPageShow(event) {
+      if (event.persisted) endAttempt();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
+  // Shows every field's error (handleSubmit has already set them) and takes
+  // the shopper to the first one.
+  function onInvalid(errors) {
+    attemptInFlight.current = false;
+    const first = FIELD_ORDER.map((f) => (errors[f] ? document.getElementById(f) : null)).find(Boolean);
+    if (!first) return;
+    first.scrollIntoView?.({ block: "center" });
+    first.focus({ preventScroll: true });
+  }
+
   async function placeOrder(values) {
+    if (blockReason) {
+      attemptInFlight.current = false;
+      setNotice(blockReason);
+      return;
+    }
     setSubmitting(true);
-    setNotice(null);
     try {
       const payload = {
         attemptKey,
@@ -211,10 +246,11 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
       }
       const cashfree = await loadCashfree(res.cashfreeMode);
       // Redirects this tab to Cashfree; it returns to /order/:ref?t=… afterwards.
-      await cashfree.checkout({ paymentSessionId: res.paymentSessionId, redirectTarget: "_self" });
+      const result = await cashfree.checkout({ paymentSessionId: res.paymentSessionId, redirectTarget: "_self" });
+      if (result?.error) throw new Error(result.error.message || "Payment page could not open");
     } catch (error) {
       console.warn("create-order failed", { code: error.code, status: error.status, message: error.message });
-      setSubmitting(false);
+      endAttempt();
       if (error.code === "checkout_off") {
         onCheckoutOff();
         return;
@@ -234,15 +270,28 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
   const outsideUp =
     !pickup && (response?.pincode?.inUp === false || (Boolean(stateValue) && stateValue !== UP_STATE));
   const unavailable = response?.unavailable ?? [];
-  const canPay =
-    formState.isValid &&
-    Boolean(q) &&
-    !quoting &&
-    !quoteError &&
-    !submitting &&
+  // Why payment cannot start even though the form is valid, in words for the
+  // shopper. Null means go ahead. Shown when Pay is tapped.
+  let blockReason = null;
+  if (quoteError || !q) {
+    blockReason = "We couldn't load your total. Please try again.";
+  } else if (unavailable.length > 0) {
+    blockReason = "Some items in your cart aren't available. Please see the message above.";
+  } else if (pickup ? response.shippingSource !== "pickup" : response.pincode?.ok !== true) {
     // The quote on screen must be for the chosen option: a pickup quote has no pincode.
-    (pickup ? response.shippingSource === "pickup" : response.pincode?.ok === true) &&
-    unavailable.length === 0;
+    blockReason = pickup
+      ? "We're still working out your total. Please try again in a moment."
+      : "We can't work out delivery for this pincode. Please check it.";
+  }
+  // Pay is only greyed out while a request or the delivery quote is running.
+  const busy = quoting || submitting;
+
+  function onPay(event) {
+    if (attemptInFlight.current) return undefined;
+    attemptInFlight.current = true;
+    setNotice(null);
+    return handleSubmit(placeOrder, onInvalid)(event);
+  }
   const nudgeAmount = q ? q.subtotal - q.promoDiscount : items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return (
@@ -344,8 +393,8 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
       <div className="mt-8 flex flex-col gap-4">
         <button
           type="button"
-          disabled={!canPay}
-          onClick={handleSubmit(placeOrder)}
+          disabled={busy}
+          onClick={onPay}
           className="w-full bg-storefront-charcoal text-storefront-cream font-sans text-xs tracking-widest uppercase py-4 px-8 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {q && q.gatewayAmount > 0 ? `Pay ₹${formatRupees(q.gatewayAmount)}` : "Place order"}

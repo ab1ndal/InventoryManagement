@@ -1,4 +1,4 @@
-import { addressSchema, checkoutSchema, shippingFee } from "../lib/checkout";
+import { addressSchema, checkoutSchema, shippingFee, normalizePhone } from "../lib/checkout";
 
 describe("shippingFee", () => {
   it("charges ₹150 below the ₹5000 free-shipping threshold", () => {
@@ -126,5 +126,34 @@ describe("addressSchema through zodResolver", () => {
     const { errors, values } = await resolve(validAddress);
     expect(errors).toEqual({});
     expect(values.state).toBe("Uttar Pradesh");
+  });
+});
+
+describe("normalizePhone", () => {
+  it.each([
+    ["9810873280", "9810873280"],
+    ["98108 73280", "9810873280"],
+    ["98108-73280", "9810873280"],
+    ["+91 98108 73280", "9810873280"],
+    ["+919810873280", "9810873280"],
+    ["919810873280", "9810873280"],
+    ["09810873280", "9810873280"],
+    ["0 98108 73280", "9810873280"],
+  ])("turns %s into the bare 10 digits", (raw, expected) => {
+    expect(normalizePhone(raw)).toBe(expected);
+  });
+
+  it.each(["98108732", "+1 415 555 0132", "91981087", "+91 12345 67890", "919810873280 1", "abc", ""])(
+    "still rejects %s",
+    (raw) => {
+      expect(/^[6-9]\d{9}$/.test(normalizePhone(raw))).toBe(false);
+    }
+  );
+
+  it("is applied by the schema, which hands back the normalised value", () => {
+    const result = checkoutSchema.safeParse({ name: "Priya Sharma", phone: "+91 98108 73280", email: "", fulfilment: "pickup" });
+    expect(result.success).toBe(true);
+    expect(result.data.phone).toBe("9810873280");
+    expect(checkoutSchema.safeParse({ name: "Priya Sharma", phone: "+1 415 555 0132", email: "", fulfilment: "pickup" }).success).toBe(false);
   });
 });
