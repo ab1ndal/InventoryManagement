@@ -1,6 +1,7 @@
 import ProductTitleField from "./ProductTitleField";
 import React, { useEffect, useState } from "react";
 import {
+  DialogDescription,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -80,7 +81,15 @@ export default function ProductEditDialog({
     },
   });
 
-  const { isSubmitting } = form.formState;
+  const { isSubmitting, isDirty } = form.formState;
+  const [discardOpen, setDiscardOpen] = useState(false);
+
+  // A stray click or Esc must not lose a product with many variants.
+  const requestClose = () => {
+    if (isSubmitting) return;
+    if (isDirty) setDiscardOpen(true);
+    else onClose();
+  };
   const [saveError, setSaveError] = useState("");
   const wasOpenRef = React.useRef(false);
   const originalVariantsRef = React.useRef([]);
@@ -252,7 +261,7 @@ export default function ProductEditDialog({
   }, [form]);
 
   return (
-    <Dialog open={open} onOpenChange={() => { if (!isSubmitting) onClose(); }}>
+    <Dialog open={open} onOpenChange={requestClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
@@ -274,7 +283,7 @@ export default function ProductEditDialog({
                   <span className="font-semibold">{product.productid}</span>
                 </span>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                  <Button type="button" variant="outline" onClick={requestClose} disabled={isSubmitting}>
                     Close
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
@@ -345,7 +354,7 @@ export default function ProductEditDialog({
 
               {!product?.productid && (
                 <div className="flex gap-2 justify-end">
-                  <Button type="button" variant="outline" onClick={onClose}>
+                  <Button type="button" variant="outline" onClick={requestClose}>
                     Close
                   </Button>
                   <Button type="submit">Save</Button>
@@ -686,7 +695,7 @@ export default function ProductEditDialog({
               </p>
             )}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={requestClose} disabled={isSubmitting}>
                 Close
               </Button>
               <Button type="submit" disabled={isSubmitting}>
@@ -728,6 +737,30 @@ export default function ProductEditDialog({
             addColor?.onSelect(newCode);
           }}
         />
+
+        <Dialog open={discardOpen} onOpenChange={setDiscardOpen}>
+          <DialogContent className="bg-white max-w-md">
+            <DialogHeader>
+              <DialogTitle>Discard Unsaved Changes?</DialogTitle>
+              <DialogDescription>Changes to this product since it was opened will be lost.</DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDiscardOpen(false)}>
+                Keep Editing
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  setDiscardOpen(false);
+                  onClose();
+                }}
+              >
+                Discard Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
