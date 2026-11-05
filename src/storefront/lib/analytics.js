@@ -27,6 +27,8 @@ export function safePageLocation(href) {
 }
 
 let initialized = false;
+// Google counts the page the tag loads on by itself, so we report only later moves.
+let loadViewCounted = false;
 
 export function initAnalytics() {
   if (!ENABLED || initialized) return;
@@ -61,6 +63,10 @@ export function trackPageView(path) {
   initAnalytics();
   const pageLocation = safePageLocation(window.location.href);
   window.gtag("set", { page_location: pageLocation });
+  if (!loadViewCounted) {
+    loadViewCounted = true;
+    return;
+  }
   window.gtag("event", "page_view", { page_path: path, page_location: pageLocation });
 }
 
