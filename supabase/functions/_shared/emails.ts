@@ -75,6 +75,15 @@ function inUp(a: Record<string, unknown>): boolean {
   return typeof a.state === "string" && a.state.trim().toLowerCase() === UP_STATE.toLowerCase();
 }
 
+/**
+ * Every order link in an email goes to /track with the number filled in. The order page needs an
+ * access token, but only its hash is stored, so an email cannot carry one; /track takes the
+ * order number plus the phone used at checkout, which works for guests and survives a retried checkout.
+ */
+function orderLinkLine(orderRef: string, siteUrl: string): string {
+  return `Check your order (you'll need the phone number you used at checkout): ${siteUrl}/track?order=${encodeURIComponent(orderRef)}`;
+}
+
 export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
   const next = o.fulfilment === "pickup"
     ? `You chose store pickup at ${SHOP_ADDRESS}. We'll email you when your order is ready to collect (usually 1–2 days).`
@@ -95,7 +104,7 @@ export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
     "",
     next,
     "",
-    `Your order: ${siteUrl}/order/${o.orderRef}`,
+    orderLinkLine(o.orderRef, siteUrl),
     "",
     `- ${SHOP_NAME}`,
   ].join("\n");
@@ -144,7 +153,7 @@ export function shipped(o: EmailOrder, siteUrl: string): Email {
     `Your order ${o.orderRef} is on its way${withCourier}.`,
     ...tracking,
     "",
-    `Your order: ${siteUrl}/order/${o.orderRef}`,
+    orderLinkLine(o.orderRef, siteUrl),
     "",
     `- ${SHOP_NAME}`,
   ].join("\n");
@@ -165,7 +174,7 @@ export function readyForPickup(o: EmailOrder, siteUrl: string): Email {
     `Please bring your order number (${o.orderRef}). It's already paid.`,
     "If you have a question, reply to this email or WhatsApp us.",
     "",
-    `Your order: ${siteUrl}/order/${o.orderRef}`,
+    orderLinkLine(o.orderRef, siteUrl),
     "",
     `- ${SHOP_NAME}`,
   ].join("\n");
