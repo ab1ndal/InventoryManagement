@@ -296,20 +296,23 @@ export default function BillTable({ onEdit }) {
   const restoreStockForBill = async (bill) => {
     if (!billGivesStockBack(bill, restoreOlderBill)) return;
     const billId = bill.billid;
-    const { data: billItems } = await supabase
+    // Both reads come before any write, so failing here leaves the bill and stock untouched.
+    const { data: billItems, error: itemsErr } = await supabase
       .from("bill_items")
       .select("bill_item_id, variantid, quantity")
       .eq("billid", billId)
       .not("variantid", "is", null);
+    if (itemsErr) throw new Error(`Could not read the bill's items, nothing was changed: ${itemsErr.message}`);
 
     // Deduct already-exchanged quantities — those items were restocked at exchange time
     const billItemIds = (billItems || []).map((bi) => bi.bill_item_id);
     let exchangedQtyMap = {};
     if (billItemIds.length > 0) {
-      const { data: exchanges } = await supabase
+      const { data: exchanges, error: exchErr } = await supabase
         .from("exchanges")
         .select("original_bill_item_id, quantity")
         .in("original_bill_item_id", billItemIds);
+      if (exchErr) throw new Error(`Could not read the bill's exchanges, nothing was changed: ${exchErr.message}`);
       for (const ex of exchanges || []) {
         exchangedQtyMap[ex.original_bill_item_id] =
           (exchangedQtyMap[ex.original_bill_item_id] || 0) + Number(ex.quantity);

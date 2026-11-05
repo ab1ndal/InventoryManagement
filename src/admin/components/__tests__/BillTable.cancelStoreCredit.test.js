@@ -29,7 +29,8 @@ const mockChain = (table) => {
       if (s.op !== "select") mockDb.writes.push({ kind: "table", table, op: s.op });
       const data =
         s.op !== "select" ? null : table === "bills" ? [bill()] : table === "bill_items" ? mockDb.items : [];
-      return Promise.resolve({ data, error: null }).then(res, rej);
+      const error = s.op === "select" && mockDb.failRead === table ? { message: "network down" } : null;
+      return Promise.resolve({ data: error ? null : data, error }).then(res, rej);
     },
   };
   return chain;
@@ -45,6 +46,10 @@ jest.mock("../../../lib/supabaseClient", () => ({
   },
 }));
 jest.mock("../../../lib/activityLog", () => ({ logActivity: () => {} }));
+const mockToasts = [];
+jest.mock("../../../components/hooks/use-toast", () => ({
+  useToast: () => ({ toast: (t) => mockToasts.push(t) }),
+}));
 jest.mock("../billing/generateInvoicePdf", () => ({
   generateInvoicePdf: () => Promise.resolve(new Blob(["pdf"])),
 }));
@@ -71,6 +76,8 @@ beforeEach(() => {
   mockDb.writes = [];
   mockDb.readError = null;
   mockDb.billExtra = {};
+  mockDb.failRead = null;
+  mockToasts.length = 0;
   mockDb.items = [];
   mockDb.current = { store_credit_used: 0, payment_amount: null, bill_payments: [] };
 });
@@ -168,6 +175,17 @@ describe("stock on cancel follows bills.stock_reduced", () => {
     await screen.findByText(/did not reduce stock, so stock will not change/);
     await finishCancel();
     expect(stockWrites()).toEqual([]);
+  });
+
+  test.each([["bill_items"], ["exchanges"]])("a failed %s read stops the cancel before any write", async (table) => {
+    mockDb.billExtra = { stock_reduced: true };
+    await openStep1();
+    mockDb.failRead = table;
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    fireEvent.click(await screen.findByText("Issue store credit"));
+    await waitFor(() => expect(mockToasts.map((t) => t.title)).toContain("Cancel failed"));
+    expect(mockToasts.find((t) => t.title === "Cancel failed").description).toMatch(/nothing was changed: network down/);
+    expect(mockDb.writes).toEqual([]);
   });
 
   test("an older bill restores by default", async () => {
