@@ -13,7 +13,7 @@
 import { json, serviceClient } from "../_shared/http.ts";
 import { logEvent, type OrdersDb, shiprocketFromEnv, supabaseOrdersDb } from "../_shared/process.ts";
 import type { ShiprocketClient } from "../_shared/shiprocket.ts";
-import { mapShipmentStatus } from "../_shared/tracking.ts";
+import { trackAndApply } from "../_shared/tracking_apply.ts";
 
 export type Deps = {
   /** SHIPROCKET_WEBHOOK_TOKEN; empty = every request refused. */
@@ -33,10 +33,6 @@ export function tokenMatches(given: string | null, expected: string): boolean {
   return diff === 0;
 }
 
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 export async function handler(req: Request, deps: Deps): Promise<Response> {
   if (!tokenMatches(req.headers.get("x-api-key"), deps.token)) {
     return json(401, { error: "invalid token", code: "unauthorized" });
@@ -45,7 +41,9 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
   let payload: Record<string, unknown> = {};
   try {
     const parsed = await req.json();
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) payload = parsed;
+    if (
+      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+    ) payload = parsed;
   } catch {
     // Shiprocket's "test webhook" ping may send no JSON; nothing to apply.
   }
@@ -59,47 +57,43 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
     shipment_status: payload.shipment_status ?? null,
   };
 
-  let track;
-  try {
-    track = await deps.shiprocket.track(awb);
-  } catch (err) {
-    // The next webhook (or a later scan) re-fetches; the payload is never trusted instead.
-    logEvent("warn", "courier_status_track_failed", { awb, hint, error: errorText(err) });
-    return json(200, { ok: true, applied: false });
-  }
-  if (!track.hasData) {
-    logEvent("info", "courier_status_no_scans", { awb, hint });
-    return json(200, { ok: true, applied: false });
-  }
-
-  const status = track.shipmentStatusId === null ? null : mapShipmentStatus(track.shipmentStatusId);
-  try {
-    const r = await deps.db.rpc<{ matched: boolean; changed: boolean; status?: string }>(
-      "online_order_apply_tracking",
-      {
-        p_awb: awb,
-        p_status: status,
-        p_payload: {
-          shipment_status_id: track.shipmentStatusId,
-          shipment_status: track.currentStatus,
-          track_url: track.trackUrl,
-          etd: track.etd,
-          source: "courier-status",
-          webhook_hint: hint,
-        },
-      },
-    );
-    logEvent("info", "courier_status_applied", {
-      awb,
-      shipment_status_id: track.shipmentStatusId,
-      mapped: status,
-      matched: r.matched,
-      changed: r.changed,
-    });
-    return json(200, { ok: true, applied: true, matched: r.matched, changed: r.changed, status: r.status ?? null });
-  } catch (err) {
-    logEvent("error", "courier_status_apply_failed", { awb, mapped: status, error: errorText(err) });
-    return json(200, { ok: true, applied: false });
+  const r = await trackAndApply(deps, awb, "courier-status", {
+    webhook_hint: hint,
+  });
+  switch (r.kind) {
+    case "track_failed":
+      // The next webhook (or a later scan) re-fetches; the payload is never trusted instead.
+      logEvent("warn", "courier_status_track_failed", {
+        awb,
+        hint,
+        error: r.error,
+      });
+      return json(200, { ok: true, applied: false });
+    case "no_data":
+      logEvent("info", "courier_status_no_scans", { awb, hint });
+      return json(200, { ok: true, applied: false });
+    case "apply_failed":
+      logEvent("error", "courier_status_apply_failed", {
+        awb,
+        mapped: r.mapped,
+        error: r.error,
+      });
+      return json(200, { ok: true, applied: false });
+    case "applied":
+      logEvent("info", "courier_status_applied", {
+        awb,
+        shipment_status_id: r.shipmentStatusId,
+        mapped: r.mapped,
+        matched: r.matched,
+        changed: r.changed,
+      });
+      return json(200, {
+        ok: true,
+        applied: true,
+        matched: r.matched,
+        changed: r.changed,
+        status: r.status,
+      });
   }
 }
 
