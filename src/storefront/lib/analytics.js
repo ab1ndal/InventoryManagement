@@ -7,8 +7,15 @@ const ENABLED = !!GA4_ID && process.env.NODE_ENV === "production";
 // GA4 reports the full address by default, and its automatic hits ignore a
 // page_location we set. Order pages carry an access token in `t`, which must never
 // reach a third party, so analytics does not run on them at all.
+//
+// The one exception: the order page of an order THIS tab checked out, once the
+// token has been moved out of the address (see resumeAnalyticsOnCleanAddress).
+let cleanOrderRef = null;
+
 export function isPrivateAddress(pathname, search = "") {
-  return /^\/order(\/|$)/.test(pathname) || new URLSearchParams(search).has("t");
+  if (new URLSearchParams(search).has("t")) return true;
+  if (cleanOrderRef && pathname === `/order/${cleanOrderRef}`) return false;
+  return /^\/order(\/|$)/.test(pathname);
 }
 
 function setPaused(paused) {
@@ -18,6 +25,24 @@ function setPaused(paused) {
 // Call before moving within the app to an address that carries a token.
 export function pauseAnalytics() {
   setPaused(true);
+}
+
+// Allows analytics on `/order/<ref>`, but only when the address bar really is
+// that bare address right now (no token, nothing else): the check reads the
+// browser's address, not router state, so the tag can never load while a token
+// is still in it. Returns whether analytics is now running.
+export function resumeAnalyticsOnCleanAddress(orderRef) {
+  const { pathname, search, hash } = window.location;
+  if (pathname !== `/order/${orderRef}` || search || hash) return false;
+  cleanOrderRef = orderRef;
+  setPaused(false);
+  initAnalytics();
+  return true;
+}
+
+// Order page closed: its address is private again.
+export function endOrderAnalytics() {
+  cleanOrderRef = null;
 }
 
 export function safePageLocation(href) {

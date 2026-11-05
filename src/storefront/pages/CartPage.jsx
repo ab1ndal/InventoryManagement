@@ -108,7 +108,7 @@ export default function CartPage() {
           target="_blank"
           rel="noopener noreferrer"
           onClick={() =>
-            trackEvent("begin_checkout", {
+            trackEvent("whatsapp_order_click", {
               value: subtotal,
               items: items.length,
               quantity: items.reduce((s, i) => s + i.quantity, 0),

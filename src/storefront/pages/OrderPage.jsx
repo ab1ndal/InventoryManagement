@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Seo from "../components/Seo";
 import OrderDelivery from "../components/OrderDelivery";
 import OrderDetails from "../components/OrderDetails";
@@ -10,7 +10,9 @@ import { useCart } from "../context/CartContext";
 import { useStorefrontAuth } from "../context/StorefrontAuthContext";
 import { WHATSAPP_URL, formatRupees, orderStatus } from "../lib/ordersApi";
 import { isConfirmed } from "../lib/orderStatus";
-import { takePendingOrder } from "../lib/pendingOrder";
+import { readOrderToken, storeOrderToken, takePendingOrder, wasCheckedOutInThisTab } from "../lib/pendingOrder";
+import { endOrderAnalytics, resumeAnalyticsOnCleanAddress } from "../lib/analytics";
+import { trackOrderOutcome } from "../lib/orderAnalytics";
 
 export const POLL_INTERVAL_MS = 3000;
 // 2 minutes of polling while Cashfree's webhook / status check lands.
@@ -66,11 +68,31 @@ function Headline({ order, timedOut }) {
 export default function OrderPage() {
   const { ref } = useParams();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("t") || "";
+  const navigate = useNavigate();
+  const urlToken = searchParams.get("t") || "";
+  // Only the tab that placed the order may take its token off the address and
+  // report the outcome; any other way of opening the link stays untouched.
+  const checkedOut = wasCheckedOutInThisTab(ref);
+  const token = urlToken || (checkedOut ? readOrderToken(ref) : "");
   const { user } = useStorefrontAuth();
   const { clearCart } = useCart();
   const [state, setState] = useState({ kind: "loading", order: null });
   const [timedOut, setTimedOut] = useState(false);
+  const [analyticsOn, setAnalyticsOn] = useState(false);
+
+  // The token must not reach Google, so it leaves the address bar (kept in
+  // this tab's session storage) before analytics may start.
+  useEffect(() => {
+    if (checkedOut && urlToken && storeOrderToken(ref, urlToken)) {
+      navigate(`/order/${ref}`, { replace: true });
+    }
+  }, [checkedOut, urlToken, ref, navigate]);
+
+  useEffect(() => {
+    if (!checkedOut || urlToken) return undefined;
+    setAnalyticsOn(resumeAnalyticsOnCleanAddress(ref));
+    return () => endOrderAnalytics();
+  }, [checkedOut, urlToken, ref]);
 
   useEffect(() => {
     let active = true;
@@ -112,6 +134,10 @@ export default function OrderPage() {
   useEffect(() => {
     if (confirmed && takePendingOrder(ref)) clearCart();
   }, [confirmed, ref, clearCart]);
+
+  useEffect(() => {
+    if (analyticsOn && state.order) trackOrderOutcome(state.order, confirmed);
+  }, [analyticsOn, state.order, confirmed]);
 
   if (state.kind === "loading") {
     return (
