@@ -44,8 +44,8 @@ export const FAQ_ITEMS = [
     a: "Yes — visit us at 58 Sihani Gate Market, Near Durga Bhabhi Chowk, Ghaziabad, Uttar Pradesh 201001. You're welcome to browse and buy in person.",
   },
   {
-    q: "Are the colours true to the photos?",
-    a: "We photograph products as accurately as we can, but screens vary. If the exact shade matters, ask us on WhatsApp for a quick photo or video before you buy.",
+    q: "Are these real photographs?",
+    a: "Our product images are AI-styled on a model. Someone at the shop checks each one by hand against the real piece for colour and pattern, so what you see is meant to match. Fit, drape and fine handwork can differ a little, and screens vary. If the exact shade or detail matters, ask us on WhatsApp before you buy. You also have 7 days from delivery to return an unused piece with tags attached.",
   },
   {
     q: "What's the fastest way to reach you?",
