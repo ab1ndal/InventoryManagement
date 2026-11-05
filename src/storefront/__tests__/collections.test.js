@@ -74,4 +74,34 @@ describe("collections config", () => {
       expect(c.title.length).toBeGreaterThan(0);
     });
   });
+
+  describe("intro text", () => {
+    const words = (text) => text.trim().split(/\s+/).length;
+    const withIntro = COLLECTIONS.filter((c) => c.slug !== "diwali");
+    const allText = (c) => [c.intro.lead, ...c.intro.more];
+
+    it("every collection except the Diwali campaign has an intro of 60 to 120 words", () => {
+      expect(COLLECTIONS.find((c) => c.slug === "diwali").intro).toBeUndefined();
+      withIntro.forEach((c) => {
+        expect(c.intro).toBeDefined();
+        const total = words(allText(c).join(" "));
+        expect(total).toBeGreaterThanOrEqual(60);
+        expect(total).toBeLessThanOrEqual(120);
+        expect(words(c.intro.lead)).toBeLessThanOrEqual(25);
+      });
+    });
+
+    it("no two collections share a sentence", () => {
+      const sentences = withIntro.flatMap((c) => allText(c).join(" ").split(/(?<=\.)\s+/));
+      expect(new Set(sentences).size).toBe(sentences.length);
+    });
+
+    it("avoids words the owner has ruled out, prices and a delivery area", () => {
+      withIntro.forEach((c) => {
+        expect(allText(c).join(" ")).not.toMatch(
+          /\bexact|true colou?r|guarantee|\bbest\b|popular|award|₹|\bRs\b|deliver|ship|all india|pan.india|real photo|\bAI\b/i
+        );
+      });
+    });
+  });
 });

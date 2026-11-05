@@ -17,6 +17,7 @@ export default function CollectionPage() {
         key={slug}
         title={collection.title}
         subtitle={collection.subtitle}
+        intro={collection.intro}
         seoTitle={collection.seoTitle}
         seoDescription={collection.description}
         scopeCategoryIds={collection.productIds ? null : collection.categoryIds}

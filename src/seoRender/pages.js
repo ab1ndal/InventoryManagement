@@ -372,6 +372,13 @@ function collectionQuery(collection) {
   return `select=${LIST_FIELDS},match:productsizecolors!inner(productid)&match.size=in.(${encodeURIComponent(sizes)})`;
 }
 
+// The words CollectionIntro shows: the lead, and the rest inside a closed <details> a crawler still reads.
+function collectionIntro({ title, intro }) {
+  if (!intro) return "";
+  const more = intro.more.map((paragraph) => `<p>${esc(paragraph)}</p>`).join("");
+  return `<p>${esc(intro.lead)}</p><details><summary>More about ${esc(title)}</summary>${more}</details>`;
+}
+
 async function collectionPage(slug, rest) {
   const collection = getCollection(slug);
   if (!collection) return NOT_FOUND;
@@ -382,7 +389,9 @@ async function collectionPage(slug, rest) {
     title: collection.seoTitle,
     description: collection.description,
     canonical: path,
-    bodyHtml: frame(`<h1>${esc(collection.title)}</h1><p>${esc(collection.subtitle)}</p>${productList(products)}`),
+    bodyHtml: frame(
+      `<h1>${esc(collection.title)}</h1><p>${esc(collection.subtitle)}</p>${collectionIntro(collection)}${productList(products)}`
+    ),
     jsonLd: [
       breadcrumbs(["Home", "/"], ["Collections", "/collections"], [collection.title, path]),
       ...(products.length ? [itemList(products)] : []),
