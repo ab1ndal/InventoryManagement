@@ -184,6 +184,17 @@ Deno.test("R6: reconciled order with a different amount is refused", async () =>
   assertEquals(err.code, "order_mismatch");
 });
 
+Deno.test("getOrder reads order_meta.return_url, null when absent", async () => {
+  const { cf } = client((c) =>
+    jsonResponse(200, {
+      ...createdBody,
+      order_meta: c.url.endsWith("WEB-000001") ? { return_url: "https://x.test/order/WEB-000001?t=abc" } : null,
+    })
+  );
+  assertEquals((await cf.getOrder("WEB-000001"))?.returnUrl, "https://x.test/order/WEB-000001?t=abc");
+  assertEquals((await cf.getOrder("WEB-000002"))?.returnUrl, null);
+});
+
 Deno.test("getOrder parses status/amount; 404 → null", async () => {
   const { cf } = client((c) =>
     c.url.endsWith("WEB-000001")

@@ -161,6 +161,57 @@ Deno.test("create-order R6: repeated attemptKey returns the same order and sessi
   assertEquals(store.tokenHashes.get("o-1"), await sha256Hex(json.accessToken));
 });
 
+Deno.test("create-order PAY-4: retry on an active session keeps the token its return URL carries", async () => {
+  const store = withCreate(new FakeStore());
+  store.orders.push(order({ id: "o-1", order_ref: "WEB-000001" }));
+  const firstToken = "first-token";
+  const firstHash = await sha256Hex(firstToken);
+  store.tokenHashes.set("o-1", firstHash);
+  store.impls.online_order_access_ok = (a) => a.p_token_hash === firstHash;
+  const deps = testDeps({ store });
+  deps.cashfree.orders.set("WEB-000001", {
+    cfOrderId: "cf-1",
+    orderRef: "WEB-000001",
+    status: "ACTIVE",
+    amount: 1080,
+    currency: "INR",
+    paymentSessionId: "session-old",
+    returnUrl: `https://www.bindalscreations.com/order/WEB-000001?t=${firstToken}`,
+  });
+  const json = await (await handler(post(URL_, body()), deps)).json();
+  assertEquals([json.accessToken, json.paymentSessionId], [firstToken, "session-old"]);
+  assertEquals(store.tokenHashes.get("o-1"), firstHash);
+});
+
+Deno.test("create-order PAY-4: a return URL token that no longer matches gets a fresh token", async () => {
+  const store = withCreate(new FakeStore());
+  store.orders.push(order({ id: "o-1", order_ref: "WEB-000001" }));
+  store.impls.online_order_access_ok = () => false;
+  const deps = testDeps({ store });
+  deps.cashfree.orders.set("WEB-000001", {
+    cfOrderId: "cf-1",
+    orderRef: "WEB-000001",
+    status: "ACTIVE",
+    amount: 1080,
+    currency: "INR",
+    paymentSessionId: "session-old",
+    returnUrl: "https://www.bindalscreations.com/order/WEB-000001?t=stale",
+  });
+  const json = await (await handler(post(URL_, body()), deps)).json();
+  assertEquals(json.accessToken === "stale", false);
+  assertEquals(store.tokenHashes.get("o-1"), await sha256Hex(json.accessToken));
+});
+
+Deno.test("create-order PAY-4: a Cashfree lookup failure changes no token", async () => {
+  const store = withCreate(new FakeStore());
+  store.orders.push(order({ id: "o-1", order_ref: "WEB-000001" }));
+  const deps = testDeps({ store });
+  deps.cashfree.getOrder = () => Promise.reject(new Error("down"));
+  const res = await handler(post(URL_, body()), deps);
+  assertEquals(res.status, 502);
+  assertEquals(store.tokenHashes.has("o-1"), false);
+});
+
 Deno.test("create-order R6: DB says created=false (concurrent twin) → existing order's session", async () => {
   const store = new FakeStore();
   const existing = order({ id: "o-1", order_ref: "WEB-000001", attempt_key: "other" });
