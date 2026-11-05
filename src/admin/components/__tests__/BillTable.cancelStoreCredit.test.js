@@ -1,0 +1,130 @@
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import BillTable from "../BillTable";
+
+// Cancel with "Issue store credit" credits only the money the customer actually paid
+// (bill_payments rows, else bills.payment_amount), never the amount payable. CRA's jest
+// config sets resetMocks: true, so state lives in a plain object reset in beforeEach.
+
+const mockDb = { writes: [], current: null, readError: null };
+
+const mockChain = (table) => {
+  const s = { op: "select" };
+  const chain = {
+    select: () => chain,
+    update: () => { s.op = "update"; return chain; },
+    delete: () => { s.op = "delete"; return chain; },
+    eq: () => chain,
+    in: () => chain,
+    not: () => chain,
+    order: () => chain,
+    range: () => chain,
+    single: () =>
+      Promise.resolve(
+        mockDb.readError
+          ? { data: null, error: { message: mockDb.readError } }
+          : { data: mockDb.current, error: null }
+      ),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    then: (res, rej) => {
+      if (s.op !== "select") mockDb.writes.push({ kind: "table", table, op: s.op });
+      const data =
+        s.op !== "select" ? null : table === "bills" ? [bill()] : [];
+      return Promise.resolve({ data, error: null }).then(res, rej);
+    },
+  };
+  return chain;
+};
+
+jest.mock("../../../lib/supabaseClient", () => ({
+  supabase: {
+    from: (table) => mockChain(table),
+    rpc: (fn, args) => {
+      mockDb.writes.push({ kind: "rpc", fn, args });
+      return Promise.resolve({ error: null });
+    },
+  },
+}));
+jest.mock("../../../lib/activityLog", () => ({ logActivity: () => {} }));
+jest.mock("../billing/generateInvoicePdf", () => ({
+  generateInvoicePdf: () => Promise.resolve(new Blob(["pdf"])),
+}));
+
+const bill = () => ({
+  billid: 1,
+  bill_number: "FY26-000217",
+  customerid: 7,
+  customers: { first_name: "Asha", last_name: "" },
+  orderdate: "2026-07-13",
+  totalamount: 1000,
+  paymentstatus: "finalized",
+  finalized: true,
+  pdf_url: null,
+});
+
+const creditWrites = () =>
+  mockDb.writes
+    .filter((w) => w.kind === "rpc" && w.fn === "store_credit_adjust")
+    .map((w) => [w.args.p_reason, w.args.p_delta]);
+
+beforeEach(() => {
+  mockDb.writes = [];
+  mockDb.readError = null;
+  mockDb.current = { store_credit_used: 0, payment_amount: null, bill_payments: [] };
+});
+
+async function openDialog() {
+  render(<BillTable onEdit={() => {}} />);
+  await screen.findByText("FY26-000217");
+  fireEvent.click(screen.getByLabelText("Cancel bill"));
+  fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+}
+
+async function issueCredit() {
+  fireEvent.click(await screen.findByText("Issue store credit"));
+  await waitFor(() =>
+    expect(mockDb.writes.some((w) => w.kind === "table" && w.table === "bills" && w.op === "update")).toBe(true)
+  );
+}
+
+test("partial bill with a deposit credits the deposit", async () => {
+  mockDb.current = { store_credit_used: 0, payment_amount: 200, bill_payments: [{ amount: 200 }] };
+  await openDialog();
+  await screen.findByText(/₹200\.00 paid by the customer/);
+  await issueCredit();
+  expect(creditWrites()).toEqual([["bill_cancel_credit", 200]]);
+});
+
+test("fully paid bill credits its received amount (payment_amount, no payment rows)", async () => {
+  mockDb.current = { store_credit_used: 0, payment_amount: 1000, bill_payments: [] };
+  await openDialog();
+  await screen.findByText(/₹1,000\.00 paid by the customer/);
+  await issueCredit();
+  expect(creditWrites()).toEqual([["bill_cancel_credit", 1000]]);
+});
+
+test("bill with store credit used credits the cash paid plus a separate refund", async () => {
+  mockDb.current = { store_credit_used: 300, payment_amount: 700, bill_payments: [] };
+  await openDialog();
+  await screen.findByText(/₹300\.00 of store credit used on this bill is also returned/);
+  await issueCredit();
+  expect(creditWrites()).toEqual([
+    ["bill_cancel_refund", 300],
+    ["bill_cancel_credit", 700],
+  ]);
+});
+
+test("nothing paid writes no credit row and the dialog says so", async () => {
+  mockDb.current = { store_credit_used: 0, payment_amount: null, bill_payments: [] };
+  await openDialog();
+  await screen.findByText(/Nothing was paid on this bill/);
+  await issueCredit();
+  expect(creditWrites()).toEqual([]);
+});
+
+test("failed payment read writes nothing and does not open the dialog", async () => {
+  mockDb.readError = "read failed";
+  await openDialog();
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Continue" })).not.toBeDisabled());
+  expect(screen.queryByText("Issue store credit")).toBeNull();
+  expect(mockDb.writes).toEqual([]);
+});

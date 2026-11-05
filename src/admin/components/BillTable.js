@@ -5,7 +5,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageSquare, Globe } from "lucide-react";
-import { isWebsiteMethod } from "./billing/paymentHelpers";
+import { isWebsiteMethod, receivedAmount } from "./billing/paymentHelpers";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
@@ -46,6 +46,8 @@ export default function BillTable({ onEdit }) {
   const [sort, setSort] = useState({ key: "bill_number", dir: "desc" });
   const [cancelBill, setCancelBill] = useState(null);
   const [resolveOpen, setResolveOpen] = useState(false);
+  // Read once when the resolve dialog opens; the dialog text and the credit written both use it.
+  const [resolveFigures, setResolveFigures] = useState({ received: 0, storeCreditUsed: 0 });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [receiptBill, setReceiptBill] = useState(null);
@@ -245,18 +247,11 @@ export default function BillTable({ onEdit }) {
         const hasNext = (data || []).length > ROWS_PER_PAGE;
         const pageBills = (data || []).slice(0, ROWS_PER_PAGE);
 
-        // Amount Received = total cash collected for the bill.
-        // bills.payment_amount tracks that running total, but bill_payments is the
-        // ledger of record, so sum it when rows exist and fall back to payment_amount
-        // for bills paid in one go (which write no bill_payments row).
+        // Amount Received = total cash collected for the bill (see receivedAmount).
         setBills(
           pageBills.map((b) => ({
             ...withOrderContact(b),
-            amount_received: b.bill_payments?.length
-              ? b.bill_payments.reduce((sum, p) => sum + Number(p.amount), 0)
-              : b.payment_amount != null
-                ? Number(b.payment_amount)
-                : null,
+            amount_received: receivedAmount(b),
           }))
         );
         setHasNextPage(hasNext);
@@ -457,7 +452,8 @@ export default function BillTable({ onEdit }) {
 
   const handleResolveIssueStoreCredit = async () => {
     if (!cancelBill) return;
-    const { billid: billId, customerid, totalamount, orderdate } = cancelBill;
+    const { billid: billId, customerid, orderdate } = cancelBill;
+    const creditAmount = resolveFigures.received;
     const customerDisplayName = cancelBill.customers
       ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
       : "";
@@ -465,21 +461,15 @@ export default function BillTable({ onEdit }) {
     try {
       await restoreStockForBill(billId);
       await refundStoreCreditForBill(billId, customerid);
-      // WR-04: Fetch net_amount (actual cash collected) so we credit only what the customer paid.
-      // Falls back to totalamount if the net_amount column has not been migrated yet.
-      const { data: billRow } = await supabase
-        .from("bills")
-        .select("net_amount")
-        .eq("billid", billId)
-        .single();
-      const refundAmount = Number(billRow?.net_amount ?? totalamount ?? 0);
-      const { error: creditErr } = await supabase.rpc("store_credit_adjust", {
-        p_customer: customerid,
-        p_delta: refundAmount,
-        p_reason: "bill_cancel_credit",
-        p_ref: String(billId),
-      });
-      if (creditErr) throw new Error("Store credit could not be added: " + creditErr.message);
+      if (creditAmount > 0) {
+        const { error: creditErr } = await supabase.rpc("store_credit_adjust", {
+          p_customer: customerid,
+          p_delta: creditAmount,
+          p_reason: "bill_cancel_credit",
+          p_ref: String(billId),
+        });
+        if (creditErr) throw new Error("Store credit could not be added: " + creditErr.message);
+      }
       await unRedeemVoucherForBill(billId);
       await supabase.from("discount_usage").delete().eq("billid", billId);
       const { error } = await supabase
@@ -498,7 +488,7 @@ export default function BillTable({ onEdit }) {
           originalBillDate: orderdate,
           customerName: customerDisplayName,
           items: receiptItems || [],
-          creditAmount: refundAmount,
+          creditAmount,
           issueDate: new Date().toISOString(),
         });
       });
@@ -516,9 +506,9 @@ export default function BillTable({ onEdit }) {
         });
       }
 
-      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || "(no number)"} for ${customerName(cancelBill.customers)} (store credit ${money(refundAmount)})` });
+      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || "(no number)"} for ${customerName(cancelBill.customers)} (store credit ${money(creditAmount)})` });
       toast({
-        title: `Bill #${billId} cancelled. ${formatINR(refundAmount, 2)} store credit added to ${customerDisplayName || "customer"}'s account.`,
+        title: `Bill #${billId} cancelled. ${formatINR(creditAmount, 2)} store credit added to ${customerDisplayName || "customer"}'s account.`,
       });
       setBills((prev) =>
         prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
@@ -543,8 +533,29 @@ export default function BillTable({ onEdit }) {
       handleCancelFinalizedNoCustomer(cancelBill);
       return;
     }
-    setConfirmOpen(false);
-    setResolveOpen(true);
+    openResolveDialog(cancelBill);
+  };
+
+  const openResolveDialog = async (bill) => {
+    setCancelSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from("bills")
+        .select("payment_amount, store_credit_used, bill_payments(amount)")
+        .eq("billid", bill.billid)
+        .single();
+      if (error) throw error;
+      setResolveFigures({
+        received: receivedAmount(data) ?? 0,
+        storeCreditUsed: Number(data.store_credit_used ?? 0),
+      });
+      setConfirmOpen(false);
+      setResolveOpen(true);
+    } catch (e) {
+      toast({ title: "Could not read what the customer paid", description: e.message, variant: "destructive" });
+    } finally {
+      setCancelSaving(false);
+    }
   };
 
   // Drafts only. A finalized bill is kept as a record and goes through Cancel.
@@ -1002,11 +1013,16 @@ export default function BillTable({ onEdit }) {
               <div className="text-left">
                 <div className="font-semibold">Issue store credit</div>
                 <div className="text-xs opacity-90">
-                  {formatINR(cancelBill?.totalamount ?? 0, 2)} added to{" "}
+                  {resolveFigures.received > 0
+                    ? `${formatINR(resolveFigures.received, 2)} paid by the customer will be added to `
+                    : "Nothing was paid on this bill, so no store credit will be added to "}
                   {cancelBill?.customers
                     ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
                     : "customer"}
-                  's account. A return receipt will be printed.
+                  's account.
+                  {resolveFigures.storeCreditUsed > 0 &&
+                    ` The ${formatINR(resolveFigures.storeCreditUsed, 2)} of store credit used on this bill is also returned.`}
+                  {" "}A return receipt will be printed. If this looks wrong, adjust the customer's credit by hand.
                 </div>
               </div>
             </Button>

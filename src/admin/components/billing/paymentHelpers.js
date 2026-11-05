@@ -15,6 +15,16 @@ export function sumPayments(payments) {
 }
 
 /**
+ * Money actually received for a bill. bill_payments is the ledger of record, so sum it
+ * when rows exist; bills paid in one go write no row and use bills.payment_amount.
+ * Null when neither records anything.
+ */
+export function receivedAmount(bill) {
+  if (bill?.bill_payments?.length) return sumPayments(bill.bill_payments);
+  return bill?.payment_amount != null ? Number(bill.payment_amount) : null;
+}
+
+/**
  * Where a bill stands after recording one more payment.
  *
  * @param {Array} existingPayments - bill_payments rows already recorded
