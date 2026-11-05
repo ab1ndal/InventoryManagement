@@ -313,4 +313,28 @@ begin
 end $$;
 rollback;
 
+-- failed leg: a late processing or failed status changes nothing and is logged; a late success completes it
+begin;
+do $$
+declare
+  rid uuid := pg_temp.guest_refund();
+  leg uuid;
+begin
+  perform public.online_refund_choose((select token from public.order_refunds where id = rid), 'original');
+  select leg_id into leg from public.online_refund_open_legs(rid);
+  perform public.online_refund_set_status(leg, 'processing', 'cf_f', null);
+  perform public.online_refund_set_status(leg, 'failed', 'cf_f', 'bank said no');
+  assert (select status from public.order_refunds where id = rid) = 'failed', 'header failed';
+  perform public.online_refund_set_status(leg, 'processing', 'cf_f', 'late pending');
+  assert (select status || '/' || note from public.order_refund_legs where id = leg) = 'failed/bank said no', 'processing cannot reopen a failed leg';
+  assert (select status from public.order_refunds where id = rid) = 'failed', 'header stays failed';
+  perform public.online_refund_set_status(leg, 'failed', 'cf_f', 'repeat');
+  assert (select note from public.order_refund_legs where id = leg) = 'bank said no', 'repeat failed changes nothing';
+  assert (select count(*) from public.online_refund_legs_due() where leg_id = leg) = 0, 'failed leg not due';
+  perform public.online_refund_set_status(leg, 'completed', 'cf_f', 'SUCCESS');
+  assert (select status from public.order_refund_legs where id = leg) = 'completed', 'late success completes it';
+  assert (select status from public.order_refunds where id = rid) = 'completed', 'header completed';
+end $$;
+rollback;
+
 \echo 'test_online_orders_refunds: all passed'
