@@ -11,6 +11,9 @@ verify_jwt = false
 [functions.refund-sweeper]
 verify_jwt = false
 
+[functions.tracking-sweeper]
+verify_jwt = false
+
 [functions.run-jobs]
 verify_jwt = false
 
