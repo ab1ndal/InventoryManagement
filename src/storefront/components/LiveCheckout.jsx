@@ -15,6 +15,7 @@ import {
 } from "../lib/ordersApi";
 import { rememberPendingOrder } from "../lib/pendingOrder";
 import { guestHolderKey } from "../lib/holder";
+import { pauseAnalytics } from "../lib/analytics";
 import { INDIAN_STATES } from "../lib/checkout";
 
 const QUOTE_DEBOUNCE_MS = 300;
@@ -238,6 +239,7 @@ export default function LiveCheckout({ items, form, onCheckoutOff, onPincodePlac
       const res = await createOrder(payload);
       rememberPendingOrder(res.orderRef);
       if (res.paid) {
+        pauseAnalytics();
         navigate(`/order/${res.orderRef}?t=${encodeURIComponent(res.accessToken)}`);
         return;
       }
