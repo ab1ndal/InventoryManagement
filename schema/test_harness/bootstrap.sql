@@ -193,6 +193,30 @@ create table if not exists public.vouchers (
   source text default 'manual'::text
 );
 
+-- Added 2026-11-04 from the live catalog, for schema/migration_bill_save.sql.
+create sequence if not exists salespersons_salesperson_id_seq;
+create sequence if not exists bill_payments_payment_id_seq;
+create table if not exists public.salespersons (
+  salesperson_id integer default nextval('salespersons_salesperson_id_seq'::regclass) primary key,
+  name text not null,
+  date_hired date,
+  active boolean default true,
+  salary integer
+);
+create table if not exists public.bill_salespersons (
+  billid integer not null,
+  salesperson_id integer not null,
+  primary key (billid, salesperson_id)
+);
+create table if not exists public.bill_payments (
+  payment_id integer default nextval('bill_payments_payment_id_seq'::regclass) primary key,
+  billid integer not null,
+  amount numeric(10,2) not null check (amount > (0)::numeric),
+  salesmethodid integer not null,
+  recorded_at timestamp without time zone default CURRENT_TIMESTAMP not null,
+  notes text
+);
+
 alter table public.customers add constraint customers_customer_ulid_key UNIQUE (customer_ulid);
 alter table public.profiles add constraint profiles_email_key UNIQUE (email);
 alter table public.customers add constraint customers_auth_user_id_key UNIQUE (auth_user_id);
@@ -237,6 +261,11 @@ alter table public.customers add constraint fk_referred_by FOREIGN KEY (referred
 alter table public.cart_items add constraint cart_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES productsizecolors(variantid);
 alter table public.bills add constraint orders_customerid_fkey FOREIGN KEY (customerid) REFERENCES customers(customerid);
 alter table public.exchanges add constraint exchanges_new_billid_fkey FOREIGN KEY (new_billid) REFERENCES bills(billid) ON DELETE SET NULL;
+alter table public.bill_items add constraint bill_items_salesperson_id_fkey FOREIGN KEY (salesperson_id) REFERENCES salespersons(salesperson_id);
+alter table public.bill_salespersons add constraint bill_salespersons_billid_fkey FOREIGN KEY (billid) REFERENCES bills(billid) ON DELETE CASCADE;
+alter table public.bill_salespersons add constraint bill_salespersons_salesperson_id_fkey FOREIGN KEY (salesperson_id) REFERENCES salespersons(salesperson_id);
+alter table public.bill_payments add constraint bill_payments_billid_fkey FOREIGN KEY (billid) REFERENCES bills(billid) ON DELETE CASCADE;
+alter table public.bill_payments add constraint bill_payments_salesmethodid_fkey FOREIGN KEY (salesmethodid) REFERENCES salesmethods(salesmethodid);
 alter table public.customers add constraint customers_community_status_check CHECK ((community_status = ANY (ARRAY['not_added'::text, 'invite_pending'::text, 'member'::text, 'left'::text, 'opted_out'::text])));
 alter table public.customers add constraint chk_ulid_length CHECK ((char_length((customer_ulid)::text) = 26));
 alter table public.customers add constraint chk_phone_format CHECK (((phone)::text ~ '^\+\d{10,15}$'::text));

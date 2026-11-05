@@ -47,6 +47,8 @@
 
 - **plpgsql `RETURNS TABLE (email, ...)` makes `email` an OUT variable.** An unqualified `email` in the body's SQL then errors `42702 ambiguous`, but only on the code path that reaches it, so it hides until a fresh user calls it. Put `#variable_conflict use_column` right after `as $$`, or qualify columns with aliases. Test SECURITY DEFINER customer functions in `begin; insert into auth.users ...; set_config('request.jwt.claims', ...); set local role authenticated; ...; rollback;`.
 - `_migrations` was backfilled 2026-10-21, so `npm run migrate` is safe again. Never put `BEGIN`/`COMMIT` in a new migration (`exec_sql` gives `0A000`).
+- `FOR UPDATE` blocks the `KEY SHARE` lock a foreign key check takes. A function that locks variants or a customer and then waits for the bill counter deadlocks against `online_order_create_bos`, which holds the counter and then inserts rows referencing them. Use `FOR NO KEY UPDATE` there: it still serializes stock and credit changes. Proven by the counter-holder case in `schema/test_harness/concurrency_test.sh`.
+- `supabase db query -f` returns only the last result set of a multi-statement file, and a final `rollback` does not count as one. Put the counts `select` just before the `rollback`.
 - Never chain `git stash pop` after `;` when the `git stash` may not have run: it pops an older unrelated stash (this repo keeps `stash@{0}` "Added Free-Size").
 
 ## Tests: deferred auth-callback work
