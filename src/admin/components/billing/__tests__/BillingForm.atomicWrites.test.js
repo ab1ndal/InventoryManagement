@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import BillingForm from "../BillingForm";
+import { clearBillingLookups } from "../billingLookups";
 
 // Records every supabase call so tests can assert what BillingForm wrote.
 // CRA's jest config sets resetMocks: true, so state lives in plain objects
@@ -11,9 +12,16 @@ const mockDb = {
   customerCredit: 0,
   voucherRow: null,
   alterationCharge: 0,
+  discounts: [],
+  failWrite: null, // (call) => error message to fail that write with, or null
 };
 
 const mockResolve = (s) => {
+  const failure = s.op !== "select" && mockDb.failWrite ? mockDb.failWrite(s) : null;
+  if (failure) return { data: null, error: { message: failure } };
+  if (s.table === "discounts" && s.op === "select") {
+    return { data: mockDb.discounts, error: null };
+  }
   if (s.table === "customers" && s.op === "select") {
     return {
       data: { first_name: "Asha", last_name: "", phone: "999", store_credit: mockDb.customerCredit },
@@ -129,6 +137,9 @@ beforeEach(() => {
   mockDb.customerCredit = 0;
   mockDb.voucherRow = null;
   mockDb.alterationCharge = 0;
+  mockDb.discounts = [];
+  mockDb.failWrite = null;
+  clearBillingLookups();
   mockToast.success = [];
   mockToast.error = [];
   window.open = () => null;
@@ -281,4 +292,89 @@ test("altered items still need their deposit, so a bill with nothing paid is ref
   expect(mockToast.error[0][0]).toBe("Insufficient initial payment");
   expect(screen.queryByRole("button", { name: "Confirm Partial Payment" })).not.toBeInTheDocument();
   expect(mockDb.calls.some((c) => c.table === "bills" && c.op === "insert")).toBe(false);
+});
+
+
+// Stopgap: once the bill row exists, a later failure that leaves it in place must lock the
+// form, so a second click cannot insert a second bill and move stock again.
+const AUTO_CODE = {
+  id: 1, code: "TEN", type: "percentage", value: 10, auto_apply: true, active: true,
+  once_per_customer: false, exclusive: false, rules: {},
+};
+const countOf = (table, op) => mockDb.calls.filter((c) => c.table === table && c.op === op).length;
+const unfinishedMsg = (step) =>
+  `Bill FY26-SG0042 was saved but not finished. Do not enter it again. Close this window, and tell the owner which step failed: ${step}.`;
+
+test("new finalize: a failure after the bill insert locks the form and a second click writes nothing", async () => {
+  mockDb.discounts = [AUTO_CODE];
+  mockDb.failWrite = (c) => (c.table === "discount_usage" ? "usage down" : null);
+  await renderBillPaidByStoreCredit();
+  await finalizeNewBill();
+
+  expect(
+    await screen.findByText(unfinishedMsg("recording the discount code use")),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Save Draft" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Finalize" }));
+  expect(countOf("bills", "insert")).toBe(1);
+  expect(rpcs("stock_adjust")).toHaveLength(1);
+});
+
+test("new partial finalize: a failure after the bill insert locks the form", async () => {
+  mockDb.customerCredit = 100;
+  mockDb.rpcResult = (fn) =>
+    fn === "store_credit_adjust" ? { data: null, error: { message: "credit down" } } : { data: 0, error: null };
+  render(<BillingForm open onOpenChange={() => {}} prefilledCustomerId={7} />);
+  fireEvent.click(screen.getByRole("button", { name: "Stub add item" }));
+  await screen.findAllByText("Kurti");
+  await screen.findAllByText(/Store Credit/);
+  fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
+
+  expect(await screen.findByText(unfinishedMsg("taking the store credit"))).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
+  expect(countOf("bills", "insert")).toBe(1);
+});
+
+test("a refused voucher deletes the bill, leaves the form unlocked and can be retried", async () => {
+  mockDb.voucherRow = {
+    voucher_id: "VOUCH1", customerid: null, expiry_date: "2099-12-31",
+    value: 300, redeemed: false, held_order_id: null,
+  };
+  mockDb.rpcResult = (fn) =>
+    fn === "voucher_redeem" ? { data: false, error: null } : { data: 0, error: null };
+  await renderUnpaidBill();
+  await applyVoucher("VOUCH1");
+  await screen.findAllByText(/Voucher #VOUCH1/);
+  await finalizeNewBill();
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Confirm & Finalize" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm & Finalize" }));
+  await waitFor(() => expect(countOf("bills", "insert")).toBe(2));
+});
+
+test("a bill-item insert failure deletes the bill, leaves the form unlocked and can be retried", async () => {
+  mockDb.failWrite = (c) => (c.table === "bill_items" && c.op === "insert" ? "items down" : null);
+  await renderBillPaidByStoreCredit();
+  await finalizeNewBill();
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Confirm & Finalize" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "Confirm & Finalize" }));
+  await waitFor(() => expect(countOf("bills", "insert")).toBe(2));
+});
+
+test("a successful finalize does not lock the form", async () => {
+  const onSubmit = jest.fn();
+  await renderBillPaidByStoreCredit(onSubmit);
+  await finalizeNewBill();
+  await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Finalize" })).toBeEnabled();
 });

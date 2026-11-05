@@ -196,6 +196,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [paymentAmount, setPaymentAmount] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [blockingError, setBlockingError] = useState(null);
+  // A new bill whose insert succeeded but whose later steps failed and left it in place.
+  // Another click would insert a second bill and move stock again, so the form locks.
+  const newBillRef = useRef(null); // { id, number }
+  const [unfinishedBill, setUnfinishedBill] = useState(null); // { number, step }
   const [discountWarningAcked, setDiscountWarningAcked] = useState(false);
   const invoiceRef = useRef(null);
   const [customerName, setCustomerName] = useState("");
@@ -302,6 +306,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setLoadedBillDate(null);
       setFinalAmount("");
       setLoadedNetAmount(null);
+      newBillRef.current = null;
+      setUnfinishedBill(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -644,7 +650,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     backdatedDate !== loadedBillDate &&
     backdatedDate > earliestPaymentDate;
   const saveBlocked =
-    billPending || discountsPending || customerPending || !backdatedDate || billDateAfterPayment;
+    billPending ||
+    discountsPending ||
+    customerPending ||
+    !backdatedDate ||
+    billDateAfterPayment ||
+    Boolean(unfinishedBill);
   const saveBlockedReason = billPending
     ? "Loading bill…"
     : discountsPending
@@ -887,6 +898,19 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   // Errors that stop a save also show in a red box by the Save buttons, so they
   // do not vanish like a toast. Cleared on the next save attempt or when the
   // items or payment change.
+  const lockIfBillSaved = (step) => {
+    const saved = newBillRef.current;
+    if (!saved) return;
+    setUnfinishedBill({ number: saved.number, step });
+    setConfirmOpen(false);
+    setPartialConfirmOpen(false);
+  };
+  const shownError = unfinishedBill
+    ? {
+        title: "Bill not finished",
+        description: `Bill ${unfinishedBill.number} was saved but not finished. Do not enter it again. Close this window, and tell the owner which step failed: ${unfinishedBill.step}.`,
+      }
+    : blockingError;
   const showBlockingError = (title, description) => {
     toast.error(title, { description });
     setBlockingError({ title, description });
@@ -1297,6 +1321,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       exchangeCredit?.amount,
     );
     const stockFailures = [];
+    let failedStep = "finishing the bill";
     try {
       if (!activeBillId) {
         // New bill: validate, create, and finalize in one step
@@ -1357,6 +1382,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (billError)
           throw new Error("Failed to save bill: " + billError.message);
         activeBillId = bill.billid;
+        newBillRef.current = { id: bill.billid, number: bill.bill_number || `#${bill.billid}` };
         setEffectiveBillNumber(bill.bill_number || null);
         pdfBillNumber = bill.bill_number || null;
 
@@ -1367,6 +1393,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
           } catch (vErr) {
             await supabase.from("bills").delete().eq("billid", activeBillId);
+            newBillRef.current = null;
             throw vErr;
           }
         }
@@ -1395,6 +1422,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
           }
           await supabase.from("bills").delete().eq("billid", activeBillId);
+          newBillRef.current = null;
           throw new Error("Failed to save bill items: " + itemsError.message);
         }
 
@@ -1560,6 +1588,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
 
       // Step 3: Insert discount_usage rows for each applied code
+      failedStep = "recording the discount code use";
       if (selectedCodes && selectedCodes.length > 0) {
         // Re-finalization: remove stale usage rows before re-inserting
         if (isFinalizedBill) {
@@ -1580,11 +1609,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       // re-finalization credit delta is handled in the else block above).
       // Exchange credit is separate — not drawn from store_credit balance.
       const totalCreditToDeduct = storeCreditUsed;
+      failedStep = "taking the store credit";
       if (totalCreditToDeduct > 0 && !isFinalizedBill && selectedCustomerId) {
         await deductStoreCredit(selectedCustomerId, totalCreditToDeduct, "bill_finalize", activeBillId);
       }
 
       // Add unused exchange balance to store credit when customer chooses that option
+      failedStep = "adding the exchange balance to store credit";
       if (exchangeBalance > 0 && exchangeBalanceMode === "store_credit" && selectedCustomerId) {
         const { error: updErr } = await supabase.rpc("store_credit_adjust", {
           p_customer: selectedCustomerId,
@@ -1595,6 +1626,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (updErr) throw updErr;
       }
 
+      failedStep = "finishing the bill";
       // Flush finalized state into InvoiceView before PDF capture (covers existing-bill path)
       flushSync(() => {
         setBillPaymentStatus("finalized");
@@ -1636,6 +1668,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       onSubmit?.();
     } catch (e) {
       toast.error(e.message);
+      lockIfBillSaved(failedStep);
     } finally {
       setIsSaving(false);
     }
@@ -1661,6 +1694,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     const isNewBill = !billId;
     const hasInitialPayment = Number(paymentAmount) > 0;
     const stockFailures = [];
+    let failedStep = "finishing the bill";
     try {
       if (items.length === 0) {
         toast.error("Add at least one item");
@@ -1716,6 +1750,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .single();
         if (billError) throw new Error("Failed to save bill: " + billError.message);
         activeBillId = bill.billid;
+        newBillRef.current = { id: bill.billid, number: bill.bill_number || `#${bill.billid}` };
         pdfBillNumber = bill.bill_number || null;
         setEffectiveBillNumber(bill.bill_number || null);
 
@@ -1725,6 +1760,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
           } catch (vErr) {
             await supabase.from("bills").delete().eq("billid", activeBillId);
+            newBillRef.current = null;
             throw vErr;
           }
         }
@@ -1751,6 +1787,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
           }
           await supabase.from("bills").delete().eq("billid", activeBillId);
+          newBillRef.current = null;
           throw new Error("Failed to save bill items: " + itemsError.message);
         }
 
@@ -1893,6 +1930,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
             }
             await supabase.from("bills").delete().eq("billid", activeBillId);
+            newBillRef.current = null;
           }
           throw new Error("Failed to record payment: " + payErr.message);
         }
@@ -1900,6 +1938,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
 
       // Discount usage rows
+      failedStep = "recording the discount code use";
       if (selectedCodes?.length > 0) {
         const usageRows = selectedCodes.map((code) => ({
           customerid: selectedCustomerId,
@@ -1913,10 +1952,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
 
       // Decrement store credit
+      failedStep = "taking the store credit";
       if (storeCreditUsed > 0 && selectedCustomerId) {
         await deductStoreCredit(selectedCustomerId, storeCreditUsed, "bill_partial_finalize", activeBillId);
       }
 
+      failedStep = "finishing the bill";
       // Flush all payment state into InvoiceView before PDF capture
       flushSync(() => {
         setBillPayments(paymentRecord ? [paymentRecord] : []);
@@ -1953,6 +1994,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       onSubmit?.();
     } catch (e) {
       toast.error(e.message);
+      lockIfBillSaved(failedStep);
     } finally {
       setIsSaving(false);
     }
@@ -2499,10 +2541,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 onAcknowledgeExchangeBalance={() => setExchangeBalanceAcknowledged(true)}
               />
 
-              {blockingError && (
+              {shownError && (
                 <div role="alert" className="mt-3 whitespace-pre-line rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-                  <p className="font-semibold">{blockingError.title}</p>
-                  <p>{blockingError.description}</p>
+                  <p className="font-semibold">{shownError.title}</p>
+                  <p>{shownError.description}</p>
                 </div>
               )}
               {/* Actions stay in view, with the total, however far the form is scrolled */}
