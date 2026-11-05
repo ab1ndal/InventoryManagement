@@ -3,6 +3,7 @@
 # Needs the throwaway DB from scripts/test-db.sh with all online-order migrations applied (through _holds):
 #   scripts/test-db.sh up
 #   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_holds.sql>
+#   scripts/test-db.sh sql schema/migration_bill_save.sql
 #   schema/test_harness/concurrency_test.sh
 # Session A confirms an order that holds the last unit and keeps its transaction open;
 # session B confirms a second order for the same unit (one from before stock holds, so it
@@ -458,6 +459,160 @@ grep -q 'returnable' "$OUT/eo_b_err" || { echo "FAIL: B should fail on returnabl
 [ "$EO_EX" = "1" ] && [ "$EO_RET" = "0" ] || { echo "FAIL: exactly one of exchange/return should exist"; fail=1; }
 [ "$EO_STOCK" = "5.000" ] || { echo "FAIL: stock should be 5 - 1 sold + 1 exchanged back = 5"; fail=1; }
 [ "$EO_WAITED" -ge 1 ] || { echo "FAIL: B did not wait for A's order lock"; fail=1; }
+
+# ---- bill_save: a failure at the last step undoes everything (matrix row 5) ----
+# Local only: it adds a trigger to a live-shared table inside the transaction.
+BS_V=77777777-7777-4777-8777-777777777777
+BS_NOTE='Concurrency BillSave'
+bs_payload() { # variant
+  echo "{\"bill\":{\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"finalized\",\"finalized\":true},\"items\":[{\"quantity\":1,\"mrp\":1,\"subtotal\":1,\"gst_amount\":0,\"total\":1,\"variantid\":\"$1\"}]}"
+}
+bs_key() { printf 'cccc0000-0000-4000-8000-%012d' "$1"; }
+cleanup_bill_save() {
+  "${PSQL[@]}" > /dev/null <<SQL
+delete from public.bill_stock_moves where idempotency_key::text like 'cccc0000-%';
+delete from public.bill_save_log where idempotency_key::text like 'cccc0000-%';
+delete from public.bills where notes = '$BS_NOTE';
+delete from public.productsizecolors where variantid = '$BS_V';
+delete from public.products where productid = 'CONCBS';
+SQL
+}
+cleanup_bill_save
+"${PSQL[@]}" > "$OUT/bs_row5" <<SQL
+begin;
+create function pg_temp.boom() returns trigger language plpgsql as \$f\$
+begin raise exception 'injected failure'; end \$f\$;
+insert into public.customers (customerid, customer_ulid, first_name, store_credit)
+  values (-9101, 'CONCBILLSAVE00000000000001', 'Fixture', 500);
+insert into public.products (productid, name, purchaseprice, retailprice) values ('CONCBS', 'Conc bill', 500, 1000);
+insert into public.productsizecolors (productid, size, color, stock, variantid) values ('CONCBS', 'M', 'Red', 5, '$BS_V');
+insert into public.vouchers (voucher_id, customerid, expiry_date, value) values ('CONCBS-V', -9101, current_date + 30, 100);
+create temp table bs_before as select
+  (select count(*) from public.bills where notes = '$BS_NOTE') as bills,
+  (select stock from public.productsizecolors where variantid = '$BS_V') as stock,
+  (select store_credit from public.customers where customerid = -9101) as credit,
+  (select redeemed from public.vouchers where voucher_id = 'CONCBS-V') as redeemed,
+  (select jsonb_object_agg(financial_year || document_type, last_value) from public.bill_sequences) as counters,
+  (select count(*) from public.bill_save_log) as log;
+create trigger bs_boom before insert on public.store_credit_ledger for each row execute function pg_temp.boom();
+do \$\$
+declare
+  pl jsonb := jsonb_set('$(bs_payload "$BS_V")'::jsonb, '{bill}',
+    '$(bs_payload "$BS_V")'::jsonb -> 'bill' || '{"customerid": -9101, "store_credit_used": 100}')
+    || '{"voucher_id": "CONCBS-V"}';
+  got text;
+  r jsonb;
+begin
+  begin
+    perform public.bill_save('$(bs_key 5)', 'finalize_create', pl);
+    got := 'saved';
+  exception when others then
+    got := sqlerrm;
+  end;
+  if got <> 'injected failure' then raise exception 'row5: expected the injected failure, got %', got; end if;
+  if not exists (select 1 from bs_before b where
+       b.bills = (select count(*) from public.bills where notes = '$BS_NOTE')
+       and b.stock = (select stock from public.productsizecolors where variantid = '$BS_V')
+       and b.credit = (select store_credit from public.customers where customerid = -9101)
+       and b.redeemed = (select redeemed from public.vouchers where voucher_id = 'CONCBS-V')
+       and b.counters = (select jsonb_object_agg(financial_year || document_type, last_value) from public.bill_sequences)
+       and b.log = (select count(*) from public.bill_save_log)) then
+    raise exception 'row5: the failed save left something behind';
+  end if;
+  drop trigger bs_boom on public.store_credit_ledger;
+  r := public.bill_save('$(bs_key 5)', 'finalize_create', pl);
+  if (r ->> 'replayed')::boolean then raise exception 'row5: the retry should do the work'; end if;
+  if (select count(*) from public.bills where notes = '$BS_NOTE') <> 1 then raise exception 'row5: one bill expected'; end if;
+  if (select stock from public.productsizecolors where variantid = '$BS_V') <> 4 then raise exception 'row5: one stock move expected'; end if;
+  if (select store_credit from public.customers where customerid = -9101) <> 400 then raise exception 'row5: one credit move expected'; end if;
+  if (select count(*) from public.store_credit_ledger where customerid = -9101) <> 1 then raise exception 'row5: one ledger row expected'; end if;
+end \$\$;
+select 'row5 ok';
+rollback;
+SQL
+grep -qx 'row5 ok' "$OUT/bs_row5" || { echo "FAIL: bill_save row 5"; fail=1; }
+echo "bill_save row 5: $(tr '\n' ' ' < "$OUT/bs_row5")"
+
+# ---- bill_save: same key from two sessions. The second waits, then replays. One bill. ----
+bs_fixture() { # stock
+  cleanup_bill_save
+  "${PSQL[@]}" > /dev/null <<SQL
+insert into public.products (productid, name, purchaseprice, retailprice) values ('CONCBS', 'Conc bill', 500, 1000);
+insert into public.productsizecolors (productid, size, color, stock, variantid) values ('CONCBS', 'M', 'Red', $1, '$BS_V');
+SQL
+}
+bs_call() { # key
+  echo "select public.bill_save('$(bs_key "$1")', 'finalize_create', '$(bs_payload "$BS_V")')"
+}
+bs_fixture 5
+"${PSQL[@]}" -c "begin" -c "$(bs_call 1)" -c "select pg_sleep(2)" -c "commit" > "$OUT/bs_a" &
+PID_BS=$!
+sleep 0.5
+START=$(date +%s)
+"${PSQL[@]}" -c "$(bs_call 1)" > "$OUT/bs_b"
+BS_WAITED=$(( $(date +%s) - START ))
+wait "$PID_BS"
+BS_CHECK="$("${PSQL[@]}" -c "select (select count(*) from public.bills where notes = '$BS_NOTE') || ' ' || (select stock from public.productsizecolors where variantid = '$BS_V')")"
+read -r BS_BILLS BS_STOCK <<< "$BS_CHECK"
+echo "bill_save same key: bills=$BS_BILLS stock=$BS_STOCK waitedB=${BS_WAITED}s"
+[ "$BS_BILLS" = "1" ] || { echo "FAIL: same key must make one bill"; fail=1; }
+[ "$BS_STOCK" = "4.000" ] || { echo "FAIL: same key must move stock once"; fail=1; }
+grep -q '"replayed": false' "$OUT/bs_a" || { echo "FAIL: first session should do the work"; fail=1; }
+grep -q '"replayed": true' "$OUT/bs_b" || { echo "FAIL: second session should replay"; fail=1; }
+[ "$BS_WAITED" -ge 1 ] || { echo "FAIL: second session did not wait"; fail=1; }
+
+# ---- bill_save: same key, and the first session rolls back. The second does the work. ----
+bs_fixture 5
+"${PSQL[@]}" -c "begin" -c "$(bs_call 2)" -c "select pg_sleep(1.5)" -c "rollback" > /dev/null &
+PID_BS=$!
+sleep 0.5
+"${PSQL[@]}" -c "$(bs_call 2)" > "$OUT/bs_b"
+wait "$PID_BS"
+BS_CHECK="$("${PSQL[@]}" -c "select (select count(*) from public.bills where notes = '$BS_NOTE') || ' ' || (select stock from public.productsizecolors where variantid = '$BS_V')")"
+read -r BS_BILLS BS_STOCK <<< "$BS_CHECK"
+echo "bill_save same key after rollback: bills=$BS_BILLS stock=$BS_STOCK"
+[ "$BS_BILLS" = "1" ] && [ "$BS_STOCK" = "4.000" ] || { echo "FAIL: after a rollback the waiting session must save once"; fail=1; }
+grep -q '"replayed": false' "$OUT/bs_b" || { echo "FAIL: after a rollback the waiting session should do the work"; fail=1; }
+
+# ---- bill_save: two bills on the last unit. Both succeed, stock is -1, flagged. ----
+bs_fixture 1
+"${PSQL[@]}" -c "begin" -c "$(bs_call 3)" -c "select pg_sleep(1.5)" -c "commit" > "$OUT/bs_a" &
+PID_BS=$!
+sleep 0.5
+"${PSQL[@]}" -c "$(bs_call 4)" > "$OUT/bs_b"
+wait "$PID_BS"
+BS_CHECK="$("${PSQL[@]}" -c "select (select count(*) from public.bills where notes = '$BS_NOTE') || ' ' || (select stock from public.productsizecolors where variantid = '$BS_V') || ' ' || (select count(*) from public.bill_stock_moves where variantid = '$BS_V')")"
+read -r BS_BILLS BS_STOCK BS_MOVES <<< "$BS_CHECK"
+echo "bill_save last unit: bills=$BS_BILLS stock=$BS_STOCK moves=$BS_MOVES"
+[ "$BS_BILLS" = "2" ] || { echo "FAIL: both bills on the last unit must save"; fail=1; }
+[ "$BS_STOCK" = "-1.000" ] || { echo "FAIL: stock should reach -1"; fail=1; }
+[ "$BS_MOVES" = "2" ] || { echo "FAIL: two stock moves expected"; fail=1; }
+grep -q '"negative_stock": \[\]' "$OUT/bs_a" || { echo "FAIL: first bill should flag nothing"; fail=1; }
+grep -q "\"negative_stock\": \[{\"stock\": -1.000, \"variantid\": \"$BS_V\"}\]" "$OUT/bs_b" || { echo "FAIL: second bill should flag the variant"; fail=1; }
+
+# ---- bill_save holds the variant and waits for the bill counter, while another session holds the
+# counter and then adds a bill line for that variant, as online_order_create_bos does. The line's
+# foreign key lock must not conflict with the variant lock, or the two deadlock. ----
+bs_fixture 5
+set +e
+"${PSQL[@]}" -c "begin" \
+  -c "create temp table bs_counter on commit drop as with b as (insert into public.bills (notes, paymentstatus, finalized) values ('$BS_NOTE', 'finalized', true) returning billid) select billid from b" \
+  -c "select pg_sleep(1.5)" \
+  -c "insert into public.bill_items (billid, quantity, mrp, variantid, subtotal, gst_amount, total) select billid, 1, 1, '$BS_V', 1, 0, 1 from bs_counter" \
+  -c "commit" > /dev/null 2> "$OUT/bs_a_err" &
+PID_BS=$!
+sleep 0.5
+"${PSQL[@]}" -c "$(bs_call 6)" > "$OUT/bs_b" 2> "$OUT/bs_b_err"
+BS_B_RC=$?
+wait "$PID_BS"
+BS_A_RC=$?
+set -e
+BS_CHECK="$("${PSQL[@]}" -c "select (select count(*) from public.bills where notes = '$BS_NOTE') || ' ' || (select count(distinct bill_number) from public.bills where notes = '$BS_NOTE')")"
+read -r BS_BILLS BS_NUMBERS <<< "$BS_CHECK"
+echo "bill_save vs counter holder: A_rc=$BS_A_RC B_rc=$BS_B_RC bills=$BS_BILLS numbers=$BS_NUMBERS"
+[ "$BS_A_RC" = "0" ] && [ "$BS_B_RC" = "0" ] || { echo "FAIL: no deadlock expected: $(cat "$OUT/bs_a_err" "$OUT/bs_b_err")"; fail=1; }
+[ "$BS_BILLS" = "2" ] && [ "$BS_NUMBERS" = "2" ] || { echo "FAIL: two bills with distinct numbers expected"; fail=1; }
+cleanup_bill_save
 
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"
