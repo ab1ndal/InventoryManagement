@@ -79,8 +79,14 @@ function feedItem(product) {
   ].join("");
 }
 
-export async function buildFeed(rest) {
-  const items = (await allProducts(rest)).map(feedItem).filter(Boolean);
+// Evenly spaced across the catalogue, so a small test feed covers more than the oldest category.
+export function sampleItems(items, size) {
+  if (!Number.isInteger(size) || size <= 0 || size >= items.length) return items;
+  return Array.from({ length: size }, (_, i) => items[Math.floor((i * items.length) / size)]);
+}
+
+export async function buildFeed(rest, { sample } = {}) {
+  const items = sampleItems((await allProducts(rest)).map(feedItem).filter(Boolean), sample);
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>` +
@@ -92,9 +98,9 @@ export async function buildFeed(rest) {
 }
 
 // An outage must not look like an empty catalogue, which would drop every listing.
-export async function feedResponse({ rest, log }) {
+export async function feedResponse({ rest, log, sample }) {
   try {
-    return { status: 200, body: await buildFeed(rest) };
+    return { status: 200, body: await buildFeed(rest, { sample }) };
   } catch (err) {
     log("merchant_feed_failed", { error: err instanceof Error ? err.message : String(err) });
     return { status: 503, body: "Feed temporarily unavailable" };
