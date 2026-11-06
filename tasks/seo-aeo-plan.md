@@ -113,7 +113,7 @@ promote. The function touches every storefront URL, so merging needs explicit ow
 | 2.2 | **Unique product titles**: "Yellow Silk Saree with Red Border". From colour, fabric, work, type. Verified against the photo | Dev + AI + owner sample | No two live products share a title |
 | 2.3 | Descriptions: continue the existing revamp (`tasks/description-revamp-plan.md`), prioritised by stock and search demand. Batches of 50, watch, continue | Dev + AI + owner sample | Under-80-char count falls each batch, indexing does not drop |
 | 2.4 | Image alt text and file names from the same facts. At least 4x3 or 1x1 high-resolution images | Dev | All live images have real alt text |
-| 2.5 | Collection pages become the ranking pages: unique intro, buying guidance, questions, links to related collections. Written by hand | Owner facts + dev | Each has useful text a shopper would read |
+| 2.5 | Collection pages become the ranking pages: buying guidance, questions, links to related collections. Written by hand. **Decided 2026-11-05:** no text that describes the page or its products (intros and subtitles removed); the title and products say what the page is, and the meta description tells search engines. Add text only when the owner gives real buying advice a shopper would use | Owner facts + dev | Each has useful text a shopper would read |
 | 2.6 | New collections only where 2.1 shows demand and stock exists: plus-size lehengas, bridal lehengas, wedding sherwanis, silk sarees | Owner + dev | Live with at least 12 products each |
 
 Title format is a test: apply it to one category, read 4 weeks of Search Console data, then roll out.
