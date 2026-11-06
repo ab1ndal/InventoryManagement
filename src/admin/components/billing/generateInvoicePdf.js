@@ -1,6 +1,9 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
+// High enough that small print stays sharp when the bill is printed or zoomed.
+const JPEG_QUALITY = 0.85;
+
 /**
  * Captures a DOM node and returns a PDF Blob.
  * @param {HTMLElement} node - DOM node to capture (ref.current)
@@ -17,7 +20,8 @@ export async function generateInvoicePdf(node, format = 'a4') {
     logging: false,
   });
 
-  const pdf = new jsPDF({ unit: "mm", format, orientation: "portrait" });
+  // compress + JPEG: a lossless PNG page is stored as raw pixels (~6 MB per bill); JPEG keeps it ~0.2 MB.
+  const pdf = new jsPDF({ unit: "mm", format, orientation: "portrait", compress: true });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
 
@@ -69,7 +73,7 @@ export async function generateInvoicePdf(node, format = 'a4') {
     );
 
     if (i > 0) pdf.addPage();
-    pdf.addImage(slice.toDataURL("image/png"), "PNG", marginX, marginTop, imgWidth, sliceHeightMm);
+    pdf.addImage(slice.toDataURL("image/jpeg", JPEG_QUALITY), "JPEG", marginX, marginTop, imgWidth, sliceHeightMm);
   });
 
   return pdf.output("blob");
