@@ -7,6 +7,7 @@ let mockToasts = [];
 let mockCountsImpl = null;
 let mockCountCalls = 0;
 let mockEmptyQueues = false;
+let mockListFails = 0;
 
 const order = (over) => ({
   created_at: "2026-10-23T10:00:00Z",
@@ -109,6 +110,10 @@ jest.mock("../onlineOrdersApi", () => ({
   },
   listOrders: async (q) => {
     mockQueues.push(q);
+    if (mockListFails > 0) {
+      mockListFails -= 1;
+      throw new Error("network down");
+    }
     return mockEmptyQueues ? [] : mockRows[q];
   },
   searchOrders: async (t) => {
@@ -131,6 +136,7 @@ beforeEach(() => {
   mockCountsImpl = null;
   mockCountCalls = 0;
   mockEmptyQueues = false;
+  mockListFails = 0;
 });
 
 const row = (name) => screen.findByRole("button", { name });
@@ -245,10 +251,28 @@ test("clicking a row selects the order and the selected row is marked", async ()
   expect(await row(/WEB-000001/)).not.toHaveAttribute("aria-current");
 });
 
-test("empty queue says so", async () => {
+test("empty Needs action says nothing needs you, and how many are in progress", async () => {
   mockEmptyQueues = true;
   render(<OrderList onSelect={() => {}} refreshKey={0} />);
+  expect(await screen.findByText("Nothing needs you right now. 2 orders are in progress.")).toBeInTheDocument();
+});
+
+test("another empty queue says so", async () => {
+  mockEmptyQueues = true;
+  render(<OrderList onSelect={() => {}} refreshKey={0} />);
+  await screen.findByText(/Nothing needs you right now/);
+  fireEvent.click(screen.getByRole("tab", { name: /Closed/ }));
   expect(await screen.findByText("No orders here.")).toBeInTheDocument();
+});
+
+test("a failed load shows the error and Try again reloads", async () => {
+  mockListFails = 1;
+  render(<OrderList onSelect={() => {}} refreshKey={0} />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not load orders: network down");
+  expect(screen.queryByText(/Nothing needs you/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  expect(await row(/WEB-000001/)).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 describe("search", () => {
@@ -303,7 +327,7 @@ describe("search", () => {
     await flush();
     search("nothing");
     await advance(300);
-    expect(screen.getByText("No orders here.")).toBeInTheDocument();
+    expect(screen.getByText("No orders match this search.")).toBeInTheDocument();
   });
 
   test("choosing a queue clears the search", async () => {
