@@ -110,7 +110,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [deliveredAt, setDeliveredAt] = useState("");
   const [deliveredReason, setDeliveredReason] = useState("");
   // Process dialog of a ship order: Shiprocket (booked here), Porter or self delivery (arranged by staff).
-  const [courier, setCourier] = useState("shiprocket");
+  const [courier, setCourier] = useState("self");
   // Manual step waiting on its confirmation (dialog 'advance').
   const [advanceStep, setAdvanceStep] = useState(null);
   // Courier cancel failure inside a send-back/rebook dialog; the dialog stays open so the
@@ -196,7 +196,7 @@ export default function OrderDetail({ orderId, onChanged }) {
     setParcelLost(false);
     setRebookNote("");
     setDeliveredReason("");
-    setCourier("shiprocket");
+    setCourier("self");
     setAdvanceStep(null);
     setDialogProblem(null);
     setDeliveredError(null);
@@ -801,15 +801,16 @@ export default function OrderDetail({ orderId, onChanged }) {
       >
         {dialog === "process" && (
           <div className="space-y-2 text-sm">
+            {/* Own delivery first and preselected (owner 2026-11-05): Shiprocket is an option, kept for bulk. */}
             <div role="radiogroup" aria-label="Courier" className="space-y-1">
               <label className="flex items-center gap-2">
                 <input
                   type="radio"
                   name="courier"
-                  checked={courier === "shiprocket"}
-                  onChange={() => setCourier("shiprocket")}
+                  checked={courier === "self"}
+                  onChange={() => setCourier("self")}
                 />
-                Shiprocket
+                Self delivery
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -824,10 +825,10 @@ export default function OrderDetail({ orderId, onChanged }) {
                 <input
                   type="radio"
                   name="courier"
-                  checked={courier === "self"}
-                  onChange={() => setCourier("self")}
+                  checked={courier === "shiprocket"}
+                  onChange={() => setCourier("shiprocket")}
                 />
-                Self delivery
+                Shiprocket
               </label>
             </div>
           </div>
