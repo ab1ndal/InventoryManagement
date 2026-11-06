@@ -8,9 +8,6 @@ reference facts still needed.
 Nothing is broken or urgent. Newest changes are live but not all proven on real use.
 
 Owner:
-- [ ] Real test order (~10 min): cheap item, `+91` phone, then refund or cancel. Proves Pay, the Cashfree return, the
-      order page address with no `?t=` and refresh still working, the email link opening `/track` with the number
-      filled in, and `purchase` in Analytics Realtime with the right amount.
 - [ ] Admin check (~5 min) at `/admin/bills`: full-name customer search; wrong payment shows the red box; Final Amount
       over 30% off shows the warning. Do not confirm a real bill.
 - [ ] Send the shop questions as one WhatsApp batch (ask Claude to format them).
@@ -29,22 +26,24 @@ Claude, next:
 - [ ] Order emails: Gmail filed a real order's emails in Spam. PR #172 is live but unproven: both formats reached the Inbox on the one test account. Check placement on the next real orders. Own-domain sending is the lasting fix, not possible for now.
 - [ ] Shiprocket Brand Name set to Bindals Creation 2026-11-04: confirm on the next Shiprocket email.
 
-## ⏭ NEXT, HIGH PRIORITY: real-money payment test on production
+## PARKED by owner 2026-11-06 (do not start without the owner)
 
-Removes the biggest go-live risk without shipping anything. Owner at /admin/online-orders + phone for UPI (~10 min):
-1. Owner switches Online checkout ON.
-2. Claude places an order for a cheap item in Chrome; owner approves a small real UPI payment.
-3. Verify: order PAID via the production webhook, shop "new order" email + customer email arrive, payment in the
-   Cashfree production dashboard, `www.` domain accepted by Cashfree.js in production mode.
-4. Owner cancels in admin with refund to original; verify the refund on production (refund-sweeper completes the leg).
-5. Checkout OFF again (or stay on if all passed).
-Option: ship that order instead of cancelling (covers the test parcel too, minus the refund test).
+- Vercel "10 GB" warning: almost certainly Hobby Fast Origin Transfer, from `/images/*` passing every photo through
+  Vercel since 2026-11-04 (#139). Vercel can't cache them: Supabase adds `set-cookie: __cf_bm`. Fix A = make the
+  rewrite cacheable (rewrite-caching header + drop set-cookie, test on preview with GET, not HEAD) or a tiny image
+  proxy function; fix B = point images back at Supabase (zero Vercel use, loses Google Images: Storage sends
+  `x-robots-tag: none`). If the limit nears, do B at once. Cold Supabase misses take ~2 s per photo.
+- Manual tracking number added after "Picked up": send the customer an email? Carrier links: not now. Edit after
+  delivery: stays allowed.
+- Storage (~16 GB, Supabase Pro so within quota): `mockups-temp` 8.2 GB = 1,536 unreviewed batch mockups for 716
+  products with no photo (review, shrink to WebP, or drop and mark cards rejected); `mockups` 4.4 GB of archival PNGs
+  never served (copy off Supabase, delete, stop `upload_archival` in mockup-generator `publish.py`).
+- Old bill PDFs: new ones are JPEG since #189 (expect ~0.2 MB; confirm on the next saved bill). Regenerating the 386
+  stored 6 MB bills needs owner OK. Regenerate path leaves old `-v<timestamp>` files (17 orphans, 108 MB).
 
-**Progress 2026-10-30:** first real order WEB-000006 paid on production (₹110 = shipping; WEB500 zeroed the
-kurti). Webhook, paid status, shop + customer confirmation emails all worked. ₹110 settled to the bank account
-2026-10-31 21:03:05 IST (first production settlement, T+1; dashboard said "due 8 PM", landed ~1 h later). Shiprocket create failed (missing `billing_last_name` key) → fixed PRs #107/#109, deployed.
-Owner retries Process on 2026-10-31.
-Refund leg of this test not exercised (order is being shipped instead).
+Dropped 2026-11-05: real test orders. The first Shiprocket parcel (WEB-000006) was still in transit a week later in
+the same pincode, so the shop delivers by its own means (Self delivery preselected, #187; tracking number #188) and
+keeps Shiprocket for bulk.
 
 ## SEO / AEO (updated 2026-11-04)
 
