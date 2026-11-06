@@ -5,7 +5,6 @@ import FilterSidebar from "../components/shop/FilterSidebar";
 import FilterDrawer from "../components/shop/FilterDrawer";
 import ProductGrid from "../components/shop/ProductGrid";
 import SortControl from "../components/shop/SortControl";
-import CollectionIntro from "../components/shop/CollectionIntro";
 import Seo from "../components/Seo";
 import { SHOP_DESCRIPTION, SHOP_TITLE } from "../lib/seoText";
 
@@ -83,8 +82,6 @@ function LoadError({ message, onRetry }) {
 // `scopeProductIds`, which also get a "Featured" (list order) sort.
 export default function ShopPage({
   title = "Shop",
-  subtitle = "Handpicked with love, for every occasion.",
-  intro = null,
   seoTitle = SHOP_TITLE,
   seoDescription = SHOP_DESCRIPTION,
   scopeCategoryIds = null,
@@ -149,13 +146,11 @@ export default function ShopPage({
       <Seo title={seoTitle} description={seoDescription} />
       {/* Page header */}
       <div className="border-b border-storefront-border bg-storefront-cream">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          {/* Own line on a phone: beside the subtitle, a late font swap re-wrapped it and shifted the page. */}
-          <h1 className="basis-full sm:basis-auto font-display font-semibold text-3xl sm:text-4xl text-storefront-charcoal leading-none">
+        {/* Title only: the page's products say what it holds, and search engines read the meta description. */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+          <h1 className="font-display font-semibold text-3xl sm:text-4xl text-storefront-charcoal leading-none">
             {title}
           </h1>
-          <p className="font-sans text-sm text-storefront-muted">{subtitle}</p>
-          {intro && <CollectionIntro title={title} intro={intro} />}
         </div>
       </div>
 

@@ -17,7 +17,6 @@ Owner:
 - [ ] Later: one accountant session; name one complaints contact for the website.
 
 Waiting, nothing to do:
-- Google Business Profile website link, due by about the evening of 2026-11-05 US time.
 - Merchant Center review of the 25 test products (feed `?sample=25`). "Found by Google" is hidden on purpose. Do not
   turn on automatic image improvements.
 - First real courier lookup by `tracking-sweeper`, about 09:17 UTC on 2026-11-05.
@@ -64,13 +63,13 @@ return `x-robots-tag: all`, sitemap lists 1,028 photos, feed has 778 valid items
 - [ ] Add photos in batches and watch Search Console: "Crawled, not indexed" rising means slow down and improve the thinnest pages. Sitemap, feed and all-products pick up new products automatically.
 - [ ] Order snapshots still store `name`, so order pages and emails show the old title.
 - [x] Needs title list in admin: Inventory toggle, PR #173.
-- [ ] Collection intro text, plan step 2.5: layout is simple, buying advice must come from the owner.
+- [x] Collection intro text removed 2026-11-05 (owner: no page descriptors). Step 2.5 now waits for real buying advice from the owner.
 
 **Owner**
-- [ ] Decide delivery area (0.1). Blocks shipping markup, Merchant Center shipping settings, and national searches.
+- [x] Delivery area decided 2026-11-05: all India, no out-of-state warnings anywhere.
 - [ ] Google Ads account, for Keyword Planner volumes (2.1).
 - [ ] Create a Merchant Center account, then give it `https://www.bindalscreations.com/feeds/google-products.xml` (feed is live).
-- [ ] Watch the Business Profile account's inbox for Google's reply to the listing appeal (dead website link on Maps).
+- [x] Business Profile website link fixed: Google Search panel shows `http://www.bindalscreations.com/` (checked 2026-11-05), which 308s to `https://www.`.
 - [ ] Bing Webmaster Tools import from Search Console. Review QR counter card. Real shop and tailoring photos.
 
 Decided, 2026-11-04: home wording names women, men and kids. Owner considers it settled, do not reopen.

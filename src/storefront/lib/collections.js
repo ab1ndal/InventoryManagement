@@ -1,5 +1,3 @@
-import { COLLECTION_INTROS } from "./collectionIntros";
-
 // PLACEHOLDER collections — owner to curate slugs/titles/membership.
 // A collection resolves by explicit productIds when given, else by categoryIds,
 // and/or by variant sizes.
@@ -21,7 +19,7 @@ const DIWALI_PRODUCT_IDS = [
   "BC25018", "BC25779",
 ];
 
-const COLLECTION_LIST = [
+export const COLLECTIONS = [
   {
     slug: "diwali",
     title: "Diwali Glam",
@@ -79,11 +77,6 @@ const COLLECTION_LIST = [
     sizes: ["3XL|46", "4XL|48", "5XL|50", "6XL|52", "7XL|54", "8XL|56", "9XL|58", "10XL|60"],
   },
 ];
-
-// Intro text lives in its own file because it is long; a collection without one shows none.
-export const COLLECTIONS = COLLECTION_LIST.map((c) =>
-  COLLECTION_INTROS[c.slug] ? { ...c, intro: COLLECTION_INTROS[c.slug] } : c
-);
 
 export function getCollection(slug) {
   return COLLECTIONS.find((c) => c.slug === slug) || null;
