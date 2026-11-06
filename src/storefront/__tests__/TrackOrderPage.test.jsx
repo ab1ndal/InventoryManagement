@@ -165,4 +165,15 @@ describe("TrackOrderPage", () => {
     expect(screen.getByText("Delivering to Ghaziabad, 201001")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Silk Saree" })).toHaveAttribute("src", "https://img.test/a.webp");
   });
+
+  it("shows a manual delivery's carrier and tracking number from the lookup", async () => {
+    supabase.rpc.mockResolvedValue({
+      data: { ...DELIVERED, status: "shipped", courier: "self", courier_name: "India Post", tracking_number: "EE123456789IN" },
+      error: null,
+    });
+    renderPage();
+    submit("WEB-000007", "9810873280");
+    expect(await screen.findByText("Delivery by India Post")).toBeInTheDocument();
+    expect(screen.getByText("Tracking number: EE123456789IN")).toBeInTheDocument();
+  });
 });

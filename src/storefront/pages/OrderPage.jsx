@@ -196,6 +196,7 @@ export default function OrderPage() {
         status={order.status}
         fulfilment={order.fulfilment}
         courierName={order.courierName}
+        trackingNumber={order.trackingNumber}
         city={order.deliveryCity}
         pincode={order.deliveryPincode}
       />

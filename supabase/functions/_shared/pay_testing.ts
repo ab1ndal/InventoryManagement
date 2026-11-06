@@ -76,6 +76,7 @@ export function order(over: Partial<OrderRow> = {}): OrderRow {
     courier: null,
     courier_name: null,
     manual_tracking_url: null,
+    manual_tracking_number: null,
     leftover_voucher_id: null,
     problem: null,
     created_at: "2026-10-23T10:00:00Z",

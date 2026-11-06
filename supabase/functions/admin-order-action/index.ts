@@ -4,8 +4,9 @@
  *
  *   set_availability {orderId, itemId, availableQty}
  *   process          {orderId, opKey}            claim → prepare → Shiprocket steps → packed (ship orders only)
- *   manual_process   {orderId, courier}          Porter or self: paid ship order (shelf checked) → processed | cancelled
- *   manual_advance   {orderId, target}           manual order, forward only: packed | shipped (bill, email) | out_for_delivery
+ *   manual_process   {orderId, courier, carrier?, trackingNumber?}  Porter or self: paid ship order (shelf checked) → processed | cancelled
+ *   manual_advance   {orderId, target, carrier?, trackingNumber?}   manual order, forward only: packed | shipped (bill, email) | out_for_delivery
+ *   manual_tracking  {orderId, carrier?, trackingNumber?}  manual order: carrier name and its tracking number (empty clears)
  *   mark_ready       {orderId}                   store pickup: paid (shelf checked) → ready_for_pickup | cancelled
  *   mark_collected   {orderId}                   store pickup: ready_for_pickup → delivered
  *   cancel           {orderId, opKey, reason}    paid, ready_for_pickup (store pickup), or processed / packed (manual)
@@ -130,6 +131,31 @@ function textField(body: Record<string, unknown>, key: string): string {
   return v.trim();
 }
 
+// Same rules as online_order_set_manual_tracking. Checked here too, so a bad value fails before
+// Process or Picked up runs rather than after.
+const TRACKING_TEXT_MAX = 40;
+const CARRIER_RE = /^[A-Za-z0-9][A-Za-z0-9 .&'()\/-]*$/;
+const TRACKING_NUMBER_RE = /^[A-Za-z0-9][A-Za-z0-9 \/-]*$/;
+
+type ManualTracking = { carrier: string | null; trackingNumber: string | null };
+
+function trackingText(body: Record<string, unknown>, key: string, re: RegExp, allowed: string): string | null {
+  const v = optionalText(body[key], key);
+  if (v !== null && (v.length > TRACKING_TEXT_MAX || !re.test(v))) {
+    throw new BadRequest(`${key} must be up to ${TRACKING_TEXT_MAX} ${allowed}`);
+  }
+  return v;
+}
+
+/** null when the body names neither field: nothing to change. */
+function manualTracking(body: Record<string, unknown>): ManualTracking | null {
+  if (body.carrier === undefined && body.trackingNumber === undefined) return null;
+  return {
+    carrier: trackingText(body, "carrier", CARRIER_RE, "letters, digits, spaces or . & ' ( ) / -"),
+    trackingNumber: trackingText(body, "trackingNumber", TRACKING_NUMBER_RE, "letters, digits, spaces, / or -"),
+  };
+}
+
 export async function handler(req: Request, deps: Deps): Promise<Response> {
   const preflight = handlePreflight(req, deps.allowedOrigins);
   if (preflight) return preflight;
@@ -152,6 +178,14 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
     const action = body.action;
     const orderBody = async (orderId: string, extra: Record<string, unknown> = {}) =>
       json(200, { ok: true, order: await deps.db.getOrderWithReturns(orderId), ...extra }, cors);
+    // Empty clears: the carrier back to the default name, the number to none.
+    const setTracking = (orderId: string, t: ManualTracking) =>
+      deps.db.rpc("online_order_set_manual_tracking", {
+        p_order_id: orderId,
+        p_actor: user.id,
+        p_carrier: t.carrier,
+        p_tracking_number: t.trackingNumber,
+      });
 
     const orderIdOfReturn = async (returnId: string) => {
       const id = await deps.db.getReturnOrderId(returnId);
@@ -194,14 +228,32 @@ export async function handler(req: Request, deps: Deps): Promise<Response> {
         // One transaction in Postgres (the delivery is arranged outside our system), so no op key:
         // a repeat returns the stored result.
         const orderId = uuidField(body, "orderId");
-        const r = await runManualProcess(ship, orderId, user.id, enumField(body, "courier", MANUAL_COURIERS));
+        const courier = enumField(body, "courier", MANUAL_COURIERS);
+        const tracking = manualTracking(body);
+        const r = await runManualProcess(ship, orderId, user.id, courier);
+        // An order cancelled for want of stock has nothing to track.
+        if (tracking && (tracking.carrier || tracking.trackingNumber) && r.status !== "cancelled") {
+          await setTracking(orderId, tracking);
+        }
         return await orderBody(orderId, r.refundId ? { refundId: r.refundId } : {});
       }
 
       case "manual_advance": {
         const orderId = uuidField(body, "orderId");
-        const r = await runManualAdvance(ship, orderId, user.id, enumField(body, "target", MANUAL_STAGES));
+        const target = enumField(body, "target", MANUAL_STAGES);
+        const tracking = manualTracking(body);
+        // Before the advance: crossing into shipped queues the email that shows the number.
+        if (tracking) await setTracking(orderId, tracking);
+        const r = await runManualAdvance(ship, orderId, user.id, target);
         return await orderBody(orderId, r.billId ? { billId: r.billId } : {});
+      }
+
+      case "manual_tracking": {
+        const orderId = uuidField(body, "orderId");
+        const tracking = manualTracking(body);
+        if (!tracking) throw new BadRequest("carrier or trackingNumber is required");
+        await setTracking(orderId, tracking);
+        return await orderBody(orderId);
       }
 
       case "mark_ready": {

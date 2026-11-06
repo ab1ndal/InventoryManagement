@@ -1,5 +1,6 @@
 import {
   STATUS_LABELS,
+  canSetTracking,
   deliveryLabel,
   hasOpenReturn,
   isOutsideUp,
@@ -16,6 +17,7 @@ import {
   returnableUnits,
   timelineRows,
   toISTInputValue,
+  typedCarrier,
   windowLabel,
 } from "../orderHelpers";
 
@@ -103,6 +105,36 @@ test("describeEvent: manual stage events read as words", () => {
   expect(describeEvent({ kind: "processed", data: {} }).label).toBe("Processed");
   expect(describeEvent({ kind: "out_for_delivery", data: {} }).label).toBe("Out for delivery");
   expect(describeEvent({ kind: "x", from_status: "paid", to_status: "processed", data: {} }).status).toBe("Processed");
+});
+
+test("describeEvent: a saved tracking number shows the carrier and number, or that it was removed", () => {
+  const saved = (data) => describeEvent({ kind: "tracking_set", from_status: "shipped", to_status: "shipped", data });
+  expect(saved({ carrier: "India Post", tracking_number: "EE1" })).toEqual({
+    label: "Tracking number saved",
+    detail: "India Post, EE1",
+    status: "",
+  });
+  expect(saved({ carrier: "Bindal's Creation", tracking_number: null }).detail).toBe("Bindal's Creation, no tracking number");
+});
+
+test("canSetTracking: manual orders from processed to delivered", () => {
+  for (const status of ["processed", "packed", "shipped", "out_for_delivery", "delivered"]) {
+    expect(canSetTracking({ courier: "self", status })).toBe(true);
+    expect(canSetTracking({ courier: "porter", status })).toBe(true);
+  }
+  for (const status of ["paid", "processing", "cancelling", "cancelled"]) {
+    expect(canSetTracking({ courier: "self", status })).toBe(false);
+  }
+  expect(canSetTracking({ courier: "shiprocket", status: "shipped" })).toBe(false);
+  expect(canSetTracking({ courier: null, status: "shipped" })).toBe(false);
+});
+
+test("typedCarrier: blank while the order has its default courier name", () => {
+  expect(typedCarrier({ courier: "self", courier_name: "Bindal's Creation" })).toBe("");
+  expect(typedCarrier({ courier: "porter", courier_name: "Porter" })).toBe("");
+  expect(typedCarrier({ courier: "self", courier_name: "India Post" })).toBe("India Post");
+  expect(typedCarrier({ courier: "porter", courier_name: "DTDC" })).toBe("DTDC");
+  expect(typedCarrier({ courier: null, courier_name: null })).toBe("");
 });
 
 // WEB-000006 (2026-10-30): raw kinds and same-status arrows, with nine identical retries.

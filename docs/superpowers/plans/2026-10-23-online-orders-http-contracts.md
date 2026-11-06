@@ -66,12 +66,12 @@ Errors: 403 `checkout_off`; 409 `price_changed` (re-quote); 409 `out_of_stock`; 
 
 ### POST `order-status`
 Req: `{ orderRef, accessToken }` (or no token with a signed-in owner's JWT)
-Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"processed"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", courier: "shiprocket"|"porter"|"self"|null, courierName: string|null, statusTimes: { [status]: iso }|null, deliveryCity: string|null, deliveryPincode: string|null, items: [{ name, size, color, qty, status, imageUrl: string|null }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
-(`courier: null` = the default Shiprocket flow. `trackingUrl`: the Shiprocket link when there is an AWB; for a Porter order the link staff pasted, or null.)
+Res 200: `{ orderRef, status: "pending_payment"|"paid"|"processing"|"processed"|"cancelling"|"packed"|"shipped"|"out_for_delivery"|"delivered"|"payment_failed"|"expired"|"cancelled"|"rto"|"rto_received"|"ready_for_pickup", fulfilment: "ship"|"pickup", courier: "shiprocket"|"porter"|"self"|null, courierName: string|null, trackingNumber: string|null, statusTimes: { [status]: iso }|null, deliveryCity: string|null, deliveryPincode: string|null, items: [{ name, size, color, qty, status, imageUrl: string|null }], totals: { subtotal, promoDiscount, shipping, voucherApplied, creditApplied, gatewayAmount }, trackingUrl: string|null, leftoverVoucher: { code, value }|null }`
+(`courier: null` = the default Shiprocket flow. `trackingUrl`: the Shiprocket link when there is an AWB; for a Porter order the link staff pasted, or null. `trackingNumber`: the carrier tracking number staff typed on a manual delivery, or null; `courierName` is then the carrier they named.)
 404 for unknown ref or bad token (identical).
 
 ### RPC `online_order_lookup` (anon, for /track)
-`supabase.rpc("online_order_lookup", { p_order_ref, p_phone })` → same shape as order-status `Res` but snake_case from SQL, or `null`. UI normalises. (`courier`, `tracking_url`, `courier_name`, `status_times`, `delivery_city`, `delivery_pincode`, `items[].image_url` as above.)
+`supabase.rpc("online_order_lookup", { p_order_ref, p_phone })` → same shape as order-status `Res` but snake_case from SQL, or `null`. UI normalises. (`courier`, `tracking_url`, `courier_name`, `tracking_number`, `status_times`, `delivery_city`, `delivery_pincode`, `items[].image_url` as above.)
 
 ### RPC `my_online_orders` (authenticated, for /account/orders) → array of order summaries (see migration).
 
@@ -96,6 +96,14 @@ Req: `{ action: "set_availability", orderId, itemId, availableQty }`
      // any admin, manual order only. Forward only: a repeat or a step back changes nothing (200). A later step
      // completes the earlier ones; crossing into shipped does shipped_qty, Bill of Supply (billId) and the shipped
      // email once. Any other target → 400; Shiprocket, pickup, cancelled or cancelling order → 409 bad_state.
+   | `{ action: "manual_tracking", orderId, carrier?, trackingNumber? }`
+     // any admin, manual order in processed..delivered: the carrier (e.g. India Post; orders.courier_name) and its
+     // tracking number (orders.manual_tracking_number), shown to the customer. Trimmed; empty clears (carrier back to
+     // Porter / Bindal's Creation). Each up to 40 chars: carrier letters, digits, spaces, . & ' ( ) / -; number
+     // letters, digits, spaces, / -. Bad value → 400; neither field → 400; other order or status → 409 bad_state.
+     // manual_process and manual_advance take the same two optional fields: process saves them after processing
+     // (skipped when blank or the order was cancelled), advance saves them before advancing, so the shipped email
+     // sent on crossing into shipped carries the number.
    | `{ action: "mark_ready", orderId }`               // pickup: paid (shelf checked) → ready_for_pickup (billId) or cancelled (nothing available; refundId)
    | `{ action: "mark_collected", orderId }`           // pickup: ready_for_pickup → delivered (delivered_at = now)
    | `{ action: "cancel", orderId, opKey, reason }`    // paid, ready_for_pickup, or processed / packed on a manual order

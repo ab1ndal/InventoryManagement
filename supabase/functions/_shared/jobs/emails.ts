@@ -41,6 +41,7 @@ export async function loadEmailOrder(store: Store, orderId: string): Promise<Ema
     awb: o.awb,
     courier: o.courier,
     courierName: o.courier_name,
+    trackingNumber: o.manual_tracking_number,
     leftoverVoucher: o.leftover_voucher_id && leftoverValue !== null
       ? { code: o.leftover_voucher_id, value: leftoverValue }
       : null,

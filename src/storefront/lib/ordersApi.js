@@ -121,6 +121,7 @@ export function normalizeOrder(row) {
     courier: row.courier ?? null,
     courierName: row.courier_name ?? null,
     awb: row.awb ?? null,
+    trackingNumber: row.tracking_number ?? null,
     statusTimes: row.status_times ?? null,
     deliveryCity: row.delivery_city ?? null,
     deliveryPincode: row.delivery_pincode ?? null,

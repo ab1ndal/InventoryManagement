@@ -76,6 +76,8 @@ export type OrderRow = {
   /** null = the default Shiprocket flow; "porter" or "self" once processed by hand. */
   courier: "shiprocket" | ManualCourier | null;
   manual_tracking_url: string | null;
+  /** Typed by staff on a manual delivery (India Post, DTDC...); never a Shiprocket AWB. */
+  manual_tracking_number: string | null;
   contact_name: string;
   contact_phone: string;
   contact_email: string | null;

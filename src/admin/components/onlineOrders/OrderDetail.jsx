@@ -18,6 +18,7 @@ import ReturnsSection from "./ReturnsSection";
 import { useBillPdf } from "../billing/useBillPdf";
 import { openBillPdf } from "../billing/billPdf";
 import {
+  canSetTracking,
   formatDateTime,
   formatRupees,
   isManualCourier,
@@ -27,6 +28,7 @@ import {
   ceilToMinute,
   timelineRows,
   toISTInputValue,
+  typedCarrier,
 } from "./orderHelpers";
 
 const BUSY_MESSAGE = "Another staff member is working on this order";
@@ -83,6 +85,42 @@ function CollapsibleSection({ title, summary, open = false, children }) {
   );
 }
 
+const EMPTY_TRACKING = { carrier: "", trackingNumber: "" };
+// The server allows 40 characters for each (admin-order-action, online_order_set_manual_tracking).
+const TRACKING_TEXT_MAX = 40;
+
+// Optional on a manual delivery: often the number exists only once the parcel is handed over.
+function TrackingFields({ value, onChange }) {
+  const inputClass = "h-9 w-full rounded-md border border-input bg-white px-2";
+  return (
+    <div className="grid gap-2 text-sm sm:grid-cols-2">
+      <label className="block">
+        <span className="mb-1 block font-medium">Carrier (optional)</span>
+        <input
+          type="text"
+          className={inputClass}
+          value={value.carrier}
+          maxLength={TRACKING_TEXT_MAX}
+          placeholder="e.g. India Post, DTDC"
+          onChange={(e) => onChange({ ...value, carrier: e.target.value })}
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block font-medium">Tracking number (optional)</span>
+        <input
+          type="text"
+          className={inputClass}
+          value={value.trackingNumber}
+          maxLength={TRACKING_TEXT_MAX}
+          autoComplete="off"
+          placeholder="e.g. EE123456789IN"
+          onChange={(e) => onChange({ ...value, trackingNumber: e.target.value })}
+        />
+      </label>
+    </div>
+  );
+}
+
 function addressText(a, fulfilment) {
   if (!a) return "";
   // A pickup order's address holds only the contact the customer gave at checkout.
@@ -100,7 +138,7 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [avail, setAvail] = useState({});
   const [checked, setChecked] = useState(() => new Set());
   const [savingLine, setSavingLine] = useState(null);
-  const [dialog, setDialog] = useState(null); // 'process' | 'ready' | 'collected' | 'cancel' | 'rto' | 'sendback' | 'rebook' | 'release' | 'delivered' | 'advance'
+  const [dialog, setDialog] = useState(null); // 'process' | 'ready' | 'collected' | 'cancel' | 'rto' | 'sendback' | 'rebook' | 'release' | 'delivered' | 'advance' | 'tracking'
   const [pending, setPending] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [courierError, setCourierError] = useState(null);
@@ -113,6 +151,8 @@ export default function OrderDetail({ orderId, onChanged }) {
   const [courier, setCourier] = useState("self");
   // Manual step waiting on its confirmation (dialog 'advance').
   const [advanceStep, setAdvanceStep] = useState(null);
+  // Carrier and tracking number typed in the Process, Picked up or tracking dialog of a manual delivery.
+  const [trackingInput, setTrackingInput] = useState(EMPTY_TRACKING);
   // Courier cancel failure inside a send-back/rebook dialog; the dialog stays open so the
   // same op key can be resumed (retry, or superadmin manual-cancel confirmation).
   const [dialogProblem, setDialogProblem] = useState(null);
@@ -200,6 +240,7 @@ export default function OrderDetail({ orderId, onChanged }) {
     setAdvanceStep(null);
     setDialogProblem(null);
     setDeliveredError(null);
+    setTrackingInput(EMPTY_TRACKING);
     opRef.current = null;
   };
 
@@ -361,14 +402,24 @@ export default function OrderDetail({ orderId, onChanged }) {
           ...extra,
         };
   const shipUnits = items.reduce((s, it) => s + (avail[it.id] ?? 0), 0);
+  // Sent only when changed: a paid order has neither yet, so Process sends whatever was typed.
+  const savedTracking = { carrier: typedCarrier(order), trackingNumber: order.manual_tracking_number ?? "" };
+  const typedTracking = { carrier: trackingInput.carrier.trim(), trackingNumber: trackingInput.trackingNumber.trim() };
+  const trackingChanged =
+    typedTracking.carrier !== savedTracking.carrier || typedTracking.trackingNumber !== savedTracking.trackingNumber;
+  const trackingPayload = trackingChanged ? typedTracking : {};
+  const openTracking = () => {
+    setTrackingInput(savedTracking);
+    setDialog("tracking");
+  };
 
   const openDelivered = () => {
     setDeliveredAt(toISTInputValue(new Date()));
     setDialog("delivered");
   };
-  const advance = (step) =>
+  const advance = (step, extra = {}) =>
     run(
-      { action: "manual_advance", orderId, target: step.key },
+      { action: "manual_advance", orderId, target: step.key, ...extra },
       `Order marked ${step.label.toLowerCase()}`
     );
   const onManualStep = (step) => {
@@ -376,6 +427,7 @@ export default function OrderDetail({ orderId, onChanged }) {
       openDelivered();
     } else if (step.key === "shipped" || (step.key === "out_for_delivery" && order.status !== "shipped")) {
       setAdvanceStep(step);
+      setTrackingInput(savedTracking);
       setDialog("advance");
     } else {
       advance(step);
@@ -447,6 +499,11 @@ export default function OrderDetail({ orderId, onChanged }) {
             {step.label}
           </Button>
         ))}
+        {canSetTracking(order) && (
+          <Button variant="outline" disabled={pending} onClick={openTracking}>
+            {order.manual_tracking_number ? "Edit tracking number" : "Add tracking number"}
+          </Button>
+        )}
         {(isPaid || isReadyForPickup || (isManual && ["processed", "packed"].includes(order.status))) && (
           <Button variant="destructive" disabled={pending} onClick={() => setDialog("cancel")}>
             Cancel order
@@ -632,6 +689,7 @@ export default function OrderDetail({ orderId, onChanged }) {
         >
           <ul className="space-y-1">
             {order.courier_name && <li>Courier: {order.courier_name}</li>}
+            {order.manual_tracking_number && <li>Tracking number: {order.manual_tracking_number}</li>}
             {order.awb && (
               <li>
                 AWB:{" "}
@@ -790,7 +848,7 @@ export default function OrderDetail({ orderId, onChanged }) {
               )
             : manualChosen
               ? run(
-                  { action: "manual_process", orderId, courier },
+                  { action: "manual_process", orderId, courier, ...trackingPayload },
                   preview.allUnavailable ? "Order cancelled and refunded" : "Order processed"
                 )
               : run(
@@ -831,6 +889,9 @@ export default function OrderDetail({ orderId, onChanged }) {
                 Shiprocket
               </label>
             </div>
+            {manualChosen && !preview.allUnavailable && (
+              <TrackingFields value={trackingInput} onChange={setTrackingInput} />
+            )}
           </div>
         )}
         {preview.lines.length > 0 ? (
@@ -863,8 +924,23 @@ export default function OrderDetail({ orderId, onChanged }) {
         confirmLabel={advanceStep?.label}
         pending={pending}
         onClose={closeDialog}
-        onConfirm={() => advance(advanceStep)}
-      />
+        onConfirm={() => advance(advanceStep, trackingPayload)}
+      >
+        <TrackingFields value={trackingInput} onChange={setTrackingInput} />
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={dialog === "tracking"}
+        title={`Tracking number for ${order.order_ref}`}
+        description="The customer sees the carrier and tracking number on our website. Leave both empty to remove them."
+        confirmLabel="Save"
+        confirmDisabled={!trackingChanged}
+        pending={pending}
+        onClose={closeDialog}
+        onConfirm={() => run({ action: "manual_tracking", orderId, ...typedTracking }, "Tracking number saved")}
+      >
+        <TrackingFields value={trackingInput} onChange={setTrackingInput} />
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={dialog === "collected"}

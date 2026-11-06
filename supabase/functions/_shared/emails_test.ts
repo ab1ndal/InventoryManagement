@@ -30,6 +30,7 @@ const o: EmailOrder = {
   awb: null,
   courier: null,
   courierName: null,
+  trackingNumber: null,
   leftoverVoucher: null,
 };
 
@@ -96,6 +97,15 @@ Deno.test("shipped: self delivery names no courier", () => {
   assertStringIncludes(m.text, "Your order WEB-000042 is on its way.");
   assertEquals(m.text.includes("Bindal's Creation"), false);
   assertStringIncludes(m.text, `${SITE}/track`);
+});
+
+Deno.test("shipped: a manual delivery names the carrier staff typed and its tracking number", () => {
+  const m = shipped({ ...o, courier: "self", courierName: "India Post", trackingNumber: "EE123456789IN" }, SITE);
+  assertStringIncludes(m.text, "Your order WEB-000042 is on its way with India Post.");
+  assertStringIncludes(m.text, "Tracking number: EE123456789IN\nFollow it at");
+  assert(!/AWB|Track it here|shiprocket/.test(m.text), "a manual number is not a Shiprocket AWB");
+  const porter = shipped({ ...o, courier: "porter", courierName: "Porter", trackingNumber: null }, SITE);
+  assertEquals(porter.text.includes("Tracking number"), false);
 });
 
 const pickup: EmailOrder = { ...o, fulfilment: "pickup", shipping: 0, address: { name: "Asha Gupta", phone: "+919876543210" } };

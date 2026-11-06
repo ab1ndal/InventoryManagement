@@ -31,6 +31,7 @@ export function fakeOrder(over: Partial<OrderRow> = {}): OrderRow {
     fulfilment: "ship",
     courier: null,
     manual_tracking_url: null,
+    manual_tracking_number: null,
     contact_name: "Asha Verma",
     contact_phone: "+919876543210",
     contact_email: "asha@example.com",
@@ -463,6 +464,15 @@ export class FakeDb implements OrdersDb {
         if (from < 2 && to >= 2) o.bill_id = this.billId;
         o.status = args.p_target as string;
         return { status: o.status, bill_id: o.bill_id, changed: true } as T;
+      }
+      case "online_order_set_manual_tracking": {
+        if (!isManualCourier(o.courier)) throw raised(fn, `set_manual_tracking: order ${o.order_ref} is not a manual delivery`);
+        if (!["processed", "packed", "shipped", "out_for_delivery", "delivered"].includes(o.status)) {
+          throw raised(fn, `set_manual_tracking: order ${o.order_ref} cannot take a tracking number in status ${o.status}`);
+        }
+        const name = (args.p_carrier as string | null) ?? (o.courier === "porter" ? "Porter" : "Bindal's Creation");
+        Object.assign(o, { courier_name: name, manual_tracking_number: args.p_tracking_number });
+        return { changed: true, courier_name: name, tracking_number: o.manual_tracking_number } as T;
       }
       case "online_order_mark_collected":
         if (o.status !== "ready_for_pickup") throw raised(fn, `mark_collected: order must be ready for pickup`);

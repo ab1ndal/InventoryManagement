@@ -42,6 +42,19 @@ it("hides courier and destination on a cancelled order", () => {
   expect(container).toBeEmptyDOMElement();
 });
 
+it("shows the carrier and tracking number the shop typed on a manual delivery", () => {
+  render(<OrderDelivery {...SHIP} courierName="India Post" trackingNumber="EE123456789IN" />);
+  expect(screen.getByText("Delivery by India Post")).toBeInTheDocument();
+  expect(screen.getByText("Tracking number: EE123456789IN")).toBeInTheDocument();
+});
+
+it("shows no tracking line without a number, and none on a cancelled order", () => {
+  const { rerender, container } = render(<OrderDelivery {...SHIP} />);
+  expect(screen.queryByText(/Tracking number/)).not.toBeInTheDocument();
+  rerender(<OrderDelivery {...SHIP} status="cancelled" trackingNumber="EE1" />);
+  expect(container).toBeEmptyDOMElement();
+});
+
 it.each(["rto", "rto_received"])("keeps the courier but drops the destination at %s", (status) => {
   render(<OrderDelivery {...SHIP} status={status} />);
   expect(screen.getByText("Delivery by Amazon Shipping Surface")).toBeInTheDocument();

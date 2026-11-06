@@ -28,6 +28,7 @@ Deno.test("order-status: valid token → contract shape", async () => {
     fulfilment: "ship",
     courier: null,
     courierName: null,
+    trackingNumber: null,
     statusTimes: null,
     deliveryCity: null,
     deliveryPincode: null,
@@ -57,6 +58,17 @@ Deno.test("order-status: Porter order → its manual link (or none), never a Shi
   const b = await setup(porter);
   const k = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), b.deps)).json();
   assertEquals([k.courier, k.trackingUrl], ["porter", null]);
+});
+
+Deno.test("order-status: a manual delivery shows the carrier and tracking number staff typed", async () => {
+  const { deps } = await setup({
+    status: "shipped",
+    courier: "self",
+    courier_name: "India Post",
+    manual_tracking_number: "EE123456789IN",
+  });
+  const j = await (await handler(post(URL_, { orderRef: "WEB-000001", accessToken: TOKEN }), deps)).json();
+  assertEquals([j.courier, j.courierName, j.trackingNumber, j.trackingUrl], ["self", "India Post", "EE123456789IN", null]);
 });
 
 Deno.test("order-status: tracking details come from the shared SQL helper, keyed by line", async () => {

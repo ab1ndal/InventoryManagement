@@ -97,6 +97,21 @@ export function manualNextSteps(status) {
   return start === undefined ? [] : MANUAL_STEPS.slice(start);
 }
 
+// courier_name of a manual order until staff name a carrier (online_order_manual_process).
+const MANUAL_COURIER_NAMES = { porter: "Porter", self: "Bindal's Creation" };
+
+// Statuses in which online_order_set_manual_tracking accepts a carrier and tracking number.
+const TRACKING_STATUSES = ["processed", "packed", "shipped", "out_for_delivery", "delivered"];
+
+export function canSetTracking(o) {
+  return isManualCourier(o.courier) && TRACKING_STATUSES.includes(o.status);
+}
+
+// The carrier staff typed, or "" while the order still has its default courier name.
+export function typedCarrier(o) {
+  return o.courier_name && o.courier_name !== MANUAL_COURIER_NAMES[o.courier] ? o.courier_name : "";
+}
+
 export function hasProblem(o, jobs = []) {
   return Boolean(
     o.problem || o.process_error || o.status === "rto" || jobs.some((j) => j.status === "failed")
@@ -301,6 +316,7 @@ const EVENT_LABELS = {
   courier_cancelled: "Courier booking cancelled",
   courier_problem: "Courier problem",
   tracking_held: "Tracking update held",
+  tracking_set: "Tracking number saved",
   rebooked: "Courier rebooked",
   sent_back: "Sent back",
   rto_received: "Returned parcel received",
@@ -361,6 +377,7 @@ export function describeEvent(e) {
     if (e.kind === "paid" && d.amount != null) detail = formatRupees(d.amount);
     else if (e.kind === "availability" && d.of != null) detail = `${d.available_qty} of ${d.of} on shelf`;
     else if (e.kind === "job_failed") detail = [JOB_LABELS[d.kind] || humanize(d.kind), d.error].filter(Boolean).join(": ");
+    else if (e.kind === "tracking_set") detail = [d.carrier, d.tracking_number || "no tracking number"].filter(Boolean).join(", ");
     else if (d.error) detail = d.error;
   }
   const status =

@@ -195,6 +195,19 @@ it("shows step times, courier, destination and photo from the order-status respo
   expect(screen.getByRole("img", { name: "Silk Saree" })).toHaveAttribute("src", "https://img.test/a.webp");
 });
 
+it("shows a manual delivery's carrier and tracking number", async () => {
+  mockOrderStatus.mockReset();
+  mockOrderStatus.mockResolvedValue(order("shipped", {
+    fulfilment: "ship",
+    courier: "self",
+    courierName: "India Post",
+    trackingNumber: "EE123456789IN",
+  }));
+  renderAt("/order/WEB-000001?t=tok");
+  expect(await screen.findByText("Delivery by India Post")).toBeInTheDocument();
+  expect(screen.getByText("Tracking number: EE123456789IN")).toBeInTheDocument();
+});
+
 it("still renders an order from a handler that has no tracking fields yet", async () => {
   mockOrderStatus.mockReset();
   mockOrderStatus.mockResolvedValue(order("shipped"));
