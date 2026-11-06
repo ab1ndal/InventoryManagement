@@ -5,7 +5,7 @@
 // (internal route) or `href` (external URL). Add a discount message only once
 // the owner confirms real terms.
 export const PROMO_MESSAGES = [
-  { text: "Free shipping on orders above ₹5,000" },
+  { text: "Delivery across India · free above ₹5,000" },
   { text: "Diwali Glam is live — shop festive picks", to: "/collections/diwali" },
   { text: "Seen a look you love? We'll make it for you", to: "/customize" },
   { text: "Plus sizes up to 6XL — hard to find, stocked here" },

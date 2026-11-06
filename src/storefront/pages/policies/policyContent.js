@@ -9,7 +9,7 @@ export const SHIPPING = [
   {
     heading: "Dispatch & delivery",
     body: [
-      "We dispatch orders within 2 working days.",
+      "We deliver across India and dispatch orders within 2 working days.",
       "Delivery typically takes 5–7 days after dispatch.",
     ],
   },
