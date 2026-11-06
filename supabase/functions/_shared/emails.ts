@@ -4,8 +4,6 @@
  * shop is a composition dealer (Bill of Supply).
  */
 
-import { UP_STATE } from "./pincode.ts";
-
 export type EmailItem = { name: string; size: string | null; color: string | null; qty: number; status: string };
 
 export type EmailOrder = {
@@ -72,11 +70,6 @@ function addressLines(a: Record<string, unknown>): string[] {
   ].filter((x): x is string => !!x);
 }
 
-// Out-of-UP orders are accepted but fulfilled case by case (owner 2026-10-30).
-function inUp(a: Record<string, unknown>): boolean {
-  return typeof a.state === "string" && a.state.trim().toLowerCase() === UP_STATE.toLowerCase();
-}
-
 /**
  * Says who is writing and why they are writing. Our emails come from a free Gmail address, and
  * Gmail has filed them as spam, so each one names the shop, its address and the reason for the email.
@@ -105,9 +98,7 @@ function orderLinkLine(orderRef: string, siteUrl: string): string {
 export function orderConfirmed(o: EmailOrder, siteUrl: string): Email {
   const next = o.fulfilment === "pickup"
     ? `You chose store pickup at ${SHOP_ADDRESS}. We'll email you when your order is ready to collect (usually 1–2 days).`
-    : `${
-      inUp(o.address) ? "" : "We'll confirm delivery to your address on WhatsApp before dispatch. "
-    }We'll email you again when your parcel ships.`;
+    : "We'll email you again when your parcel ships.";
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",

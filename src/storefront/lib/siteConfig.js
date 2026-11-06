@@ -5,7 +5,10 @@
 // (internal route) or `href` (external URL). Add a discount message only once
 // the owner confirms real terms.
 export const PROMO_MESSAGES = [
-  { text: "Free shipping on orders above ₹5,000" },
+  // Owner 2026-11-05: GET500 = flat ₹500, subtotal ₹2,000+, typed at checkout (not auto-applied),
+  // ends 2026-11-30 in the discounts table. Remove this line when the code ends.
+  { text: "₹500 off orders above ₹2,000 · use code GET500" },
+  { text: "Delivery across India · free above ₹5,000" },
   { text: "Diwali Glam is live — shop festive picks", to: "/collections/diwali" },
   { text: "Seen a look you love? We'll make it for you", to: "/customize" },
   { text: "Plus sizes up to 6XL — hard to find, stocked here" },

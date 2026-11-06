@@ -33,7 +33,7 @@ const o: EmailOrder = {
   leftoverVoucher: null,
 };
 
-Deno.test("orderConfirmed: items, order total, ref, link and the UP line", () => {
+Deno.test("orderConfirmed: items, order total, ref, link, same wording in every state", () => {
   const m = orderConfirmed(o, SITE);
   assertEquals(m.subject, "Bindals Creation: order WEB-000042 confirmed");
   assertStringIncludes(m.text, "Hi Asha,");
@@ -45,7 +45,8 @@ Deno.test("orderConfirmed: items, order total, ref, link and the UP line", () =>
   assert(!m.text.includes("confirm delivery"), "no doubt about delivery inside UP");
   assert(!m.text.includes("We deliver within"), "the email names no delivery area");
   const out = orderConfirmed({ ...o, address: { ...o.address, state: "Maharashtra", pincode: "400001" } }, SITE);
-  assertStringIncludes(out.text, "We'll confirm delivery to your address on WhatsApp before dispatch.");
+  assertStringIncludes(out.text, "We'll email you again when your parcel ships.");
+  assert(!out.text.includes("confirm delivery"), "owner 2026-11-05: no delivery doubt outside UP");
   assert(!out.text.includes("Uttar Pradesh"), "no UP promise outside UP");
   assertStringIncludes(m.text, `${SITE}/track?order=WEB-000042`);
   assert(!m.text.includes("/order/"), "no tokenless order-page link");

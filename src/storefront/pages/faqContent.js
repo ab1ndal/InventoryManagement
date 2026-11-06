@@ -4,7 +4,7 @@
 export const FAQ_ITEMS = [
   {
     q: "How long does delivery take?",
-    a: "We dispatch within 2 working days. Delivery typically takes 5–7 days after dispatch.",
+    a: "We deliver across India and dispatch within 2 working days. Delivery typically takes 5–7 days after dispatch.",
   },
   {
     q: "What payment methods do you accept?",
