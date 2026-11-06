@@ -108,17 +108,18 @@ describe("StorefrontHeader promo line", () => {
     renderHeader();
     act(() => jest.advanceTimersByTime(4000));
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[1].text);
-    expect(within(promo()).getByRole("link", { name: PROMO_MESSAGES[1].text })).toHaveAttribute(
+    act(() => jest.advanceTimersByTime(4000));
+    expect(within(promo()).getByRole("link", { name: PROMO_MESSAGES[2].text })).toHaveAttribute(
       "href",
       "/collections/diwali"
     );
     act(() => jest.advanceTimersByTime(4000));
-    expect(within(promo()).getByRole("link", { name: PROMO_MESSAGES[2].text })).toHaveAttribute(
+    expect(within(promo()).getByRole("link", { name: PROMO_MESSAGES[3].text })).toHaveAttribute(
       "href",
       "/customize"
     );
     act(() => jest.advanceTimersByTime(4000));
-    expect(promo()).toHaveTextContent(PROMO_MESSAGES[3].text);
+    expect(promo()).toHaveTextContent(PROMO_MESSAGES[4].text);
     act(() => jest.advanceTimersByTime(4000));
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[0].text);
   });
@@ -145,7 +146,10 @@ describe("StorefrontHeader promo line", () => {
     expect(promo()).toHaveTextContent(PROMO_MESSAGES[0].text);
   });
 
-  it("never advertises a discount", () => {
-    PROMO_MESSAGES.forEach(({ text }) => expect(text).not.toMatch(/%|off\b|discount/i));
+  it("advertises a discount only with its code and minimum order", () => {
+    PROMO_MESSAGES.filter(({ text }) => /%|off\b|discount/i.test(text)).forEach(({ text }) => {
+      expect(text).toMatch(/code [A-Z0-9]+/);
+      expect(text).toMatch(/above ₹[\d,]+/);
+    });
   });
 });
