@@ -23,6 +23,14 @@ import {
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+function emptyText(term, queue, counts) {
+  if (term) return "No orders match this search.";
+  if (queue !== DEFAULT_QUEUE) return "No orders here.";
+  const inProgress = counts?.in_progress ?? 0;
+  if (inProgress === 0) return "Nothing needs you right now.";
+  return `Nothing needs you right now. ${inProgress} ${inProgress === 1 ? "order is" : "orders are"} in progress.`;
+}
+
 export function StatusBadge({ status, fulfilment }) {
   return (
     <span
@@ -135,6 +143,8 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   // Clearing the box returns to the queue at once; only typing waits.
   useEffect(() => {
@@ -150,6 +160,7 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(null);
     (term ? searchOrders(term) : listOrders(queue))
       .then((rows) => {
         if (!cancelled) setOrders(rows);
@@ -157,7 +168,7 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
       .catch((err) => {
         if (!cancelled) {
           setOrders([]);
-          toast.error("Could not load orders", { description: err.message });
+          setLoadError(err.message);
         }
       })
       .finally(() => {
@@ -166,7 +177,7 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
     return () => {
       cancelled = true;
     };
-  }, [queue, term, refreshKey]);
+  }, [queue, term, refreshKey, retryKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,9 +242,21 @@ export default function OrderList({ selectedId, onSelect, refreshKey }) {
             ))}
           </ul>
         )}
-        {orders.length === 0 && (
+        {orders.length === 0 && !loading && loadError && (
+          <div role="alert" className="space-y-2 px-3 py-6 text-center text-sm text-red-700">
+            <p>Could not load orders: {loadError}</p>
+            <button
+              type="button"
+              onClick={() => setRetryKey((k) => k + 1)}
+              className="rounded border border-red-300 px-3 py-1 font-medium hover:bg-red-50"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+        {orders.length === 0 && (loading || !loadError) && (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            {loading ? "Loading orders…" : "No orders here."}
+            {loading ? "Loading orders…" : emptyText(term, queue, counts)}
           </p>
         )}
       </div>
