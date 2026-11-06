@@ -132,6 +132,8 @@ export type OrderRow = {
   fulfilment: "ship" | "pickup";
   courier: "shiprocket" | "porter" | "self" | null;
   manual_tracking_url: string | null;
+  /** Typed by staff on a manual delivery (India Post, DTDC...); never a Shiprocket AWB. */
+  manual_tracking_number: string | null;
   customerid: number | null;
   auth_user_id: string | null;
   contact_name: string;
@@ -199,7 +201,7 @@ export type Store = {
 
 const ORDER_COLUMNS = "id, order_ref, attempt_key, status, fulfilment, customerid, auth_user_id, contact_name, " +
   "contact_phone, contact_email, address, subtotal, promo_discount, shipping, voucher_applied, credit_applied, gateway_amount, " +
-  "cf_order_id, cf_payment_id, awb, courier, courier_name, manual_tracking_url, leftover_voucher_id, problem, " +
+  "cf_order_id, cf_payment_id, awb, courier, courier_name, manual_tracking_url, manual_tracking_number, leftover_voucher_id, problem, " +
   "created_at";
 
 const MONEY_KEYS = ["subtotal", "promo_discount", "shipping", "voucher_applied", "credit_applied", "gateway_amount"] as const;

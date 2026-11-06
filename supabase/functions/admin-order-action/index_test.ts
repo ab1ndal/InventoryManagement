@@ -883,6 +883,99 @@ Deno.test("manual_advance: bad target → 400 before any DB call; Shiprocket or 
   assertEquals((await setup({ ...PROCESSED, status: "cancelled" }).call(advance)).body.code, "bad_state");
 });
 
+// ---------- manual tracking number ----------
+
+const TRACK = { action: "manual_tracking", orderId: ORDER_ID, carrier: " India Post ", trackingNumber: " EE123456789IN " };
+
+Deno.test("manual_tracking → RPC with trimmed values; order returned with the carrier and number", async () => {
+  const { db, sr, call } = setup({ ...PROCESSED, status: "shipped" });
+  const r = await call(TRACK);
+  assertEquals(r.status, 200);
+  assertEquals(db.calls[0], {
+    fn: "online_order_set_manual_tracking",
+    args: { p_order_id: ORDER_ID, p_actor: ADMIN, p_carrier: "India Post", p_tracking_number: "EE123456789IN" },
+  });
+  assertEquals([r.body.order.courier_name, r.body.order.manual_tracking_number], ["India Post", "EE123456789IN"]);
+  assertEquals(sr.methods(), []);
+});
+
+Deno.test("manual_tracking: empty values clear; neither field → 400", async () => {
+  const { db, call } = setup({ ...PROCESSED, courier_name: "DTDC", manual_tracking_number: "D1" });
+  const r = await call({ ...TRACK, carrier: "", trackingNumber: "  " });
+  assertEquals(r.status, 200);
+  assertEquals(db.calls[0].args, { p_order_id: ORDER_ID, p_actor: ADMIN, p_carrier: null, p_tracking_number: null });
+  assertEquals([r.body.order.courier_name, r.body.order.manual_tracking_number], ["Bindal's Creation", null]);
+  const none = setup(PROCESSED);
+  const n = await none.call({ action: "manual_tracking", orderId: ORDER_ID });
+  assertEquals([n.status, n.body.code], [400, "invalid_request"]);
+  assertEquals(none.db.calls, []);
+});
+
+Deno.test("manual_tracking: unsafe or long values → 400 before any DB call", async () => {
+  const bad = [
+    { trackingNumber: "EE1;drop" },
+    { trackingNumber: "<b>1</b>" },
+    { trackingNumber: "9".repeat(41) },
+    { trackingNumber: "-1" },
+    { trackingNumber: 123 },
+    { carrier: "<script>" },
+    { carrier: "a".repeat(41) },
+    { carrier: ["India Post"] },
+  ];
+  for (const over of bad) {
+    const { db, call } = setup(PROCESSED);
+    const r = await call({ ...TRACK, ...over });
+    assertEquals([r.status, r.body.code], [400, "invalid_request"], JSON.stringify(over));
+    assertEquals(db.calls, []);
+  }
+  const ok = setup(PROCESSED);
+  const r = await ok.call({ ...TRACK, carrier: "Shree Maruti (B&D) Co. / Ltd-1", trackingNumber: "9".repeat(40) });
+  assertEquals(r.status, 200);
+});
+
+Deno.test("manual_tracking: Shiprocket or cancelled order → 409 bad_state", async () => {
+  assertEquals((await setup({ status: "packed", awb: "AWB1" }).call(TRACK)).body.code, "bad_state");
+  assertEquals((await setup({ ...PROCESSED, status: "cancelled" }).call(TRACK)).body.code, "bad_state");
+});
+
+Deno.test("manual_process with a carrier and number: processed first, then the number is saved", async () => {
+  const { db, call } = setup();
+  const r = await call({ ...MANUAL, courier: "self", carrier: "India Post", trackingNumber: "EE1" });
+  assertEquals(r.status, 200);
+  assertEquals(db.fns(), ["online_order_manual_process", "online_order_set_manual_tracking"]);
+  assertEquals([r.body.order.status, r.body.order.courier_name, r.body.order.manual_tracking_number], [
+    "processed",
+    "India Post",
+    "EE1",
+  ]);
+});
+
+Deno.test("manual_process: blank tracking fields or a cancelled order → no tracking call; bad number → 400 first", async () => {
+  const blank = setup();
+  await blank.call({ ...MANUAL, carrier: "", trackingNumber: "" });
+  assertEquals(blank.db.fns(), ["online_order_manual_process"]);
+  const cancelled = setup({}, { shippable_items: [], all_unavailable: true, refund_id: "refund-unavailable" });
+  const c = await cancelled.call({ ...MANUAL, trackingNumber: "EE1" });
+  assertEquals([c.status, c.body.order.status], [200, "cancelled"]);
+  assertEquals(cancelled.db.fns(), ["online_order_manual_process"]);
+  const bad = setup();
+  const b = await bad.call({ ...MANUAL, trackingNumber: "EE1;" });
+  assertEquals([b.status, b.body.code], [400, "invalid_request"]);
+  assertEquals(bad.db.calls, []);
+  assertEquals(bad.sr.methods(), []);
+});
+
+Deno.test("manual_advance with a number: saved before the advance that queues the shipped email", async () => {
+  const { db, call } = setup(PROCESSED);
+  const r = await call({ action: "manual_advance", orderId: ORDER_ID, target: "shipped", trackingNumber: "EE1" });
+  assertEquals(r.status, 200);
+  assertEquals(db.fns(), ["online_order_set_manual_tracking", "online_order_manual_advance"]);
+  assertEquals([r.body.order.status, r.body.order.manual_tracking_number, r.body.billId], ["shipped", "EE1", 9001]);
+  const plain = setup(PROCESSED);
+  await plain.call({ action: "manual_advance", orderId: ORDER_ID, target: "packed" });
+  assertEquals(plain.db.fns(), ["online_order_manual_advance"]);
+});
+
 Deno.test("cancel: a manual order at processed or packed cancels, without a second Shiprocket cancel", async () => {
   for (const status of ["processed", "packed"]) {
     const { db, sr, call } = setup({ ...PROCESSED, status, sr_order_id: "111" });

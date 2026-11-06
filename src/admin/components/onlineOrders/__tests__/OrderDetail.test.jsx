@@ -731,7 +731,11 @@ describe("manual delivery", () => {
     expect(within(dialog).getByRole("radio", { name: "Self delivery" })).toBeChecked();
     expect(within(dialog).getByRole("radio", { name: "Porter (manual)" })).not.toBeChecked();
     expect(within(dialog).getByRole("radio", { name: "Shiprocket" })).not.toBeChecked();
-    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    // A manual courier asks only for the optional carrier and tracking number, no link.
+    expect(within(dialog).getAllByRole("textbox").map((t) => t.closest("label").textContent)).toEqual([
+      "Carrier (optional)",
+      "Tracking number (optional)",
+    ]);
     fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
     expect(dialog).toHaveTextContent("1 unit will be booked with the courier");
   });
@@ -857,6 +861,111 @@ describe("manual delivery", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Out for delivery" }));
     await waitFor(() => expect(mockActions).toHaveLength(1));
     expect(mockActions[0]).toEqual({ action: "manual_advance", orderId: "o1", target: "out_for_delivery" });
+  });
+
+  const carrierBox = (dialog) => within(dialog).getByRole("textbox", { name: "Carrier (optional)" });
+  const numberBox = (dialog) => within(dialog).getByRole("textbox", { name: "Tracking number (optional)" });
+
+  test("manual Process takes an optional carrier and tracking number, trimmed", async () => {
+    mockDetail = detail({ items: checkedItems() });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Self delivery" }));
+    fireEvent.change(carrierBox(dialog), { target: { value: " India Post " } });
+    fireEvent.change(numberBox(dialog), { target: { value: "EE123456789IN " } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Process" }));
+    await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order processed"]));
+    expect(mockActions).toEqual([
+      { action: "manual_process", orderId: "o1", courier: "self", carrier: "India Post", trackingNumber: "EE123456789IN" },
+    ]);
+  });
+
+  test("no tracking fields for Shiprocket", async () => {
+    mockDetail = detail({ items: checkedItems() });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  test("no tracking fields when nothing is available", async () => {
+    mockDetail = detail({ items: [item({ id: "i1", line_no: 1, product_name: "Kurta", paid_value: 1200, available_qty: 0 })] });
+    const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Self delivery" }));
+    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  test("Picked up can add the number, prefilled from what is saved; unchanged sends nothing extra", async () => {
+    mockDetail = manual("packed", "self", { courier_name: "DTDC", manual_tracking_number: "D1" });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    fireEvent.click(screen.getByRole("button", { name: "Picked up" }));
+    let dialog = await screen.findByRole("dialog");
+    expect(carrierBox(dialog)).toHaveValue("DTDC");
+    expect(numberBox(dialog)).toHaveValue("D1");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Picked up" }));
+    await waitFor(() => expect(mockActions).toHaveLength(1));
+    expect(mockActions[0]).toEqual({ action: "manual_advance", orderId: "o1", target: "shipped" });
+  });
+
+  test("Picked up with a new number sends it with the advance", async () => {
+    await openAt("processed", "porter");
+    fireEvent.click(screen.getByRole("button", { name: "Picked up" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(carrierBox(dialog)).toHaveValue("");
+    fireEvent.change(numberBox(dialog), { target: { value: "CRN 12/34" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Picked up" }));
+    await waitFor(() => expect(mockActions).toHaveLength(1));
+    expect(mockActions[0]).toEqual({
+      action: "manual_advance",
+      orderId: "o1",
+      target: "shipped",
+      carrier: "",
+      trackingNumber: "CRN 12/34",
+    });
+  });
+
+  test.each(["processed", "packed", "shipped", "out_for_delivery", "delivered"])(
+    "%s: Add tracking number saves carrier and number",
+    async (status) => {
+      await openAt(status, "self");
+      fireEvent.click(screen.getByRole("button", { name: "Add tracking number" }));
+      const dialog = await screen.findByRole("dialog");
+      const save = within(dialog).getByRole("button", { name: "Save" });
+      expect(save).toBeDisabled();
+      fireEvent.change(carrierBox(dialog), { target: { value: "India Post" } });
+      fireEvent.change(numberBox(dialog), { target: { value: "EE1" } });
+      fireEvent.click(save);
+      await waitFor(() => expect(mockToasts).toContainEqual(["success", "Tracking number saved"]));
+      expect(mockActions).toEqual([{ action: "manual_tracking", orderId: "o1", carrier: "India Post", trackingNumber: "EE1" }]);
+    }
+  );
+
+  test("Edit tracking number can clear both", async () => {
+    mockDetail = manual("shipped", "self", { courier_name: "India Post", manual_tracking_number: "EE1" });
+    render(<OrderDetail orderId="o1" />);
+    await screen.findByText("Kurta");
+    expect(screen.getByText("Tracking number: EE1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit tracking number" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(carrierBox(dialog), { target: { value: "" } });
+    fireEvent.change(numberBox(dialog), { target: { value: "" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mockActions).toHaveLength(1));
+    expect(mockActions[0]).toEqual({ action: "manual_tracking", orderId: "o1", carrier: "", trackingNumber: "" });
+  });
+
+  test("no tracking button on a paid, cancelled, Shiprocket or pickup order", async () => {
+    for (const order of [
+      { status: "paid" },
+      { status: "cancelled", courier: "self", courier_name: "Bindal's Creation" },
+      { status: "packed", courier: "shiprocket", awb: "AWB1" },
+      { status: "ready_for_pickup", fulfilment: "pickup" },
+    ]) {
+      mockDetail = detail({ order: { fulfilment: "ship", ...order } });
+      const { unmount } = render(<OrderDetail orderId="o1" />);
+      await screen.findByText("Kurta");
+      expect(screen.queryByRole("button", { name: /tracking number/ })).not.toBeInTheDocument();
+      unmount();
+    }
   });
 
   test("backing out of the confirmation sends nothing", async () => {

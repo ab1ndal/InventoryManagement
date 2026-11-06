@@ -23,6 +23,8 @@ export type EmailOrder = {
   awb: string | null;
   courier: "shiprocket" | "porter" | "self" | null;
   courierName: string | null;
+  /** A manual delivery's carrier tracking number, typed by staff (never a Shiprocket AWB). */
+  trackingNumber: string | null;
   leftoverVoucher: { code: string; value: number } | null;
 };
 
@@ -35,6 +37,9 @@ const SHOP_WEBSITE = `www.${SHOP_DOMAIN}`;
 
 const inr = (n: number) =>
   "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: n % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 });
+
+/** courier_name of a self delivery until staff name a carrier (online_order_manual_process). */
+const SHOP_COURIER_NAME = "Bindal's Creation";
 
 export const trackingUrl = (awb: string) => `https://shiprocket.co/tracking/${encodeURIComponent(awb)}`;
 
@@ -143,19 +148,23 @@ export function shopNewOrder(o: EmailOrder, siteUrl: string): Email {
 
 /**
  * A Shiprocket shipment needs its AWB. A manual delivery has none, and no tracker in another
- * app: the shopper follows the stages staff set, on /track.
+ * app: the shopper follows the stages staff set, on /track, plus the carrier's tracking number
+ * when staff typed one before the parcel was picked up.
  */
 export function shipped(o: EmailOrder, siteUrl: string): Email {
   const manual = o.courier === "porter" || o.courier === "self";
   let tracking: string[];
   if (manual) {
-    tracking = [`Follow it at ${siteUrl}/track with your order number and phone number.`];
+    tracking = [
+      ...(o.trackingNumber ? [`Tracking number: ${o.trackingNumber}`] : []),
+      `Follow it at ${siteUrl}/track with your order number and phone number.`,
+    ];
   } else {
     if (!o.awb) throw new Error(`order ${o.orderRef} has no AWB yet`);
     tracking = [`Tracking number (AWB): ${o.awb}`, `Track it here: ${trackingUrl(o.awb)}`];
   }
-  // courierName on a self delivery is the shop itself: "with Bindal's Creation" reads wrong.
-  const withCourier = o.courierName && o.courier !== "self" ? ` with ${o.courierName}` : "";
+  // A self delivery's default courier name is the shop itself: "with Bindal's Creation" reads wrong.
+  const withCourier = o.courierName && o.courierName !== SHOP_COURIER_NAME ? ` with ${o.courierName}` : "";
   const text = [
     `Hi ${firstName(o.contactName)},`,
     "",

@@ -52,6 +52,7 @@ export default function TrackOrderPage() {
             status={result.order.status}
             fulfilment={result.order.fulfilment}
             courierName={result.order.courierName}
+            trackingNumber={result.order.trackingNumber}
             city={result.order.deliveryCity}
             pincode={result.order.deliveryPincode}
           />

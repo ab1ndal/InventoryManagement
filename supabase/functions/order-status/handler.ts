@@ -32,6 +32,8 @@ export type OrderStatusResponse = {
   fulfilment: "ship" | "pickup";
   courier: "shiprocket" | "porter" | "self" | null;
   courierName: string | null;
+  /** A manual delivery's carrier tracking number, typed by staff; null for Shiprocket (see trackingUrl). */
+  trackingNumber: string | null;
   statusTimes: Record<string, string> | null;
   deliveryCity: string | null;
   deliveryPincode: string | null;
@@ -114,6 +116,7 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
       fulfilment: order.fulfilment,
       courier: order.courier,
       courierName: order.courier_name,
+      trackingNumber: order.manual_tracking_number,
       statusTimes: tracking?.status_times ?? null,
       deliveryCity: tracking?.delivery_city ?? null,
       deliveryPincode: tracking?.delivery_pincode ?? null,

@@ -15,9 +15,10 @@ function ReviewPrompt() {
   );
 }
 
-// Who carries a ship order and the city it is going to. City and pincode only: /track
-// asks for just an order number and a phone number.
-export default function OrderDelivery({ status, fulfilment, courierName, city, pincode }) {
+// Who carries a ship order, its tracking number when the shop typed one (a manual delivery handed
+// to India Post and the like), and the city it is going to. City and pincode only: /track asks for
+// just an order number and a phone number.
+export default function OrderDelivery({ status, fulfilment, courierName, trackingNumber, city, pincode }) {
   const delivered = status === "delivered";
   if (fulfilment === "pickup") {
     return delivered ? (
@@ -29,10 +30,12 @@ export default function OrderDelivery({ status, fulfilment, courierName, city, p
   if (completedStep(status, fulfilment) < 0) return null;
   const courier = status === "cancelled" ? null : courierDisplayName(courierName);
   const place = NOT_ON_ITS_WAY.includes(status) ? "" : [city, pincode].filter(Boolean).join(", ");
-  if (!courier && !place && !delivered) return null;
+  const tracking = status === "cancelled" ? null : trackingNumber;
+  if (!courier && !tracking && !place && !delivered) return null;
   return (
     <div className="font-sans text-sm text-storefront-charcoal space-y-1">
       {courier && <p>Delivery by {courier}</p>}
+      {tracking && <p>Tracking number: {tracking}</p>}
       {place && <p>{delivered ? "Delivered to" : "Delivering to"} {place}</p>}
       {delivered && <ReviewPrompt />}
     </div>

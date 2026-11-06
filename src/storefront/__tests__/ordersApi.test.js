@@ -124,6 +124,20 @@ test("lookupOrder: a response from before the migration gives nulls", async () =
   supabase.rpc.mockResolvedValue({ data: { order_ref: "WEB-000001", status: "paid", items: [{ name: "Kurti", qty: 1 }] }, error: null });
   const order = await lookupOrder("WEB-000001", "9810873280");
   expect([order.statusTimes, order.deliveryCity, order.deliveryPincode, order.items[0].imageUrl]).toEqual([null, null, null, null]);
+  expect(order.trackingNumber).toBeNull();
+});
+
+it("keeps a manual delivery's carrier and tracking number", async () => {
+  supabase.rpc.mockResolvedValue({
+    data: { ...ROW, courier: "self", courier_name: "India Post", awb: null, tracking_url: null, tracking_number: "EE123456789IN" },
+    error: null,
+  });
+  await expect(lookupOrder("WEB-000001", "9810873280")).resolves.toMatchObject({
+    courier: "self",
+    courierName: "India Post",
+    trackingNumber: "EE123456789IN",
+    trackingUrl: null,
+  });
 });
 
 it("lists my orders newest first, unwrapping setof jsonb rows", async () => {
