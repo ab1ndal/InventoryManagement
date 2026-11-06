@@ -177,6 +177,7 @@ test("confirm dialog lists the unavailable unit and its paid value when 1 of 2 i
   expect(dialog).toHaveTextContent("1 × Dupatta (M / Red) — ₹800.00");
   expect(within(dialog).getByTestId("refund-total")).toHaveTextContent("₹800.00");
   expect(dialog).not.toHaveTextContent("Kurta");
+  fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
   expect(dialog).toHaveTextContent("1 unit will be booked");
 
   fireEvent.click(within(dialog).getByRole("button", { name: "Process" }));
@@ -209,6 +210,7 @@ test("409 busy shows the other-staff message and a retry of the click reuses the
   await screen.findByText("Kurta");
   fireEvent.click(processButton());
   const dialog = await screen.findByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Process" }));
   await waitFor(() =>
     expect(mockToasts).toContainEqual(["error", "Another staff member is working on this order", undefined])
@@ -236,7 +238,9 @@ test("502 courier_error shows the error and a Retry button", async () => {
   await screen.findByText("Kurta");
   expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   fireEvent.click(processButton());
-  fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Process" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Process" }));
   expect(await screen.findByRole("button", { name: "Retry" })).toBeInTheDocument();
   expect(mockToasts).toContainEqual(["error", "Courier error", "AWB assignment failed"]);
   expect(screen.getByText("Process error: AWB assignment failed")).toBeInTheDocument();
@@ -716,13 +720,19 @@ describe("manual delivery", () => {
     await screen.findByText("Kurta");
   };
 
-  test("Process offers Shiprocket, Porter and Self delivery, with no link field", async () => {
+  test("Process offers Self delivery (preselected), Porter and Shiprocket, with no link field", async () => {
     mockDetail = detail({ items: checkedItems() });
     const dialog = await openProcess();
-    expect(within(dialog).getByRole("radio", { name: "Shiprocket" })).toBeChecked();
+    expect(within(dialog).getAllByRole("radio").map((r) => r.closest("label").textContent)).toEqual([
+      "Self delivery",
+      "Porter (manual)",
+      "Shiprocket",
+    ]);
+    expect(within(dialog).getByRole("radio", { name: "Self delivery" })).toBeChecked();
     expect(within(dialog).getByRole("radio", { name: "Porter (manual)" })).not.toBeChecked();
-    expect(within(dialog).getByRole("radio", { name: "Self delivery" })).not.toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: "Shiprocket" })).not.toBeChecked();
     expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
     expect(dialog).toHaveTextContent("1 unit will be booked with the courier");
   });
 
@@ -764,19 +774,20 @@ describe("manual delivery", () => {
   test("Shiprocket still sends process with an op key", async () => {
     mockDetail = detail({ items: checkedItems() });
     const dialog = await openProcess();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Process" }));
     await waitFor(() => expect(mockToasts).toContainEqual(["success", "Order processed"]));
     expect(mockActions).toEqual([{ action: "process", orderId: "o1", opKey: "key-1" }]);
   });
 
-  test("closing the dialog resets the choice to Shiprocket", async () => {
+  test("closing the dialog resets the choice to Self delivery", async () => {
     mockDetail = detail({ items: checkedItems() });
     const dialog = await openProcess();
-    fireEvent.click(within(dialog).getByRole("radio", { name: "Porter (manual)" }));
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Shiprocket" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Back" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     fireEvent.click(processButton());
-    expect(within(await screen.findByRole("dialog")).getByRole("radio", { name: "Shiprocket" })).toBeChecked();
+    expect(within(await screen.findByRole("dialog")).getByRole("radio", { name: "Self delivery" })).toBeChecked();
   });
 
   test.each([
