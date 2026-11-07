@@ -1,0 +1,39 @@
+name: IndexNow
+
+# Daily: tell Bing and other IndexNow engines which pages appeared or disappeared since yesterday.
+# The previous sitemap list lives in the Actions cache; with none, every page is sent once.
+on:
+  schedule:
+    - cron: "30 2 * * *" # 08:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: indexnow
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test scripts/indexnow/indexnow.test.mjs
+      - name: Restore last sitemap list
+        uses: actions/cache/restore@v4
+        with:
+          path: .indexnow-state
+          key: indexnow-${{ github.run_id }}
+          restore-keys: indexnow-
+      - run: node scripts/indexnow/indexnow.mjs .indexnow-state
+      # Saved only after a successful run, so a failed day is retried from the same list.
+      - name: Save sitemap list
+        uses: actions/cache/save@v4
+        with:
+          path: .indexnow-state
+          key: indexnow-${{ github.run_id }}
