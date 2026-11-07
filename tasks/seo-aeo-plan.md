@@ -200,7 +200,7 @@ Google Maps listing as of 2026-11-03: 3.8 stars from 25 reviews. Its website lin
 
 Open, needs the owner:
 - 0.1 decided 2026-11-05: all India. 0.4 and 3.1 Find who manages the listing, then fix its website link and address.
-- 0.6 Bing Webmaster Tools. 3.2 Counter QR card (review link is live, PR #137). 3.4 Merchant Center account (feed is PR #141).
+- 0.6 Bing Webmaster Tools. 3.2 Counter QR card (review link is live, PR #137). 3.4 Merchant Center account 5899745962 set up 2026-11-05, 25-item test feed in review.
 
 Open, dev:
 - Request indexing for kurta-pajama, about, contact, all-products, after PR #138 is live.

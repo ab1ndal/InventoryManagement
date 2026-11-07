@@ -22,7 +22,7 @@ Claude, next:
 - [ ] Transactional bill save, step 1: new database step unused by any screen, proved locally and in a rolled-back
       production test. Plan is in the owner's private audit folder.
 - [ ] Confirm the tracking sweep's first real lookup worked.
-- [ ] Merchant Center: fix what Google flags, then point the source at the full feed (778 items). Held 2026-11-04: review still running, and AI image metadata (audit LEGAL-8) needs the owner's decision first.
+- [ ] Merchant Center: fix what Google flags, then point the source at the full feed (778 items). Held 2026-11-04: review still running. AI labels: owner decided none (2026-11-06).
 - [ ] Order emails: Gmail filed a real order's emails in Spam. PR #172 is live but unproven: both formats reached the Inbox on the one test account. Check placement on the next real orders. Own-domain sending is the lasting fix, not possible for now.
 - [ ] Shiprocket Brand Name set to Bindals Creation 2026-11-04: confirm on the next Shiprocket email.
 
@@ -70,7 +70,7 @@ return `x-robots-tag: all`, sitemap lists 1,028 photos, feed has 778 valid items
 **Owner**
 - [x] Delivery area decided 2026-11-05: all India, no out-of-state warnings anywhere.
 - [ ] Google Ads account, for Keyword Planner volumes (2.1).
-- [ ] Create a Merchant Center account, then give it `https://www.bindalscreations.com/feeds/google-products.xml` (feed is live).
+- [x] Merchant Center account 5899745962 set up 2026-11-05: test feed `?sample=25` under review, account shipping flat ₹250 under ₹5,000. Full feed after the review (see Claude, next).
 - [x] Business Profile website link fixed: Google Search panel shows `http://www.bindalscreations.com/` (checked 2026-11-05), which 308s to `https://www.`.
 - [ ] Bing Webmaster Tools import from Search Console. Review QR counter card. Real shop and tailoring photos.
 
