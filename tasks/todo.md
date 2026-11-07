@@ -58,7 +58,9 @@ return `x-robots-tag: all`, sitemap lists 1,028 photos, feed has 778 valid items
 - [x] Indexing requested 2026-11-04: kurta-pajama, about, contact, all-products. Search Console's page report was still dated 2026-10-22.
 - [ ] Saree titles LIVE 2026-11-04: all 89 unique, final list in `tasks/title-drafts/sarees.json`. Wait 4 weeks of Search Console data, then decide on other categories. Check recorded colours against photos first.
 - [ ] New photos will go live with shared titles such as "Silk Saree", because `title_detail` is empty until someone fills it. 731 visible products have none, and about 2,860 more have no photo yet. mockup-generator is getting `title_detail` drafting on branch `feat/title-detail` (started 2026-11-04).
-- [ ] Add a Kids collection and nav link when the first kids' photos go live. `collections.js` has none, so they would only appear under Shop All.
+- [x] Kids collection + header link LIVE 2026-11-06 (PR #191): all five C- categories, 5 kurta pajamas at launch; more join as photos are approved. Owner (Search Console): request indexing for `/collections/kids`.
+- [x] Shipping markup (plan 1.5) LIVE 2026-11-06 (PR #192): free delivery across India at ₹5,000+ only; below that is a courier quote, so no rate stated. Owner: Rich Results Test on /contact.
+- [ ] 1.9 field data: PageSpeed Insights API without a key hit its daily quota (2026-11-06). Read Core Web Vitals in Search Console instead, or add a key.
 - [ ] Add photos in batches and watch Search Console: "Crawled, not indexed" rising means slow down and improve the thinnest pages. Sitemap, feed and all-products pick up new products automatically.
 - [ ] Order snapshots still store `name`, so order pages and emails show the old title.
 - [x] Needs title list in admin: Inventory toggle, PR #173.
@@ -129,7 +131,7 @@ Untested against real services: payment on production keys (task above) and Proc
 - [ ] Fix BC25022's price in admin (₹0, hidden from the storefront until then).
 - [ ] Decide: product names back on cards? "Diwali Glam" name? sentence-case page titles? Inter body font?
 - [ ] First-order discount terms (amount + how to claim) before it goes on the promo line.
-- [ ] Curate Wedding / Festive collections (hidden until then); Kids pending photos.
+- [ ] Curate Wedding / Festive collections (hidden until then).
 - [ ] Optional: Diwali 50 swaps via `tasks/diwali-pick-sheet.html`.
 
 **Build later** (details in `tasks/site-review-2026-10-25.md`)
