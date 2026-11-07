@@ -14,7 +14,13 @@ const codeOf = (value) => {
   return parsed ? `+${parsed.countryCallingCode}` : null;
 };
 
-export default function PhoneField({ value, onChange, onBlur, name }) {
+export default function PhoneField({
+  value,
+  onChange,
+  onBlur,
+  name,
+  placeholder = "Phone (Optional)",
+}) {
   const text = value ?? "";
   const [code, setCode] = React.useState(
     () => (text.startsWith("+") && codeOf(text)) || DEFAULT_COUNTRY_CODE,
@@ -50,7 +56,7 @@ export default function PhoneField({ value, onChange, onBlur, name }) {
         name={name}
         className="flex-1"
         inputMode="tel"
-        placeholder="Phone (Optional)"
+        placeholder={placeholder}
         value={number}
         onChange={(e) => {
           const typed = e.target.value;
