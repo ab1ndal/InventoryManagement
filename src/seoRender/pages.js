@@ -46,7 +46,7 @@ const SIMILAR_CANDIDATES = 200;
 const SIMILAR_FIELDS = `${LIST_FIELDS},fabric,categoryid,productsizecolors(stock,color)`;
 
 // States only what /policies/returns says: 7 days from delivery, sent back at the customer's cost or
-// brought to the shop.
+// brought to the shop, item price refunded (store credit is the customer's option, not the rule).
 const RETURN_POLICY = {
   "@type": "MerchantReturnPolicy",
   applicableCountry: "IN",
@@ -54,6 +54,7 @@ const RETURN_POLICY = {
   merchantReturnDays: 7,
   returnMethod: ["https://schema.org/ReturnByMail", "https://schema.org/ReturnInStore"],
   returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+  refundType: "https://schema.org/FullRefund",
   merchantReturnLink: `${SITE_URL}/policies/returns`,
 };
 
