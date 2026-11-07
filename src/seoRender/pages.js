@@ -34,6 +34,7 @@ import {
 } from "../storefront/pages/allProductsContent";
 import { DELIVERY_ESTIMATE, RETURNS_BADGE } from "../storefront/lib/deliveryEstimate";
 import { compareSizes, formatSize } from "../storefront/lib/sizes";
+import { FREE_SHIPPING_THRESHOLD } from "../storefront/lib/freeShipping";
 import { categoryAudience } from "./audience";
 import { SITE_NAME, SITE_URL, esc } from "./html";
 
@@ -54,6 +55,21 @@ const RETURN_POLICY = {
   returnMethod: ["https://schema.org/ReturnByMail", "https://schema.org/ReturnInStore"],
   returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
   merchantReturnLink: `${SITE_URL}/policies/returns`,
+};
+
+// Only the free-delivery rule: below the threshold the fee is a live courier quote, so no fixed
+// rate can be stated (Google treats shippingRate as optional). The database's order check enforces
+// the same threshold.
+const SHIPPING_SERVICE = {
+  "@type": "ShippingService",
+  name: "Delivery across India",
+  fulfillmentType: "https://schema.org/FulfillmentTypeDelivery",
+  shippingConditions: {
+    "@type": "ShippingConditions",
+    shippingDestination: { "@type": "DefinedRegion", addressCountry: "IN" },
+    orderValue: { "@type": "MonetaryAmount", minValue: FREE_SHIPPING_THRESHOLD, currency: "INR" },
+    shippingRate: { "@type": "MonetaryAmount", value: 0, currency: "INR" },
+  },
 };
 
 const STORE_JSON_LD = {
@@ -86,6 +102,7 @@ const STORE_JSON_LD = {
   },
   sameAs: ["https://instagram.com/bindals_creation_shop", GOOGLE_MAPS_URL],
   hasMerchantReturnPolicy: RETURN_POLICY,
+  hasShippingService: SHIPPING_SERVICE,
 };
 
 const breadcrumbs = (...crumbs) => ({

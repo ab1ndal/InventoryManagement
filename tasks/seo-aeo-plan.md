@@ -189,7 +189,7 @@ Updated 2026-11-04. Rendering is live (PR #131). Open work and merge order: `tas
 Done:
 - 0.2 Sitemap submitted in Search Console: Success, 843 pages. 0.5 Bare domain is a permanent 308.
 - 1.1, 1.2, 1.3, 1.6, 1.8 live. 1.4 checked on one product with Google's live test: Product, Merchant listing and Breadcrumb valid.
-- 1.5 Return policy markup, from the policy text. Shipping markup still waits on 0.1.
+- 1.5 Return policy markup, from the policy text. Shipping markup added 2026-11-06 after 0.1 (all India): the store states free delivery at ₹5,000 and above only, because below that the fee is a live courier quote.
 - 1.7 `/all-products` lists every product in plain links, in the app and in server HTML, linked from every footer.
 - 1.9 Product page layout shift fixed. Field data still to be read in Search Console.
 - 10 pages sent to Google's priority queue: home, shop, customize, lehengas, suits, kurtis, gowns, men, sherwani, plus-size.
@@ -199,7 +199,7 @@ Baseline, 2026-11-03: 9 pages indexed, 4 not indexed, 14 web clicks over about 3
 Google Maps listing as of 2026-11-03: 3.8 stars from 25 reviews. Its website link is `http://wwwbindalscreations.com/`, missing a dot, and that domain does not resolve. The address reads "58, Sihani Gate, Richalpuri, Naya Ganj" against the site's "58 Sihani Gate Market, Near Durga Bhabhi Chowk". Listing not managed from the account that owns Search Console.
 
 Open, needs the owner:
-- 0.1 Delivery area. 0.4 and 3.1 Find who manages the listing, then fix its website link and address.
+- 0.1 decided 2026-11-05: all India. 0.4 and 3.1 Find who manages the listing, then fix its website link and address.
 - 0.6 Bing Webmaster Tools. 3.2 Counter QR card (review link is live, PR #137). 3.4 Merchant Center account (feed is PR #141).
 
 Open, dev:
