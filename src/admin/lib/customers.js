@@ -24,15 +24,18 @@ const blankToNull = (v) => {
   return s === "" ? null : s;
 };
 
+/** A bare 10-digit Indian mobile gets +91 (how 88% of stored phones look). */
+export const withIndiaCode = (cleaned) =>
+  /^\d{10}$/.test(cleaned) ? `+91${cleaned}` : cleaned;
+
 /**
- * Spaces removed; a bare 10-digit Indian mobile gets +91 (how 88% of stored
- * phones look). Returns null for empty input; throws if the result is not a
- * valid +<country><number>.
+ * Spaces removed, then withIndiaCode. Returns null for empty input; throws if
+ * the result is not a valid +<country><number>.
  */
 export function normalizePhone(raw) {
   const cleaned = blankToNull(raw)?.replace(/\s/g, "") ?? null;
   if (cleaned === null) return null;
-  const phone = /^\d{10}$/.test(cleaned) ? `+91${cleaned}` : cleaned;
+  const phone = withIndiaCode(cleaned);
   if (!PHONE_RE.test(phone)) {
     throw new CustomerInputError(
       `Invalid phone "${raw}": expected 10 digits or +<country code><number>`,

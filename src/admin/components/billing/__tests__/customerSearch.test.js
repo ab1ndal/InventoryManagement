@@ -1,4 +1,8 @@
-import { buildCustomerSearchFilter, cleanSearchTerm } from "../customerSearch";
+import {
+  buildCustomerSearchFilter,
+  cleanSearchTerm,
+  customerDraftFromSearch,
+} from "../customerSearch";
 
 describe("buildCustomerSearchFilter", () => {
   it("returns null for an empty search", () => {
@@ -32,5 +36,24 @@ describe("buildCustomerSearchFilter", () => {
 
   it("returns null when only unsafe characters were typed", () => {
     expect(buildCustomerSearchFilter(",()")).toBeNull();
+  });
+});
+
+describe("customerDraftFromSearch", () => {
+  it("is empty for an empty search", () => {
+    expect(customerDraftFromSearch("  ")).toEqual({});
+  });
+
+  it("puts a typed number in the phone", () => {
+    expect(customerDraftFromSearch(" 98100 00001 ")).toEqual({ phone: "+919810000001" });
+    expect(customerDraftFromSearch("+91 98100-00001")).toEqual({ phone: "+919810000001" });
+  });
+
+  it("splits a name into first name and the rest", () => {
+    expect(customerDraftFromSearch("Anita")).toEqual({ first_name: "Anita", last_name: "" });
+    expect(customerDraftFromSearch("Anita Devi Sharma")).toEqual({
+      first_name: "Anita",
+      last_name: "Devi Sharma",
+    });
   });
 });
