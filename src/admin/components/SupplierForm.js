@@ -7,7 +7,8 @@ import { supabase } from "../../lib/supabaseClient";
 import { toast } from "sonner";
 import { logActivity } from "../../lib/activityLog";
 import { diffFields } from "../../utility/activitySummary";
-import { formatLivePhoneInput } from "../../utility/formatPhone";
+import { withIndiaCode } from "../lib/customers";
+import PhoneField from "./PhoneField";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Textarea } from "../../components/ui/textarea";
@@ -34,7 +35,10 @@ const formSchema = z.object({
   phone: z
     .string()
     .optional()
-    .transform((v) => (v?.trim() === "" ? null : v?.replace(/\s/g, "") ?? null)),
+    .transform((v) => {
+      const cleaned = v?.replace(/\s/g, "");
+      return cleaned ? withIndiaCode(cleaned) : null;
+    }),
   additional_phones: z
     .array(z.object({ value: z.string() }))
     .optional()
@@ -245,12 +249,12 @@ export default function SupplierForm({
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(formatLivePhoneInput(e.target.value))
-                        }
-                        placeholder="+91XXXXXXXXXX"
+                      <PhoneField
+                        name={field.name}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        placeholder="Phone"
                       />
                     </FormControl>
                     <FormMessage />
@@ -266,11 +270,10 @@ export default function SupplierForm({
                     render={({ field }) => (
                       <FormItem className="flex-1">
                         <FormControl>
+                          {/* Free text, no +91: landlines carry an STD code. */}
                           <Input
                             {...field}
-                            onChange={(e) =>
-                              field.onChange(formatLivePhoneInput(e.target.value))
-                            }
+                            inputMode="tel"
                             placeholder="Landline / additional number"
                           />
                         </FormControl>
