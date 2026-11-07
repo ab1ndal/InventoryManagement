@@ -22,7 +22,7 @@ Claude, next:
 - [ ] Transactional bill save, step 1: new database step unused by any screen, proved locally and in a rolled-back
       production test. Plan is in the owner's private audit folder.
 - [ ] Confirm the tracking sweep's first real lookup worked.
-- [ ] PR #196 LIVE 2026-11-07: customer phone as +91 box + number box (no live reformat), "Add this customer" prefilled from the bill search. Owner to try on the next new customer. SupplierForm still has the old cursor-jumping phone box.
+- [ ] PR #196 LIVE 2026-11-07: customer phone as +91 box + number box (no live reformat), "Add this customer" prefilled from the bill search. Owner to try on the next new customer. Supplier form same field, PR #197 LIVE 2026-11-07 (extra numbers stay free text, no +91: landlines).
 - [ ] Merchant Center: fix what Google flags, then point the source at the full feed (778 items). Held 2026-11-04: review still running. AI labels: owner decided none (2026-11-06).
 - [ ] Order emails: Gmail filed a real order's emails in Spam. PR #172 is live but unproven: both formats reached the Inbox on the one test account. Check placement on the next real orders. Own-domain sending is the lasting fix, not possible for now.
 - [ ] Shiprocket Brand Name set to Bindals Creation 2026-11-04: confirm on the next Shiprocket email.
