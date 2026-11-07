@@ -14,7 +14,8 @@ import {
   FormControl,
   FormLabel,
 } from "../../components/ui/form";
-import { formatLivePhoneInput } from "../../utility/formatPhone";
+import { withIndiaCode } from "../lib/customers";
+import PhoneField from "./PhoneField";
 import { formatINR } from "../../utility/formatCurrency";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -45,7 +46,7 @@ const formSchema = z.object({
     .optional()
     .transform((v) => {
       const cleaned = v?.replace(/\s/g, "");
-      return cleaned === "" ? null : cleaned;
+      return cleaned ? withIndiaCode(cleaned) : null;
     })
     .refine(
       (v) => v === null || /^\+\d{10,15}$/.test(v),
@@ -356,12 +357,11 @@ export default function CustomerForm(props) {
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(formatLivePhoneInput(e.target.value))
-                        }
-                        placeholder="Phone (Optional, e.g. +91XXXXXXXXXX)"
+                      <PhoneField
+                        name={field.name}
+                        value={field.value}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
                       />
                     </FormControl>
                     <FormMessage />

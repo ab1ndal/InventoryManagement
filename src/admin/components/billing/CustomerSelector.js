@@ -3,7 +3,11 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "../../../components/ui/input";
 import CustomerForm from "../CustomerForm";
 import { supabase } from "../../../lib/supabaseClient";
-import { buildCustomerSearchFilter, CUSTOMER_SEARCH_LIMIT } from "./customerSearch";
+import {
+  buildCustomerSearchFilter,
+  customerDraftFromSearch,
+  CUSTOMER_SEARCH_LIMIT,
+} from "./customerSearch";
 
 const customerLabel = (c) =>
   `${`${c.first_name} ${c.last_name || ""}`.trim()} | ${c.phone || "No Phone"}`;
@@ -122,6 +126,8 @@ export default function CustomerSelector({
       <div ref={addCustomerRef}>
       <CustomerForm
         triggerLabel="Add Customer"
+        // A selected customer's label is not something to copy into a new one.
+        defaultValues={selectedCustomerId ? {} : customerDraftFromSearch(customerQuery)}
         onSubmit={(cust) => {
           setSelectedCustomerId(cust.customerid);
           setCustomerQuery(customerLabel(cust));
