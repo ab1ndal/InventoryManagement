@@ -28,6 +28,29 @@ test("an in-stock product has the fields Merchant Center needs", async () => {
   expect(xml).toContain("<g:color>Yellow</g:color>");
 });
 
+test("AI-drafted titles and descriptions go only in the structured attributes Google requires", async () => {
+  const ai = await buildFeed(rest([{ ...product, title_detail: "Red Border", description_source: "ai_reviewed" }]));
+  expect(ai).toContain(
+    "<g:structured_title><g:digital_source_type>trained_algorithmic_media</g:digital_source_type><g:content>Silk Saree</g:content></g:structured_title>"
+  );
+  expect(ai).toContain(
+    "<g:structured_description><g:digital_source_type>trained_algorithmic_media</g:digital_source_type><g:content>Yellow silk saree with a red border</g:content></g:structured_description>"
+  );
+  // Google uses the plain attribute whenever both are present.
+  expect(ai).not.toContain("<g:title>");
+  expect(ai).not.toContain("<g:description>");
+
+  const human = await buildFeed(rest([{ ...product, title_detail: null, description_source: "manual" }]));
+  expect(human).toContain("<g:title>Silk Saree</g:title>");
+  expect(human).toContain("<g:description>Yellow silk saree with a red border</g:description>");
+  expect(human).not.toContain("structured_");
+
+  // With no description the feed writes its own template text, which no AI drafted.
+  const empty = await buildFeed(rest([{ ...product, description: "", description_source: "ai" }]));
+  expect(empty).toContain("<g:description>");
+  expect(empty).not.toContain("structured_description");
+});
+
 test("colours use Google's separator, and a value that is not a colour states none", async () => {
   expect(feedColour("Yellow-Red-Green")).toBe("Yellow/Red/Green");
   expect(feedColour("Red and Yellow")).toBe("Red/Yellow");

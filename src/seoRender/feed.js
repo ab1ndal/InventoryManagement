@@ -10,7 +10,9 @@ export const CACHE_FEED = "public, max-age=0, s-maxage=3600, stale-while-revalid
 
 const PAGE = 1000;
 const FIELDS =
-  "productid,name:display_title,description,retailprice,categoryid,productimages(imageurl,displayorder),productsizecolors(stock,color,size)";
+  "productid,name:display_title,title_detail,description,description_source,retailprice,categoryid,productimages(imageurl,displayorder),productsizecolors(stock,color,size)";
+// description_source values for text an AI drafted, reviewed by a person or not (migration_description_source.sql).
+const AI_DESCRIPTION_SOURCES = new Set(["ai", "ai_reviewed"]);
 // Google's category "Apparel & Accessories > Clothing".
 const GOOGLE_CATEGORY_CLOTHING = 1604;
 // Merchant Center allows 10 extra photos per item.
@@ -40,6 +42,13 @@ export function feedColour(raw) {
 
 const tag = (name, value) => `<g:${name}>${esc(value)}</g:${name}>`;
 
+// Google requires AI-drafted text in the structured attribute, and uses the plain one whenever
+// both are sent, so AI text replaces the plain tag rather than joining it.
+const textTag = (name, value, aiDrafted) =>
+  aiDrafted
+    ? `<g:structured_${name}>${tag("digital_source_type", "trained_algorithmic_media")}${tag("content", value)}</g:structured_${name}>`
+    : tag(name, value);
+
 function feedItem(product) {
   const images = [...(product.productimages || [])]
     .sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0))
@@ -59,8 +68,11 @@ function feedItem(product) {
   return [
     "<item>",
     tag("id", product.productid),
-    tag("title", product.name),
-    tag("description", text || productMetaDescription({ name: product.name, text, price })),
+    // Every title_detail so far is an AI draft a person approved; nothing records a hand-typed one.
+    textTag("title", product.name, Boolean(product.title_detail)),
+    text
+      ? textTag("description", text, AI_DESCRIPTION_SOURCES.has(product.description_source))
+      : tag("description", productMetaDescription({ name: product.name, text, price })),
     tag("link", `${SITE_URL}/product/${encodeURIComponent(product.productid)}`),
     tag("image_link", images[0]),
     ...images.slice(1, MAX_EXTRA_IMAGES + 1).map((url) => tag("additional_image_link", url)),
