@@ -69,6 +69,7 @@ describe("describePage", () => {
     const policy = ld(page, "Product").offers.hasMerchantReturnPolicy;
     expect(policy.merchantReturnDays).toBe(7);
     expect(policy.returnFees).toBe("https://schema.org/ReturnFeesCustomerResponsibility");
+    expect(policy.refundType).toBe("https://schema.org/FullRefund");
     expect(policy.merchantReturnLink).toBe("https://www.bindalscreations.com/policies/returns");
     const contact = await describePage("contact", rest());
     expect(ld(contact, "ClothingStore").hasMerchantReturnPolicy).toEqual(policy);
