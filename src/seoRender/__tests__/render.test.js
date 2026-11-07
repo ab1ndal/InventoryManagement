@@ -74,6 +74,14 @@ describe("describePage", () => {
     expect(ld(contact, "ClothingStore").hasMerchantReturnPolicy).toEqual(policy);
   });
 
+  test("the store states free delivery across India from the checkout threshold, and no rate below it", async () => {
+    const contact = await describePage("contact", rest());
+    const conditions = ld(contact, "ClothingStore").hasShippingService.shippingConditions;
+    expect(conditions.shippingDestination.addressCountry).toBe("IN");
+    expect(conditions.orderValue).toEqual({ "@type": "MonetaryAmount", minValue: 5000, currency: "INR" });
+    expect(conditions.shippingRate).toEqual({ "@type": "MonetaryAmount", value: 0, currency: "INR" });
+  });
+
   test("all-products links every product, across pages of results", async () => {
     const full = Array.from({ length: 1000 }, (_, i) => ({ productid: `BC${i}`, name: `Piece ${i}` }));
     const q = jest
