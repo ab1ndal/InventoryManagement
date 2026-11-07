@@ -21,7 +21,9 @@ Waiting, nothing to do:
 Claude, next:
 - [ ] Transactional bill save, step 1: new database step unused by any screen, proved locally and in a rolled-back
       production test. Plan is in the owner's private audit folder.
-- [ ] Confirm the tracking sweep's first real lookup worked.
+- [x] Tracking sweep checked 2026-11-07: 22 cron runs since 2026-11-05, all succeeded (HTTP 200). WEB-000006 out-for-delivery and delivered both arrived by webhook (`courier-status`), so the sweep had nothing to fix; no open shipments now. A sweep-applied change is still unproven, only matters if a webhook is lost.
+- [x] Bill PDFs: FY26-000394/395 (2026-11-07) are 175 KB each, down from 5-7 MB.
+- [x] Vercel Oct 8 - Nov 7 (Hobby): Fast Data Transfer 3.29 GB of 100 GB, Fast Origin Transfer 370 MB of 10 GB. CLI `vercel metrics` needs Pro; read the dashboard usage page.
 - [ ] PR #196 LIVE 2026-11-07: customer phone as +91 box + number box (no live reformat), "Add this customer" prefilled from the bill search. Owner to try on the next new customer. Supplier form same field, PR #197 LIVE 2026-11-07 (extra numbers stay free text, no +91: landlines).
 - [ ] Merchant Center: fix what Google flags, then point the source at the full feed (778 items). Held 2026-11-04: review still running. AI labels: owner decided none (2026-11-06).
 - [ ] Order emails: Gmail filed a real order's emails in Spam. PR #172 is live but unproven: both formats reached the Inbox on the one test account. Check placement on the next real orders. Own-domain sending is the lasting fix, not possible for now.
@@ -67,7 +69,7 @@ return `x-robots-tag: all`, sitemap lists 1,028 photos, feed has 778 valid items
 - [ ] 1.9 field data: PageSpeed Insights API without a key hit its daily quota (2026-11-06). Read Core Web Vitals in Search Console instead, or add a key.
 - [ ] Add photos in batches and watch Search Console: "Crawled, not indexed" rising means slow down and improve the thinnest pages. Sitemap, feed and all-products pick up new products automatically.
 - [ ] Index check 2026-11-07 (URL Inspection API, all 850 sitemap pages): 29 indexed. Site pages 10 of 13 and collections 10 of 12 indexed (Kids indexed 2026-11-07, a day after the request). Products 9 of 823: 660 "Discovered - currently not indexed" (known, not yet crawled), 154 unknown to Google, 1 crawled not indexed. No canonical mismatches. Read: Google is rationing crawl on a young, low-authority site; not a page fault. Levers: links from collections to products, outside links (Business Profile, Instagram), time. Re-run monthly and compare; access in memory reference_search_console_api.
-- [ ] Order snapshots still store `name`, so order pages and emails show the old title.
+- [ ] Order snapshots still store `name`, so order pages and emails show the old title. Checked 2026-11-07: `order_items.product_name` also feeds the order's bill, Shiprocket item name and refund/rebook bill lines, and bills must keep `name`. Proposed: new `order_items.display_title` set in `online_order_create`, used only in customer-facing JSON (order page, emails); admin, bills, Shiprocket keep `product_name`. Needs owner OK: migration redefines the payment-path function plus ~6 email/order-page functions.
 - [x] Needs title list in admin: Inventory toggle, PR #173.
 - [x] Collection intro text removed 2026-11-05 (owner: no page descriptors). Step 2.5 now waits for real buying advice from the owner.
 
@@ -142,7 +144,7 @@ Untested against real services: payment on production keys (task above) and Proc
 
 **Build later** (details in `tasks/site-review-2026-10-25.md`)
 - [ ] PDP mobile: one sticky action; beige add-to-cart looks disabled.
-- [ ] "More like this" shows men's coat suits under women's 3-pc suits ("Suit (3 Pc)" mixes both).
+- [ ] "More like this" shows men's coat suits under women's 3-pc suits ("Suit (3 Pc)" mixes both). Checked 2026-11-07: of 14 visible S3P products, 13 are men's coat-pant suits; BC26215 (Cotton, ₹995, photo = women's kurta suit with dupatta) is the only women's one, and S3P is in no collection so it shows nowhere for women. Fix is data, not code: owner picks a women's category for it (e.g. RMS Readymade Suit, which also changes its title) and for future women's 3-pc suits.
 - [ ] Home: fewer repeating rails; trust bar as a plain fact strip; collections index made visual; nav taxonomy.
 - [ ] Mobile footer: compact accordions.
 - [ ] Filters cleanup (fabric bug, greyed options, size groups), after Diwali.
