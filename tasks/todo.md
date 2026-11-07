@@ -73,7 +73,7 @@ return `x-robots-tag: all`, sitemap lists 1,028 photos, feed has 778 valid items
 - [ ] Google Ads account, for Keyword Planner volumes (2.1).
 - [x] Merchant Center account 5899745962 set up 2026-11-05: test feed `?sample=25` under review, account shipping flat ₹250 under ₹5,000. Full feed after the review (see Claude, next).
 - [x] Business Profile website link fixed: Google Search panel shows `http://www.bindalscreations.com/` (checked 2026-11-05), which 308s to `https://www.`.
-- [x] Bing Webmaster Tools site added 2026-11-06 (data takes up to 48 h). Open: confirm sitemap listed.
+- [x] Bing Webmaster Tools site added 2026-11-06 (data takes up to 48 h). Sitemap submitted there 2026-11-07 (property `bindalscreations.com`). AI training and grounding: no setting needed, both default to Allow and the site sends no NoArchive/NoCache (Bing blog 2026-10-30; new rules from 2027-02-01). Check Site Explorer and Search Performance after 2026-11-09.
 - [ ] Review QR counter card. Real shop and tailoring photos.
 
 Decided, 2026-11-04: home wording names women, men and kids. Owner considers it settled, do not reopen.
