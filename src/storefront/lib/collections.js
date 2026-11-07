@@ -46,12 +46,22 @@ export const COLLECTIONS = [
     description: "Kurta pajamas, shirts, Nehru jackets, sherwanis, blazers and Jodhpuri suits for men from Bindal's Creation, Ghaziabad. Shop online or visit our store.",
     categoryIds: ["SW", "KP", "SK", "NHJ", "IW", "SJ-2P", "S2P", "S5P", "BLZ", "SHT", "T-SHT", "FRMP", "PNT"],
   },
+  // Every child category, so kids' products show here as their photos are
+  // approved (owner 2026-11-06). Only kurta pajamas had photos at launch.
+  {
+    slug: "kids",
+    title: "Kids",
+    subtitle: "Kurta pajamas, sherwanis and suits for boys",
+    seoTitle: "Kids' Ethnic Wear in Ghaziabad",
+    description: "Kurta pajamas, sherwanis, Indo-western outfits and suits for boys from Bindal's Creation, Ghaziabad. Shop online or visit our store at Sihani Gate Market.",
+    categoryIds: ["C-KP", "C-SW", "C-IW", "C-S3P", "C-S5P"],
+  },
   // Wedding and Festive hidden until curated (owner 2026-10-25): with no
   // membership they only showed "coming soon".
   // Owner ask (2026-10-20): everyday cord sets, shirts and kids' wear. Kurtis
   // are included because they are the main everyday women's piece; without
-  // them the page is almost all men's shirts. Kids is pending: no kids'
-  // products have photos yet. Kept after Kurtis and Men so those stay the
+  // them the page is almost all men's shirts. Kids has its own collection
+  // above. Kept after Kurtis and Men so those stay the
   // "More like this" group for kurtis and shirts (first match wins).
   {
     slug: "everyday",
