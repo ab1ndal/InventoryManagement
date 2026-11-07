@@ -56,6 +56,16 @@ describe("collections config", () => {
     expect(categoryGroup("KP").slug).toBe("men");
   });
 
+  it("groups every child category under Kids, kept out of Men", () => {
+    const { categoryGroup } = require("../lib/similarProducts");
+    const childCategories = ["C-KP", "C-SW", "C-IW", "C-S3P", "C-S5P"];
+    expect(getCollection("kids").categoryIds).toEqual(childCategories);
+    childCategories.forEach((id) => {
+      expect(categoryGroup(id).slug).toBe("kids");
+      expect(getCollection("men").categoryIds).not.toContain(id);
+    });
+  });
+
   it("has unique slugs", () => {
     const slugs = COLLECTIONS.map((c) => c.slug);
     expect(new Set(slugs).size).toBe(slugs.length);

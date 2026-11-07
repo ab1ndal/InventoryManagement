@@ -201,12 +201,12 @@ export default function StorefrontHeader() {
         aria-label="Categories"
         className="hidden md:block border-b border-storefront-border bg-storefront-card"
       >
-        <ul className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-11 flex items-center justify-center gap-6 lg:gap-9">
+        <ul className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-11 flex items-center justify-center gap-4 lg:gap-9">
           {NAV_LINKS.map(({ label, to, highlight }) => (
             <li key={label}>
               <Link
                 to={to}
-                className={`text-[13px] tracking-wide transition-colors duration-150 ${
+                className={`whitespace-nowrap text-[13px] tracking-wide transition-colors duration-150 ${
                   highlight
                     ? "font-semibold text-storefront-gold hover:text-storefront-gold-dark"
                     : "font-medium text-storefront-charcoal hover:text-storefront-gold"

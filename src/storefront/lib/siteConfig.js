@@ -24,6 +24,7 @@ export const NAV_LINKS = [
   { label: "Kurtis", to: "/collections/kurtis" },
   { label: "Gowns", to: "/collections/gowns" },
   { label: "Men", to: "/collections/men" },
+  { label: "Kids", to: "/collections/kids" },
   { label: "Custom Tailoring", to: "/customize" },
   { label: "Shop All", to: "/shop" },
 ];
