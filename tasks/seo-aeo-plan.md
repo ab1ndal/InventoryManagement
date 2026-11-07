@@ -212,6 +212,11 @@ Live 2026-11-04:
 - PR #140, 1.9 page speed: main.js 846 KB to 664 KB. Public pages stay eager to protect layout stability.
 - PR #141, 3.4 Merchant Center feed, 778 in-stock items.
 
+IndexNow, 2026-11-06: `.github/workflows/indexnow.yml` runs daily at 08:00 IST and sends Bing, Yandex, Naver, Seznam and Yep the
+pages added to or removed from the sitemap since the last run (first run sends all). Key file `public/4a3dab4214c8fd6eee375524f8e3de46.txt`.
+Google does not use IndexNow, and its Indexing API is only for job postings and livestreams, so it is not used.
+`llms.txt` and an on-site AI chat agent were considered and rejected: no major AI search engine reads them.
+
 Live 2026-11-04: 2.2 saree titles, owner reviewed. 16 titles became 89, list in `tasks/title-drafts/sarees.json`. Five stock colours corrected.
 
 Catalogue, 2026-11-04: 3,685 products, 3,530 in stock, and 821 with photos. Only products with photos show on the site, and
