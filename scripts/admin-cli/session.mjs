@@ -39,7 +39,7 @@ function readSession(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
-function writeSession(file, session) {
+export function writeSession(file, session) {
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   const data = {
     access_token: session.access_token,

@@ -18,8 +18,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { authedClient, login, logout, promptHidden, AuthError } from "./admin-cli/session.mjs";
+import { authedClient, login, logout, promptHidden, sessionPath, writeSession, AuthError } from "./admin-cli/session.mjs";
 import { shrinkSlipPhoto, SlipFileError } from "./admin-cli/slipPhoto.mjs";
+import { regenerateBillPdf, BillPdfError, DEFAULT_APP_URL } from "./admin-cli/billPdf.mjs";
 
 // src/ is untyped ESM shared with CRA; marking it "type": "module" would force
 // extensionful imports on the whole app. Node warns when loading it, so drop
@@ -260,6 +261,18 @@ const COMMANDS = {
         return getBill(client, { billNumber: o.number, billid: o.id });
       },
     },
+    pdf: {
+      usage: "bill pdf (--number <FY26-000NNN> | --id <billid>) [--app-url <admin app origin>]   (needs Google Chrome)",
+      options: { number: { type: "string" }, id: { type: "string" }, "app-url": { type: "string" } },
+      run: async (client, o) =>
+        regenerateBillPdf({
+          client,
+          supabaseUrl: supabaseConfig().url,
+          appUrl: o["app-url"] ?? DEFAULT_APP_URL,
+          billid: await billIdFrom(client, o),
+          onSessionRotated: (session) => writeSession(sessionPath(), session),
+        }),
+    },
   },
   slip: {
     add: {
@@ -389,6 +402,7 @@ main(process.argv.slice(2)).catch((err) => {
     err instanceof ProductInputError ||
     err instanceof BillInputError ||
     err instanceof SlipPhotoInputError ||
+    err instanceof BillPdfError ||
     err instanceof SlipFileError;
   process.stderr.write(
     JSON.stringify({ error: err.message, type: err.name || "Error", ...(err.code && { code: err.code }) }) + "\n",
