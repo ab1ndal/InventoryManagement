@@ -12,7 +12,7 @@ node scripts/admin-cli.mjs                                   # lists all command
 
 - **Output:** success → JSON on stdout, exit `0`. Failure → one JSON line on
   stderr, `{"error": "...", "type": "..."}`, exit `2` for bad input
-  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`, `SlipPhotoInputError`, `SlipFileError`, `BillPdfError`), `3` for not logged in /
+  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `VariantInputError`, `BillInputError`, `SlipPhotoInputError`, `SlipFileError`, `BillPdfError`), `3` for not logged in /
   not an admin (`AuthError`), `1` for anything else (database, network).
 - **Dry run:** every write accepts `--dry-run`: it runs all checks and prints
   `{"dry_run": true, "would_insert": {...}}` without writing. Use it to review
@@ -258,6 +258,49 @@ The id is the next `BCX{YY}{NNN}` for the current year (from
 Errors (exit 2): `Name is required`, `Category is required`,
 `Invalid MRP "…"`, `A valid cost is required …`, `Unknown category "…"`.
 Like the app, no activity-log entry is written for a new manual item.
+
+## stock add
+
+Add stock to a product's size and colour, for a slip whose piece is on the
+shelf but not in the inventory. Same writes as the bill screen's "add stock /
+new variant": stock on an existing variant moves only by `stock_adjust`
+(reason `manual_edit`), and the activity log gets `Increased stock of …` or
+`Added variant …`, ending `(via CLI)`.
+
+```bash
+node scripts/admin-cli.mjs stock add --code BC25385 --size "XL|42" --color Pink --qty 1 --dry-run
+node scripts/admin-cli.mjs stock add --code BC25385 --size "3XL|46" --color Pink --qty 1 --new-variant
+```
+
+| Option | Required | Notes |
+|---|---|---|
+| `--code` | yes | the exact product code (normalised like `product find`) |
+| `--size`, `--color` | yes | matched to an existing variant ignoring case; the variant's own spelling is kept |
+| `--qty` | yes | > 0; whole pieces, or metres to 3 decimals for metre products |
+| `--new-variant` | no | allow a size and colour the product doesn't have yet; both must be in the inventory's size and colour lists (size as the code, e.g. `XL\|42`) |
+| `--dry-run` | no | look up and show the change, write nothing |
+
+Without `--new-variant`, a size and colour the product doesn't have is refused
+with its variants listed, so a typo or a near shade (Yellow for Mustard) can't
+become a new variant. Quote the size: `|` is a shell pipe.
+
+```json
+{
+  "productid": "BC25385",
+  "name": "Cotton Self-Shirt",
+  "size": "XL|42",
+  "color": "Pink",
+  "variantid": "c594874d-…",
+  "created": false,
+  "stock_before": 0,
+  "stock": 1
+}
+```
+
+`variantid` is `null` in a dry run of a new variant. Errors (exit 2):
+`No product …`, `… has no Mustard / XL|42 variant (has: …). Pass --new-variant to add it`,
+`Unknown size "46": use a size code like XL|42`, `Unknown colour "…"`,
+`Stock to add must be more than 0`, `Stock to add must be a whole number of pieces`.
 
 ## Bills
 
