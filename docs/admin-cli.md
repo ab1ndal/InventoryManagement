@@ -12,7 +12,7 @@ node scripts/admin-cli.mjs                                   # lists all command
 
 - **Output:** success → JSON on stdout, exit `0`. Failure → one JSON line on
   stderr, `{"error": "...", "type": "..."}`, exit `2` for bad input
-  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`, `SlipPhotoInputError`, `SlipFileError`), `3` for not logged in /
+  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`, `SlipPhotoInputError`, `SlipFileError`, `BillPdfError`), `3` for not logged in /
   not an admin (`AuthError`), `1` for anything else (database, network).
 - **Dry run:** every write accepts `--dry-run`: it runs all checks and prints
   `{"dry_run": true, "would_insert": {...}}` without writing. Use it to review
@@ -264,7 +264,8 @@ Like the app, no activity-log entry is written for a new manual item.
 `bill create` makes a **finalized, fully paid Bill of Supply**, writing what
 the billing screen's Finalize button writes for a new bill. `bill preview`
 shows all of it without writing. Not supported: drafts, discount codes,
-vouchers, store credit, exchanges, partial payment, salespersons, PDF, SMS.
+vouchers, store credit, exchanges, partial payment, salespersons, SMS. The
+bill's PDF is a separate step: [bill pdf](#bill-pdf).
 
 ### Bill spec
 
@@ -434,6 +435,30 @@ Read-only. The full `bills` row plus `payment_method`, `location`,
 `customer`, `items` (each inventory line with its variant's `size`, `color`
 and `current_stock`), `payments` (`bill_payments` rows) and `slip_photos`.
 `null` if no such bill.
+
+### bill pdf
+
+```bash
+node scripts/admin-cli.mjs bill pdf --number FY26-000412
+node scripts/admin-cli.mjs bill pdf --id 485 --app-url http://localhost:3000
+```
+
+Makes (or remakes) a finalized bill's PDF, the same file as the Bills
+screen's "Regenerate PDF" button. The app draws the PDF in the browser, so
+the command opens the admin Bills screen (default
+`https://www.bindalscreations.com`, or `--app-url`) in headless Google
+Chrome, signed in with your CLI session, and clicks that button for the bill.
+Needs Google Chrome installed (or `npx playwright install chromium`). Takes
+about 15 seconds.
+
+Output: `billid`, `bill_number`, `pdf_url` (the new file in the `invoices`
+bucket) and `previous_pdf_url`. Success is checked in the database:
+`pdf_url` must have changed. If the app refreshes the login while it runs,
+the new session is saved back to the CLI's session file.
+
+Errors: `No bill numbered …`, `Bill … is not finalized` (exit 2); the app
+not accepting the session, the app's "PDF generation failed" message, or
+`pdf_url` unchanged (exit 1).
 
 ## Slip photos
 
