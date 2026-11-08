@@ -38,6 +38,7 @@ const { findProducts, searchProducts, listCategories, ProductInputError } = awai
 const { findManualItems, createManualItem, ManualItemInputError } = await import(
   "../src/admin/lib/manualItems.js"
 );
+const { addStockByCode, VariantInputError } = await import("../src/admin/lib/variants.js");
 const { prepareBill, createBill, getBill, findBills, BillInputError } = await import(
   "../src/admin/lib/bills.js"
 );
@@ -210,6 +211,35 @@ const COMMANDS = {
           },
           { dryRun: Boolean(o["dry-run"]) },
         ),
+    },
+  },
+  stock: {
+    add: {
+      usage:
+        "stock add --code <product code> --size <size> --color <colour> --qty <n> [--new-variant] [--dry-run]",
+      options: {
+        code: { type: "string" },
+        size: { type: "string" },
+        color: { type: "string" },
+        qty: { type: "string" },
+        "new-variant": { type: "boolean" },
+        "dry-run": { type: "boolean" },
+      },
+      run: (client, o) => {
+        if (!o.code) throw new UsageError("--code is required");
+        if (o.qty === undefined) throw new UsageError("--qty is required");
+        return addStockByCode(
+          client,
+          {
+            code: o.code,
+            size: o.size,
+            color: o.color,
+            quantity: o.qty,
+            allowNewVariant: Boolean(o["new-variant"]),
+          },
+          { dryRun: Boolean(o["dry-run"]) },
+        );
+      },
     },
   },
   bill: {
@@ -400,6 +430,7 @@ main(process.argv.slice(2)).catch((err) => {
     err instanceof CustomerInputError ||
     err instanceof ManualItemInputError ||
     err instanceof ProductInputError ||
+    err instanceof VariantInputError ||
     err instanceof BillInputError ||
     err instanceof SlipPhotoInputError ||
     err instanceof BillPdfError ||
