@@ -13,6 +13,7 @@ import { Button } from "../../../components/ui/button";
 import { supabase } from "../../../lib/supabaseClient";
 import { v4 as uuidv4 } from "uuid";
 import { sortVariantsBySizeColor } from "../../../utility/sortVariants";
+import AddVariantStock from "./AddVariantStock";
 
 export default function InventoryPicker({ onPicked, initialVal, isBackdated, salespersons = [] }) {
   const isEditing = !!initialVal;
@@ -33,6 +34,8 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
   const [discount, setDiscount] = useState(initialVal?.quickDiscountPct || 0);
   const [salespersonId, setSalespersonId] = useState(initialVal?.salesperson_id || null);
   const variantsLoadedFor = useRef(null);
+  // Bumped after stock is added from the bill, to load the product's variants again.
+  const [variantsVersion, setVariantsVersion] = useState(0);
 
   // When editing, load the product and its variants together on mount
   useEffect(() => {
@@ -101,7 +104,7 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
     return () => {
       superseded = true;
     };
-  }, [selected]);
+  }, [selected, variantsVersion]);
 
   // When editing, the original variant's stock is effectively higher by the original quantity
   const originalVariantId = isEditing ? initialVal?.variantid : null;
@@ -222,6 +225,14 @@ export default function InventoryPicker({ onPicked, initialVal, isBackdated, sal
                 ))}
               </SelectContent>
             </Select>
+            <AddVariantStock
+              product={selected}
+              variants={variants}
+              onAdded={(addedId) => {
+                setVariantId(addedId);
+                setVariantsVersion((n) => n + 1);
+              }}
+            />
           </div>
 
           {/* Quantity input */}
