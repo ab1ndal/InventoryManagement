@@ -111,17 +111,36 @@ test.each([
     fireEvent.change(phone, { target: { value: phone.value + ch } });
   }
   expect(screen.getByLabelText("Country code").value).toBe("+91");
-  expect(phone.value).toBe("9810000002");
+  expect(phone.value).toBe("98100 00002");
   fireEvent.click(screen.getByRole("button", { name: "Save Customer" }));
   await waitFor(() => expect(mockToasts.length).toBeGreaterThan(0), SLOW);
   expect(upsertPayload().phone).toBe("+919810000002");
 });
 
-test("a 10-digit number starting with 91 is kept as typed", async () => {
+test("a 10-digit number starting with 91 stays the number, split 5 + 5", async () => {
   await openAddForm();
   const phone = screen.getByPlaceholderText(/^Phone/);
   fireEvent.change(phone, { target: { value: "9181000000" } });
-  expect(phone.value).toBe("9181000000");
+  expect(phone.value).toBe("91810 00000");
+  expect(screen.getByLabelText("Country code").value).toBe("+91");
+});
+
+test("a complete +91 number typed digit by digit splits 5 + 5, partial does not", async () => {
+  await openAddForm({ first_name: "Asha" });
+  const phone = screen.getByPlaceholderText(/^Phone/);
+  for (const ch of "9810000002") {
+    fireEvent.change(phone, { target: { value: phone.value + ch } });
+    if (phone.value.replace(/\s/g, "").length < 10) expect(phone.value).not.toMatch(/\s/);
+  }
+  expect(phone.value).toBe("98100 00002");
+  fireEvent.click(screen.getByRole("button", { name: "Save Customer" }));
+  await waitFor(() => expect(mockToasts.length).toBeGreaterThan(0), SLOW);
+  expect(upsertPayload().phone).toBe("+919810000002");
+});
+
+test("an existing +91 customer opens with the number split 5 + 5", async () => {
+  await openAddForm({ first_name: "Asha", phone: "+919810000002" });
+  expect(screen.getByPlaceholderText(/^Phone/).value).toBe("98100 00002");
 });
 
 test("a second click while saving does not submit again", async () => {

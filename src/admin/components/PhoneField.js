@@ -1,7 +1,8 @@
 // src/admin/components/PhoneField.js
 // Phone entry as two boxes: country code (default +91) and the number.
 // The form keeps one string, "+<code><number>", or "" when no number is typed.
-// Nothing is reformatted while typing, so the cursor stays where it is.
+// Nothing is reformatted mid-number, so the cursor stays where it is; only a
+// complete 10-digit +91 number is shown split as 5 + 5 (98100 00001).
 import React from "react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { Input } from "../../components/ui/input";
@@ -26,6 +27,16 @@ const withoutRepeatedCode = (code, typed) => {
   const full = parsePhoneNumberFromString(typed, { defaultCallingCode: callingCode });
   if (!full?.isValid()) return null;
   return full.number === `${code}${typed}`.replace(/\s/g, "") ? null : full.number;
+};
+
+// A complete Indian mobile number (10 digits after +91) shown as 5 + 5, the way
+// it is written in India. Anything else is shown as typed. Spaces never reach
+// the database: both forms strip them on save.
+const shownNumber = (code, number) => {
+  const digits = number.replace(/\s/g, "");
+  return code === DEFAULT_COUNTRY_CODE && /^\d{10}$/.test(digits)
+    ? `${digits.slice(0, 5)} ${digits.slice(5)}`
+    : number;
 };
 
 export default function PhoneField({
@@ -71,7 +82,7 @@ export default function PhoneField({
         className="flex-1"
         inputMode="tel"
         placeholder={placeholder}
-        value={number}
+        value={shownNumber(code, number)}
         onChange={(e) => {
           const typed = e.target.value;
           // A full number pasted with its own "+code" replaces both boxes.
