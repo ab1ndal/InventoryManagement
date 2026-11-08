@@ -14,6 +14,20 @@ const codeOf = (value) => {
   return parsed ? `+${parsed.countryCallingCode}` : null;
 };
 
+// Digits typed with the country code but no "+" (91 98100 00001) or with a
+// leading 0 (098100 00001) would otherwise be stored as +9191... / +910...
+// Once such a number is complete it is returned as "+<code><number>", so the
+// code moves out of the number box. Returns null when the typed digits are
+// already the number after the code (kept as typed, spaces and all), or are
+// not yet a complete number.
+const withoutRepeatedCode = (code, typed) => {
+  const callingCode = code.replace(/^\+/, "");
+  if (!callingCode) return null;
+  const full = parsePhoneNumberFromString(typed, { defaultCallingCode: callingCode });
+  if (!full?.isValid()) return null;
+  return full.number === `${code}${typed}`.replace(/\s/g, "") ? null : full.number;
+};
+
 export default function PhoneField({
   value,
   onChange,
@@ -61,7 +75,11 @@ export default function PhoneField({
         onChange={(e) => {
           const typed = e.target.value;
           // A full number pasted with its own "+code" replaces both boxes.
-          onChange(typed.startsWith("+") ? typed : compose(code, typed));
+          if (typed.startsWith("+")) {
+            onChange(typed);
+            return;
+          }
+          onChange(withoutRepeatedCode(code, typed) ?? compose(code, typed));
         }}
         onBlur={onBlur}
       />

@@ -618,7 +618,10 @@ export default function CustomerForm(props) {
             />
 
             <div className="px-6 py-2 rounded-md text-sm font-medium">
-              <Button type="submit">
+              {/* Disabled while saving: a second click or Enter on a slow
+                  connection submitted again and hit the duplicate-phone check
+                  against the row the first submit had just written. */}
+              <Button type="submit" disabled={form.formState.isSubmitting}>
                 {stableDefaults.customer_ulid ? "Update" : "Save"} Customer
               </Button>
             </div>

@@ -11,6 +11,7 @@ global.ResizeObserver = class {
 // Plain functions: CRA resetMocks wipes jest.fn implementations between tests.
 let mockOps = [];
 let mockToasts = [];
+let mockDelayMs = 0;
 
 const mockChain = (table) => {
   const op = { table, method: "select", filters: [] };
@@ -20,7 +21,9 @@ const mockChain = (table) => {
     eq: (col, val) => { op.filters.push([col, val]); return chain; },
     upsert: (p) => { op.method = "upsert"; op.payload = p; return chain; },
     insert: (p) => { op.method = "insert"; op.payload = p; return chain; },
-    then: (resolve) => {
+    then: (resolveNow) => {
+      const resolve = (v) =>
+        mockDelayMs ? setTimeout(() => resolveNow(v), mockDelayMs) : resolveNow(v);
       if (op.method === "upsert") return resolve({ data: [{ ...op.payload, customerid: 42 }], error: null });
       return resolve({ data: [], error: null });
     },
@@ -49,6 +52,7 @@ jest.mock("sonner", () => ({
 beforeEach(() => {
   mockOps = [];
   mockToasts = [];
+  mockDelayMs = 0;
 });
 
 // Dialog + form mount is slow under parallel CPU load; the 1s default flaked.
@@ -95,4 +99,43 @@ test("opens with the values passed in from the bill search", async () => {
   await openAddForm({ first_name: "Anita", last_name: "Sharma" });
   expect(screen.getByDisplayValue("Anita")).toBeInTheDocument();
   expect(screen.getByDisplayValue("Sharma")).toBeInTheDocument();
+});
+
+test.each([
+  ["with the country code and no +", "919810000002"],
+  ["with a leading 0", "09810000002"],
+])("a full number typed %s moves the code out of the number box", async (_, typed) => {
+  await openAddForm({ first_name: "Asha" });
+  const phone = screen.getByPlaceholderText(/^Phone/);
+  for (const ch of typed) {
+    fireEvent.change(phone, { target: { value: phone.value + ch } });
+  }
+  expect(screen.getByLabelText("Country code").value).toBe("+91");
+  expect(phone.value).toBe("9810000002");
+  fireEvent.click(screen.getByRole("button", { name: "Save Customer" }));
+  await waitFor(() => expect(mockToasts.length).toBeGreaterThan(0), SLOW);
+  expect(upsertPayload().phone).toBe("+919810000002");
+});
+
+test("a 10-digit number starting with 91 is kept as typed", async () => {
+  await openAddForm();
+  const phone = screen.getByPlaceholderText(/^Phone/);
+  fireEvent.change(phone, { target: { value: "9181000000" } });
+  expect(phone.value).toBe("9181000000");
+});
+
+test("a second click while saving does not submit again", async () => {
+  mockDelayMs = 200;
+  await openAddForm({ first_name: "Asha" });
+  fireEvent.change(screen.getByPlaceholderText(/^Phone/), {
+    target: { value: "9810000002" },
+  });
+  const save = screen.getByRole("button", { name: "Save Customer" });
+  fireEvent.click(save);
+  await waitFor(() => expect(save).toBeDisabled(), SLOW);
+  fireEvent.click(save);
+  await waitFor(() => expect(mockToasts.length).toBeGreaterThan(0), SLOW);
+  await new Promise((r) => setTimeout(r, 600));
+  expect(mockToasts).toEqual([["success", "Customer added successfully"]]);
+  expect(mockOps.filter((o) => o.method === "upsert")).toHaveLength(1);
 });
