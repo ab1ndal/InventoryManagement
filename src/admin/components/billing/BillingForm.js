@@ -32,6 +32,7 @@ import AddItemDialog from "./AddItemDialog";
 import DiscountSelector from "./DiscountSelector";
 import Summary from "./Summary";
 import Notes from "./Notes";
+import BillSlipPhotos from "./BillSlipPhotos";
 import SalespersonSelector from "./SalespersonSelector";
 import InvoiceView from "./InvoiceView";
 import PaymentHistory from "./PaymentHistory";
@@ -2356,6 +2357,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
               {/* Notes */}
               <Notes notes={notes} setNotes={setNotes} />
+
+              <BillSlipPhotos billId={effectiveBillId ?? billId} />
 
               {/* Sale Context */}
               <section className="space-y-2">

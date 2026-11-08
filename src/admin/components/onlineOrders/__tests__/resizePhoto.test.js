@@ -28,6 +28,13 @@ test("shrinks the longest side to 1600 and returns a JPEG with the same name", a
   expect([out.type, out.name]).toEqual(["image/jpeg", "box.png"]);
 });
 
+test("takes a larger long side when asked", async () => {
+  mockCanvas();
+  global.createImageBitmap = bitmapOf(3000, 4000);
+  await resizePhoto(original, { maxSidePx: 2000 });
+  expect(drawn).toEqual([[0, 0, 1500, 2000]]);
+});
+
 test("never enlarges a small photo", async () => {
   mockCanvas();
   global.createImageBitmap = bitmapOf(800, 600);
