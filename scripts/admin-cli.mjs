@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Command-line access to admin features (customers, products, bills), for
+ * Command-line access to admin features (customers, products, bills, slip photos), for
  * entering and auditing data without the admin screens. Thin wrapper: all
  * rules live in the shared modules under src/admin/lib/.
  *
@@ -19,6 +19,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { authedClient, login, logout, promptHidden, AuthError } from "./admin-cli/session.mjs";
+import { shrinkSlipPhoto, SlipFileError } from "./admin-cli/slipPhoto.mjs";
 
 // src/ is untyped ESM shared with CRA; marking it "type": "module" would force
 // extensionful imports on the whole app. Node warns when loading it, so drop
@@ -38,6 +39,9 @@ const { findManualItems, createManualItem, ManualItemInputError } = await import
 );
 const { prepareBill, createBill, getBill, findBills, BillInputError } = await import(
   "../src/admin/lib/bills.js"
+);
+const { listSlipPhotos, addSlipPhoto, downloadSlipPhoto, SlipPhotoInputError, MAX_SLIP_BYTES } = await import(
+  "../src/admin/lib/billSlipPhotos.js"
 );
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -214,9 +218,20 @@ const COMMANDS = {
       run: (client, o) => prepareBill(client, readSpec(o)),
     },
     create: {
-      usage: "bill create (--spec <file.json> | --json '<spec>') [--dry-run]",
-      options: { spec: { type: "string" }, json: { type: "string" }, "dry-run": { type: "boolean" } },
-      run: (client, o) => createBill(client, readSpec(o), { dryRun: Boolean(o["dry-run"]) }),
+      usage: "bill create (--spec <file.json> | --json '<spec>') [--photo <slip photo>]... [--dry-run]",
+      options: {
+        spec: { type: "string" },
+        json: { type: "string" },
+        photo: { type: "string", multiple: true },
+        "dry-run": { type: "boolean" },
+      },
+      run: async (client, o) => {
+        // Shrink and check photos first, so a bad photo stops before the bill is written.
+        const photos = shrinkSlipPhotos(o.photo);
+        const result = await createBill(client, readSpec(o), { dryRun: Boolean(o["dry-run"]) });
+        if (o["dry-run"]) return { ...result, slip_photos: photos.map(describeShrunk) };
+        return { ...result, ...(await attachSlipPhotos(client, result.billid, photos)) };
+      },
     },
     find: {
       usage:
@@ -246,7 +261,82 @@ const COMMANDS = {
       },
     },
   },
+  slip: {
+    add: {
+      usage: "slip add (--number <FY26-000NNN> | --id <billid>) --file <slip photo>... [--dry-run]",
+      options: {
+        number: { type: "string" },
+        id: { type: "string" },
+        file: { type: "string", multiple: true },
+        "dry-run": { type: "boolean" },
+      },
+      run: async (client, o) => {
+        if (!o.file?.length) throw new UsageError("--file is required");
+        const billid = await billIdFrom(client, o);
+        const photos = shrinkSlipPhotos(o.file);
+        if (o["dry-run"]) return { dry_run: true, billid, slip_photos: photos.map(describeShrunk) };
+        return { billid, ...(await attachSlipPhotos(client, billid, photos)) };
+      },
+    },
+    list: {
+      usage: "slip list (--number <FY26-000NNN> | --id <billid>)",
+      options: { number: { type: "string" }, id: { type: "string" } },
+      run: async (client, o) => listSlipPhotos(client, await billIdFrom(client, o)),
+    },
+    download: {
+      usage: "slip download --photo <photo id> [--out <folder>]   (saves <photo id>.jpg)",
+      options: { photo: { type: "string" }, out: { type: "string" } },
+      run: async (client, o) => {
+        if (!o.photo) throw new UsageError("--photo is required");
+        const found = await downloadSlipPhoto(client, o.photo);
+        if (!found) throw new UsageError(`No slip photo ${o.photo}`);
+        const file = path.resolve(o.out ?? ".", `${found.photo.id}.jpg`);
+        fs.writeFileSync(file, found.bytes);
+        return { ...found.photo, file };
+      },
+    },
+  },
 };
+
+async function billIdFrom(client, o) {
+  if (!o.number === !o.id) throw new UsageError("Give exactly one of --number or --id");
+  if (o.id) return Number(o.id);
+  const { data, error } = await client
+    .from("bills")
+    .select("billid")
+    .eq("bill_number", o.number.trim().toUpperCase())
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new UsageError(`No bill numbered ${o.number}`);
+  return data.billid;
+}
+
+function shrinkSlipPhotos(files = []) {
+  const photos = files.map(shrinkSlipPhoto);
+  const tooBig = photos.find((p) => p.size > MAX_SLIP_BYTES);
+  if (tooBig) {
+    throw new SlipPhotoInputError(`${tooBig.source} is still over 2 MB after shrinking (${tooBig.size} bytes)`);
+  }
+  return photos;
+}
+
+const describeShrunk = (p) => ({ file: p.source, upload_bytes: p.size });
+
+// The bill already exists here, so a failed photo is reported, not thrown, with the command
+// that retries it; the exit code is still 1 so a script notices.
+async function attachSlipPhotos(client, billid, photos) {
+  const slip_photos = [];
+  const slip_photo_errors = [];
+  for (const p of photos) {
+    try {
+      slip_photos.push({ ...(await addSlipPhoto(client, billid, p)), file: p.source });
+    } catch (e) {
+      slip_photo_errors.push({ file: p.source, error: e.message, retry: `slip add --id ${billid} --file ${JSON.stringify(p.source)}` });
+    }
+  }
+  if (slip_photo_errors.length) process.exitCode = 1;
+  return { slip_photos, ...(slip_photo_errors.length && { slip_photo_errors }) };
+}
 
 // A bill spec comes from a JSON file (--spec) or inline (--json).
 function readSpec(o) {
@@ -297,7 +387,9 @@ main(process.argv.slice(2)).catch((err) => {
     err instanceof CustomerInputError ||
     err instanceof ManualItemInputError ||
     err instanceof ProductInputError ||
-    err instanceof BillInputError;
+    err instanceof BillInputError ||
+    err instanceof SlipPhotoInputError ||
+    err instanceof SlipFileError;
   process.stderr.write(
     JSON.stringify({ error: err.message, type: err.name || "Error", ...(err.code && { code: err.code }) }) + "\n",
   );
