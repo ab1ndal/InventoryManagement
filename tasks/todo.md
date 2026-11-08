@@ -144,7 +144,7 @@ Untested against real services: payment on production keys (task above) and Proc
 
 **Build later** (details in `tasks/site-review-2026-10-25.md`)
 - [ ] PDP mobile: one sticky action; beige add-to-cart looks disabled.
-- [ ] "More like this" shows men's coat suits under women's 3-pc suits ("Suit (3 Pc)" mixes both). Checked 2026-11-07: of 14 visible S3P products, 13 are men's coat-pant suits; BC26215 (Cotton, ₹995, photo = women's kurta suit with dupatta) is the only women's one, and S3P is in no collection so it shows nowhere for women. Fix is data, not code: owner picks a women's category for it (e.g. RMS Readymade Suit, which also changes its title) and for future women's 3-pc suits.
+- [x] "More like this" mixed men's coat suits with women's 3-pc suits. Done 2026-11-07: owner moved BC26215 (women's kurta suit, sizes 2XL|44) from S3P to ST Suits in admin; title now "Cotton Suits". S3P now holds only men's suits. Future women's 3-pc suits go in ST or RMS, not S3P.
 - [ ] Home: fewer repeating rails; trust bar as a plain fact strip; collections index made visual; nav taxonomy.
 - [ ] Mobile footer: compact accordions.
 - [ ] Filters cleanup (fabric bug, greyed options, size groups), after Diwali.
