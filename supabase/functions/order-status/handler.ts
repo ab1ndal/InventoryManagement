@@ -123,6 +123,7 @@ export function handler(req: Request, deps: AppDeps): Promise<Response> {
       packedPhotos: await packedPhotoUrlsOrNone(deps, order.id, order.order_ref),
       items: items.map((i) => ({
         name: i.product_name,
+        productId: i.productid,
         size: i.size,
         color: i.color,
         qty: i.qty,

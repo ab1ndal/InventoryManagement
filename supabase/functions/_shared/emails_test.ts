@@ -18,8 +18,8 @@ const o: EmailOrder = {
   contactEmail: "asha@example.com",
   address: { line1: "1 MG Road", city: "Ghaziabad", state: "Uttar Pradesh", pincode: "201001" },
   items: [
-    { name: "Silk Kurti", size: "M", color: "Red", qty: 2, status: "ordered" },
-    { name: "Lehenga", size: "L", color: null, qty: 1, status: "unavailable" },
+    { name: "Silk Kurti", productId: "BC25001", size: "M", color: "Red", qty: 2, status: "ordered" },
+    { name: "Lehenga", productId: "BC25002", size: "L", color: null, qty: 1, status: "unavailable" },
   ],
   subtotal: 4500,
   promoDiscount: 450,
@@ -38,8 +38,8 @@ Deno.test("orderConfirmed: items, order total, ref, link, same wording in every 
   const m = orderConfirmed(o, SITE);
   assertEquals(m.subject, "Bindals Creation: order WEB-000042 confirmed");
   assertStringIncludes(m.text, "Hi Asha,");
-  assertStringIncludes(m.text, "- Silk Kurti (M, Red) x 2");
-  assertStringIncludes(m.text, "- Lehenga (L) x 1 (out of stock");
+  assertStringIncludes(m.text, "- Silk Kurti (M, Red) x 2, code BC25001");
+  assertStringIncludes(m.text, "- Lehenga (L) x 1, code BC25002 (out of stock");
   assertStringIncludes(m.text, "Order total: ₹4,130 (₹3,630 paid online)");
   assertStringIncludes(m.text, "Store credit: -₹500");
   assertStringIncludes(m.text, "We'll email you again when your parcel ships.");

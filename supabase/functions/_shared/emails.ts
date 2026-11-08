@@ -4,7 +4,7 @@
  * shop is a composition dealer (Bill of Supply).
  */
 
-export type EmailItem = { name: string; size: string | null; color: string | null; qty: number; status: string };
+export type EmailItem = { name: string; productId: string; size: string | null; color: string | null; qty: number; status: string };
 
 export type EmailOrder = {
   orderRef: string;
@@ -46,7 +46,7 @@ export const trackingUrl = (awb: string) => `https://shiprocket.co/tracking/${en
 function itemLine(i: EmailItem): string {
   const variant = [i.size, i.color].filter((x) => x && String(x).trim()).join(", ");
   const note = i.status === "unavailable" ? " (out of stock: we'll email you about the refund)" : "";
-  return `- ${i.name}${variant ? ` (${variant})` : ""} x ${i.qty}${note}`;
+  return `- ${i.name}${variant ? ` (${variant})` : ""} x ${i.qty}, code ${i.productId}${note}`;
 }
 
 function firstName(name: string): string {

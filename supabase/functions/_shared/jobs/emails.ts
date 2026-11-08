@@ -31,7 +31,7 @@ export async function loadEmailOrder(store: Store, orderId: string): Promise<Ema
     contactPhone: o.contact_phone,
     contactEmail: o.contact_email?.trim() || null,
     address: o.address ?? {},
-    items: items.map((i) => ({ name: i.product_name, size: i.size, color: i.color, qty: i.qty, status: i.status })),
+    items: items.map((i) => ({ name: i.product_name, productId: i.productid, size: i.size, color: i.color, qty: i.qty, status: i.status })),
     subtotal: o.subtotal,
     promoDiscount: o.promo_discount,
     shipping: o.shipping,

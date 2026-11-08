@@ -116,6 +116,7 @@ export default function OpenReturnDialog({ open, order, items, role, pending, er
                 <li key={it.id} className="flex items-center justify-between gap-2">
                   <span>
                     {it.product_name}
+                    {it.productid ? ` · ${it.productid}` : ""}
                     {variantText(it) ? ` (${variantText(it)})` : ""}
                   </span>
                   <input

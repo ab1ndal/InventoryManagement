@@ -159,6 +159,7 @@ export type OrderItemRow = {
   id: string;
   line_no: number;
   product_name: string;
+  productid: string;
   size: string | null;
   color: string | null;
   qty: number;
@@ -281,7 +282,7 @@ export function createStore(db: SupabaseClient): Store {
       const rows = check(
         await db
           .from("order_items")
-          .select("id, line_no, product_name, size, color, qty, unit_price, paid_value, status, refunded_qty")
+          .select("id, line_no, product_name, productid, size, color, qty, unit_price, paid_value, status, refunded_qty")
           .eq("order_id", orderId)
           .order("line_no"),
         "order_items",

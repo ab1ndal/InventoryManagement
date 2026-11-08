@@ -46,6 +46,7 @@ export default function OrderDetails({ order }) {
             <ItemPhoto url={i.imageUrl} name={i.name} />
             <span>
               {i.name} ({formatSize(i.size)}/{i.color}) ×{i.qty}
+              {i.productId && <span className="block text-xs text-storefront-muted">Code {i.productId}</span>}
               {ITEM_NOTES[i.status] && <span className="block text-xs text-storefront-muted">{ITEM_NOTES[i.status]}</span>}
             </span>
           </li>

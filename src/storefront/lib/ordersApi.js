@@ -102,6 +102,7 @@ export function normalizeOrder(row) {
     paidAt: row.paid_at ?? null,
     items: (row.items ?? []).map((i) => ({
       name: i.name,
+      productId: i.productid ?? null,
       size: i.size,
       color: i.color,
       qty: i.qty,
