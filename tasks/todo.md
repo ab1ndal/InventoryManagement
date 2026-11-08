@@ -19,8 +19,11 @@ Waiting, nothing to do:
 - First real courier lookup by `tracking-sweeper`, about 09:17 UTC on 2026-11-05.
 
 Claude, next:
-- [ ] Transactional bill save, step 1: new database step unused by any screen, proved locally and in a rolled-back
-      production test. Plan is in the owner's private audit folder.
+- [x] Transactional bill save, step 1: `bill_save` live and unused since PR #171 (2026-11-05). Rolled-back
+      production run 2026-11-08 09:46 IST: 114 pass, 0 fail; afterwards no fixtures, counter FY26 BoS still 395, max
+      billid 440 (the run used up about 25 bill ids, so the next bill id jumps; bill numbers unaffected). Plan in the owner's private audit folder.
+- [ ] Transactional bill save, step 2: one supervised real paper slip through the admin CLI on `bill_save`, read
+      back with `bill show`. Needs the CLI switched to the RPC first (small PR) and the owner's OK for the prod write.
 - [x] Tracking sweep checked 2026-11-07: 22 cron runs since 2026-11-05, all succeeded (HTTP 200). WEB-000006 out-for-delivery and delivered both arrived by webhook (`courier-status`), so the sweep had nothing to fix; no open shipments now. A sweep-applied change is still unproven, only matters if a webhook is lost.
 - [x] Bill PDFs: FY26-000394/395 (2026-11-07) are 175 KB each, down from 5-7 MB.
 - [x] Vercel Oct 8 - Nov 7 (Hobby): Fast Data Transfer 3.29 GB of 100 GB, Fast Origin Transfer 370 MB of 10 GB. CLI `vercel metrics` needs Pro; read the dashboard usage page.
