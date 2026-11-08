@@ -89,6 +89,7 @@ export function item(over: Partial<OrderItemRow> = {}): OrderItemRow {
     id: "i-1",
     line_no: 1,
     product_name: "Silk Kurti",
+    productid: "BC25001",
     size: "M",
     color: "Red",
     qty: 1,

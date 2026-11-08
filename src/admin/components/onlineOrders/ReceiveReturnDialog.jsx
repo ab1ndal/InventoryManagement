@@ -86,6 +86,7 @@ export default function ReceiveReturnDialog({ open, ret, items, pending, error, 
                 <li key={ri.item_id} className="rounded border p-2">
                   <div className="font-medium">
                     {it.product_name}
+                    {it.productid ? ` · ${it.productid}` : ""}
                     {variantText(it) ? ` (${variantText(it)})` : ""} · expected {ri.units}
                   </div>
                   <div className="mt-1 flex gap-4">

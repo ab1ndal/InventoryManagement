@@ -155,6 +155,7 @@ export default function ReturnsSection({ order, items, role, onChanged }) {
                   return (
                     <li key={ri.item_id}>
                       {ri.units} × {it?.product_name || "Item"}
+                      {it?.productid ? ` · ${it.productid}` : ""}
                       {it && variantText(it) ? ` (${variantText(it)})` : ""}
                       {ri.received_units !== null && ri.received_units !== undefined
                         ? ` — received ${ri.received_units}, restocked ${ri.restock_units ?? 0}`

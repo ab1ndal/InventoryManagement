@@ -33,7 +33,7 @@ Deno.test("order-status: valid token → contract shape", async () => {
     deliveryCity: null,
     deliveryPincode: null,
     packedPhotos: [],
-    items: [{ name: "Silk Kurti", size: "M", color: "Red", qty: 1, status: "ordered", imageUrl: null }],
+    items: [{ name: "Silk Kurti", productId: "BC25001", size: "M", color: "Red", qty: 1, status: "ordered", imageUrl: null }],
     totals: { subtotal: 1000, promoDiscount: 0, shipping: 80, voucherApplied: 0, creditApplied: 0, gatewayAmount: 1080 },
     trackingUrl: "https://shiprocket.co/tracking/AWB1",
     leftoverVoucher: { code: "LEFT123", value: 250 },
