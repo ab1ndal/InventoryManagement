@@ -2,6 +2,7 @@
 // Records every query (table, op, filters, row) and resolves with the canned
 // result for `${table}.${op}` (or `rpc.${fn}`); missing keys resolve to
 // { data: null, error: null }. A result may be a function of the call.
+// Storage calls resolve `storage.${op}` (upload, remove, createSignedUrl, download).
 export function fakeSupabase(results = {}) {
   const calls = [];
   const resolve = (key, call) => {
@@ -51,7 +52,17 @@ export function fakeSupabase(results = {}) {
     calls.push(call);
     return resolve(`rpc.${fn}`, call);
   };
+  const storage = {
+    from: (bucket) => {
+      const op = (name) => (...args) => {
+        const call = { table: null, op: `storage.${name}`, bucket, args };
+        calls.push(call);
+        return resolve(`storage.${name}`, call);
+      };
+      return { upload: op("upload"), remove: op("remove"), createSignedUrl: op("createSignedUrl"), download: op("download") };
+    },
+  };
   // The signed-in user, if the test sets results.session.
   const auth = { getSession: async () => ({ data: { session: results.session ?? null }, error: null }) };
-  return { from, rpc, auth, calls };
+  return { from, rpc, auth, storage, calls };
 }

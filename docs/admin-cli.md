@@ -12,7 +12,7 @@ node scripts/admin-cli.mjs                                   # lists all command
 
 - **Output:** success → JSON on stdout, exit `0`. Failure → one JSON line on
   stderr, `{"error": "...", "type": "..."}`, exit `2` for bad input
-  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`), `3` for not logged in /
+  (`UsageError`, `CustomerInputError`, `ManualItemInputError`, `ProductInputError`, `BillInputError`, `SlipPhotoInputError`, `SlipFileError`), `3` for not logged in /
   not an admin (`AuthError`), `1` for anything else (database, network).
 - **Dry run:** every write accepts `--dry-run`: it runs all checks and prints
   `{"dry_run": true, "would_insert": {...}}` without writing. Use it to review
@@ -362,7 +362,13 @@ would be inserted (bill number and ids are assigned on create), `stock` (per var
 ```bash
 node scripts/admin-cli.mjs bill create --spec bill.json --dry-run   # same as preview
 node scripts/admin-cli.mjs bill create --spec bill.json
+node scripts/admin-cli.mjs bill create --spec 319.json --photo "BC Bills/319.jpeg"
 ```
+
+`--photo` (repeatable, e.g. front and back) attaches the paper slip the bill
+was entered from; see [Slip photos](#slip-photos). Photos are shrunk and
+checked before the bill is written, so a bad photo stops the command with
+nothing saved. With `--dry-run` the output lists each photo's upload size.
 
 Writes, in order: the customer and manual items from `creates` (if any), then
 as the screen does: the bill (the database assigns the next
@@ -388,6 +394,11 @@ update does not undo the bill (as on the screen); it is listed in
 fails after a customer or manual item was created, the error ends with
 `NOTE: … were already created` — re-run with `customer { id }` /
 `manual_item { id }` so they aren't created twice.
+
+With `--photo`, the output adds `slip_photos` (`id`, `billid`, `path`,
+`uploaded_at`, `file`). A photo that fails after the bill is saved does not
+undo the bill: it is listed in `slip_photo_errors` with a `retry` command
+(`slip add --id …`), and the exit code is `1`.
 
 ### bill find
 
@@ -421,8 +432,29 @@ node scripts/admin-cli.mjs bill get --id 352
 
 Read-only. The full `bills` row plus `payment_method`, `location`,
 `customer`, `items` (each inventory line with its variant's `size`, `color`
-and `current_stock`) and `payments` (`bill_payments` rows). `null` if no such
-bill.
+and `current_stock`), `payments` (`bill_payments` rows) and `slip_photos`.
+`null` if no such bill.
+
+## Slip photos
+
+Photos of the handwritten slip a bill was entered from, kept so bills can be
+audited against paper later. Optional. Stored in the private `bill-slips`
+bucket (admins only), one `bill_slip_photos` row per photo. The billing
+screen has the same section ("Paper slip photo": pick or drop photos).
+
+Photos are shrunk on your Mac before upload with the built-in `sips`: long
+side 2000 px, JPEG, so iPhone HEIC works too (a 3-5 MB camera photo becomes
+a few hundred KB). The bucket refuses anything that is not a JPEG or is over
+2 MB, so an unshrunk file can never be stored.
+
+```bash
+node scripts/admin-cli.mjs slip add --number FY26-000336 --file 319.jpeg [--file 319_back.jpeg] [--dry-run]
+node scripts/admin-cli.mjs slip list --number FY26-000336        # or --id <billid>
+node scripts/admin-cli.mjs slip download --photo <photo id> --out audit/   # saves <photo id>.jpg
+```
+
+For an audit: `bill get` shows the bill with its `slip_photos`; `slip download`
+saves each photo so it can be read next to the bill.
 
 ### Checked against the app
 

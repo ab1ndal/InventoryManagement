@@ -263,7 +263,7 @@ describe("getBill", () => {
     expect(client.calls[0].filters).toEqual([["eq", "bill_number", "FY26-000999"]]);
   });
 
-  it("joins items, payments, customer, method, location and current stock", async () => {
+  it("joins items, payments, customer, method, location, slip photos and current stock", async () => {
     const client = fakeSupabase({
       ...db(),
       "bills.select": { data: { billid: 900, bill_number: "FY26-000336", customerid: 453, salesmethodid: 1, saleslocationid: 1 }, error: null },
@@ -271,6 +271,7 @@ describe("getBill", () => {
       "bill_payments.select": { data: [], error: null },
       "salesmethods.select": { data: { methodname: "Cash" }, error: null },
       "saleslocations.select": { data: { locationname: "Walk-In" }, error: null },
+      "bill_slip_photos.select": { data: [{ id: "a1", billid: 900, path: "900/a1.jpg" }], error: null },
     });
     const b = await getBill(client, { billid: 900 });
     expect(b).toMatchObject({
@@ -280,6 +281,7 @@ describe("getBill", () => {
       customer: { first_name: "Test" },
       items: [{ bill_item_id: 1, color: "Mustard", size: "FREE-SIZE", current_stock: 1 }],
       payments: [],
+      slip_photos: [{ id: "a1", path: "900/a1.jpg" }],
     });
   });
 

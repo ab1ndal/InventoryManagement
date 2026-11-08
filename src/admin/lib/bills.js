@@ -21,6 +21,7 @@ import { findCustomerByPhone, createCustomer } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
 import { logActivityWith } from "./activity.js";
+import { listSlipPhotos } from "./billSlipPhotos.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -579,7 +580,7 @@ async function insertBill(client, prepared, source) {
   };
 }
 
-/** A bill with its items, payments, customer and each variant's current stock. */
+/** A bill with its items, payments, customer, slip photos and each variant's current stock. */
 export async function getBill(client, { billid, billNumber }) {
   if (billid == null && !billNumber) throw new BillInputError("Give a bill id or bill number");
   let q = client.from("bills").select("*");
@@ -587,7 +588,7 @@ export async function getBill(client, { billid, billNumber }) {
   const bill = await one(q.maybeSingle());
   if (!bill) return null;
 
-  const [items, payments, customer, method, location] = await Promise.all([
+  const [items, payments, customer, method, location, slipPhotos] = await Promise.all([
     one(client.from("bill_items").select("*").eq("billid", bill.billid).order("bill_item_id")),
     one(client.from("bill_payments").select("*").eq("billid", bill.billid).order("payment_id")),
     bill.customerid != null
@@ -599,6 +600,7 @@ export async function getBill(client, { billid, billNumber }) {
     bill.saleslocationid != null
       ? one(client.from("saleslocations").select("locationname").eq("saleslocationid", bill.saleslocationid).maybeSingle())
       : null,
+    listSlipPhotos(client, bill.billid),
   ]);
   const variantIds = [...new Set((items ?? []).map((i) => i.variantid).filter(Boolean))];
   const variants = variantIds.length
@@ -616,6 +618,7 @@ export async function getBill(client, { billid, billNumber }) {
       return v ? { ...i, size: v.size, color: v.color, current_stock: Number(v.stock) } : i;
     }),
     payments: payments ?? [],
+    slip_photos: slipPhotos,
   };
 }
 
