@@ -3,7 +3,7 @@
 
 import { COLLECTIONS, getCollection } from "../storefront/lib/collections";
 import { HERO_SLIDES } from "../storefront/lib/heroSlides";
-import { CATEGORY_RAILS, RAIL_SIZE } from "../storefront/lib/homeRails";
+import { CATEGORY_RAILS, RAIL_SIZE, railHref } from "../storefront/lib/homeRails";
 import {
   GOOGLE_MAPS_URL,
   NAV_LINKS,
@@ -310,15 +310,16 @@ async function homePage(rest) {
   const newest = `products?select=${LIST_FIELDS}&order=productid.desc&limit=${RAIL_SIZE}`;
   const [arrivals, ...railProducts] = await Promise.all([
     rest(newest),
-    ...CATEGORY_RAILS.map(({ slug }) =>
-      rest(`products?${collectionQuery(getCollection(slug))}&order=productid.desc&limit=${RAIL_SIZE}`)
+    ...CATEGORY_RAILS.map(({ slug, maxPrice }) =>
+      rest(
+        `products?${collectionQuery(getCollection(slug))}${maxPrice ? `&retailprice=lte.${maxPrice}` : ""}` +
+          `&order=productid.desc&limit=${RAIL_SIZE}`
+      )
     ),
   ]);
   const rails = [
     `<h2>${link("/shop", "New Arrivals")}</h2>${productList(arrivals)}`,
-    ...CATEGORY_RAILS.map(
-      ({ slug, title }, i) => `<h2>${link(`/collections/${slug}`, title)}</h2>${productList(railProducts[i])}`
-    ),
+    ...CATEGORY_RAILS.map((rail, i) => `<h2>${link(railHref(rail), rail.title)}</h2>${productList(railProducts[i])}`),
   ].join("");
   const collections = COLLECTIONS.map((c) => `<li>${link(`/collections/${c.slug}`, c.title)}</li>`).join("");
   return {

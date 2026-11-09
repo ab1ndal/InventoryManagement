@@ -5,7 +5,7 @@ import { renderHtml } from "../html";
 import { describePage } from "../pages";
 import { COLLECTIONS } from "../../storefront/lib/collections";
 import { HERO_SLIDES } from "../../storefront/lib/heroSlides";
-import { CATEGORY_RAILS, RAIL_SIZE } from "../../storefront/lib/homeRails";
+import { CATEGORY_RAILS, RAIL_SIZE, railHref } from "../../storefront/lib/homeRails";
 import { buildSitemap, sitemapResponse } from "../sitemap";
 
 const shell = fs.readFileSync(path.join(__dirname, "../../../public/index.html"), "utf8");
@@ -228,10 +228,13 @@ describe("describePage", () => {
     expect(queries).toHaveLength(1 + CATEGORY_RAILS.length);
     expect(queries.every((query) => query.endsWith(`&limit=${RAIL_SIZE}`))).toBe(true);
     expect(queries[0]).not.toContain("categoryid");
-    expect(queries[1]).toContain("categoryid=in.(SA)");
-    for (const { slug, title } of CATEGORY_RAILS) {
-      expect(page.bodyHtml).toContain(`<h2><a href="/collections/${slug}">${title}</a></h2>`);
-    }
+    CATEGORY_RAILS.forEach((rail, i) => {
+      const query = queries[i + 1];
+      expect(query).toContain("categoryid=in.(");
+      if (rail.maxPrice) expect(query).toContain(`&retailprice=lte.${rail.maxPrice}`);
+      else expect(query).not.toContain("retailprice=lte");
+      expect(page.bodyHtml).toContain(`<h2><a href="${railHref(rail)}">${rail.title}</a></h2>`);
+    });
     expect(page.bodyHtml).toContain('<h2><a href="/shop">New Arrivals</a></h2>');
   });
 

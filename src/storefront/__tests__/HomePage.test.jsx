@@ -48,10 +48,17 @@ describe("HomePage", () => {
     expect(precedes(trust, story)).toBe(true);
   });
 
-  it("shows women's rails, then everyday, then men's sherwani and kurta pajama", () => {
+  it("leads with the best sellers' price range, then the other rails", () => {
     renderHome();
     const titles = screen.getAllByTestId("category-rail").map((r) => r.textContent);
-    expect(titles).toEqual(["Sarees", "Lehengas", "Kurtis", "Everyday", "Sherwani", "Kurta Pajama"]);
+    expect(titles).toEqual([
+      "Kurta Pajama under ₹2,000",
+      "Sarees under ₹2,000",
+      "Lehengas",
+      "Kurtis",
+      "Everyday",
+      "Sherwani",
+    ]);
   });
 
   it("has a page heading for the home page", () => {
