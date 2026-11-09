@@ -1,6 +1,7 @@
 import React from "react";
 import CategoryBand from "../components/home/CategoryBand";
 import HeroSlider from "../components/home/HeroSlider";
+import OfferBand from "../components/home/OfferBand";
 import DiwaliRail from "../components/home/DiwaliRail";
 import TailoringBand from "../components/home/TailoringBand";
 import NewArrivals from "../components/home/NewArrivals";
@@ -18,6 +19,7 @@ export default function HomePage() {
       <h1 className="sr-only">Bindal's Creation: handpicked Indian ethnic wear and custom tailoring</h1>
       <CategoryBand />
       <HeroSlider />
+      <OfferBand />
       <DiwaliRail />
       <TailoringBand />
       <NewArrivals />

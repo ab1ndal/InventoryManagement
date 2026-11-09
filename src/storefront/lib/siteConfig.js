@@ -1,13 +1,22 @@
 // Storefront chrome content (promo line + header nav), kept here so seasonal
 // copy can be swapped without touching layout code.
 
+// Home page offer band (components/home/OfferBand.jsx). Must match a real, owner-confirmed
+// row in the discounts table; the band hides itself after `endsOn` (India date).
+export const HOME_OFFER = {
+  code: "GET500",
+  endsOn: "2026-11-30",
+  headline: "₹500 off orders above ₹2,000",
+  terms: "Enter the code at checkout. Valid till 30 Nov 2026.",
+};
+
 // Rotating promo line. Each message is plain text, or a link via `to`
 // (internal route) or `href` (external URL). Add a discount message only once
 // the owner confirms real terms.
 export const PROMO_MESSAGES = [
   // Owner 2026-11-05: GET500 = flat ₹500, subtotal ₹2,000+, typed at checkout (not auto-applied),
   // ends 2026-11-30 in the discounts table. Remove this line when the code ends.
-  { text: "₹500 off orders above ₹2,000 · use code GET500" },
+  { text: `${HOME_OFFER.headline} · use code ${HOME_OFFER.code}` },
   { text: "Delivery across India · free above ₹5,000" },
   { text: "Diwali Glam is live — shop festive picks", to: "/collections/diwali" },
   { text: "Seen a look you love? We'll make it for you", to: "/customize" },
