@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import HeroSlider from "../components/home/HeroSlider";
+import { HERO_TAGLINE } from "../lib/heroSlides";
 
 // Plain function, not jest.fn: CRA's resetMocks would wipe a mock implementation.
 jest.mock("../lib/productImage", () => ({
@@ -67,6 +68,12 @@ describe("HeroSlider", () => {
   afterEach(() => jest.useRealTimers());
 
   /* eslint-disable testing-library/no-container, testing-library/no-node-access */
+  it("opens every slide with who we are", () => {
+    renderSlider();
+    expect(HERO_TAGLINE).toMatch(/since 2017/);
+    expect(screen.getAllByText(HERO_TAGLINE)).toHaveLength(SLIDES.length);
+  });
+
   it("renders every slide from the config with its CTA link", async () => {
     const { container } = renderSlider();
     SLIDES.forEach((s) => {
