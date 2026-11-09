@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImageUrl } from "../../lib/productImage";
-import { HERO_SLIDES } from "../../lib/heroSlides";
+import { HERO_SLIDES, HERO_TAGLINE } from "../../lib/heroSlides";
 
 const AUTOPLAY_MS = 5000;
 const SWIPE_THRESHOLD_PX = 40;
@@ -132,6 +132,13 @@ function Slide({ slide, index, count, active, loadImages, onImageDone, srcFor })
           panel ? "md:text-storefront-charcoal" : ""
         }`}
       >
+        <p
+          className={`mb-3 font-sans text-xs font-medium uppercase tracking-[0.18em] ${
+            panel ? "text-white/90 md:text-storefront-gold-dark" : "text-white/90"
+          }`}
+        >
+          {HERO_TAGLINE}
+        </p>
         <h2 className="font-display font-semibold leading-[1.05] text-[clamp(2rem,4.2vw,3.5rem)] text-inherit">
           {slide.headline}
         </h2>

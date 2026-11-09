@@ -11,6 +11,10 @@
 // references (scripts/generate-hero-banners.mjs, 2026-10-22): desktop
 // 2560x976 with the left 40% kept clear for the copy, mobile 1088x1360 with
 // the bottom quarter clear.
+// Shown above every slide's headline: most visitors land on the home page not
+// knowing the shop, so the first line says who we are (owner 2026-11-09).
+export const HERO_TAGLINE = "Family-run in Ghaziabad since 2017";
+
 export const HERO_SLIDES = [
   {
     id: "diwali",
