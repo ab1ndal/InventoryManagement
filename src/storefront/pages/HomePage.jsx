@@ -28,6 +28,7 @@ export default function HomePage() {
           key={rail.slug}
           slug={rail.slug}
           title={rail.title}
+          maxPrice={rail.maxPrice}
           tone={i % 2 === 0 ? "white" : "cream"}
         />
       ))}
