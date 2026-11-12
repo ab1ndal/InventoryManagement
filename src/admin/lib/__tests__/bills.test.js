@@ -256,6 +256,73 @@ describe("createBill", () => {
   });
 });
 
+describe("part payment (payment.balance_due)", () => {
+  const saved = { billid: 901, bill_number: "FY26-000337" };
+  // Slip 387's saree sold for 1800: 1000 paid now, 800 still owed.
+  const partial = { ...slip387, payment: { method: "Cash", amount: 1000, balance_due: 800 } };
+
+  it.each([
+    [{ ...slip387, payment: { method: "Cash", amount: 1000, balance_due: -1 } }, /balance_due must be >= 0/],
+    [{ ...slip387, payment: { method: "Cash", amount: 1000, balance_due: "x" } }, /balance_due/],
+  ])("rejects a bad balance_due %#", (spec, msg) => {
+    expect(() => parseBillSpec(spec)).toThrow(msg);
+  });
+
+  it("prices the bill at paid + balance due and marks it partial, as the screen's partial finalize", async () => {
+    const p = await prepareBill(fakeSupabase(db()), partial);
+    expect(p.totals).toEqual({
+      mrp_total: 2395, line_discounts: 594.92, balance_discount: 0.08, grand_total: 1800, paid: 1000, balance_due: 800,
+    });
+    expect(p.bill).toMatchObject({
+      totalamount: 1800,
+      net_amount: 1800,
+      final_amount: 1800,
+      paymentstatus: "partial",
+      finalized: true,
+      payment_amount: 1000,
+      salesmethodid: 1,
+    });
+  });
+
+  it("still refuses a shortfall that balance_due does not explain", async () => {
+    await expect(
+      prepareBill(fakeSupabase(db()), { ...slip387, payment: { method: "Cash", amount: 500, balance_due: 800 } }),
+    ).rejects.toThrow(/differs from the bill total/);
+  });
+
+  it("writes the first payment to bill_payments, dated the bill date, before moving stock", async () => {
+    const client = fakeSupabase(db({
+      "bills.insert": { data: saved, error: null },
+      "bill_items.insert": { data: null, error: null },
+      "bill_payments.insert": { data: null, error: null },
+      "rpc.stock_adjust": { data: 0, error: null },
+      "activity_log.insert": { data: null, error: null },
+    }));
+    const out = await createBill(client, partial);
+    const writes = client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
+    expect(writes).toEqual(["bills.insert", "bill_items.insert", "bill_payments.insert", "stock_adjust", "activity_log.insert"]);
+    expect(client.calls.find((c) => c.table === "bill_payments").row).toEqual({
+      billid: 901, amount: 1000, salesmethodid: 1, recorded_at: "2026-10-22T12:00:00",
+    });
+    expect(client.calls.find((c) => c.fn === "stock_adjust").args.p_reason).toBe("bill_partial_finalize");
+    expect(client.calls.find((c) => c.table === "activity_log").row.summary).toBe(
+      "Finalized bill (partial) #FY26-000337 for Test Customer — ₹1,800, 1 items (via CLI)",
+    );
+    expect(out.totals.balance_due).toBe(800);
+  });
+
+  it("removes the bill and moves no stock when the payment insert fails", async () => {
+    const client = fakeSupabase(db({
+      "bills.insert": { data: saved, error: null },
+      "bill_items.insert": { data: null, error: null },
+      "bill_payments.insert": { data: null, error: new Error("pay boom") },
+      "bills.delete": { data: null, error: null },
+    }));
+    await expect(createBill(client, partial)).rejects.toThrow("Failed to record payment: pay boom (bill 901 removed)");
+    expect(client.calls.some((c) => c.fn === "stock_adjust")).toBe(false);
+  });
+});
+
 describe("getBill", () => {
   it("returns null for an unknown bill number", async () => {
     const client = fakeSupabase({ "bills.select": { data: null, error: null } });
