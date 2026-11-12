@@ -46,6 +46,12 @@ Claude, next:
   never served (copy off Supabase, delete, stop `upload_archival` in mockup-generator `publish.py`).
 - Old bill PDFs: new ones are JPEG since #189 (expect ~0.2 MB; confirm on the next saved bill). Regenerating the 386
   stored 6 MB bills needs owner OK. Regenerate path leaves old `-v<timestamp>` files (17 orphans, 108 MB).
+- Bill line discount in ₹ instead of % (deferred 2026-11-11): form state keeps `quickDiscountPct`, so ₹ entry
+  round-trips through a 2-decimal % and drifts (₹100 on ₹2,995 → 3.34% → ₹100.03); CLI floors the % and leans on
+  balance discount. DB already stores ₹ (`bill_items.discount_total`), so code-only, no migration: swap to a ₹ field
+  in billUtils, ItemRow, ManualItemForm, InventoryPicker, InvoiceView, generateBillText, billPdf, BillingForm
+  (rehydrate + 30% checks), admin/lib/bills.js; ~half day. Open question: on qty/MRP change, keep ₹ fixed
+  (recommended, matches slip) or rescale.
 
 Dropped 2026-11-05: real test orders. The first Shiprocket parcel (WEB-000006) was still in transit a week later in
 the same pincode, so the shop delivers by its own means (Self delivery preselected, #187; tracking number #188) and
