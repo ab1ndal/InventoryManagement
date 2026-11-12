@@ -7,7 +7,7 @@ import { Badge } from "../../components/ui/badge";
 import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageCircle, Globe } from "lucide-react";
 import { isWebsiteMethod, receivedAmount } from "./billing/paymentHelpers";
 import { round2 } from "./billing/billUtils";
-import { BILL_STATUS, isDraft, isCancelled } from "../lib/billStatus";
+import { BILL_STATUS, isDraft, isCancelled, isLiveSale } from "../lib/billStatus";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
@@ -854,7 +854,9 @@ export default function BillTable({ onEdit }) {
                           ? <Loader2 className="h-4 w-4 animate-spin" />
                           : <MessageCircle className="h-4 w-4" />}
                       </Button>
-                      {b.finalized && (
+                      {/* A cancelled bill keeps finalized, but the PDF has no cancelled mark, so a new
+                          one would print it as a valid sale. */}
+                      {isLiveSale(b) && (
                         <Button
                           size="icon"
                           variant="ghost"

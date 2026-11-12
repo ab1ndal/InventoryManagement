@@ -142,3 +142,14 @@ test("a bill finalized since the list loaded is not deleted", async () => {
   expect(mockDb.deleted).toHaveLength(0);
   expect(mockDb.stock).toHaveLength(0);
 });
+
+// A cancelled bill keeps finalized, and its PDF has no cancelled mark.
+test.each([
+  ["finalized", { paymentstatus: "finalized", finalized: true }, true],
+  ["cancelled", { paymentstatus: "cancelled", finalized: true }, false],
+])("Regenerate PDF offered on a %s bill only while it is a live sale", async (_label, overrides, offered) => {
+  mockDb.rows = [bill(overrides)];
+  render(<BillTable onEdit={() => {}} />);
+  await screen.findByText("FY26-000217");
+  expect(screen.queryAllByRole("button", { name: "Regenerate PDF" }).length > 0).toBe(offered);
+});
