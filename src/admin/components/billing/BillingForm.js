@@ -4,6 +4,7 @@ import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlte
 import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct } from "./stockHelpers";
 import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields, paymentStatusAfterEdit } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
+import { BILL_STATUS, billStatusFields } from "../../lib/billStatus";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import {
@@ -1053,13 +1054,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             final_amount: finalAmount !== "" ? Number(finalAmount) : null,
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
-            finalized: isFinalizedBill ? true : false,
-            paymentstatus: paymentStatusAfterEdit({
-              finalized: isFinalizedBill,
-              paymentStatus: billPaymentStatus,
-              payments: billPayments,
-              netAmount: editEffectiveTotal,
-            }),
+            ...billStatusFields(
+              paymentStatusAfterEdit({
+                finalized: isFinalizedBill,
+                paymentStatus: billPaymentStatus,
+                payments: billPayments,
+                netAmount: editEffectiveTotal,
+              }),
+            ),
             store_credit_used: isFinalizedBill
               ? Math.min(
                   Number(appliedStoreCredit || 0),
@@ -1154,8 +1156,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           discount_total:
             computed.itemLevelDiscountTotal + computed.overallDiscount,
           taxable_total: computed.taxableTotal,
-          paymentstatus: "draft",
-          finalized: false,
+          ...billStatusFields(BILL_STATUS.DRAFT),
           applied_codes: selectedCodes,
           payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
           final_amount: finalAmount !== "" ? Number(finalAmount) : null,
@@ -1387,8 +1388,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               balanceAdjustedComputed.overallDiscount +
               balanceAdjustedComputed.balanceDiscount,
             taxable_total: balanceAdjustedComputed.taxableTotal,
-            paymentstatus: "finalized",
-            finalized: true,
+            ...billStatusFields(BILL_STATUS.FINALIZED),
             applied_codes: selectedCodes,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
             store_credit_used: storeCreditUsed,
@@ -1543,8 +1543,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         const { error: billErr } = await supabase
           .from("bills")
           .update({
-            finalized: true,
-            paymentstatus: "finalized",
+            ...billStatusFields(BILL_STATUS.FINALIZED),
             customerid: selectedCustomerId || null,
             notes: notes || null,
             payment_amount: Number(paymentAmount),
@@ -1760,8 +1759,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             taxable_total: billComputed.taxableTotal,
             net_amount: effectiveTotal,
             final_amount: finalAmount !== "" ? Number(finalAmount) : null,
-            paymentstatus: "partial",
-            finalized: true,
+            ...billStatusFields(BILL_STATUS.PARTIAL),
             applied_codes: selectedCodes,
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,
@@ -1885,8 +1883,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             taxable_total: billComputed.taxableTotal,
             net_amount: effectiveTotal,
             final_amount: finalAmount !== "" ? Number(finalAmount) : null,
-            paymentstatus: "partial",
-            finalized: true,
+            ...billStatusFields(BILL_STATUS.PARTIAL),
             applied_codes: selectedCodes,
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,

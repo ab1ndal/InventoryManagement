@@ -7,6 +7,7 @@ import { Badge } from "../../components/ui/badge";
 import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageCircle, Globe } from "lucide-react";
 import { isWebsiteMethod, receivedAmount } from "./billing/paymentHelpers";
 import { round2 } from "./billing/billUtils";
+import { BILL_STATUS, isDraft, isCancelled } from "../lib/billStatus";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
@@ -40,8 +41,8 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-// A cancelled draft has already had its stock put back, so deleting it would put it back again.
-const isDeletableDraft = (bill) => !bill.finalized && bill.paymentstatus !== "cancelled";
+// Only a draft: a cancelled draft has already had its stock put back, so deleting it would put it back again.
+const isDeletableDraft = isDraft;
 
 // stock_reduced is null on bills saved before it existed: nobody recorded whether they moved stock,
 // so whoever cancels one decides.
@@ -55,7 +56,7 @@ const CANCEL_ERRORS = {
 };
 
 // Cancelled bills are locked: a sale is redone as a new bill.
-const isEditableBill = (bill) => bill.paymentstatus !== "cancelled";
+const isEditableBill = (bill) => !isCancelled(bill);
 
 export default function BillTable({ onEdit }) {
   const { toast } = useToast();
@@ -383,7 +384,7 @@ export default function BillTable({ onEdit }) {
     if (error) throw new Error(CANCEL_ERRORS[error.message] || error.message);
     cancelKeyRef.current = null;
     setBills((prev) =>
-      prev.map((b) => (b.billid === bill.billid ? { ...b, paymentstatus: "cancelled" } : b))
+      prev.map((b) => (b.billid === bill.billid ? { ...b, paymentstatus: BILL_STATUS.CANCELLED } : b))
     );
     return data;
   };

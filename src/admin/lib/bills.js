@@ -24,6 +24,7 @@ import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
 import { logActivityWith } from "./activity.js";
 import { listSlipPhotos } from "./billSlipPhotos.js";
+import { BILL_STATUS, billStatusFields } from "./billStatus.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -454,10 +455,8 @@ export async function prepareBill(client, rawSpec) {
     gst_total: totals.gstTotal,
     discount_total: totals.itemLevelDiscountTotal + totals.overallDiscount + totals.balanceDiscount,
     taxable_total: totals.taxableTotal,
-    ...(partial
-      ? { net_amount: totals.grandTotal, final_amount: agreed, paymentstatus: "partial" }
-      : { paymentstatus: "finalized" }),
-    finalized: true,
+    ...(partial ? { net_amount: totals.grandTotal, final_amount: agreed } : {}),
+    ...billStatusFields(partial ? BILL_STATUS.PARTIAL : BILL_STATUS.FINALIZED),
     // Bill cancel restores stock only when this is true; the column defaults to true.
     stock_reduced: !spec.skip_stock,
     applied_codes: [],
@@ -592,7 +591,7 @@ async function insertBill(client, prepared, source) {
       .insert({ billid: saved.billid, ...prepared.first_payment });
     if (payErr) await removeBill("Failed to record payment", payErr);
   }
-  const partial = prepared.bill.paymentstatus === "partial";
+  const partial = prepared.bill.paymentstatus === BILL_STATUS.PARTIAL;
 
   const stockFailures = [];
   for (const s of prepared.stock) {
