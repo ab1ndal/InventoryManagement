@@ -24,6 +24,14 @@ export function receivedAmount(bill) {
   return bill?.payment_amount != null ? Number(bill.payment_amount) : null;
 }
 
+// Bill totals carry paise from item-level rounding (e.g. ₹1500.08) while payments are taken in
+// whole rupees, so a shortfall under one rupee counts as paid in full.
+const PAID_IN_FULL_TOLERANCE = 1;
+
+function coversNet(totalPaid, net) {
+  return net - totalPaid < PAID_IN_FULL_TOLERANCE;
+}
+
 /**
  * Where a bill stands after recording one more payment.
  *
@@ -35,10 +43,10 @@ export function receivedAmount(bill) {
 export function tallyPayment(existingPayments, newAmount, netAmount) {
   const totalPaid = round2(sumPayments(existingPayments) + Number(newAmount || 0));
   const net = round2(Number(netAmount || 0));
-  const isFullyPaid = totalPaid >= net;
+  const isFullyPaid = coversNet(totalPaid, net);
   return {
     totalPaid,
-    remaining: round2(Math.max(0, net - totalPaid)),
+    remaining: isFullyPaid ? 0 : round2(net - totalPaid),
     isFullyPaid,
     paymentStatus: isFullyPaid ? "finalized" : "partial",
   };
@@ -53,7 +61,7 @@ export function tallyPayment(existingPayments, newAmount, netAmount) {
 export function paymentStatusAfterEdit({ finalized, paymentStatus, payments, netAmount }) {
   if (!finalized) return "draft";
   if (paymentStatus !== "partial" && !payments?.length) return "finalized";
-  return sumPayments(payments) >= round2(Number(netAmount || 0)) ? "finalized" : "partial";
+  return coversNet(sumPayments(payments), round2(Number(netAmount || 0))) ? "finalized" : "partial";
 }
 
 /**
