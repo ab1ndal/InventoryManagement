@@ -7,6 +7,8 @@
 --     schema/migration_online_orders.sql schema/migration_bill_save.sql \
 --     schema/migration_bill_stock_reduced.sql schema/migration_bill_status_states.sql \
 --     schema/migration_bill_add_payment.sql schema/test_bill_add_payment.sql
+-- It also passes with schema/migration_bill_cancel_marker.sql and
+-- schema/migration_bill_payments_ledger.sql loaded: fixtures set the markers those rely on.
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -55,8 +57,16 @@ exception when others then
   return case when sqlstate = 'P0001' then sqlerrm else sqlstate end;
 end $$;
 
--- A bill in the given state with its earlier payments, written straight to the tables. A
--- cancelled one is cancelled after its payments, as bill_cancel would leave it.
+-- A bill in the given state with its earlier payments, written straight to the tables with the
+-- markers bill_save and bill_cancel set. A cancelled one is cancelled after its payments, as
+-- bill_cancel would leave it.
+create function pg_temp.pay(p_b int, p_amount numeric) returns void language plpgsql as $$
+begin
+  perform set_config('app.bill_payment_writer', 'on', true);
+  insert into public.bill_payments (billid, amount, salesmethodid) values (p_b, p_amount, -9402);
+  perform set_config('app.bill_payment_writer', '', true);
+end $$;
+
 create function pg_temp.bill(p_status text, p_net numeric, p_paid numeric[] default '{}')
 returns int language plpgsql as $$
 declare
@@ -68,10 +78,12 @@ begin
           p_status <> 'draft', p_net, null)
   returning billid into b;
   foreach a in array p_paid loop
-    insert into public.bill_payments (billid, amount, salesmethodid) values (b, a, -9402);
+    perform pg_temp.pay(b, a);
   end loop;
   if p_status = 'cancelled' then
+    perform set_config('app.bill_cancel', 'on', true);
     update public.bills set paymentstatus = 'cancelled' where billid = b;
+    perform set_config('app.bill_cancel', '', true);
   end if;
   return b;
 end $$;
@@ -137,7 +149,8 @@ begin
       (1500.99, array[500]::numeric[], 1000, 'finalized', 0),
       (1501.00, array[500]::numeric[], 1000, 'partial', 1),       -- a whole rupee short does not
       (2000.00, array[]::numeric[], 500, 'partial', 1500),
-      (1000.00, array[600]::numeric[], 600, 'finalized', 0)) v(net, paid, amt, st, remaining)
+      (1000.00, array[600]::numeric[], 400, 'finalized', 0),
+      (1000.00, array[600]::numeric[], 400.99, 'finalized', 0)) v(net, paid, amt, st, remaining)  -- under a rupee over
   loop
     n := n + 1;
     b := pg_temp.bill('partial', t.net, t.paid);
@@ -156,8 +169,8 @@ declare
   b int := pg_temp.bill('partial', 1000, array[300]::numeric[]);
   r jsonb;
 begin
-  -- Another screen records 400 the old way after this one loaded the bill.
-  insert into public.bill_payments (billid, amount, salesmethodid) values (b, 400, -9402);
+  -- Another screen records 400 after this one loaded the bill.
+  perform pg_temp.pay(b, 400);
   r := pg_temp.call(pg_temp.k(31), b, 300);
   perform pg_temp.ok('stale screen: all rows counted, bill paid',
     r ->> 'paymentstatus' = 'finalized' and (r ->> 'total_paid')::numeric = 1000);
@@ -217,6 +230,32 @@ begin
   values ('BPAY-TEST', 'BPAY', '9999999999', '{}'::jsonb, 1000, 1000, b);
   perform pg_temp.ok('online bill refused', pg_temp.try(pg_temp.k(64), b, 100) = 'BILL_ONLINE');
   perform pg_temp.ok('online: no payment', pg_temp.payments(b) = 0);
+end $$;
+
+-- ---------- no payment beyond the balance ----------
+do $$
+declare
+  b int := pg_temp.bill('partial', 1000, array[200]::numeric[]);
+  r jsonb;
+begin
+  perform pg_temp.ok('overpay refused', pg_temp.try(pg_temp.k(71), b, 900) = 'BILL_OVERPAID');
+  perform pg_temp.ok('a rupee over refused', pg_temp.try(pg_temp.k(72), b, 801) = 'BILL_OVERPAID');
+  perform pg_temp.ok('overpay: nothing recorded, key released',
+    pg_temp.payments(b) = 1
+    and not exists (select 1 from public.bill_save_log where idempotency_key in (pg_temp.k(71), pg_temp.k(72))));
+  r := pg_temp.call(pg_temp.k(73), b, 800);
+  perform pg_temp.ok('exact balance settles the bill', r ->> 'paymentstatus' = 'finalized');
+  perform pg_temp.ok('settled bill refuses another payment', pg_temp.try(pg_temp.k(74), b, 500) = 'BILL_NOTHING_DUE');
+  perform pg_temp.ok('settled bill refuses even paise', pg_temp.try(pg_temp.k(75), b, 0.5) = 'BILL_NOTHING_DUE');
+  perform pg_temp.ok('settled bill: two payments, 1000 paid', pg_temp.payments(b) = 2
+    and (select payment_amount from public.bills where billid = b) = 1000);
+
+  -- Paid in one go: finalized with no rows, so nothing is due whatever net_amount says.
+  b := pg_temp.bill('finalized', 1000);
+  perform pg_temp.ok('bill paid in one go refuses a payment', pg_temp.try(pg_temp.k(76), b, 100) = 'BILL_NOTHING_DUE');
+  -- Payments already over the net (an edit took an item off): nothing more is taken.
+  b := pg_temp.bill('finalized', 600, array[1000]::numeric[]);
+  perform pg_temp.ok('bill paid past its net refuses a payment', pg_temp.try(pg_temp.k(77), b, 100) = 'BILL_NOTHING_DUE');
 end $$;
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _bp_checks;

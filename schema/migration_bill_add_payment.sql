@@ -16,6 +16,13 @@
 -- Like the screen, the status is judged from bill_payments alone: a bill paid in one go has
 -- no rows, and the screen only offers this on part-paid bills.
 --
+-- A payment may not take the bill past its net amount: anything more than the balance by a
+-- rupee or more is refused (BILL_OVERPAID, detail has the remaining balance), and so is any
+-- payment on a bill with nothing left to pay (BILL_NOTHING_DUE). A finalized bill with no
+-- bill_payments rows was paid in one go, so it has nothing due. Money taken beyond the net
+-- would otherwise have no record of being owed back, and cancelling the bill would then
+-- refund it as if it were part of the sale.
+--
 -- Not enforced as a table rule: "partial exactly when payments fall short of net_amount".
 -- A bill paid in one go keeps its total in payment_amount with no bill_payments rows, and an
 -- edit that raises its total keeps it finalized (paymentStatusAfterEdit), so the rule would
@@ -25,10 +32,13 @@
 -- Result: billid, payment (payment_id, amount, salesmethodid, recorded_at, salesmethods),
 -- total_paid, remaining, paymentstatus, replayed.
 -- Errors use SQLSTATE P0001 with the code as the message and the cause in detail:
---   BILL_NOT_PAYABLE (draft or cancelled), BILL_ONLINE, BILL_KEY_CONFLICT, BILL_BAD_PAYLOAD.
+--   BILL_NOT_PAYABLE (draft or cancelled), BILL_ONLINE, BILL_NOTHING_DUE, BILL_OVERPAID,
+--   BILL_KEY_CONFLICT, BILL_BAD_PAYLOAD.
 -- A caller without access gets 42501. Lock and timeout errors pass through unchanged.
 --
 -- Needs schema/migration_bill_save.sql (bill_save_log, _bill_claim_key), live on 2026-11-12.
+-- The insert sets app.bill_payment_writer, the marker schema/migration_bill_payments_ledger.sql
+-- requires of every bill_payments insert.
 
 set local lock_timeout = '3s';
 
@@ -46,6 +56,8 @@ declare
   v_saved jsonb;
   v_bill public.bills;
   v_first boolean;
+  v_paid_before numeric;
+  v_remaining numeric;
   v_payment public.bill_payments;
   v_total numeric;
   v_net numeric;
@@ -88,13 +100,27 @@ begin
     end if;
 
     v_first := not exists (select 1 from public.bill_payments p where p.billid = p_billid);
+    v_net := round(coalesce(v_bill.net_amount, 0), 2);
+    select coalesce(round(sum(p.amount), 2), 0) into v_paid_before
+      from public.bill_payments p where p.billid = p_billid;
+    v_remaining := v_net - v_paid_before;
+    if (v_first and v_bill.paymentstatus = 'finalized')
+       or v_remaining < c_paid_in_full_tolerance then
+      raise exception 'BILL_NOTHING_DUE' using errcode = 'P0001',
+        detail = format('bill %s is paid (net %s, received %s)', p_billid, v_net, v_paid_before);
+    end if;
+    if p_amount - v_remaining >= c_paid_in_full_tolerance then
+      raise exception 'BILL_OVERPAID' using errcode = 'P0001',
+        detail = jsonb_build_object('remaining', v_remaining, 'amount', p_amount)::text;
+    end if;
 
+    perform set_config('app.bill_payment_writer', 'on', true);
     insert into public.bill_payments (billid, amount, salesmethodid, recorded_at)
     values (p_billid, p_amount, p_salesmethodid, coalesce(p_recorded_at, localtimestamp))
     returning * into v_payment;
+    perform set_config('app.bill_payment_writer', '', true);
 
     select round(sum(p.amount), 2) into v_total from public.bill_payments p where p.billid = p_billid;
-    v_net := round(coalesce(v_bill.net_amount, 0), 2);
     v_paid := v_net - v_total < c_paid_in_full_tolerance;
     v_status := case when v_paid then 'finalized' else 'partial' end;
 
