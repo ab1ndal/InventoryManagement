@@ -139,7 +139,7 @@ function App() {
         </Suspense>
         </RouteErrorBoundary>
       </Router>
-      <Toaster position="bottom-right" richColors closeButton duration={4000} />
+      <Toaster position="bottom-right" richColors closeButton duration={5000} />
     </TooltipProvider>
   );
 }

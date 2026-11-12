@@ -14,7 +14,6 @@ jest.mock("../../../lib/supabaseClient", () => ({
 jest.mock("../onlineOrders/onlineOrdersApi", () => ({ countQueue: async () => 3 }));
 jest.mock("../../lib/adminAccess", () => ({ lastCheckedRole: () => "admin" }));
 jest.mock("../../../components/ui/toaster", () => ({ Toaster: () => null }));
-jest.mock("../../lib/stickyErrorToasts", () => ({ keepErrorToastsUntilDismissed: () => () => {} }));
 
 const scrolled = [];
 
