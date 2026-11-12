@@ -31,6 +31,14 @@ const SORTABLE_COLUMNS = {
   paymentstatus: "paymentstatus",
 };
 
+// Order and labels match the Status badge in each row.
+const STATUS_OPTIONS = [
+  { value: "draft", label: "Draft" },
+  { value: "partial", label: "Pending Payment" },
+  { value: "finalized", label: "Finalized" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
 // A cancelled draft has already had its stock put back, so deleting it would put it back again.
 const isDeletableDraft = (bill) => !bill.finalized && bill.paymentstatus !== "cancelled";
 
@@ -48,6 +56,9 @@ export default function BillTable({ onEdit }) {
   const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState({ search: "" });
   const [typeFilter, setTypeFilter] = useState("all"); // 'all' | 'bos' | 'invoice'
+  const [statusFilter, setStatusFilter] = useState([]); // empty = every status
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const statusMenuRef = useRef(null);
   const [sort, setSort] = useState({ key: "bill_number", dir: "desc" });
   const [cancelBill, setCancelBill] = useState(null);
   const [resolveOpen, setResolveOpen] = useState(false);
@@ -195,6 +206,7 @@ export default function BillTable({ onEdit }) {
         .range((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE); // fetch 51 to detect next page
 
       if (typeFilter !== "all") query = query.eq("document_type", typeFilter);
+      if (statusFilter.length > 0) query = query.in("paymentstatus", statusFilter);
 
       const term = filters.search.trim();
       if (term) {
@@ -269,7 +281,29 @@ export default function BillTable({ onEdit }) {
     return () => {
       superseded = true;
     };
-  }, [page, filters, sort, toast, typeFilter]);
+  }, [page, filters, sort, toast, typeFilter, statusFilter]);
+
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+    const close = (e) => {
+      if (!statusMenuRef.current?.contains(e.target)) setStatusMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [statusMenuOpen]);
+
+  // Kept in STATUS_OPTIONS order so the button label and the query read the same way every time.
+  const toggleStatus = (value) => {
+    setPage(1);
+    setStatusFilter((prev) =>
+      STATUS_OPTIONS.map((o) => o.value).filter((v) => (v === value) !== prev.includes(v))
+    );
+  };
+
+  const statusButtonLabel =
+    statusFilter.length === 0
+      ? "All"
+      : STATUS_OPTIONS.filter((o) => statusFilter.includes(o.value)).map((o) => o.label).join(", ");
 
   // Cycle a column header through ascending → descending → no-sort (back to default: Bill Number desc).
   const handleSortClick = (key) => {
@@ -645,6 +679,39 @@ export default function BillTable({ onEdit }) {
           <option value="bos">Bill of Supply</option>
           <option value="invoice">Tax Invoice</option>
         </select>
+        <div className="relative" ref={statusMenuRef}>
+          <button
+            type="button"
+            onClick={() => setStatusMenuOpen((o) => !o)}
+            aria-expanded={statusMenuOpen}
+            className="border rounded px-2 py-1 text-sm bg-white"
+          >
+            Status: {statusButtonLabel} ▾
+          </button>
+          {statusMenuOpen && (
+            <div className="absolute left-0 z-20 mt-1 w-48 rounded border bg-white p-2 shadow-md space-y-1">
+              {STATUS_OPTIONS.map((o) => (
+                <label key={o.value} className="flex items-center gap-2 text-sm cursor-pointer px-1 py-0.5 rounded hover:bg-muted">
+                  <input
+                    type="checkbox"
+                    checked={statusFilter.includes(o.value)}
+                    onChange={() => toggleStatus(o.value)}
+                    className="h-4 w-4 cursor-pointer"
+                  />
+                  {o.label}
+                </label>
+              ))}
+              <button
+                type="button"
+                disabled={statusFilter.length === 0}
+                onClick={() => { setPage(1); setStatusFilter([]); }}
+                className="w-full text-left text-xs text-primary px-1 pt-1 border-t disabled:text-muted-foreground"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Table */}
