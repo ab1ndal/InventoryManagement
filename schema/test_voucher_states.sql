@@ -6,6 +6,9 @@
 --   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_holds.sql> \
 --     schema/migration_bill_save.sql schema/migration_bill_stock_reduced.sql \
 --     schema/migration_bill_cancel.sql schema/migration_bill_cancel_exchange_payout.sql \
+--     schema/migration_bill_save_app_callers.sql schema/migration_bill_cancel_marker.sql \
+--     schema/migration_bill_status_states.sql schema/migration_bill_add_payment.sql \
+--     schema/migration_bill_payments_ledger.sql \
 --     schema/migration_voucher_states.sql schema/test_voucher_states.sql
 begin;
 set local lock_timeout = '2s';
@@ -253,7 +256,11 @@ begin
   perform pg_temp.ok('bill_cancel releases its voucher and passes the commit check', r = 'ok'
     and pg_temp.state('VSTATE-C') = 'available'
     and (select paymentstatus from public.bills where billid = bc) = 'cancelled');
+  -- Fixture: only bill_cancel may mark a bill cancelled (schema/migration_bill_cancel_marker.sql),
+  -- so set the marker it sets.
+  perform set_config('app.bill_cancel', 'on', true);
   update public.bills set paymentstatus = 'cancelled' where billid = b1;
+  perform set_config('app.bill_cancel', '', true);
   r := pg_temp.try_commit(format('update public.vouchers set redeemed = false, redeemed_at = null, redeemed_billid = null
       where redeemed_billid = %s', b1));
   perform pg_temp.ok('a cancelled bill''s voucher released by a function passes the commit check',

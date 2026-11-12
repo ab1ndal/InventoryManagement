@@ -642,7 +642,9 @@ if [ "$("${PSQL[@]}" -c "select to_regprocedure('public.bill_discard(int)') is n
     "${PSQL[@]}" > /dev/null <<SQL
 delete from public.vouchers where voucher_id = 'CONCVC-V';
 delete from public.bill_save_log where idempotency_key = 'cccc0000-0000-4000-8000-0000000000c1';
+$BILLS_DELETE_ANY
 delete from public.bills where billid = -9201;
+$BILLS_DELETE_DRAFTS
 delete from public.customers where customerid = -9201;
 SQL
   }
