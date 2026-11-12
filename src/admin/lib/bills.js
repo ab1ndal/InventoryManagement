@@ -458,6 +458,8 @@ export async function prepareBill(client, rawSpec) {
       ? { net_amount: totals.grandTotal, final_amount: agreed, paymentstatus: "partial" }
       : { paymentstatus: "finalized" }),
     finalized: true,
+    // Bill cancel restores stock only when this is true; the column defaults to true.
+    stock_reduced: !spec.skip_stock,
     applied_codes: [],
     payment_amount: spec.payment.amount,
     store_credit_used: 0,
