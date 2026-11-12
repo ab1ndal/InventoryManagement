@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct } from "./stockHelpers";
-import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields } from "./paymentHelpers";
+import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields, paymentStatusAfterEdit } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
@@ -655,6 +655,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     Boolean(earliestPaymentDate) &&
     backdatedDate !== loadedBillDate &&
     backdatedDate > earliestPaymentDate;
+  // Paid in installments (or finalized with nothing paid): payments live in bill_payments and are
+  // recorded one by one, so the single Payment Amount box and Finalize do not apply.
+  const paidInInstallments = billPaymentStatus === "partial" || billPayments.length > 0;
   const saveBlocked =
     billPending ||
     discountsPending ||
@@ -685,7 +688,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     selectedCustomerId,
     selectedSalespersonIds,
     notes,
-    billPaymentStatus === "partial" || billPayments.length > 0 ? null : paymentAmount,
+    paidInInstallments ? null : paymentAmount,
     finalAmount,
     backdatedDate,
     salesMethodId,
@@ -1045,7 +1048,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
             finalized: isFinalizedBill ? true : false,
-            paymentstatus: billPaymentStatus === "partial" ? "partial" : (isFinalizedBill ? "finalized" : "draft"),
+            paymentstatus: paymentStatusAfterEdit({
+              finalized: isFinalizedBill,
+              paymentStatus: billPaymentStatus,
+              payments: billPayments,
+              netAmount: editEffectiveTotal,
+            }),
             store_credit_used: isFinalizedBill
               ? Math.min(
                   Number(appliedStoreCredit || 0),
@@ -1089,7 +1097,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         // Step J: Success
-        toast.success(`Draft saved — Bill #${billId}`);
+        toast.success(isFinalizedBill ? `Bill saved — #${effectiveBillNumber || billId}` : `Draft saved — Bill #${billId}`);
         if (stockFailures.length > 0) {
           toast.error("Stock sync warning", {
             description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
@@ -2435,7 +2443,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               {/* Payment — show installment history whenever any bill_payments rows exist
                   (a bill flips from "partial" to "finalized" once fully paid, but its
                   payment history must stay visible), otherwise standard single-amount input */}
-              {billPaymentStatus === "partial" || billPayments.length > 0 ? (
+              {paidInInstallments ? (
                 <section className="space-y-3">
                   <PaymentHistory
                     payments={billPayments}
@@ -2578,7 +2586,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                   Cancel
                 </Button>
                 <Button disabled={isSaving || saveBlocked} onClick={handleSaveDraft}>
-                  {isSaving ? "Saving..." : "Save Draft"}
+                  {isSaving ? "Saving..." : isFinalizedBill ? "Save Changes" : "Save Draft"}
                 </Button>
                 {showPartialButton && (
                   <Button
@@ -2590,9 +2598,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     {isSaving ? "Saving..." : "Partial Payment"}
                   </Button>
                 )}
-                <Button disabled={isSaving || saveBlocked} onClick={openFinalizeConfirm}>
-                  {isSaving ? "Saving..." : "Finalize"}
-                </Button>
+                {!paidInInstallments && (
+                  <Button disabled={isSaving || saveBlocked} onClick={openFinalizeConfirm}>
+                    {isSaving ? "Saving..." : "Finalize"}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

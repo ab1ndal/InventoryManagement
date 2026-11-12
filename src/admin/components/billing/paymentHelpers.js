@@ -45,6 +45,18 @@ export function tallyPayment(existingPayments, newAmount, netAmount) {
 }
 
 /**
+ * Payment status to save after editing a bill. A bill paid in installments (or finalized
+ * with nothing paid) is judged by its bill_payments against the new total, so an edit can
+ * move it between "partial" and "finalized". A bill paid in one go has no ledger and keeps
+ * its status; a draft stays a draft.
+ */
+export function paymentStatusAfterEdit({ finalized, paymentStatus, payments, netAmount }) {
+  if (!finalized) return "draft";
+  if (paymentStatus !== "partial" && !payments?.length) return "finalized";
+  return sumPayments(payments) >= round2(Number(netAmount || 0)) ? "finalized" : "partial";
+}
+
+/**
  * Bill fields to write with a payment. A bill finalized with nothing paid has no
  * payment method until its first payment; later payments keep the bill's method,
  * since each one's own method is on its bill_payments row.
