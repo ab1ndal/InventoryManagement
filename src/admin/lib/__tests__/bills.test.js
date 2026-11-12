@@ -123,6 +123,11 @@ describe("prepareBill — slip 387", () => {
     expect(p.stock[0]).toMatchObject({ change: 0, stock_after: 0 });
   });
 
+  it("records whether the bill took stock, so cancelling it gives back only what left the shelf", async () => {
+    expect((await prepareBill(fakeSupabase(db()), slip387)).bill.stock_reduced).toBe(true);
+    expect((await prepareBill(fakeSupabase(db()), { ...slip387, skip_stock: true })).bill.stock_reduced).toBe(false);
+  });
+
   it("uses manual item MRP, cost and category", async () => {
     const p = await prepareBill(fakeSupabase(db()), {
       ...slip387,
