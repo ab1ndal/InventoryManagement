@@ -6,6 +6,7 @@ import AttributesTab from "../components/attributes/AttributesTab";
 import AdminInvites from "../components/AdminInvites";
 import FiguresDidNotLoad from "../components/FiguresDidNotLoad";
 import { fetchInChunks } from "../lib/fetchInChunks";
+import { onlyLiveSales } from "../lib/billStatus";
 import {
   Table,
   TableBody,
@@ -59,9 +60,9 @@ export function MonthlySales() {
   const fetchMonthlySales = async () => {
     setLoading(true);
     try {
-      const { data: bills, error: billsError } = await supabase
-        .from("bills")
-        .select("billid, orderdate, net_amount, payment_amount");
+      const { data: bills, error: billsError } = await onlyLiveSales(
+        supabase.from("bills").select("billid, orderdate, net_amount, payment_amount"),
+      );
       if (billsError) throw billsError;
 
       const { data: items, error: itemsError } = await supabase

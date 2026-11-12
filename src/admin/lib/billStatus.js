@@ -32,3 +32,18 @@ export function billStatusFields(status) {
 export const isDraft = (bill) => bill.paymentstatus === BILL_STATUS.DRAFT;
 
 export const isCancelled = (bill) => bill.paymentstatus === BILL_STATUS.CANCELLED;
+
+// A live sale is a finalized bill that was not cancelled. Cancelling keeps finalized and every
+// amount, so finalized alone also counts cancelled bills. A NULL paymentstatus (old rows, until
+// the preflight repairs them) is not cancelled, so it counts.
+export const isLiveSale = (bill) => bill.finalized === true && !isCancelled(bill);
+
+/**
+ * Narrows a bills query to live sales, matching isLiveSale. A plain neq would also drop rows
+ * whose paymentstatus is NULL, since NULL <> 'cancelled' is not true in SQL.
+ */
+export function onlyLiveSales(query) {
+  return query
+    .eq("finalized", true)
+    .or(`paymentstatus.is.null,paymentstatus.neq.${BILL_STATUS.CANCELLED}`);
+}

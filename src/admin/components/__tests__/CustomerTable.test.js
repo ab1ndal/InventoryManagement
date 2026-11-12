@@ -16,6 +16,7 @@ const mockChain = (table) => {
     select: () => chain,
     eq: () => chain,
     neq: () => chain,
+    or: () => chain,
     order: () => chain,
     update: (p) => { op = "update"; payload = p; return chain; },
     in: (_col, v) => { ids = v; return chain; },

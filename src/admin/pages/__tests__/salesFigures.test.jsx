@@ -7,11 +7,29 @@ const URL_LIMIT = 640;
 const mockVariants = Array.from({ length: 700 }, (_, i) => `variant-${i}`);
 const mockDb = { costLookups: [], failCosts: false };
 
+// A live sale, a draft, a cancelled finalized bill and an old bill with no status. Only the
+// live sale and the old bill are sales; the filters below run as PostgREST would run them.
+const mockBills = [
+  { billid: 1, net_amount: 7000, orderdate: "2026-06-11", finalized: true, paymentstatus: "finalized" },
+  { billid: 2, net_amount: 500, orderdate: "2026-06-12", finalized: false, paymentstatus: "draft" },
+  { billid: 3, net_amount: 900, orderdate: "2026-06-13", finalized: true, paymentstatus: "cancelled" },
+  { billid: 4, net_amount: 60, orderdate: "2026-06-14", finalized: true, paymentstatus: null },
+];
+const sqlEq = (a, b) => (a == null || b == null ? null : String(a) === String(b));
+const orTerm = (part) => {
+  const [col, op, val] = part.split(".");
+  return (row) =>
+    op === "is" ? row[col] == null
+    : op === "neq" ? sqlEq(row[col], val) === false
+    : sqlEq(row[col], val) === true;
+};
+
 const mockChain = (table) => {
   let listed = null;
+  const filters = [];
   const reply = (from = 0) => {
     if (table === "bills") {
-      return { data: [{ billid: 1, net_amount: 7000, orderdate: "2026-06-01" }], error: null };
+      return { data: mockBills.filter((b) => filters.every((f) => f(b))), error: null };
     }
     if (table === "bill_items") {
       return {
@@ -29,7 +47,15 @@ const mockChain = (table) => {
   let rangeFrom = 0;
   const chain = {
     select: () => chain,
-    eq: () => chain,
+    eq: (col, val) => {
+      filters.push((row) => sqlEq(row[col], val) === true);
+      return chain;
+    },
+    or: (expr) => {
+      const terms = expr.split(",").map(orTerm);
+      filters.push((row) => terms.some((t) => t(row)));
+      return chain;
+    },
     gte: () => chain,
     lt: () => chain,
     order: () => chain,
@@ -57,6 +83,7 @@ jest.mock("sonner", () => ({ toast: { error: () => {} } }));
 jest.mock("../../components/dashboard/KpiCards", () => ({ current, loading }) => (
   <div>
     {!loading && `Costs ${current.items.reduce((sum, item) => sum + item.cost_price, 0)}`}
+    {!loading && ` Sales ${current.bills.reduce((sum, bill) => sum + bill.net_amount, 0)}`}
   </div>
 ));
 jest.mock("../../components/dashboard/RevenueChart", () => () => null);
@@ -78,7 +105,7 @@ beforeEach(() => {
 test("the dashboard adds up costs for 700 products without one over-long request", async () => {
   render(<DashboardPage />);
 
-  expect(await screen.findByText("Costs 1400")).toBeInTheDocument();
+  expect(await screen.findByText(/Costs 1400/)).toBeInTheDocument();
   expect(mockDb.costLookups).toEqual([300, 300, 100]);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
@@ -94,8 +121,8 @@ test("the dashboard hides its figures and says so when they fail to load", async
 test("Monthly Sales adds up costs for 700 products without one over-long request", async () => {
   render(<MonthlySales />);
 
-  // 7000 of sales less 700 products at 2 each.
-  expect(await screen.findByText(/5,600/)).toBeInTheDocument();
+  // 7060 of sales less 700 products at 2 each.
+  expect(await screen.findByText(/5,660/)).toBeInTheDocument();
   expect(mockDb.costLookups).toEqual([300, 300, 100]);
 });
 
@@ -105,4 +132,17 @@ test("Monthly Sales says so when its figures fail, instead of showing no sales",
 
   expect(await screen.findByRole("alert")).toHaveTextContent("Figures did not load");
   expect(screen.queryByText("No sales data found.")).not.toBeInTheDocument();
+});
+
+test("the dashboard counts live sales only, not drafts or cancelled bills", async () => {
+  render(<DashboardPage />);
+
+  expect(await screen.findByText(/Sales 7060/)).toBeInTheDocument();
+});
+
+test("Monthly Sales counts live sales only, not drafts or cancelled bills", async () => {
+  render(<MonthlySales />);
+
+  expect(await screen.findByText(/7,060/)).toBeInTheDocument();
+  expect(screen.queryByText(/8,460/)).not.toBeInTheDocument();
 });
