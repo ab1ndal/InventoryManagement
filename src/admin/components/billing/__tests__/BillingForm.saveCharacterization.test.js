@@ -81,6 +81,21 @@ const mockAddPayment = (args) => {
   };
 };
 
+// What bill_save returns for a new bill: the number, and the first payment row if one was sent.
+const mockBillSave = (args) => {
+  const pay = args.p_payload.first_payment;
+  return {
+    op: args.p_op,
+    billid: 42,
+    bill_number: "FY26-SG0042",
+    replayed: false,
+    negative_stock: [],
+    payment: pay
+      ? { payment_id: 900, amount: pay.amount, salesmethodid: pay.salesmethodid, recorded_at: pay.recorded_at || "2026-01-01T00:00:00" }
+      : null,
+  };
+};
+
 const mockChain = (table) => {
   const s = { table, op: "select", payload: undefined, filters: [] };
   const run = () => {
@@ -120,6 +135,7 @@ jest.mock("../../../../lib/supabaseClient", () => ({
     rpc: (fn, args) => {
       mockDb.writes.push({ kind: "rpc", fn, args });
       if (fn === "bill_add_payment") return Promise.resolve({ data: mockAddPayment(args), error: null });
+      if (fn === "bill_save") return Promise.resolve({ data: mockBillSave(args), error: null });
       return Promise.resolve(
         fn === "voucher_redeem" ? { data: true, error: null } : { data: 0, error: null },
       );

@@ -425,10 +425,12 @@ checked before the bill is written, so a bad photo stops the command with
 nothing saved. With `--dry-run` the output lists each photo's upload size.
 
 Writes, in order: the customer and manual items from `creates` (if any), then
-as the screen does: the bill (the database assigns the next
-`FY26-000NNN`), its items (if this fails the bill row is deleted again),
-`stock_adjust` per inventory variant (reason `bill_finalize`), and an
-activity-log entry `Finalized bill #… for … — ₹…, N items (via CLI)`.
+as the screen does, one `bill_save` call that saves the bill (the database
+assigns the next `FY26-000NNN`), its items, the stock change per inventory
+variant (none with `skip_stock`) and, on a part-paid bill, the first payment,
+all in one transaction: if any part fails, nothing is saved and no bill is
+left to delete. Then an activity-log entry
+`Finalized bill #… for … — ₹…, N items (via CLI)`.
 
 ```json
 {
@@ -437,14 +439,14 @@ activity-log entry `Finalized bill #… for … — ₹…, N items (via CLI)`.
   "customer": { "customerid": 453, "first_name": "Test", "last_name": "Customer", "phone": "+919000000001" },
   "totals": { "mrp_total": 2395, "line_discounts": 594.92, "balance_discount": 0.08, "grand_total": 1800, "paid": 1800 },
   "stock": [ { "variantid": "29c3…", "productid": "BC252051", "size": "FREE-SIZE", "color": "Mustard", "stock_before": 1, "change": -1, "stock_after": 0 } ],
-  "stock_failures": [],
+  "negative_stock": [],
   "warnings": []
 }
 ```
 
-The output also has `created` (`customer`, `manual_items`). A failed stock
-update does not undo the bill (as on the screen); it is listed in
-`stock_failures` with the error. Fix stock by hand for those. If the bill
+The output also has `created` (`customer`, `manual_items`). `negative_stock`
+lists any variant (`variantid`, `stock`) the save took below zero, which can
+only happen if stock was sold elsewhere after the preview; recount those. If the bill
 fails after a customer or manual item was created, the error ends with
 `NOTE: … were already created` — re-run with `customer { id }` /
 `manual_item { id }` so they aren't created twice.

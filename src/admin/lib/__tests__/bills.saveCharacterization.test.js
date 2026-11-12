@@ -8,6 +8,12 @@ import { fakeSupabase } from "../testing/fakeSupabase";
 
 const VID = "29c3daa8-5483-4c84-8959-1c930b8d1bb4";
 
+// A fixed bill_save key keeps the snapshots stable.
+Object.defineProperty(global, "crypto", {
+  value: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
+  configurable: true,
+});
+
 const slip = {
   customerid: 453,
   date: "2026-10-22",
@@ -30,11 +36,8 @@ const db = (overrides = {}) => ({
     data: [{ productid: "BC252051", name: "Georgette-Saree", categoryid: "SA", retailprice: 2395, unit_type: "piece" }],
     error: null,
   },
-  "bills.insert": { data: { billid: 900, bill_number: "FY26-000336" }, error: null },
-  "bill_items.insert": { data: null, error: null },
-  "rpc.stock_adjust": { data: 0, error: null },
+  "rpc.bill_save": { data: { billid: 900, bill_number: "FY26-000336", negative_stock: [] }, error: null },
   "activity_log.insert": { data: null, error: null },
-  "bills.delete": { data: null, error: null },
   ...overrides,
 });
 
@@ -59,14 +62,8 @@ test("pins current behaviour: CLI bill with skip_stock moves no stock", async ()
   expect(writesOf(client)).toMatchSnapshot();
 });
 
-test("pins current behaviour: CLI items failure removes the bill row", async () => {
-  const client = fakeSupabase(db({ "bill_items.insert": { data: null, error: new Error("items boom") } }));
+test("pins current behaviour: CLI refused save writes nothing else", async () => {
+  const client = fakeSupabase(db({ "rpc.bill_save": { data: null, error: new Error("items boom") } }));
   await expect(createBill(client, slip)).rejects.toThrow("items boom");
-  expect(writesOf(client)).toMatchSnapshot();
-});
-
-test("pins current behaviour: CLI stock failure keeps the bill and still logs it", async () => {
-  const client = fakeSupabase(db({ "rpc.stock_adjust": { data: null, error: new Error("variant gone") } }));
-  await createBill(client, slip);
   expect(writesOf(client)).toMatchSnapshot();
 });
