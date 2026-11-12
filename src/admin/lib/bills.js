@@ -132,12 +132,15 @@ export function parseBillSpec(spec) {
   }
   if (!isObj(spec.payment)) fail("payment is required: { method, amount }");
   checkKeys(spec.payment, ["method", "amount", "balance_due"], "payment");
-  const method = String(spec.payment.method ?? "").trim();
-  if (!method) fail("payment.method is required (e.g. Cash, UPI)");
   const paid = num(spec.payment.amount, "payment.amount");
-  if (paid <= 0) fail("payment.amount must be > 0");
   const balanceDue = spec.payment.balance_due == null ? 0 : num(spec.payment.balance_due, "payment.balance_due");
   if (balanceDue < 0) fail("payment.balance_due must be >= 0");
+  // Nothing paid yet is allowed only on a part-paid bill, which then has no
+  // payment method until its first payment (the screen's partial finalize).
+  if (paid < 0 || (paid === 0 && balanceDue === 0)) fail("payment.amount must be > 0");
+  const method = String(spec.payment.method ?? "").trim();
+  if (paid > 0 && !method) fail("payment.method is required (e.g. Cash, UPI)");
+  if (paid === 0 && method) fail("give no payment.method when nothing is paid yet");
   if (!Array.isArray(spec.items) || spec.items.length === 0) fail("items: at least one item is required");
 
   const items = spec.items.map((it, i) => {
@@ -303,9 +306,9 @@ export async function prepareBill(client, rawSpec) {
       : [],
   ]);
 
-  const method = byName(methods ?? [], "methodname", spec.payment.method);
+  const method = spec.payment.method ? byName(methods ?? [], "methodname", spec.payment.method) : null;
   // "Website" is reserved for online orders; the billing screen hides it.
-  if (!method || method.methodname.toLowerCase() === "website") {
+  if (spec.payment.method && (!method || method.methodname.toLowerCase() === "website")) {
     const allowed = (methods ?? []).map((m) => m.methodname).filter((n) => n.toLowerCase() !== "website");
     fail(`Unknown payment method "${spec.payment.method}" (one of: ${allowed.join(", ")})`);
   }
@@ -462,7 +465,7 @@ export async function prepareBill(client, rawSpec) {
     exchange_source_bill: null,
     exchange_cash_refund: 0,
     saleslocationid: location.saleslocationid,
-    salesmethodid: method.salesmethodid,
+    salesmethodid: method?.salesmethodid ?? null,
     orderdate: spec.date + "T00:00:00+05:30",
   };
   const billItems = buildBillItemsPayload(null, items, totals.balanceDiscount || 0, totals.overallDiscount, DOC_TYPE);
@@ -470,7 +473,7 @@ export async function prepareBill(client, rawSpec) {
   return {
     customer,
     creates,
-    payment_method: method.methodname,
+    payment_method: method?.methodname ?? null,
     location: location.locationname,
     bill,
     bill_items: billItems,
@@ -486,7 +489,7 @@ export async function prepareBill(client, rawSpec) {
     // The first payment's ledger row, written only for a part-paid bill. A
     // backdated payment is stored at midday, as the screen does (recorded_at
     // has no time zone).
-    first_payment: partial
+    first_payment: partial && spec.payment.amount > 0
       ? {
           amount: spec.payment.amount,
           salesmethodid: method.salesmethodid,

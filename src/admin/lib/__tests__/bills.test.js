@@ -311,6 +311,33 @@ describe("part payment (payment.balance_due)", () => {
     expect(out.totals.balance_due).toBe(800);
   });
 
+  it("allows nothing paid yet when the whole amount is due, as the screen does", async () => {
+    const unpaid = { ...slip387, payment: { amount: 0, balance_due: 1800 } };
+    const p = await prepareBill(fakeSupabase(db()), unpaid);
+    expect(p.bill).toMatchObject({
+      totalamount: 1800, final_amount: 1800, paymentstatus: "partial", payment_amount: 0, salesmethodid: null,
+    });
+    expect(p.payment_method).toBeNull();
+    expect(p.first_payment).toBeNull();
+
+    const client = fakeSupabase(db({
+      "bills.insert": { data: saved, error: null },
+      "bill_items.insert": { data: null, error: null },
+      "rpc.stock_adjust": { data: 0, error: null },
+      "activity_log.insert": { data: null, error: null },
+    }));
+    await createBill(client, unpaid);
+    expect(client.calls.some((c) => c.table === "bill_payments")).toBe(false);
+  });
+
+  it.each([
+    [{ ...slip387, payment: { method: "Cash", amount: 0 } }, /payment.amount must be > 0/],
+    [{ ...slip387, payment: { amount: 1800 } }, /payment.method is required/],
+    [{ ...slip387, payment: { method: "Cash", amount: 0, balance_due: 1800 } }, /no payment.method when nothing is paid/],
+  ])("needs a method exactly when something is paid %#", (spec, msg) => {
+    expect(() => parseBillSpec(spec)).toThrow(msg);
+  });
+
   it("removes the bill and moves no stock when the payment insert fails", async () => {
     const client = fakeSupabase(db({
       "bills.insert": { data: saved, error: null },
