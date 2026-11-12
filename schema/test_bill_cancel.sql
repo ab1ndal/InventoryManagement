@@ -7,6 +7,8 @@
 --     schema/migration_online_orders.sql schema/migration_bill_save.sql \
 --     schema/migration_bill_stock_reduced.sql schema/migration_bill_cancel.sql \
 --     schema/migration_bill_cancel_exchange_payout.sql schema/test_bill_cancel.sql
+-- Add schema/migration_bill_cancel_marker.sql before this file to test the live definition; it
+-- also passes with the later bill migrations loaded (bill_status_states, bill_payments_ledger).
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -338,7 +340,10 @@ declare
   r jsonb;
   c0 numeric := pg_temp.credit(-9102);
 begin
+  -- Written with the marker bill_save and bill_add_payment set (migration_bill_payments_ledger.sql).
+  perform set_config('app.bill_payment_writer', 'on', true);
   insert into public.bill_payments (billid, amount, salesmethodid) values (b, 150.25, -9101), (b, 100, -9101);
+  perform set_config('app.bill_payment_writer', '', true);
   r := pg_temp.call(pg_temp.k(70), b, 'store_credit', pg_temp.opts(true, 'partial'));
   perform pg_temp.ok('partial: received from payments', (r ->> 'refund')::numeric = 250.25);
   perform pg_temp.ok('store_credit: credit added', pg_temp.credit(-9102) = c0 + 250.25
