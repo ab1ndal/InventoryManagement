@@ -149,14 +149,18 @@ async function redeemVoucher(voucherId, billId) {
   }
 }
 
-// Undoes this bill's own redemption before the bill row is rolled back
-// (vouchers.redeemed_billid references bills, so the delete fails otherwise).
-const releaseVoucher = (voucherId, billId) =>
-  supabase
-    .from("vouchers")
-    .update({ redeemed: false, redeemed_at: null, redeemed_billid: null })
-    .eq("voucher_id", voucherId)
-    .eq("redeemed_billid", billId);
+// Undoes this draft's redemption when its finalize redeemed the voucher and then failed to
+// mark the draft finalized. The database allows it only while the bill is still a draft, so
+// if the bill did get finalized the voucher stays spent on it.
+async function releaseDraftVoucher(voucherId, billId) {
+  const { error } = await supabase.rpc("voucher_release", {
+    p_voucher: voucherId,
+    p_bill: billId,
+  });
+  if (error) {
+    console.error(`voucher_release failed for voucher ${voucherId} on bill ${billId}:`, error.message);
+  }
+}
 
 function isAutoApplyEligible(d, items, today) {
   // Date guards (defensive — loadDiscounts already filters, but belt-and-suspenders)
@@ -920,6 +924,17 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     setConfirmOpen(false);
     setPartialConfirmOpen(false);
   };
+  // Abandons the bill this save just inserted. bill_discard frees any voucher it redeemed and
+  // deletes it in one transaction, so the voucher is never free while the bill exists. If that
+  // fails the bill stays, and newBillRef keeps it so the form locks as saved but not finished.
+  const discardNewBill = async (billId) => {
+    const { error } = await supabase.rpc("bill_discard", { p_billid: billId });
+    if (error) {
+      console.error(`bill_discard failed for bill ${billId}:`, error.message);
+      return;
+    }
+    newBillRef.current = null;
+  };
   const shownError = unfinishedBill
     ? {
         title: "Bill not finished",
@@ -1414,8 +1429,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           try {
             await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
           } catch (vErr) {
-            await supabase.from("bills").delete().eq("billid", activeBillId);
-            newBillRef.current = null;
+            await discardNewBill(activeBillId);
             throw vErr;
           }
         }
@@ -1440,11 +1454,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bill_items")
           .insert(billItemsPayload);
         if (itemsError) {
-          if (appliedVoucher?.voucher_id) {
-            await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
-          }
-          await supabase.from("bills").delete().eq("billid", activeBillId);
-          newBillRef.current = null;
+          await discardNewBill(activeBillId);
           throw new Error("Failed to save bill items: " + itemsError.message);
         }
 
@@ -1563,7 +1573,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
           .eq("billid", activeBillId);
-        if (billErr) throw billErr;
+        if (billErr) {
+          if (appliedVoucher?.voucher_id && !isFinalizedBill) {
+            await releaseDraftVoucher(appliedVoucher.voucher_id, activeBillId);
+          }
+          throw billErr;
+        }
 
         // Delete + re-insert bill_items to reflect all edits and balance discount
         const { error: delErr } = await supabase
@@ -1784,8 +1799,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           try {
             await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
           } catch (vErr) {
-            await supabase.from("bills").delete().eq("billid", activeBillId);
-            newBillRef.current = null;
+            await discardNewBill(activeBillId);
             throw vErr;
           }
         }
@@ -1808,11 +1822,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bill_items")
           .insert(billItemsPayload);
         if (itemsError) {
-          if (appliedVoucher?.voucher_id) {
-            await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
-          }
-          await supabase.from("bills").delete().eq("billid", activeBillId);
-          newBillRef.current = null;
+          await discardNewBill(activeBillId);
           throw new Error("Failed to save bill items: " + itemsError.message);
         }
 
@@ -1897,7 +1907,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
           .eq("billid", activeBillId);
-        if (billErr) throw billErr;
+        if (billErr) {
+          if (appliedVoucher?.voucher_id) {
+            await releaseDraftVoucher(appliedVoucher.voucher_id, activeBillId);
+          }
+          throw billErr;
+        }
 
         await supabase.from("bill_items").delete().eq("billid", activeBillId);
         const updatedPayload = buildBillItemsPayload(
@@ -1951,11 +1966,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .single();
         if (payErr) {
           if (isNewBill) {
-            if (appliedVoucher?.voucher_id) {
-              await releaseVoucher(appliedVoucher.voucher_id, activeBillId);
-            }
-            await supabase.from("bills").delete().eq("billid", activeBillId);
-            newBillRef.current = null;
+            await discardNewBill(activeBillId);
           }
           throw new Error("Failed to record payment: " + payErr.message);
         }

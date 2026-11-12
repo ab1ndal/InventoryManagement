@@ -14,6 +14,8 @@ const mockDb = {
   alterationCharge: 0,
   discounts: [],
   failWrite: null, // (call) => error message to fail that write with, or null
+  bill: null, // row returned when an existing bill is opened
+  existingItems: [], // bill_items rows a save of an existing bill reads
 };
 
 const mockResolve = (s) => {
@@ -36,6 +38,12 @@ const mockResolve = (s) => {
   }
   if (s.table === "vouchers" && s.op === "select") {
     return { data: mockDb.voucherRow, error: null };
+  }
+  if (s.table === "bills" && s.op === "select" && mockDb.bill) {
+    return { data: mockDb.bill, error: null };
+  }
+  if (s.table === "bill_items" && s.op === "select") {
+    return { data: mockDb.existingItems, error: null };
   }
   return { data: s.single ? null : [], error: null };
 };
@@ -139,6 +147,8 @@ beforeEach(() => {
   mockDb.alterationCharge = 0;
   mockDb.discounts = [];
   mockDb.failWrite = null;
+  mockDb.bill = null;
+  mockDb.existingItems = [];
   clearBillingLookups();
   mockToast.success = [];
   mockToast.error = [];
@@ -227,11 +237,8 @@ test("voucher is redeemed via voucher_redeem; a false result stops finalize with
   // nothing else hung off the refused bill, and the bill row itself is rolled back
   expect(rpcs("stock_adjust")).toEqual([]);
   expect(mockDb.calls.some((c) => c.table === "bill_items" && c.op === "insert")).toBe(false);
-  expect(
-    mockDb.calls.some(
-      (c) => c.table === "bills" && c.op === "delete" && c.filters.some(([, col, v]) => col === "billid" && v === 42),
-    ),
-  ).toBe(true);
+  expect(rpcs("bill_discard")).toEqual([{ p_billid: 42 }]);
+  expect(mockDb.calls.some((c) => c.table === "bills" && c.op === "delete")).toBe(false);
   // no direct redemption write
   expect(
     mockDb.calls.some((c) => c.table === "vouchers" && c.op === "update" && c.payload?.redeemed === true),
@@ -378,3 +385,100 @@ test("a successful finalize does not lock the form", async () => {
   expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Finalize" })).toBeEnabled();
 });
+
+const VOUCHER_ROW = {
+  voucher_id: "VOUCH1", customerid: null, expiry_date: "2099-12-31",
+  value: 100, redeemed: false, held_order_id: null,
+};
+const voucherWrites = () => mockDb.calls.filter((c) => c.table === "vouchers" && c.op !== "select");
+
+test("a bill-item failure discards the new bill and frees its voucher in one bill_discard call", async () => {
+  mockDb.voucherRow = VOUCHER_ROW;
+  mockDb.failWrite = (c) => (c.table === "bill_items" && c.op === "insert" ? "items down" : null);
+  await renderBillPaidByStoreCredit();
+  await applyVoucher("VOUCH1");
+  await screen.findAllByText(/Voucher #VOUCH1/);
+  await finalizeNewBill();
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(rpcs("voucher_redeem")).toEqual([{ p_voucher: "VOUCH1", p_bill: 42 }]);
+  expect(rpcs("bill_discard")).toEqual([{ p_billid: 42 }]);
+  // The voucher is never freed by a separate write the bill could outlive.
+  expect(voucherWrites()).toEqual([]);
+  expect(countOf("bills", "delete")).toBe(0);
+  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
+});
+
+test("when bill_discard fails the bill stays, so the form locks as saved but not finished", async () => {
+  mockDb.voucherRow = VOUCHER_ROW;
+  mockDb.failWrite = (c) => (c.table === "bill_items" && c.op === "insert" ? "items down" : null);
+  mockDb.rpcResult = (fn) => {
+    if (fn === "voucher_redeem") return { data: true, error: null };
+    if (fn === "bill_discard") return { data: null, error: { message: "discard down" } };
+    return { data: 0, error: null };
+  };
+  await renderBillPaidByStoreCredit();
+  await applyVoucher("VOUCH1");
+  await screen.findAllByText(/Voucher #VOUCH1/);
+  await finalizeNewBill();
+
+  expect(await screen.findByText(unfinishedMsg("finishing the bill"))).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
+  expect(voucherWrites()).toEqual([]);
+});
+
+// A saved draft: 2 × Kurti @ ₹150, ₹200 left to pay once the ₹100 voucher is applied.
+const draftBill = (paymentAmount) => ({
+  billid: 330,
+  bill_number: "FY26-SG0330",
+  orderdate: "2026-09-30T00:00:00",
+  customerid: 7,
+  customers: { first_name: "Asha", last_name: "", phone: "999", store_credit: 0, discount_usage: [], exchanges: [] },
+  document_type: "bos",
+  paymentstatus: "draft",
+  finalized: false,
+  totalamount: 300,
+  net_amount: null,
+  final_amount: null,
+  payment_amount: paymentAmount,
+  salesmethodid: 1,
+  saleslocationid: 1,
+  store_credit_used: 0,
+  applied_codes: [],
+  notes: null,
+  bill_payments: [],
+  bill_salespersons: [],
+  linked_exchanges: [],
+  bill_items: [
+    {
+      bill_item_id: 11, variantid: "v1", product_code: "BC25001", product_name: "Kurti",
+      quantity: 2, unit_type: "piece", mrp: 150, discount_total: 0, total: 300,
+      gst_rate: 5, stitch_type: "unstitched", alteration_charge: 0,
+      productsizecolors: { size: "M", color: "Red" },
+    },
+  ],
+});
+
+test.each([
+  ["Finalize", "Confirm & Finalize", 200],
+  ["Partial Payment", "Confirm Partial Payment", 50],
+])(
+  "a draft whose %s fails after redeeming the voucher releases it with voucher_release",
+  async (button, confirm, paid) => {
+    mockDb.bill = draftBill(paid);
+    mockDb.existingItems = [{ variantid: "v1", quantity: 2 }];
+    mockDb.voucherRow = VOUCHER_ROW;
+    mockDb.failWrite = (c) => (c.table === "bills" && c.op === "update" ? "bill write down" : null);
+    render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+    await screen.findAllByText("Kurti");
+    await applyVoucher("VOUCH1");
+    await screen.findAllByText(/Voucher #VOUCH1/);
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    fireEvent.click(await screen.findByRole("button", { name: confirm }));
+    await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+    expect(rpcs("voucher_redeem")).toEqual([{ p_voucher: "VOUCH1", p_bill: 330 }]);
+    expect(rpcs("voucher_release")).toEqual([{ p_voucher: "VOUCH1", p_bill: 330 }]);
+    expect(voucherWrites()).toEqual([]);
+  },
+);
