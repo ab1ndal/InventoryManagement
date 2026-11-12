@@ -357,9 +357,9 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 | Field | Required | Notes |
 |---|---|---|
 | `date` | yes | `YYYY-MM-DD`, stored as the bill date; the FY of the bill number follows it |
-| `payment.method` | yes | a sales method name (Cash, UPI, Card, Paytm, GPay, Mixed); not Website. Split payments: one combined amount, method `Mixed`, the split in `notes` |
+| `payment.method` | yes, unless nothing is paid | a sales method name (Cash, UPI, Card, Paytm, GPay, Mixed); not Website. Split payments: one combined amount, method `Mixed`, the split in `notes` |
 | `payment.amount` | yes | what the customer paid (the slip's net amount, or the first payment of a part-paid bill) |
-| `payment.balance_due` | no | what the customer still owes (slip "bal 3950"); > 0 makes a part-paid bill priced at `amount + balance_due` |
+| `payment.balance_due` | no | what the customer still owes (slip "bal 3950"); > 0 makes a part-paid bill priced at `amount + balance_due`. Nothing paid yet: `"amount": 0` and no `method`; the bill then has no payment method and no `bill_payments` row, as on the screen |
 | `location` | no | sales location name, default `Walk-In` |
 | `notes` | no | e.g. `"Paper bill 387; Cash 1000 + UPI 950"` |
 | `skip_stock` | no | `true` = don't touch stock (the screen's "backdated" checkbox); default reduces stock |
