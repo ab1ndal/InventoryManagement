@@ -39,6 +39,16 @@ select b.billid, b.bill_number, b.orderdate::date, b.paymentstatus, b.finalized,
                     or (b.finalized is true and b.paymentstatus in ('partial', 'finalized', 'cancelled')), false)
  order by b.billid;
 
+-- 4. Payments already on draft bills, which the migration refuses from now on (payments on
+--    cancelled bills are expected: they record what was refunded). The rows stay, but they
+--    can no longer be edited; look at each bill before the migration if any are listed.
+select b.billid, b.bill_number, b.paymentstatus, count(*) as payments, sum(p.amount) as paid
+  from public.bill_payments p
+  join public.bills b on b.billid = p.billid
+ where b.paymentstatus = 'draft'
+ group by b.billid, b.bill_number, b.paymentstatus
+ order by b.billid;
+
 -- Suggested repairs, only if query 2 found rows. Review query 3 first; run inside a
 -- transaction and check the counts before commit. Not part of the migration.
 --
