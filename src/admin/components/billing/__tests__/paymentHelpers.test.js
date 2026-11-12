@@ -115,3 +115,21 @@ describe("paymentStatusAfterEdit", () => {
     expect(paymentStatusAfterEdit({ finalized: true, paymentStatus: "finalized", payments: [{ amount: 300 }, { amount: 500 }], netAmount: 1200 })).toBe("partial");
   });
 });
+
+describe("paise left over from rounding", () => {
+  // As on FY26-000272: ₹1500.00 received against a net of ₹1500.08.
+  test("an edit does not reopen a bill short only by paise", () => {
+    expect(paymentStatusAfterEdit({ finalized: true, paymentStatus: "finalized", payments: [{ amount: 1000 }, { amount: 500 }], netAmount: 1500.08 })).toBe("finalized");
+  });
+
+  test("a payment short only by paise settles the bill", () => {
+    const t = tallyPayment([{ amount: 1000 }], 500, 1500.08);
+    expect(t.isFullyPaid).toBe(true);
+    expect(t.paymentStatus).toBe("finalized");
+    expect(t.remaining).toBe(0);
+  });
+
+  test("a rupee or more short still leaves the bill partial", () => {
+    expect(tallyPayment([{ amount: 1000 }], 499, 1500).paymentStatus).toBe("partial");
+  });
+});
