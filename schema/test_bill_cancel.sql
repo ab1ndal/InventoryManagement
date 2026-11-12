@@ -6,7 +6,7 @@
 --   scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql \
 --     schema/migration_online_orders.sql schema/migration_bill_save.sql \
 --     schema/migration_bill_stock_reduced.sql schema/migration_bill_cancel.sql \
---     schema/test_bill_cancel.sql
+--     schema/migration_bill_cancel_exchange_payout.sql schema/test_bill_cancel.sql
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -80,11 +80,11 @@ create function pg_temp.state() returns jsonb language sql as $$
   select jsonb_build_object(
     'bills', (select jsonb_object_agg(billid, paymentstatus) from public.bills where notes like 'BCAN%'),
     'stock', (select jsonb_object_agg(variantid, stock) from public.productsizecolors where productid like 'BCAN%'),
-    'credit', (select jsonb_object_agg(customerid, store_credit) from public.customers where customerid in (-9101, -9102)),
-    'ledger', (select count(*) from public.store_credit_ledger where customerid in (-9101, -9102)),
+    'credit', (select jsonb_object_agg(customerid, store_credit) from public.customers where customerid in (-9101, -9102, -9103)),
+    'ledger', (select count(*) from public.store_credit_ledger where customerid in (-9101, -9102, -9103)),
     'vouchers', (select jsonb_object_agg(voucher_id, jsonb_build_array(redeemed, redeemed_billid)) from public.vouchers where voucher_id like 'BCAN%'),
     'exchanges', (select jsonb_object_agg(exchangeid, new_billid) from public.exchanges where exchangeid between -9199 and -9101),
-    'usage', (select count(*) from public.discount_usage where customerid in (-9101, -9102)),
+    'usage', (select count(*) from public.discount_usage where customerid in (-9101, -9102, -9103)),
     'moves', (select count(*) from public.bill_stock_moves where reason = 'bill_cancel'),
     'log', (select count(*) from public.bill_save_log where idempotency_key::text like 'bca2c000-%'))
 $$;
@@ -98,9 +98,13 @@ declare
   l jsonb;
 begin
   insert into public.bills (customerid, notes, totalamount, paymentstatus, finalized, payment_amount,
-                            store_credit_used, stock_reduced, saleslocationid, salesmethodid)
+                            store_credit_used, exchange_credit_used, exchange_cash_refund,
+                            stock_reduced, saleslocationid, salesmethodid)
   values (p_customer, 'BCAN', 1000, p_status, p_finalized, p_paid,
-          coalesce((p_extra ->> 'store_credit_used')::numeric, 0), p_stock_reduced, -9101, -9101)
+          coalesce((p_extra ->> 'store_credit_used')::numeric, 0),
+          coalesce((p_extra ->> 'exchange_credit_used')::numeric, 0),
+          coalesce((p_extra ->> 'exchange_cash_refund')::numeric, 0),
+          p_stock_reduced, -9101, -9101)
   returning billid into b;
   for l in select * from jsonb_array_elements(p_lines) loop
     insert into public.bill_items (billid, quantity, mrp, variantid, product_name, subtotal, gst_amount, total)
@@ -126,7 +130,8 @@ begin
 
   insert into public.customers (customerid, customer_ulid, first_name, store_credit) values
     (-9101, 'BCANFIXTURE000000000000001', 'Fixture', 500),
-    (-9102, 'BCANFIXTURE000000000000002', 'Fixture', 0);
+    (-9102, 'BCANFIXTURE000000000000002', 'Fixture', 0),
+    (-9103, 'BCANFIXTURE000000000000003', 'Fixture', 0);
   insert into public.salesmethods (salesmethodid, methodname) values (-9101, 'BCAN method');
   insert into public.saleslocations (saleslocationid, locationname) values (-9101, 'BCAN location');
   insert into public.discounts (code, type, value) values ('BCAN', 'flat', 10);
@@ -345,7 +350,8 @@ end $$;
 -- ---------- decision 2 + voucher + discount usage ----------
 do $$
 declare
-  b int := pg_temp.bill(true, 'finalized', -9101, 400, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)));
+  b int := pg_temp.bill(true, 'finalized', -9101, 400, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)),
+    '{"exchange_credit_used": 600}');
   r jsonb;
 begin
   insert into public.exchanges (exchangeid, quantity, customerid, credit_amount, new_billid)
@@ -360,6 +366,87 @@ begin
   perform pg_temp.ok('voucher released', (select not redeemed and redeemed_billid is null and redeemed_at is null
       from public.vouchers where voucher_id = 'BCAN-V') and (r ->> 'voucher_released')::boolean);
   perform pg_temp.ok('discount usage removed', not exists (select 1 from public.discount_usage where billid = b));
+end $$;
+
+-- ---------- owner rule: exchange credit is never cashed out twice ----------
+-- Bill 167 on prod: exchange 688.46 paid a 687.90 bill and 0.56 went back as cash.
+do $$
+declare
+  b int := pg_temp.bill(true, 'finalized', -9103, null, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)),
+    '{"exchange_credit_used": 687.90, "exchange_cash_refund": 0.56}');
+  before jsonb;
+begin
+  insert into public.exchanges (exchangeid, quantity, customerid, credit_amount, new_billid)
+  values (-9110, 1, -9103, 688.46, b);
+  before := pg_temp.state();
+  perform pg_temp.ok('cash back with nothing to take it from: refused',
+    pg_temp.try(pg_temp.k(100), b, 'store_credit', pg_temp.opts(true, 'finalized')) = 'BILL_EXCHANGE_PAID_OUT');
+  perform pg_temp.ok('cash back refused: nothing changed', pg_temp.state() = before
+      and (select new_billid from public.exchanges where exchangeid = -9110) = b);
+end $$;
+
+-- the paid-out part comes off this bill's refund first
+do $$
+declare
+  b int := pg_temp.bill(true, 'finalized', -9103, 500, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)),
+    '{"exchange_credit_used": 700, "exchange_cash_refund": 100}');
+  r jsonb;
+  c0 numeric := pg_temp.credit(-9103);
+begin
+  insert into public.exchanges (exchangeid, quantity, customerid, credit_amount, new_billid)
+  values (-9111, 1, -9103, 800, b);
+  r := pg_temp.call(pg_temp.k(101), b, 'store_credit', pg_temp.opts(true, 'finalized'));
+  perform pg_temp.ok('paid out taken from refund', (r ->> 'refund')::numeric = 400
+      and (r ->> 'exchange_paid_out')::numeric = 100 and (r ->> 'store_credit_taken')::numeric = 0);
+  perform pg_temp.ok('refund net of paid out credited', pg_temp.credit(-9103) = c0 + 400);
+  perform pg_temp.ok('exchange pending again', (select new_billid from public.exchanges where exchangeid = -9111) is null);
+end $$;
+
+-- excess put on store credit at the bill is taken back from store credit
+do $$
+declare
+  b int := pg_temp.bill(true, 'finalized', -9103, 0, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)),
+    '{"exchange_credit_used": 600}');
+  r jsonb;
+  c0 numeric;
+begin
+  insert into public.exchanges (exchangeid, quantity, customerid, credit_amount, new_billid)
+  values (-9112, 1, -9103, 1000, b);
+  perform public.store_credit_adjust(-9103, 400, 'exchange_credit', b::text);
+  c0 := pg_temp.credit(-9103);
+  r := pg_temp.call(pg_temp.k(102), b, 'return_payment', pg_temp.opts(true, 'finalized'));
+  perform pg_temp.ok('store credit excess taken back', pg_temp.credit(-9103) = c0 - 400
+      and (r ->> 'store_credit_taken')::numeric = 400 and (r ->> 'refund')::numeric = 0);
+  perform pg_temp.ok('take-back ledger row', exists (select 1 from public.store_credit_ledger
+      where customerid = -9103 and reason = 'bill_cancel_exchange_paid_out' and ref_id = b::text and delta = -400));
+end $$;
+
+-- the same excess already spent from store credit: refused
+do $$
+declare
+  b int := pg_temp.bill(true, 'finalized', -9103, 0, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)),
+    '{"exchange_credit_used": 600}');
+  before jsonb;
+begin
+  insert into public.exchanges (exchangeid, quantity, customerid, credit_amount, new_billid)
+  values (-9113, 1, -9103, 1000, b);
+  update public.customers set store_credit = 399.99 where customerid = -9103;
+  before := pg_temp.state();
+  perform pg_temp.ok('spent excess: refused',
+    pg_temp.try(pg_temp.k(103), b, 'return_payment', pg_temp.opts(true, 'finalized')) = 'BILL_EXCHANGE_PAID_OUT');
+  perform pg_temp.ok('spent excess: nothing changed', pg_temp.state() = before);
+end $$;
+
+-- no customer to take it from: refused
+do $$
+declare
+  b int := pg_temp.bill(true, 'finalized', null, 0, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)),
+    '{"exchange_credit_used": 100, "exchange_cash_refund": 50}');
+begin
+  insert into public.exchanges (exchangeid, quantity, customerid, credit_amount, new_billid)
+  values (-9114, 1, -9103, 150, b);
+  perform pg_temp.ok('no customer, paid out: refused',
+    pg_temp.try(pg_temp.k(104), b, 'no_customer', pg_temp.opts(true, 'finalized')) = 'BILL_EXCHANGE_PAID_OUT');
 end $$;
 
 -- ---------- a failure part way leaves nothing behind ----------
@@ -377,7 +464,7 @@ create trigger bcan_fail before update on public.bills for each row execute func
 do $$
 declare
   b int := pg_temp.bill(true, 'finalized', -9101, 1000, true, jsonb_build_array(pg_temp.line(pg_temp.v1(), 1)),
-    '{"store_credit_used": 50}');
+    '{"store_credit_used": 50, "exchange_credit_used": 100}');
   before jsonb;
 begin
   update public.bills set notes = 'BCAN fail' where billid = b;

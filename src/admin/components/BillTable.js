@@ -50,6 +50,8 @@ const CANCEL_ERRORS = {
   BILL_ALREADY_CANCELLED: "This bill is already cancelled. Refresh the list.",
   BILL_STALE: "This bill changed since the list loaded. Refresh and try again.",
   BILL_ONLINE: "Cancel website orders from the Orders screen.",
+  BILL_EXCHANGE_PAID_OUT:
+    "Part of the exchange credit on this bill was already paid out, and there is not enough refund or store credit to take it back. Cancelling would pay it twice, so the bill was not cancelled.",
 };
 
 // Cancelled bills are locked: a sale is redone as a new bill.
@@ -71,7 +73,9 @@ export default function BillTable({ onEdit }) {
   const [cancelBill, setCancelBill] = useState(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   // Read once when the resolve dialog opens; the dialog text and the credit written both use it.
-  const [resolveFigures, setResolveFigures] = useState({ received: 0, exchangeGiven: 0, refund: 0, storeCreditUsed: 0 });
+  const [resolveFigures, setResolveFigures] = useState({
+    received: 0, exchangeGiven: 0, exchangePaidOut: 0, creditTaken: 0, refund: 0, storeCreditUsed: 0,
+  });
   const cancelKeyRef = useRef(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
@@ -508,7 +512,10 @@ export default function BillTable({ onEdit }) {
     try {
       const { data, error } = await supabase
         .from("bills")
-        .select("payment_amount, store_credit_used, bill_payments(amount), bill_items(exchanges(credit_amount))")
+        .select(
+          "payment_amount, store_credit_used, exchange_credit_used, bill_payments(amount), " +
+            "bill_items(exchanges(credit_amount)), exchanges(credit_amount)"
+        )
         .eq("billid", bill.billid)
         .single();
       if (error) throw error;
@@ -516,10 +523,19 @@ export default function BillTable({ onEdit }) {
       const exchangeGiven = round2(
         (data.bill_items || []).flatMap((bi) => bi.exchanges || []).reduce((s, e) => s + Number(e.credit_amount), 0)
       );
+      // Exchange credit that paid for this bill goes back to pending in full, so any of it the
+      // customer already took out here (cash back or store credit) comes off the refund first,
+      // then off store credit. Same rule as bill_cancel, which refuses when neither covers it.
+      const released = (data.exchanges || []).reduce((s, e) => s + Number(e.credit_amount), 0);
+      const exchangePaidOut = Math.max(0, round2(released - Number(data.exchange_credit_used ?? 0)));
+      const beforePaidOut = Math.max(0, round2(received - exchangeGiven));
+      const fromRefund = Math.min(exchangePaidOut, beforePaidOut);
       setResolveFigures({
         received,
         exchangeGiven,
-        refund: Math.max(0, round2(received - exchangeGiven)),
+        exchangePaidOut,
+        creditTaken: round2(exchangePaidOut - fromRefund),
+        refund: round2(beforePaidOut - fromRefund),
         storeCreditUsed: Number(data.store_credit_used ?? 0),
       });
       setConfirmOpen(false);
@@ -1030,10 +1046,22 @@ export default function BillTable({ onEdit }) {
                 <span>−{formatINR(resolveFigures.exchangeGiven, 2)}</span>
               </div>
             )}
+            {resolveFigures.exchangePaidOut > 0 && (
+              <div className="flex justify-between">
+                <span>Less exchange credit already paid out</span>
+                <span>−{formatINR(resolveFigures.exchangePaidOut, 2)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-semibold">
               <span>To refund</span>
               <span>{formatINR(resolveFigures.refund, 2)}</span>
             </div>
+            {resolveFigures.creditTaken > 0 && (
+              <p className="text-xs text-muted-foreground">
+                The exchange credit goes back to pending in full, so {formatINR(resolveFigures.creditTaken, 2)} paid
+                out from it will be taken from the customer's store credit.
+              </p>
+            )}
           </div>
           <div className="space-y-2 pt-2">
             <Button
@@ -1062,7 +1090,7 @@ export default function BillTable({ onEdit }) {
                   {resolveFigures.refund > 0
                     ? `${formatINR(resolveFigures.refund, 2)} will be added to `
                     : resolveFigures.received > 0
-                      ? "Exchange credit already covers what was paid, so no store credit will be added to "
+                      ? "Nothing is left to refund after exchange credit, so no store credit will be added to "
                       : "Nothing was paid on this bill, so no store credit will be added to "}
                   {cancelBill?.customers
                     ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()

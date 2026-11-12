@@ -150,8 +150,25 @@ test("exchange credit covering everything paid says nothing will be added", asyn
     bill_items: [{ exchanges: [{ credit_amount: 500 }] }],
   };
   await openDialog();
-  await screen.findByText(/Exchange credit already covers what was paid/);
+  await screen.findByText(/Nothing is left to refund after exchange credit/);
   expect(screen.getByText(/Nothing to hand back/)).toBeInTheDocument();
+});
+
+test("exchange credit already paid out comes off the refund, then store credit", async () => {
+  // 1000 of exchange credit paid an 800 bill; 200 went back as cash. 100 was also paid in cash.
+  mockDb.current = {
+    store_credit_used: 0,
+    payment_amount: 100,
+    exchange_credit_used: 800,
+    bill_payments: [],
+    bill_items: [],
+    exchanges: [{ credit_amount: 1000 }],
+  };
+  await openDialog();
+  expect(await screen.findByText("Less exchange credit already paid out")).toBeInTheDocument();
+  expect(screen.getByText("−₹200.00")).toBeInTheDocument();
+  expect(screen.getByText(/Nothing to hand back/)).toBeInTheDocument();
+  expect(screen.getByText(/₹100\.00 paid\s+out from it will be taken from the customer's store credit/)).toBeInTheDocument();
 });
 
 test("nothing paid says so", async () => {
@@ -205,12 +222,13 @@ test.each([
   ["BILL_ALREADY_CANCELLED", "This bill is already cancelled. Refresh the list."],
   ["BILL_STALE", "This bill changed since the list loaded. Refresh and try again."],
   ["BILL_ONLINE", "Cancel website orders from the Orders screen."],
+  ["BILL_EXCHANGE_PAID_OUT", expect.stringMatching(/Cancelling would pay it twice/)],
 ])("refusal %s is shown in plain words", async (code, words) => {
   mockDb.rpcErrors = [{ message: code }];
   await openDialog();
   fireEvent.click(await screen.findByText("Return payment to customer"));
   await waitFor(() => expect(toastTitles()).toContain("Cancel failed"));
-  expect(mockToasts.find((t) => t.title === "Cancel failed").description).toBe(words);
+  expect(mockToasts.find((t) => t.title === "Cancel failed").description).toEqual(words);
 });
 
 test("pressing again after a failure reuses the key, so the server replays instead of cancelling twice", async () => {
