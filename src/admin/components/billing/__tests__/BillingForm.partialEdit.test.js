@@ -2,14 +2,20 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import BillingForm from "../BillingForm";
 import { clearBillingLookups } from "../billingLookups";
 
+const mockToasts = [];
 jest.mock("sonner", () => ({
-  toast: { error: () => {}, success: () => {}, warning: () => {} },
+  toast: { error: (title) => mockToasts.push(title), success: () => {}, warning: () => {} },
 }));
 
 let mockBill;
+// What the save's check reads back; the opened bill unless a test changes it.
+let mockBillNow;
+// Rows the bill update reports changed: none when the bill changed between check and write.
+let mockUpdatedRows;
 const mockBillUpdates = [];
 
 const mockChain = (table) => {
+  let updating = false;
   const chain = {
     select: () => chain,
     eq: () => chain,
@@ -22,11 +28,13 @@ const mockChain = (table) => {
     insert: () => chain,
     update: (payload) => {
       if (table === "bills") mockBillUpdates.push(payload);
+      updating = true;
       return chain;
     },
-    single: () => Promise.resolve({ data: table === "bills" ? mockBill : null, error: null }),
+    single: () => Promise.resolve({ data: table === "bills" ? mockBillNow() : null, error: null }),
     maybeSingle: () => Promise.resolve({ data: null, error: null }),
-    then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej),
+    then: (res, rej) =>
+      Promise.resolve({ data: updating && table === "bills" ? mockUpdatedRows : [], error: null }).then(res, rej),
   };
   return chain;
 };
@@ -72,6 +80,9 @@ const partialBill = {
 
 beforeEach(() => {
   mockBill = partialBill;
+  mockBillNow = () => mockBill;
+  mockUpdatedRows = [{ billid: 330 }];
+  mockToasts.length = 0;
   mockBillUpdates.length = 0;
   clearBillingLookups();
 });
@@ -119,4 +130,38 @@ test("a bill marked paid in installments goes back to partial when payments fall
 
   await waitFor(() => expect(mockBillUpdates).toHaveLength(1));
   expect(mockBillUpdates[0]).toMatchObject({ net_amount: 800, paymentstatus: "partial" });
+});
+
+// Another window recorded the last ₹500 after this one opened the bill. Saving this window's
+// "partial, ₹300 received" over it would undo that payment and let the bill take more.
+test("a bill paid in another window since it opened is not saved over", async () => {
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(saveChanges()).toBeEnabled());
+
+  mockBillNow = () => ({ ...partialBill, paymentstatus: "finalized", payment_amount: 800 });
+  fireEvent.click(screen.getByRole("button", { name: "Remove Kurti" }));
+  fireEvent.click(saveChanges());
+
+  await waitFor(() => expect(mockToasts).toContain("This bill changed in another window — reload"));
+  expect(mockBillUpdates).toHaveLength(0);
+});
+
+test("a payment landing between the check and the write is caught too", async () => {
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(saveChanges()).toBeEnabled());
+
+  mockUpdatedRows = [];
+  fireEvent.click(saveChanges());
+
+  await waitFor(() => expect(mockToasts).toContain("This bill changed in another window — reload"));
+  expect(mockBillUpdates).toHaveLength(1);
+});
+
+test("an unchanged bill saves with no warning", async () => {
+  const onSubmit = jest.fn();
+  render(<BillingForm billId={330} open onOpenChange={() => {}} onSubmit={onSubmit} />);
+  await waitFor(() => expect(saveChanges()).toBeEnabled());
+  fireEvent.click(saveChanges());
+  await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  expect(mockToasts).toEqual([]);
 });

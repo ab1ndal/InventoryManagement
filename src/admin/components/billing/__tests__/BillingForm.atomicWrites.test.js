@@ -137,11 +137,28 @@ jest.mock("../AddItemDialog", () => (props) =>
 );
 
 
+// bill_save answers with the new bill, voucher_redeem (a draft's finalize) redeems; other RPCs succeed.
+const mockRpcOk = (fn) => {
+  if (fn === "bill_save") {
+    return { data: { billid: 42, bill_number: "FY26-SG0042", replayed: false, negative_stock: [], payment: null }, error: null };
+  }
+  if (fn === "voucher_redeem") return { data: true, error: null };
+  return { data: 0, error: null };
+};
+// A bill_save refusal: supabase-js puts the code in message and the cause in details.
+const mockSaveRefused = (code, details = null) => (fn) =>
+  fn === "bill_save" ? { data: null, error: { message: code, details } } : mockRpcOk(fn);
+
+// jsdom has no crypto.randomUUID; a fixed key shows retries reuse it.
+Object.defineProperty(global, "crypto", {
+  value: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
+  configurable: true,
+});
+
 beforeEach(() => {
   mockDb.calls = [];
   mockDb.rpcCalls = [];
-  mockDb.rpcResult = (fn) =>
-    fn === "voucher_redeem" ? { data: true, error: null } : { data: 0, error: null };
+  mockDb.rpcResult = mockRpcOk;
   mockDb.customerCredit = 0;
   mockDb.voucherRow = null;
   mockDb.alterationCharge = 0;
@@ -173,34 +190,34 @@ async function renderBillPaidByStoreCredit(onSubmit = () => {}) {
   await screen.findAllByText(/Store Credit/);
 }
 
-test("finalizing 2 units of a variant calls stock_adjust with p_delta -2 and never writes stock directly", async () => {
+// A new bill is saved by one bill_save call: the database moves stock, takes credit and redeems
+// the voucher in the same transaction, so nothing here writes them and nothing is ever deleted.
+const writesOtherThanSave = () =>
+  mockDb.calls.filter((c) => c.op !== "select").concat(mockDb.rpcCalls.filter((c) => c.fn !== "bill_save"));
+
+test("finalizing 2 units sends them to bill_save, which moves the stock; nothing writes stock directly", async () => {
   const onSubmit = jest.fn();
   await renderBillPaidByStoreCredit(onSubmit);
   await finalizeNewBill();
   await waitFor(() => expect(onSubmit).toHaveBeenCalled());
 
-  expect(rpcs("stock_adjust")).toEqual([
-    { p_variant: "v1", p_delta: -2, p_reason: "bill_finalize", p_ref: "42" },
-  ]);
-  const directStockWrites = mockDb.calls.filter(
-    (c) => c.table === "productsizecolors" && c.op !== "select",
-  );
-  expect(directStockWrites).toEqual([]);
+  const [save] = rpcs("bill_save");
+  expect(save.p_op).toBe("finalize_create");
+  expect(save.p_payload.items).toEqual([expect.objectContaining({ variantid: "v1", quantity: 2, billid: null })]);
+  expect(save.p_payload.skip_stock).toBe(false);
+  expect(rpcs("stock_adjust")).toEqual([]);
+  expect(mockDb.calls.filter((c) => c.table === "productsizecolors" && c.op !== "select")).toEqual([]);
 });
 
-test("using ₹300 store credit calls store_credit_adjust with p_delta -300 and never writes the balance directly", async () => {
+test("using ₹300 store credit sends store_credit_used 300 to bill_save and never writes the balance", async () => {
   const onSubmit = jest.fn();
   await renderBillPaidByStoreCredit(onSubmit);
   await finalizeNewBill();
   await waitFor(() => expect(onSubmit).toHaveBeenCalled());
 
-  expect(rpcs("store_credit_adjust")).toEqual([
-    { p_customer: 7, p_delta: -300, p_reason: "bill_finalize", p_ref: "42" },
-  ]);
-  const directCreditWrites = mockDb.calls.filter(
-    (c) => c.table === "customers" && c.op === "update",
-  );
-  expect(directCreditWrites).toEqual([]);
+  expect(rpcs("bill_save")[0].p_payload.bill.store_credit_used).toBe(300);
+  expect(rpcs("store_credit_adjust")).toEqual([]);
+  expect(mockDb.calls.filter((c) => c.table === "customers" && c.op === "update")).toEqual([]);
 });
 
 async function applyVoucher(code) {
@@ -208,7 +225,7 @@ async function applyVoucher(code) {
   fireEvent.click(screen.getByRole("button", { name: "Apply Voucher" }));
 }
 
-test("voucher is redeemed via voucher_redeem; a false result stops finalize with an error toast", async () => {
+test("a voucher bill_save refuses stops finalize with an error toast and writes nothing", async () => {
   const onSubmit = jest.fn();
   mockDb.voucherRow = {
     voucher_id: "VOUCH1",
@@ -218,8 +235,7 @@ test("voucher is redeemed via voucher_redeem; a false result stops finalize with
     redeemed: false,
     held_order_id: null,
   };
-  mockDb.rpcResult = (fn) =>
-    fn === "voucher_redeem" ? { data: false, error: null } : { data: 0, error: null };
+  mockDb.rpcResult = mockSaveRefused("BILL_VOUCHER_REFUSED", "VOUCH1");
 
   render(<BillingForm open onOpenChange={() => {}} onSubmit={onSubmit} prefilledCustomerId={7} />);
   fireEvent.click(screen.getByRole("button", { name: "Stub add item" }));
@@ -230,19 +246,12 @@ test("voucher is redeemed via voucher_redeem; a false result stops finalize with
   await finalizeNewBill();
   await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
 
-  expect(rpcs("voucher_redeem")).toEqual([{ p_voucher: "VOUCH1", p_bill: 42 }]);
+  expect(rpcs("bill_save")[0].p_payload.voucher_id).toBe("VOUCH1");
   expect(mockToast.error[0][0]).toMatch(/VOUCH1 can no longer be used/);
   expect(mockToast.success).toEqual([]);
   expect(onSubmit).not.toHaveBeenCalled();
-  // nothing else hung off the refused bill, and the bill row itself is rolled back
-  expect(rpcs("stock_adjust")).toEqual([]);
-  expect(mockDb.calls.some((c) => c.table === "bill_items" && c.op === "insert")).toBe(false);
-  expect(rpcs("bill_discard")).toEqual([{ p_billid: 42 }]);
-  expect(mockDb.calls.some((c) => c.table === "bills" && c.op === "delete")).toBe(false);
-  // no direct redemption write
-  expect(
-    mockDb.calls.some((c) => c.table === "vouchers" && c.op === "update" && c.payload?.redeemed === true),
-  ).toBe(false);
+  // the refused save rolled back in the database; nothing to undo here
+  expect(writesOtherThanSave()).toEqual([]);
 });
 
 test("a voucher held for an online order shows the reserved message and is not applied", async () => {
@@ -266,7 +275,7 @@ async function renderUnpaidBill(onSubmit = () => {}) {
   await screen.findAllByText("Kurti");
 }
 
-test("a bill with nothing paid finalizes as partial: no method, no payment row, stock still moves", async () => {
+test("a bill with nothing paid finalizes as partial: no method, no first payment, stock still moves", async () => {
   const onSubmit = jest.fn();
   await renderUnpaidBill(onSubmit);
 
@@ -274,19 +283,19 @@ test("a bill with nothing paid finalizes as partial: no method, no payment row, 
   fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
   await waitFor(() => expect(onSubmit).toHaveBeenCalled());
 
-  const billInsert = mockDb.calls.find((c) => c.table === "bills" && c.op === "insert");
-  expect(billInsert.payload).toMatchObject({
+  const [save] = rpcs("bill_save");
+  expect(save.p_op).toBe("partial_create");
+  expect(save.p_payload.bill).toMatchObject({
     paymentstatus: "partial",
     finalized: true,
     payment_amount: 0,
     salesmethodid: null,
   });
-  expect(billInsert.payload.net_amount).toBeGreaterThan(0);
+  expect(save.p_payload.bill.net_amount).toBeGreaterThan(0);
   // bill_payments.amount must be > 0, and no money has moved yet
-  expect(mockDb.calls.some((c) => c.table === "bill_payments" && c.op === "insert")).toBe(false);
-  expect(rpcs("stock_adjust")).toEqual([
-    { p_variant: "v1", p_delta: -2, p_reason: "bill_partial_finalize", p_ref: "42" },
-  ]);
+  expect(save.p_payload.first_payment).toBeNull();
+  expect(save.p_payload.skip_stock).toBe(false);
+  expect(writesOtherThanSave().filter((c) => c.table === "bill_payments")).toEqual([]);
 });
 
 test("altered items still need their deposit, so a bill with nothing paid is refused", async () => {
@@ -298,83 +307,38 @@ test("altered items still need their deposit, so a bill with nothing paid is ref
   await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
   expect(mockToast.error[0][0]).toBe("Insufficient initial payment");
   expect(screen.queryByRole("button", { name: "Confirm Partial Payment" })).not.toBeInTheDocument();
-  expect(mockDb.calls.some((c) => c.table === "bills" && c.op === "insert")).toBe(false);
+  expect(rpcs("bill_save")).toEqual([]);
 });
 
-
-// Stopgap: once the bill row exists, a later failure that leaves it in place must lock the
-// form, so a second click cannot insert a second bill and move stock again.
-const AUTO_CODE = {
-  id: 1, code: "TEN", type: "percentage", value: 10, auto_apply: true, active: true,
-  once_per_customer: false, exclusive: false, rules: {},
-};
-const countOf = (table, op) => mockDb.calls.filter((c) => c.table === table && c.op === op).length;
-const unfinishedMsg = (step) =>
-  `Bill FY26-SG0042 was saved but not finished. Do not enter it again. Close this window, and tell the owner which step failed: ${step}.`;
-
-test("new finalize: a failure after the bill insert locks the form and a second click writes nothing", async () => {
-  mockDb.discounts = [AUTO_CODE];
-  mockDb.failWrite = (c) => (c.table === "discount_usage" ? "usage down" : null);
+// A failed save changed nothing, so the form stays open for a retry, and the retry sends the
+// same key: if the first save did commit and only its answer was lost, the database replays it
+// instead of saving a second bill.
+test("a failed save leaves the form unlocked, and the retry reuses the key", async () => {
+  mockDb.rpcResult = mockSaveRefused("canceling statement due to statement timeout");
   await renderBillPaidByStoreCredit();
   await finalizeNewBill();
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
 
-  expect(
-    await screen.findByText(unfinishedMsg("recording the discount code use")),
-  ).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Save Draft" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
-
-  fireEvent.click(screen.getByRole("button", { name: "Finalize" }));
-  expect(countOf("bills", "insert")).toBe(1);
-  expect(rpcs("stock_adjust")).toHaveLength(1);
+  expect(mockToast.error[0][0]).toBe("Failed to save bill: canceling statement due to statement timeout");
+  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Confirm & Finalize" })).toBeEnabled();
+  mockDb.rpcResult = mockRpcOk;
+  fireEvent.click(screen.getByRole("button", { name: "Confirm & Finalize" }));
+  await waitFor(() => expect(rpcs("bill_save")).toHaveLength(2));
+  expect(rpcs("bill_save")[1].p_key).toBe(rpcs("bill_save")[0].p_key);
+  expect(writesOtherThanSave().filter((c) => c.op === "delete")).toEqual([]);
 });
 
-test("new partial finalize: a failure after the bill insert locks the form", async () => {
-  mockDb.customerCredit = 100;
-  mockDb.rpcResult = (fn) =>
-    fn === "store_credit_adjust" ? { data: null, error: { message: "credit down" } } : { data: 0, error: null };
-  render(<BillingForm open onOpenChange={() => {}} prefilledCustomerId={7} />);
-  fireEvent.click(screen.getByRole("button", { name: "Stub add item" }));
-  await screen.findAllByText("Kurti");
-  await screen.findAllByText(/Store Credit/);
+test("new partial: exchange credit already used elsewhere is refused with nothing written", async () => {
+  mockDb.rpcResult = mockSaveRefused("BILL_EXCHANGE_USED");
+  await renderUnpaidBill();
   fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
   fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
-
-  expect(await screen.findByText(unfinishedMsg("taking the store credit"))).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
-  expect(countOf("bills", "insert")).toBe(1);
-});
-
-test("a refused voucher deletes the bill, leaves the form unlocked and can be retried", async () => {
-  mockDb.voucherRow = {
-    voucher_id: "VOUCH1", customerid: null, expiry_date: "2099-12-31",
-    value: 300, redeemed: false, held_order_id: null,
-  };
-  mockDb.rpcResult = (fn) =>
-    fn === "voucher_redeem" ? { data: false, error: null } : { data: 0, error: null };
-  await renderUnpaidBill();
-  await applyVoucher("VOUCH1");
-  await screen.findAllByText(/Voucher #VOUCH1/);
-  await finalizeNewBill();
   await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
 
+  expect(mockToast.error[0][0]).toMatch(/exchange credit has already been used on another bill/);
   expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Confirm & Finalize" })).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: "Confirm & Finalize" }));
-  await waitFor(() => expect(countOf("bills", "insert")).toBe(2));
-});
-
-test("a bill-item insert failure deletes the bill, leaves the form unlocked and can be retried", async () => {
-  mockDb.failWrite = (c) => (c.table === "bill_items" && c.op === "insert" ? "items down" : null);
-  await renderBillPaidByStoreCredit();
-  await finalizeNewBill();
-  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
-
-  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Confirm & Finalize" })).toBeEnabled();
-  fireEvent.click(screen.getByRole("button", { name: "Confirm & Finalize" }));
-  await waitFor(() => expect(countOf("bills", "insert")).toBe(2));
+  expect(writesOtherThanSave()).toEqual([]);
 });
 
 test("a successful finalize does not lock the form", async () => {
@@ -391,41 +355,6 @@ const VOUCHER_ROW = {
   value: 100, redeemed: false, held_order_id: null,
 };
 const voucherWrites = () => mockDb.calls.filter((c) => c.table === "vouchers" && c.op !== "select");
-
-test("a bill-item failure discards the new bill and frees its voucher in one bill_discard call", async () => {
-  mockDb.voucherRow = VOUCHER_ROW;
-  mockDb.failWrite = (c) => (c.table === "bill_items" && c.op === "insert" ? "items down" : null);
-  await renderBillPaidByStoreCredit();
-  await applyVoucher("VOUCH1");
-  await screen.findAllByText(/Voucher #VOUCH1/);
-  await finalizeNewBill();
-  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
-
-  expect(rpcs("voucher_redeem")).toEqual([{ p_voucher: "VOUCH1", p_bill: 42 }]);
-  expect(rpcs("bill_discard")).toEqual([{ p_billid: 42 }]);
-  // The voucher is never freed by a separate write the bill could outlive.
-  expect(voucherWrites()).toEqual([]);
-  expect(countOf("bills", "delete")).toBe(0);
-  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
-});
-
-test("when bill_discard fails the bill stays, so the form locks as saved but not finished", async () => {
-  mockDb.voucherRow = VOUCHER_ROW;
-  mockDb.failWrite = (c) => (c.table === "bill_items" && c.op === "insert" ? "items down" : null);
-  mockDb.rpcResult = (fn) => {
-    if (fn === "voucher_redeem") return { data: true, error: null };
-    if (fn === "bill_discard") return { data: null, error: { message: "discard down" } };
-    return { data: 0, error: null };
-  };
-  await renderBillPaidByStoreCredit();
-  await applyVoucher("VOUCH1");
-  await screen.findAllByText(/Voucher #VOUCH1/);
-  await finalizeNewBill();
-
-  expect(await screen.findByText(unfinishedMsg("finishing the bill"))).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Finalize" })).toBeDisabled();
-  expect(voucherWrites()).toEqual([]);
-});
 
 // A saved draft: 2 × Kurti @ ₹150, ₹200 left to pay once the ₹100 voucher is applied.
 const draftBill = (paymentAmount) => ({

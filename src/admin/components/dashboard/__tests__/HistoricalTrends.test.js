@@ -7,6 +7,7 @@ const createMockQuery = (data = []) => {
   const q = {
     select: () => q,
     eq: () => q,
+    or: () => q,
     gte: () => q,
     range: () => Promise.resolve({ data, error: null }),
     then: (res, rej) => Promise.resolve({ data, error: null }).then(res, rej),

@@ -26,6 +26,8 @@ export function receivedAmount(bill) {
 
 // Bill totals carry paise from item-level rounding (e.g. ₹1500.08) while payments are taken in
 // whole rupees, so a shortfall under one rupee counts as paid in full.
+// bill_add_payment (schema/migration_bill_add_payment.sql) applies the same rule in the
+// database when a payment is recorded; change both together.
 const PAID_IN_FULL_TOLERANCE = 1;
 
 function coversNet(totalPaid, net) {
@@ -33,7 +35,9 @@ function coversNet(totalPaid, net) {
 }
 
 /**
- * Where a bill stands after recording one more payment.
+ * Where a bill stands after recording one more payment. The screen records payments through
+ * bill_add_payment, which decides this in the database; this is the same rule, and the
+ * "same rule as bill_add_payment" tests pin the cases both must agree on.
  *
  * @param {Array} existingPayments - bill_payments rows already recorded
  * @param {number} newAmount - the payment being added
@@ -62,15 +66,6 @@ export function paymentStatusAfterEdit({ finalized, paymentStatus, payments, net
   if (!finalized) return "draft";
   if (paymentStatus !== "partial" && !payments?.length) return "finalized";
   return coversNet(sumPayments(payments), round2(Number(netAmount || 0))) ? "finalized" : "partial";
-}
-
-/**
- * Bill fields to write with a payment. A bill finalized with nothing paid has no
- * payment method until its first payment; later payments keep the bill's method,
- * since each one's own method is on its bill_payments row.
- */
-export function firstPaymentMethodFields(existingPayments, methodId) {
-  return existingPayments?.length ? {} : { salesmethodid: methodId };
 }
 
 /**

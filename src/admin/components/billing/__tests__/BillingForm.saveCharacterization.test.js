@@ -22,6 +22,12 @@ const mockDb = {
   alterationCharge: 0,
 };
 
+// A fixed payment key keeps the snapshots stable (jsdom has no crypto.randomUUID anyway).
+Object.defineProperty(global, "crypto", {
+  value: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
+  configurable: true,
+});
+
 const CASH = 1;
 const UPI = 2;
 
@@ -59,6 +65,35 @@ const mockResolve = (s) => {
     default:
       return { data: s.single ? null : [], error: null };
   }
+};
+
+// What bill_add_payment returns for the opened bill, judged as the database does.
+const mockAddPayment = (args) => {
+  const paid = (mockDb.bill?.bill_payments || []).reduce((sum, p) => sum + p.amount, 0) + args.p_amount;
+  const short = Number(mockDb.bill?.net_amount || 0) - paid;
+  return {
+    billid: args.p_billid,
+    payment: { payment_id: 900, amount: args.p_amount, salesmethodid: args.p_salesmethodid, recorded_at: args.p_recorded_at || "2026-01-01T00:00:00" },
+    total_paid: paid,
+    remaining: short < 1 ? 0 : short,
+    paymentstatus: short < 1 ? "finalized" : "partial",
+    replayed: false,
+  };
+};
+
+// What bill_save returns for a new bill: the number, and the first payment row if one was sent.
+const mockBillSave = (args) => {
+  const pay = args.p_payload.first_payment;
+  return {
+    op: args.p_op,
+    billid: 42,
+    bill_number: "FY26-SG0042",
+    replayed: false,
+    negative_stock: [],
+    payment: pay
+      ? { payment_id: 900, amount: pay.amount, salesmethodid: pay.salesmethodid, recorded_at: pay.recorded_at || "2026-01-01T00:00:00" }
+      : null,
+  };
 };
 
 const mockChain = (table) => {
@@ -99,6 +134,8 @@ jest.mock("../../../../lib/supabaseClient", () => ({
     from: (table) => mockChain(table),
     rpc: (fn, args) => {
       mockDb.writes.push({ kind: "rpc", fn, args });
+      if (fn === "bill_add_payment") return Promise.resolve({ data: mockAddPayment(args), error: null });
+      if (fn === "bill_save") return Promise.resolve({ data: mockBillSave(args), error: null });
       return Promise.resolve(
         fn === "voucher_redeem" ? { data: true, error: null } : { data: 0, error: null },
       );

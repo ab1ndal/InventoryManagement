@@ -213,20 +213,22 @@ describe("createBill", () => {
     expect(client.calls.every((c) => c.op === "select")).toBe(true);
   });
 
-  it("writes bill, items, stock and activity log in the screen's order", async () => {
+  it("saves bill, items and stock in one bill_save, then logs it, as the screen does", async () => {
     const client = fakeSupabase(db({
-      "bills.insert": { data: saved, error: null },
-      "bill_items.insert": { data: null, error: null },
-      "rpc.stock_adjust": { data: 0, error: null },
+      "rpc.bill_save": { data: { ...saved, negative_stock: [] }, error: null },
       "activity_log.insert": { data: null, error: null },
     }));
     const out = await createBill(client, slip387);
     const writes = client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
-    expect(writes).toEqual(["bills.insert", "bill_items.insert", "stock_adjust", "activity_log.insert"]);
-    expect(client.calls.find((c) => c.table === "bill_items").row[0].billid).toBe(900);
-    expect(client.calls.find((c) => c.fn === "stock_adjust").args).toEqual({
-      p_variant: VID, p_delta: -1, p_reason: "bill_finalize", p_ref: "900",
-    });
+    expect(writes).toEqual(["bill_save", "activity_log.insert"]);
+    const { args } = client.calls.find((c) => c.fn === "bill_save");
+    expect(args.p_op).toBe("finalize_create");
+    expect(args.p_key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(args.p_payload.skip_stock).toBe(false);
+    expect(args.p_payload.bill).not.toHaveProperty("stock_reduced");
+    expect(args.p_payload.bill).toMatchObject({ customerid: 453, paymentstatus: "finalized", finalized: true, payment_amount: 1800 });
+    expect(args.p_payload.items).toEqual([expect.objectContaining({ billid: null, variantid: VID, quantity: 1 })]);
+    expect(args.p_payload).not.toHaveProperty("first_payment");
     expect(client.calls.find((c) => c.table === "activity_log").row).toEqual({
       actor_id: null,
       action: "create",
@@ -234,30 +236,29 @@ describe("createBill", () => {
       entity_id: "FY26-000336",
       summary: "Finalized bill #FY26-000336 for Test Customer — ₹1,800, 1 items (via CLI)",
     });
-    expect(out).toMatchObject({ billid: 900, bill_number: "FY26-000336", stock_failures: [] });
-    expect(client.calls.some((c) => c.table === "bill_payments")).toBe(false);
+    expect(out).toMatchObject({ billid: 900, bill_number: "FY26-000336", negative_stock: [] });
   });
 
-  it("removes the bill row when the items insert fails", async () => {
+  it("sends skip_stock to bill_save, which then moves no stock and records it", async () => {
+    const client = fakeSupabase(db({ "rpc.bill_save": { data: saved, error: null } }));
+    await createBill(client, { ...slip387, skip_stock: true });
+    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload.skip_stock).toBe(true);
+  });
+
+  it("a refused save writes nothing else, deletes nothing and says why", async () => {
     const client = fakeSupabase(db({
-      "bills.insert": { data: saved, error: null },
-      "bill_items.insert": { data: null, error: new Error("items boom") },
-      "bills.delete": { data: null, error: null },
+      "rpc.bill_save": { data: null, error: { message: "BILL_BAD_PAYLOAD", details: "unknown variant" } },
     }));
-    await expect(createBill(client, slip387)).rejects.toThrow("Failed to save bill items: items boom (bill 900 removed)");
-    expect(client.calls.find((c) => c.op === "delete").filters).toEqual([["eq", "billid", 900]]);
-    expect(client.calls.some((c) => c.fn === "stock_adjust")).toBe(false);
+    await expect(createBill(client, slip387)).rejects.toThrow("Failed to save bill: BILL_BAD_PAYLOAD (unknown variant)");
+    expect(client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`)).toEqual(["bill_save"]);
   });
 
-  it("keeps the bill but reports a stock failure", async () => {
+  it("reports a variant the save took below zero", async () => {
     const client = fakeSupabase(db({
-      "bills.insert": { data: saved, error: null },
-      "bill_items.insert": { data: null, error: null },
-      "rpc.stock_adjust": { data: null, error: new Error("variant gone") },
-      "activity_log.insert": { data: null, error: null },
+      "rpc.bill_save": { data: { ...saved, negative_stock: [{ variantid: VID, stock: -1 }] }, error: null },
     }));
     const out = await createBill(client, slip387);
-    expect(out.stock_failures).toEqual([{ variantid: VID, change: -1, error: "variant gone" }]);
+    expect(out.negative_stock).toEqual([{ variantid: VID, stock: -1 }]);
   });
 });
 
@@ -295,21 +296,18 @@ describe("part payment (payment.balance_due)", () => {
     ).rejects.toThrow(/differs from the bill total/);
   });
 
-  it("writes the first payment to bill_payments, dated the bill date, before moving stock", async () => {
+  it("sends the first payment, dated the bill date, in the same bill_save", async () => {
     const client = fakeSupabase(db({
-      "bills.insert": { data: saved, error: null },
-      "bill_items.insert": { data: null, error: null },
-      "bill_payments.insert": { data: null, error: null },
-      "rpc.stock_adjust": { data: 0, error: null },
+      "rpc.bill_save": { data: saved, error: null },
       "activity_log.insert": { data: null, error: null },
     }));
     const out = await createBill(client, partial);
     const writes = client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
-    expect(writes).toEqual(["bills.insert", "bill_items.insert", "bill_payments.insert", "stock_adjust", "activity_log.insert"]);
-    expect(client.calls.find((c) => c.table === "bill_payments").row).toEqual({
-      billid: 901, amount: 1000, salesmethodid: 1, recorded_at: "2026-10-22T12:00:00",
-    });
-    expect(client.calls.find((c) => c.fn === "stock_adjust").args.p_reason).toBe("bill_partial_finalize");
+    expect(writes).toEqual(["bill_save", "activity_log.insert"]);
+    const { args } = client.calls.find((c) => c.fn === "bill_save");
+    expect(args.p_op).toBe("partial_create");
+    expect(args.p_payload.first_payment).toEqual({ amount: 1000, salesmethodid: 1, recorded_at: "2026-10-22T12:00:00" });
+    expect(args.p_payload.bill.payment_amount).toBe(1000);
     expect(client.calls.find((c) => c.table === "activity_log").row.summary).toBe(
       "Finalized bill (partial) #FY26-000337 for Test Customer — ₹1,800, 1 items (via CLI)",
     );
@@ -326,13 +324,14 @@ describe("part payment (payment.balance_due)", () => {
     expect(p.first_payment).toBeNull();
 
     const client = fakeSupabase(db({
-      "bills.insert": { data: saved, error: null },
-      "bill_items.insert": { data: null, error: null },
-      "rpc.stock_adjust": { data: 0, error: null },
+      "rpc.bill_save": { data: saved, error: null },
       "activity_log.insert": { data: null, error: null },
     }));
     await createBill(client, unpaid);
-    expect(client.calls.some((c) => c.table === "bill_payments")).toBe(false);
+    const { args } = client.calls.find((c) => c.fn === "bill_save");
+    expect(args.p_op).toBe("partial_create");
+    expect(args.p_payload).not.toHaveProperty("first_payment");
+    expect(args.p_payload.bill.payment_amount).toBe(0);
   });
 
   it.each([
@@ -343,16 +342,6 @@ describe("part payment (payment.balance_due)", () => {
     expect(() => parseBillSpec(spec)).toThrow(msg);
   });
 
-  it("removes the bill and moves no stock when the payment insert fails", async () => {
-    const client = fakeSupabase(db({
-      "bills.insert": { data: saved, error: null },
-      "bill_items.insert": { data: null, error: null },
-      "bill_payments.insert": { data: null, error: new Error("pay boom") },
-      "bills.delete": { data: null, error: null },
-    }));
-    await expect(createBill(client, partial)).rejects.toThrow("Failed to record payment: pay boom (bill 901 removed)");
-    expect(client.calls.some((c) => c.fn === "stock_adjust")).toBe(false);
-  });
 });
 
 describe("getBill", () => {
@@ -557,9 +546,7 @@ describe("readable bill spec", () => {
           error: null,
         }),
         "manual_items.insert": (call) => ({ data: { ...call.row, stock: 1 }, error: null }),
-        "bills.insert": { data: { billid: 901, bill_number: "FY26-000337" }, error: null },
-        "bill_items.insert": { data: null, error: null },
-        "rpc.stock_adjust": { data: 0, error: null },
+        "rpc.bill_save": { data: { billid: 901, bill_number: "FY26-000337" }, error: null },
         "activity_log.insert": { data: null, error: null },
       }),
     );
@@ -574,13 +561,13 @@ describe("readable bill spec", () => {
         ],
       }),
     );
-    const writes = client.calls.filter((c) => !["select", "rpc"].includes(c.op) || c.fn === "stock_adjust").map((c) => c.fn ?? `${c.table}.${c.op}`);
+    const writes = client.calls.filter((c) => !["select", "rpc"].includes(c.op) || c.fn === "bill_save").map((c) => c.fn ?? `${c.table}.${c.op}`);
     expect(writes).toEqual([
-      "customers.insert", "activity_log.insert", "manual_items.insert",
-      "bills.insert", "bill_items.insert", "stock_adjust", "activity_log.insert",
+      "customers.insert", "activity_log.insert", "manual_items.insert", "bill_save", "activity_log.insert",
     ]);
-    expect(client.calls.find((c) => c.table === "bills" && c.op === "insert").row.customerid).toBe(500);
-    expect(client.calls.find((c) => c.table === "bill_items").row.map((r) => r.product_code)).toEqual(["BC252051", "BCX26129"]);
+    const { p_payload: payload } = client.calls.find((c) => c.fn === "bill_save").args;
+    expect(payload.bill.customerid).toBe(500);
+    expect(payload.items.map((r) => r.product_code)).toEqual(["BC252051", "BCX26129"]);
     expect(out).toMatchObject({ bill_number: "FY26-000337", created: { customer: { customerid: 500 }, manual_items: [{ manual_item_id: "BCX26129" }] } });
   });
 
@@ -589,7 +576,7 @@ describe("readable bill spec", () => {
       rdb({
         "customers.select": (call) => (call.filters.some((f) => f[1] === "phone") ? { data: [], error: null } : { data: { customerid: 500, first_name: "W" }, error: null }),
         "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
-        "bills.insert": { data: null, error: new Error("db down") },
+        "rpc.bill_save": { data: null, error: new Error("db down") },
       }),
     );
     await expect(createBill(client, spec({ customer: { create: { first: "W" } } }))).rejects.toThrow(

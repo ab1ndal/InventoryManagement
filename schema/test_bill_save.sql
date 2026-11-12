@@ -7,7 +7,10 @@
 -- Run locally:
 --   scripts/test-db.sh up
 --   scripts/test-db.sh sql schema/migration_atomic_shared_writes.sql schema/migration_bill_save.sql \
+--     schema/migration_bill_stock_reduced.sql schema/migration_bill_save_app_callers.sql \
 --     schema/test_bill_save.sql
+-- It also passes with the later bill migrations loaded (bill_status_states, bill_add_payment,
+-- bill_payments_ledger).
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -105,7 +108,8 @@ $$;
 create function pg_temp.partial_pl(p_v uuid, p_qty numeric default 1, p_extra jsonb default '{}', p_bill jsonb default '{}')
 returns jsonb language sql as $$
   select pg_temp.final_pl(p_v, p_qty, p_extra,
-    jsonb_build_object('paymentstatus', 'partial', 'net_amount', 1000, 'final_amount', null) || p_bill)
+    jsonb_build_object('paymentstatus', 'partial', 'net_amount', 1000, 'final_amount', null,
+                       'payment_amount', 0) || p_bill)
 $$;
 
 -- ---------- fixtures: all created here, gone at rollback ----------
@@ -305,7 +309,8 @@ begin
       pg_temp.partial_pl(pg_temp.v1(), 1, jsonb_build_object('first_payment', '{"amount": 0, "salesmethodid": -9001}'::jsonb))) = 'BILL_BAD_PAYLOAD');
   perform pg_temp.ok('row10 bad method refused',
     pg_temp.try(pg_temp.k(9), 'partial_create',
-      pg_temp.partial_pl(pg_temp.v1(), 1, jsonb_build_object('first_payment', '{"amount": 200, "salesmethodid": -9999}'::jsonb))) = 'BILL_BAD_PAYLOAD');
+      pg_temp.partial_pl(pg_temp.v1(), 1, jsonb_build_object('first_payment', '{"amount": 200, "salesmethodid": -9999}'::jsonb),
+                         '{"payment_amount": 200}')) = 'BILL_BAD_PAYLOAD');
   perform pg_temp.ok('row10 nothing saved, stock not lost', pg_temp.state() = before);
 
   r := pg_temp.call(pg_temp.k(9), 'partial_create',
@@ -484,7 +489,7 @@ declare
   bill_txt text := '{"customerid": -9001, "notes": "BSAVE direct", "document_type": "invoice",
     "totalamount": 1234.5649999999999, "gst_total": 0.30000000000000004, "discount_total": 99.995,
     "taxable_total": 1234.565, "paymentstatus": "partial", "finalized": true, "applied_codes": ["BSAVE-TEST"],
-    "payment_amount": 1000.005, "net_amount": 1.005, "final_amount": 2.675, "store_credit_used": 0,
+    "payment_amount": 100.005, "net_amount": 1.005, "final_amount": 2.675, "store_credit_used": 0,
     "exchange_credit_used": 12.345, "exchange_source_bill": "FY26-TEST", "exchange_cash_refund": 3.335,
     "saleslocationid": -9001, "salesmethodid": -9001, "orderdate": "2026-04-01T00:00:00+05:30"}';
   item_txt text := '{"quantity": 1.2345, "mrp": 1000.555, "variantid": null, "product_name": "BSAVE item",
@@ -515,9 +520,12 @@ begin
     select direct_id, quantity, mrp, variantid, product_name, product_code, category, cost_price,
       alteration_charge, discount_total, subtotal, gst_rate, gst_amount, total, stitch_type, unit_type, salesperson_id
     from json_populate_record(null::public.bill_items, item_txt::json);
+  -- bill_payments takes rows only with the marker bill_save sets (migration_bill_payments_ledger.sql).
+  perform set_config('app.bill_payment_writer', 'on', true);
   insert into public.bill_payments (billid, amount, salesmethodid, recorded_at)
     select direct_id, amount, salesmethodid, recorded_at
     from json_populate_record(null::public.bill_payments, pay_set_txt::json);
+  perform set_config('app.bill_payment_writer', '', true);
 
   perform pg_temp.ok('row27 bill equals direct insert',
     (select to_jsonb(b) - drop_keys from public.bills b where billid = rpc_id)
@@ -534,11 +542,12 @@ begin
 
   -- recorded_at absent, then null: the database clock, as a direct insert gets
   r := pg_temp.call(pg_temp.k(51), 'partial_create', pg_temp.partial_pl(pg_temp.v1(), 1,
-    '{"skip_stock": true, "first_payment": {"amount": 5, "salesmethodid": -9001}}'));
+    '{"skip_stock": true, "first_payment": {"amount": 5, "salesmethodid": -9001}}', '{"payment_amount": 5}'));
   perform pg_temp.ok('row27 recorded_at absent uses the clock',
     (select recorded_at from public.bill_payments where billid = (r ->> 'billid')::int) = current_timestamp::timestamp);
   r := pg_temp.call(pg_temp.k(52), 'partial_create', pg_temp.partial_pl(pg_temp.v1(), 1,
-    '{"skip_stock": true, "first_payment": {"amount": 5, "salesmethodid": -9001, "recorded_at": null}}'));
+    '{"skip_stock": true, "first_payment": {"amount": 5, "salesmethodid": -9001, "recorded_at": null}}',
+    '{"payment_amount": 5}'));
   perform pg_temp.ok('row27 recorded_at null uses the clock',
     (select recorded_at from public.bill_payments where billid = (r ->> 'billid')::int) = current_timestamp::timestamp);
 
@@ -556,6 +565,38 @@ begin
     select alteration_charge = 0 and discount_total = 0 and stitch_type = 'unstitched' and unit_type = 'piece'
            and variantid is null and cost_price is null and gst_rate is null
       from public.bill_items where billid = (r ->> 'billid')::int));
+end $$;
+
+-- ---------- app callers (migration_bill_save_app_callers.sql) ----------
+do $$
+declare
+  r jsonb;
+begin
+  -- stock_reduced records the skip_stock choice, so cancelling restores only what left.
+  r := pg_temp.call(pg_temp.k(60), 'finalize_create', pg_temp.final_pl(pg_temp.v1(), 1, '{"skip_stock": true}'));
+  perform pg_temp.ok('app: skip_stock saves stock_reduced false',
+    (select stock_reduced is false from public.bills where billid = (r ->> 'billid')::int));
+  r := pg_temp.call(pg_temp.k(61), 'finalize_create', pg_temp.final_pl(pg_temp.v1(), 1));
+  perform pg_temp.ok('app: moving stock saves stock_reduced true',
+    (select stock_reduced is true from public.bills where billid = (r ->> 'billid')::int));
+  perform pg_temp.ok('app: stock_reduced is not a bill key',
+    pg_temp.try(pg_temp.k(62), 'finalize_create', pg_temp.final_pl(pg_temp.v1(), 1, '{}', '{"stock_reduced": false}'))
+      = 'BILL_BAD_PAYLOAD');
+
+  -- A part-paid bill's payment_amount is its first payment, since that is its only row.
+  perform pg_temp.ok('app: payment_amount above the first payment refused',
+    pg_temp.try(pg_temp.k(63), 'partial_create', pg_temp.partial_pl(pg_temp.v1(), 1,
+      '{"first_payment": {"amount": 200, "salesmethodid": -9001}}', '{"payment_amount": 1000}')) = 'BILL_BAD_PAYLOAD');
+  perform pg_temp.ok('app: payment_amount without a first payment refused',
+    pg_temp.try(pg_temp.k(64), 'partial_create', pg_temp.partial_pl(pg_temp.v1(), 1, '{}', '{"payment_amount": 200}'))
+      = 'BILL_BAD_PAYLOAD');
+  perform pg_temp.ok('app: refused saves left no key',
+    not exists (select 1 from public.bill_save_log where idempotency_key in (pg_temp.k(62), pg_temp.k(63), pg_temp.k(64))));
+  r := pg_temp.call(pg_temp.k(65), 'partial_create', pg_temp.partial_pl(pg_temp.v1(), 1,
+    '{"first_payment": {"amount": 200, "salesmethodid": -9001}}', '{"payment_amount": 200}'));
+  perform pg_temp.ok('app: matching first payment saved',
+    (select payment_amount = 200 from public.bills where billid = (r ->> 'billid')::int)
+    and (select sum(amount) = 200 from public.bill_payments where billid = (r ->> 'billid')::int));
 end $$;
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _bs_checks;

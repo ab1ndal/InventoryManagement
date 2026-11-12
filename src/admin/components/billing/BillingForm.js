@@ -2,8 +2,9 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct } from "./stockHelpers";
-import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields, paymentStatusAfterEdit } from "./paymentHelpers";
+import { storeCreditDeductionDelta, isWebsiteMethod, paymentStatusAfterEdit } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
+import { BILL_STATUS, billStatusFields } from "../../lib/billStatus";
 import { Button } from "../../../components/ui/button";
 import { Input } from "../../../components/ui/input";
 import {
@@ -53,6 +54,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
+
+// bill_add_payment refusals, in words staff can act on.
+const ADD_PAYMENT_ERRORS = {
+  BILL_NOT_PAYABLE: "This bill is a draft or has been cancelled, so it cannot take a payment. Refresh the bill list.",
+  BILL_ONLINE: "This is a website order's bill. Its payments are handled from Online Orders.",
+  BILL_KEY_CONFLICT: "A payment from this screen may already be recorded. Reopen the bill to check before recording again.",
+  BILL_OVERPAID: "This is more than the balance due. Check the amount, and reopen the bill in case it was paid in another window.",
+  BILL_NOTHING_DUE: "Nothing is left to pay on this bill. Reopen it in case it was paid in another window.",
+};
+
+// bill_save refusals, in words staff can act on. A refused save changed nothing.
+const BILL_SAVE_ERRORS = {
+  BILL_EXCHANGE_USED: "This exchange credit has already been used on another bill. Nothing was saved. Close this window and start the bill again.",
+  BILL_KEY_CONFLICT: "A bill from this window may already be saved. Close this window and check the bill list before entering it again.",
+};
+
+// Shown when an opened bill was paid, finalized or cancelled in another window since it loaded.
+const BILL_CHANGED_MESSAGE = "This bill changed in another window — reload";
+
+const sameAmount = (a, b) => (a == null ? null : Number(a)) === (b == null ? null : Number(b));
 
 // A payment entered today keeps the database's own time. recorded_at has no time zone, so an earlier
 // date is stored as midday, well clear of the day boundary.
@@ -248,6 +269,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [addPaymentAmount, setAddPaymentAmount] = useState("");
   const [addPaymentMethodId, setAddPaymentMethodId] = useState(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const addPaymentKeyRef = useRef(null); // { attempt, key } for bill_add_payment
+  // One key per window for saving a new bill (bill_save) or a draft's first payment. A failed
+  // save releases its key, so a corrected retry still saves; a save whose answer was lost is
+  // replayed, never saved twice.
+  const saveKeyRef = useRef(null);
+  // The opened bill's payment state as this window last saw it: { paymentstatus, payment_amount }.
+  const openedStateRef = useRef(null);
   const [partialConfirmOpen, setPartialConfirmOpen] = useState(false);
   const [finalAmount, setFinalAmount] = useState("");
   const [voucherError, setVoucherError] = useState("");
@@ -315,6 +343,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setFinalAmount("");
       setLoadedNetAmount(null);
       newBillRef.current = null;
+      saveKeyRef.current = null;
+      openedStateRef.current = null;
       setUnfinishedBill(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -447,6 +477,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setIsBackdated(bill.stock_reduced === false);
         setStockChoiceLocked(bill.stock_reduced === false);
         setBillPaymentStatus(bill.paymentstatus || "draft");
+        openedStateRef.current = { paymentstatus: bill.paymentstatus, payment_amount: bill.payment_amount };
         if (bill.net_amount != null) {
           setLoadedNetAmount(Number(bill.net_amount));
         }
@@ -924,16 +955,56 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     setConfirmOpen(false);
     setPartialConfirmOpen(false);
   };
-  // Abandons the bill this save just inserted. bill_discard frees any voucher it redeemed and
-  // deletes it in one transaction, so the voucher is never free while the bill exists. If that
-  // fails the bill stays, and newBillRef keeps it so the form locks as saved but not finished.
-  const discardNewBill = async (billId) => {
-    const { error } = await supabase.rpc("bill_discard", { p_billid: billId });
-    if (error) {
-      console.error(`bill_discard failed for bill ${billId}:`, error.message);
-      return;
+
+  // A new bill is saved by bill_save in one transaction: the bill, its items and salespeople, stock,
+  // the voucher, exchange links, discount use, store credit and the first payment all happen or
+  // none do. A failure leaves nothing to undo, so no finalized bill is ever deleted (deleting one
+  // freed its exchange credit to be spent again). Returns { billid, bill_number, payment, ... }.
+  const saveNewBill = async (op, payload) => {
+    if (!saveKeyRef.current) saveKeyRef.current = crypto.randomUUID();
+    const { data, error } = await supabase.rpc("bill_save", {
+      p_key: saveKeyRef.current,
+      p_op: op,
+      p_payload: payload,
+    });
+    if (!error) return data;
+    if (error.message === "BILL_VOUCHER_REFUSED") {
+      throw new Error(
+        `Voucher ${payload.voucher_id} can no longer be used (already redeemed, expired or reserved for an online order). Bill not finalized.`,
+      );
     }
-    newBillRef.current = null;
+    throw new Error(
+      BILL_SAVE_ERRORS[error.message] ||
+        "Failed to save bill: " + error.message + (error.details ? ` (${error.details})` : ""),
+    );
+  };
+
+  // Saving an opened bill writes its status and amount received from what this window loaded.
+  // If another window has since recorded a payment, finalized or cancelled it, that write would
+  // undo it, so the save checks first and then writes only while the bill is still as loaded.
+  const assertBillUnchanged = async (id) => {
+    const { data, error } = await supabase
+      .from("bills")
+      .select("paymentstatus, payment_amount")
+      .eq("billid", id)
+      .single();
+    if (error) throw new Error("Could not check the bill: " + error.message);
+    const opened = openedStateRef.current;
+    if (data.paymentstatus !== opened.paymentstatus || !sameAmount(data.payment_amount, opened.payment_amount)) {
+      throw new Error(BILL_CHANGED_MESSAGE);
+    }
+  };
+  const whileUnchanged = (query) => {
+    const opened = openedStateRef.current;
+    const q = query.eq("paymentstatus", opened.paymentstatus);
+    return opened.payment_amount == null ? q.is("payment_amount", null) : q.eq("payment_amount", opened.payment_amount);
+  };
+  // No row updated means the bill changed between the check and the write. BILL_PAYMENTS_MISMATCH
+  // is the database refusing a total that disagrees with the bill's payments, for the same reason.
+  const billUpdateError = (error, updated, prefix) => {
+    if (error) return new Error(error.message === "BILL_PAYMENTS_MISMATCH" ? BILL_CHANGED_MESSAGE : prefix + error.message);
+    if (Array.isArray(updated) && updated.length === 0) return new Error(BILL_CHANGED_MESSAGE);
+    return null;
   };
   const shownError = unfinishedBill
     ? {
@@ -1018,6 +1089,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           }
         }
 
+        await assertBillUnchanged(billId);
+
         // Step F: Delete old bill_items
         const { error: delErr } = await supabase
           .from("bill_items")
@@ -1052,7 +1125,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           exchangeCredit?.amount,
         );
 
-        const { error: updErr } = await supabase
+        const { data: updatedBill, error: updErr } = await whileUnchanged(supabase
           .from("bills")
           .update({
             customerid: selectedCustomerId || null,
@@ -1068,13 +1141,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             final_amount: finalAmount !== "" ? Number(finalAmount) : null,
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
-            finalized: isFinalizedBill ? true : false,
-            paymentstatus: paymentStatusAfterEdit({
-              finalized: isFinalizedBill,
-              paymentStatus: billPaymentStatus,
-              payments: billPayments,
-              netAmount: editEffectiveTotal,
-            }),
+            ...billStatusFields(
+              paymentStatusAfterEdit({
+                finalized: isFinalizedBill,
+                paymentStatus: billPaymentStatus,
+                payments: billPayments,
+                netAmount: editEffectiveTotal,
+              }),
+            ),
             store_credit_used: isFinalizedBill
               ? Math.min(
                   Number(appliedStoreCredit || 0),
@@ -1083,8 +1157,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               : 0,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .eq("billid", billId);
-        if (updErr) throw new Error("Failed to update bill: " + updErr.message);
+          .eq("billid", billId))
+          .select("billid");
+        const updateErr = billUpdateError(updErr, updatedBill, "Failed to update bill: ");
+        if (updateErr) throw updateErr;
 
         // Reconcile salesperson associations
         const { error: spDelErr } = await supabase
@@ -1169,8 +1245,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           discount_total:
             computed.itemLevelDiscountTotal + computed.overallDiscount,
           taxable_total: computed.taxableTotal,
-          paymentstatus: "draft",
-          finalized: false,
+          ...billStatusFields(BILL_STATUS.DRAFT),
           applied_codes: selectedCodes,
           payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
           final_amount: finalAmount !== "" ? Number(finalAmount) : null,
@@ -1387,12 +1462,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           }
         }
 
-        // Create bill as finalized
-        const { data: bill, error: billError } = await supabase
-          .from("bills")
-          .insert({
+        // Create bill as finalized, in one bill_save transaction
+        const bill = await saveNewBill("finalize_create", {
+          bill: {
             customerid: selectedCustomerId || null,
-            stock_reduced: !isBackdated,
             notes: notes || null,
             document_type: docType,
             totalamount: balanceAdjustedComputed.grandTotal,
@@ -1402,8 +1475,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               balanceAdjustedComputed.overallDiscount +
               balanceAdjustedComputed.balanceDiscount,
             taxable_total: balanceAdjustedComputed.taxableTotal,
-            paymentstatus: "finalized",
-            finalized: true,
+            ...billStatusFields(BILL_STATUS.FINALIZED),
             applied_codes: selectedCodes,
             payment_amount: paymentAmount !== "" ? Number(paymentAmount) : null,
             store_credit_used: storeCreditUsed,
@@ -1413,74 +1485,28 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             saleslocationid: salesLocationId || null,
             salesmethodid: salesMethodId || null,
             orderdate: backdatedDate + "T00:00:00+05:30",
-          })
-          .select("billid, bill_number")
-          .single();
-        if (billError)
-          throw new Error("Failed to save bill: " + billError.message);
+          },
+          // The balance-waiver discount distributed proportionally.
+          items: buildBillItemsPayload(
+            null,
+            items,
+            balanceAdjustedComputed.balanceDiscount || 0,
+            balanceAdjustedComputed.overallDiscount,
+            docType,
+          ),
+          salesperson_ids: selectedSalespersonIds,
+          // "Don't reduce stock": bill_save then moves none and records stock_reduced false.
+          skip_stock: isBackdated,
+          voucher_id: appliedVoucher?.voucher_id || null,
+          exchange_ids: exchangeCredit?.exchangeIds || [],
+          exchange_balance_to_credit:
+            exchangeBalance > 0 && exchangeBalanceMode === "store_credit" && selectedCustomerId ? exchangeBalance : 0,
+          discount_codes: selectedCodes,
+        });
         activeBillId = bill.billid;
         newBillRef.current = { id: bill.billid, number: bill.bill_number || `#${bill.billid}` };
         setEffectiveBillNumber(bill.bill_number || null);
         pdfBillNumber = bill.bill_number || null;
-
-        // D-23: Redeem the voucher before anything else hangs off this bill, so a
-        // refusal (redeemed/held meanwhile) leaves nothing to undo but the bill row.
-        if (appliedVoucher?.voucher_id) {
-          try {
-            await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
-          } catch (vErr) {
-            await discardNewBill(activeBillId);
-            throw vErr;
-          }
-        }
-
-        // Link exchange rows to this new bill
-        if (exchangeCredit?.exchangeIds?.length) {
-          await supabase
-            .from("exchanges")
-            .update({ new_billid: activeBillId })
-            .in("exchangeid", exchangeCredit.exchangeIds);
-        }
-
-        // Insert bill_items with the balance-waiver discount distributed proportionally.
-        const billItemsPayload = buildBillItemsPayload(
-          activeBillId,
-          items,
-          balanceAdjustedComputed.balanceDiscount || 0,
-          balanceAdjustedComputed.overallDiscount,
-          docType,
-        );
-        const { error: itemsError } = await supabase
-          .from("bill_items")
-          .insert(billItemsPayload);
-        if (itemsError) {
-          await discardNewBill(activeBillId);
-          throw new Error("Failed to save bill items: " + itemsError.message);
-        }
-
-        // Save salesperson associations
-        if (selectedSalespersonIds.length > 0) {
-          const spPayload = selectedSalespersonIds.map((spId) => ({
-            billid: activeBillId,
-            salesperson_id: spId,
-          }));
-          const { error: spErr } = await supabase
-            .from("bill_salespersons")
-            .insert(spPayload);
-          if (spErr)
-            console.error("Failed to save salespersons:", spErr.message);
-        }
-
-        // Decrement stock (skipped for backdated bills)
-        if (!isBackdated) {
-          stockFailures.push(
-            ...(await applyStockChanges(
-              Object.entries(computeStockDelta([], inventoryItems)),
-              "bill_finalize",
-              activeBillId,
-            )),
-          );
-        }
 
         // Flush finalized state into InvoiceView before PDF capture
         flushSync(() => {
@@ -1490,6 +1516,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         });
       } else {
         // Existing bill (draft or re-finalization): full update
+        await assertBillUnchanged(activeBillId);
 
         // Capture original store_credit_used before overwriting (needed for delta on re-finalization)
         let origStoreCreditUsed = 0;
@@ -1550,11 +1577,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         // Update bill row — all fields
-        const { error: billErr } = await supabase
+        const { data: updatedBill, error: billErr } = await whileUnchanged(supabase
           .from("bills")
           .update({
-            finalized: true,
-            paymentstatus: "finalized",
+            ...billStatusFields(BILL_STATUS.FINALIZED),
             customerid: selectedCustomerId || null,
             notes: notes || null,
             payment_amount: Number(paymentAmount),
@@ -1572,12 +1598,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             salesmethodid: salesMethodId || null,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .eq("billid", activeBillId);
-        if (billErr) {
+          .eq("billid", activeBillId))
+          .select("billid");
+        const updateErr = billUpdateError(billErr, updatedBill, "");
+        if (updateErr) {
           if (appliedVoucher?.voucher_id && !isFinalizedBill) {
             await releaseDraftVoucher(appliedVoucher.voucher_id, activeBillId);
           }
-          throw billErr;
+          throw updateErr;
         }
 
         // Delete + re-insert bill_items to reflect all edits and balance discount
@@ -1623,45 +1651,45 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             await deductStoreCredit(selectedCustomerId, creditDelta, "bill_refinalize", activeBillId);
           }
         }
-      }
 
-      // Step 3: Insert discount_usage rows for each applied code
-      failedStep = "recording the discount code use";
-      if (selectedCodes && selectedCodes.length > 0) {
-        // Re-finalization: remove stale usage rows before re-inserting
-        if (isFinalizedBill) {
-          await supabase.from("discount_usage").delete().eq("billid", activeBillId);
+        // Step 3: Insert discount_usage rows for each applied code (a new bill's are in bill_save)
+        failedStep = "recording the discount code use";
+        if (selectedCodes && selectedCodes.length > 0) {
+          // Re-finalization: remove stale usage rows before re-inserting
+          if (isFinalizedBill) {
+            await supabase.from("discount_usage").delete().eq("billid", activeBillId);
+          }
+          const usageRows = selectedCodes.map((code) => ({
+            customerid: selectedCustomerId,
+            code,
+            billid: activeBillId,
+          }));
+          const { error: duErr } = await supabase
+            .from("discount_usage")
+            .insert(usageRows);
+          if (duErr) throw duErr;
         }
-        const usageRows = selectedCodes.map((code) => ({
-          customerid: selectedCustomerId,
-          code,
-          billid: activeBillId,
-        }));
-        const { error: duErr } = await supabase
-          .from("discount_usage")
-          .insert(usageRows);
-        if (duErr) throw duErr;
-      }
 
-      // D-18 + D-26: Decrement customer store credit (new bill or draft→finalized only;
-      // re-finalization credit delta is handled in the else block above).
-      // Exchange credit is separate — not drawn from store_credit balance.
-      const totalCreditToDeduct = storeCreditUsed;
-      failedStep = "taking the store credit";
-      if (totalCreditToDeduct > 0 && !isFinalizedBill && selectedCustomerId) {
-        await deductStoreCredit(selectedCustomerId, totalCreditToDeduct, "bill_finalize", activeBillId);
-      }
+        // D-18 + D-26: Decrement customer store credit (draft→finalized only; re-finalization
+        // credit delta is handled above).
+        // Exchange credit is separate — not drawn from store_credit balance.
+        const totalCreditToDeduct = storeCreditUsed;
+        failedStep = "taking the store credit";
+        if (totalCreditToDeduct > 0 && !isFinalizedBill && selectedCustomerId) {
+          await deductStoreCredit(selectedCustomerId, totalCreditToDeduct, "bill_finalize", activeBillId);
+        }
 
-      // Add unused exchange balance to store credit when customer chooses that option
-      failedStep = "adding the exchange balance to store credit";
-      if (exchangeBalance > 0 && exchangeBalanceMode === "store_credit" && selectedCustomerId) {
-        const { error: updErr } = await supabase.rpc("store_credit_adjust", {
-          p_customer: selectedCustomerId,
-          p_delta: exchangeBalance,
-          p_reason: "exchange_credit",
-          p_ref: String(activeBillId),
-        });
-        if (updErr) throw updErr;
+        // Add unused exchange balance to store credit when customer chooses that option
+        failedStep = "adding the exchange balance to store credit";
+        if (exchangeBalance > 0 && exchangeBalanceMode === "store_credit" && selectedCustomerId) {
+          const { error: updErr } = await supabase.rpc("store_credit_adjust", {
+            p_customer: selectedCustomerId,
+            p_delta: exchangeBalance,
+            p_reason: "exchange_credit",
+            p_ref: String(activeBillId),
+          });
+          if (updErr) throw updErr;
+        }
       }
 
       failedStep = "finishing the bill";
@@ -1741,6 +1769,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
 
       const inventoryItems = items.filter((it) => it.variantid);
+      let paymentRecord = null;
 
       if (isNewBill) {
         // ── NEW BILL: absolute stock validation + insert + full stock decrement ──
@@ -1762,11 +1791,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           }
         }
 
-        const { data: bill, error: billError } = await supabase
-          .from("bills")
-          .insert({
+        // One bill_save transaction, first payment included
+        const bill = await saveNewBill("partial_create", {
+          bill: {
             customerid: selectedCustomerId || null,
-            stock_reduced: !isBackdated,
             notes: notes || null,
             document_type: docType,
             totalamount: billComputed.grandTotal,
@@ -1775,8 +1803,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             taxable_total: billComputed.taxableTotal,
             net_amount: effectiveTotal,
             final_amount: finalAmount !== "" ? Number(finalAmount) : null,
-            paymentstatus: "partial",
-            finalized: true,
+            ...billStatusFields(BILL_STATUS.PARTIAL),
             applied_codes: selectedCodes,
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,
@@ -1785,64 +1812,32 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             saleslocationid: salesLocationId || null,
             salesmethodid: hasInitialPayment ? salesMethodId : null,
             orderdate: backdatedDate + "T00:00:00+05:30",
-          })
-          .select("billid, bill_number")
-          .single();
-        if (billError) throw new Error("Failed to save bill: " + billError.message);
+          },
+          items: buildBillItemsPayload(
+            null,
+            items,
+            billComputed.balanceDiscount || 0,
+            billComputed.overallDiscount,
+            docType,
+          ),
+          salesperson_ids: selectedSalespersonIds,
+          skip_stock: isBackdated,
+          voucher_id: appliedVoucher?.voucher_id || null,
+          exchange_ids: exchangeCredit?.exchangeIds || [],
+          // A bill finalized with nothing paid has no ledger row yet: bill_payments.amount must be > 0.
+          first_payment: hasInitialPayment
+            ? { amount: Number(paymentAmount), salesmethodid: salesMethodId, ...paymentDateFields(firstPaymentDate) }
+            : null,
+          discount_codes: selectedCodes,
+        });
         activeBillId = bill.billid;
         newBillRef.current = { id: bill.billid, number: bill.bill_number || `#${bill.billid}` };
         pdfBillNumber = bill.bill_number || null;
         setEffectiveBillNumber(bill.bill_number || null);
-
-        // Redeem the voucher first so a refusal leaves only the bill row to undo
-        if (appliedVoucher?.voucher_id) {
-          try {
-            await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
-          } catch (vErr) {
-            await discardNewBill(activeBillId);
-            throw vErr;
-          }
-        }
-
-        if (exchangeCredit?.exchangeIds?.length) {
-          await supabase
-            .from("exchanges")
-            .update({ new_billid: activeBillId })
-            .in("exchangeid", exchangeCredit.exchangeIds);
-        }
-
-        const billItemsPayload = buildBillItemsPayload(
-          activeBillId,
-          items,
-          billComputed.balanceDiscount || 0,
-          billComputed.overallDiscount,
-          docType,
-        );
-        const { error: itemsError } = await supabase
-          .from("bill_items")
-          .insert(billItemsPayload);
-        if (itemsError) {
-          await discardNewBill(activeBillId);
-          throw new Error("Failed to save bill items: " + itemsError.message);
-        }
-
-        if (selectedSalespersonIds.length > 0) {
-          await supabase.from("bill_salespersons").insert(
-            selectedSalespersonIds.map((spId) => ({ billid: activeBillId, salesperson_id: spId })),
-          );
-        }
-
-        if (!isBackdated) {
-          stockFailures.push(
-            ...(await applyStockChanges(
-              Object.entries(computeStockDelta([], inventoryItems)),
-              "bill_partial_finalize",
-              activeBillId,
-            )),
-          );
-        }
+        paymentRecord = bill.payment;
       } else {
         // ── EXISTING DRAFT: delta stock validation + bill update (stock already decremented) ──
+        await assertBillUnchanged(activeBillId);
         const { data: existingItems } = await supabase
           .from("bill_items")
           .select("variantid, quantity")
@@ -1884,7 +1879,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
         }
 
-        const { error: billErr } = await supabase
+        const { data: updatedBill, error: billErr } = await whileUnchanged(supabase
           .from("bills")
           .update({
             customerid: selectedCustomerId || null,
@@ -1895,8 +1890,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             taxable_total: billComputed.taxableTotal,
             net_amount: effectiveTotal,
             final_amount: finalAmount !== "" ? Number(finalAmount) : null,
-            paymentstatus: "partial",
-            finalized: true,
+            ...billStatusFields(BILL_STATUS.PARTIAL),
             applied_codes: selectedCodes,
             payment_amount: Number(paymentAmount),
             store_credit_used: storeCreditUsed,
@@ -1906,12 +1900,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             salesmethodid: hasInitialPayment ? salesMethodId : null,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .eq("billid", activeBillId);
-        if (billErr) {
+          .eq("billid", activeBillId))
+          .select("billid");
+        const updateErr = billUpdateError(billErr, updatedBill, "");
+        if (updateErr) {
           if (appliedVoucher?.voucher_id) {
             await releaseDraftVoucher(appliedVoucher.voucher_id, activeBillId);
           }
-          throw billErr;
+          throw updateErr;
         }
 
         await supabase.from("bill_items").delete().eq("billid", activeBillId);
@@ -1948,49 +1944,44 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             .update({ new_billid: activeBillId })
             .in("exchangeid", exchangeCredit.exchangeIds);
         }
-      }
 
-      // Insert initial payment record. A bill finalized with nothing paid has no ledger
-      // row yet: bill_payments.amount must be > 0.
-      let paymentRecord = null;
-      if (hasInitialPayment) {
-        const { data, error: payErr } = await supabase
-          .from("bill_payments")
-          .insert({
-            billid: activeBillId,
-            amount: Number(paymentAmount),
-            salesmethodid: salesMethodId,
-            ...paymentDateFields(firstPaymentDate),
-          })
-          .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
-          .single();
-        if (payErr) {
-          if (isNewBill) {
-            await discardNewBill(activeBillId);
+        // First payment. bill_payments takes rows only through bill_save and bill_add_payment,
+        // which keep payment_amount and the status in step with them. A bill finalized with
+        // nothing paid has no ledger row yet: bill_payments.amount must be > 0.
+        if (hasInitialPayment) {
+          if (!saveKeyRef.current) saveKeyRef.current = crypto.randomUUID();
+          const { data, error: payErr } = await supabase.rpc("bill_add_payment", {
+            p_key: saveKeyRef.current,
+            p_billid: activeBillId,
+            p_amount: Number(paymentAmount),
+            p_salesmethodid: salesMethodId,
+            p_recorded_at: paymentDateFields(firstPaymentDate).recorded_at ?? null,
+          });
+          if (payErr) {
+            throw new Error(ADD_PAYMENT_ERRORS[payErr.message] || "Failed to record payment: " + payErr.message);
           }
-          throw new Error("Failed to record payment: " + payErr.message);
+          paymentRecord = data.payment;
         }
-        paymentRecord = data;
-      }
 
-      // Discount usage rows
-      failedStep = "recording the discount code use";
-      if (selectedCodes?.length > 0) {
-        const usageRows = selectedCodes.map((code) => ({
-          customerid: selectedCustomerId,
-          code,
-          billid: activeBillId,
-        }));
-        const { error: duErr } = await supabase
-          .from("discount_usage")
-          .insert(usageRows);
-        if (duErr) throw duErr;
-      }
+        // Discount usage rows (a new bill's are in bill_save)
+        failedStep = "recording the discount code use";
+        if (selectedCodes?.length > 0) {
+          const usageRows = selectedCodes.map((code) => ({
+            customerid: selectedCustomerId,
+            code,
+            billid: activeBillId,
+          }));
+          const { error: duErr } = await supabase
+            .from("discount_usage")
+            .insert(usageRows);
+          if (duErr) throw duErr;
+        }
 
-      // Decrement store credit
-      failedStep = "taking the store credit";
-      if (storeCreditUsed > 0 && selectedCustomerId) {
-        await deductStoreCredit(selectedCustomerId, storeCreditUsed, "bill_partial_finalize", activeBillId);
+        // Decrement store credit
+        failedStep = "taking the store credit";
+        if (storeCreditUsed > 0 && selectedCustomerId) {
+          await deductStoreCredit(selectedCustomerId, storeCreditUsed, "bill_partial_finalize", activeBillId);
+        }
       }
 
       failedStep = "finishing the bill";
@@ -2067,48 +2058,36 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     }
     setIsAddingPayment(true);
     try {
-      const { data: billRow, error: billFetchErr } = await supabase
-        .from("bills")
-        .select("net_amount")
-        .eq("billid", billId)
-        .single();
-      if (billFetchErr) throw billFetchErr;
-      const netAmount = Number(billRow?.net_amount ?? 0);
-
-      const { data: newPayment, error: payErr } = await supabase
-        .from("bill_payments")
-        .insert({
-          billid: billId,
-          amount: amt,
-          salesmethodid: addPaymentMethodId,
-          ...paymentDateFields(addPaymentDate),
-        })
-        .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
-        .single();
-      if (payErr) throw new Error("Failed to record payment: " + payErr.message);
+      // The payment, payment_amount and status are one bill_add_payment transaction, judged from
+      // every payment on the bill rather than the ones this screen loaded. The key stays while
+      // the amount, method and date stay, so pressing again after an unknown outcome replays
+      // the first payment instead of recording it twice.
+      const attempt = `${billId}|${amt}|${addPaymentMethodId}|${addPaymentDate}`;
+      if (addPaymentKeyRef.current?.attempt !== attempt) {
+        addPaymentKeyRef.current = { attempt, key: crypto.randomUUID() };
+      }
+      const { data: result, error: payErr } = await supabase.rpc("bill_add_payment", {
+        p_key: addPaymentKeyRef.current.key,
+        p_billid: billId,
+        p_amount: amt,
+        p_salesmethodid: addPaymentMethodId,
+        p_recorded_at: paymentDateFields(addPaymentDate).recorded_at ?? null,
+      });
+      if (payErr) {
+        throw new Error(ADD_PAYMENT_ERRORS[payErr.message] || "Failed to record payment: " + payErr.message);
+      }
+      addPaymentKeyRef.current = null;
+      const { payment: newPayment, total_paid: totalPaid, remaining } = result;
+      // This window's own payment is not a change made elsewhere: a later save expects it.
+      openedStateRef.current = { paymentstatus: result.paymentstatus, payment_amount: totalPaid };
+      const isFullyPaid = result.paymentstatus === BILL_STATUS.FINALIZED;
 
       const updatedPayments = [...billPayments, newPayment].sort(
         (a, b) => new Date(a.recorded_at) - new Date(b.recorded_at),
       );
-      const { totalPaid, remaining, isFullyPaid, paymentStatus } = tallyPayment(
-        billPayments,
-        amt,
-        netAmount,
-      );
       setBillPayments(updatedPayments);
       setAddPaymentAmount("");
       setAddPaymentMethodId(null);
-
-      // payment_amount is the running total received, so it moves with every payment
-      const { error: updErr } = await supabase
-        .from("bills")
-        .update({
-          payment_amount: totalPaid,
-          paymentstatus: paymentStatus,
-          ...firstPaymentMethodFields(billPayments, addPaymentMethodId),
-        })
-        .eq("billid", billId);
-      if (updErr) throw updErr;
       setPaymentAmount(String(totalPaid));
       // A later save writes salesMethodId back to the bill, so keep it in step
       if (billPayments.length === 0) setSalesMethodId(addPaymentMethodId);
