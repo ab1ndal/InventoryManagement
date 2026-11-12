@@ -15,7 +15,7 @@
 --   partial/finalized -> partial, finalized (payments and edits move between them), cancelled
 --   cancelled         -> nothing (owner decision 2026-11-12: cancelled bills are locked)
 -- A finalized bill never goes back to draft: it has a number, took stock and credit, and may
--- have payments. The same app code is mirrored in src/admin/lib/billStatus.js.
+-- have payments. The app names these states in src/admin/lib/billStatus.js.
 --
 -- Run schema/preflight_bill_status_states.sql first. The checks are added NOT VALID, so this
 -- migration does not read old rows and cannot fail on them, while every new insert and update
