@@ -10,6 +10,7 @@
 --     schema/migration_bill_status_states.sql schema/migration_bill_add_payment.sql \
 --     schema/migration_bill_payments_ledger.sql \
 --     schema/migration_voucher_states.sql schema/test_voucher_states.sql
+-- Without the bill migrations, the checks that a live or cancelled bill cannot be reopened fail.
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -238,12 +239,11 @@ begin
       where redeemed_billid = (select billid from b)', b1)) = 'VOUCHER_BAD_TRANSITION');
 end $$;
 
--- ---------- releases that are allowed: cancelled, discarded, draft ----------
+-- ---------- releases that are allowed: cancelled, draft ----------
 do $$
 declare
   b1 int := (select redeemed_billid from public.vouchers where voucher_id = 'VSTATE-A');
   bc int := pg_temp.bill();
-  bn int := pg_temp.bill();
   d int := pg_temp.bill('draft');
   r text;
 begin
@@ -271,16 +271,6 @@ begin
     'select public.voucher_redeem(''VSTATE-A'', %s)', bc)) = 'VOUCHER_BAD_TRANSITION');
   perform pg_temp.ok('still available after redeem on a cancelled bill', pg_temp.state('VSTATE-A') = 'available');
 
-  -- bill_discard: the billing screen abandoning a bill it just inserted
-  perform public.voucher_redeem('VSTATE-A', bn);
-  r := pg_temp.try_commit(format('select public.bill_discard(%s)', bn));
-  perform pg_temp.ok('bill_discard frees the voucher and deletes the bill together', r = 'ok'
-    and pg_temp.state('VSTATE-A') = 'available' and not exists (select 1 from public.bills where billid = bn));
-  perform pg_temp.ok('bill_discard refuses a cancelled bill', pg_temp.try(format(
-    'select public.bill_discard(%s)', bc)) = 'BILL_DISCARD_REFUSED');
-  perform pg_temp.ok('bill_discard of a missing bill does nothing', pg_temp.try(format(
-    'select public.bill_discard(%s)', bn)) = 'ok');
-
   -- hole 2: a draft's finalize redeems first; if marking it finalized fails, voucher_release
   perform pg_temp.ok('voucher_redeem allowed on a draft', public.voucher_redeem('VSTATE-A', d));
   r := pg_temp.try_commit(format('select public.voucher_release(''VSTATE-A'', %s)', d));
@@ -295,6 +285,83 @@ begin
   perform pg_temp.ok('voucher_release by an API caller without staff rights refused',
     r = '42501' and pg_temp.state('VSTATE-A') = 'redeemed');
   perform public.voucher_release('VSTATE-A', d);
+end $$;
+
+-- ---------- a completed sale's voucher stays spent, whatever staff try ----------
+-- A signed-in admin, through the API, on a finalized and on a part-paid bill: deleting the bill,
+-- discarding it, releasing the voucher, reopening the bill as a draft first, or writing the
+-- voucher directly. Only bill_cancel frees it, once, and the cancelled bill cannot come back.
+create function pg_temp.staff_id() returns uuid language sql as $$ select '05a7e000-0000-4000-8000-a00000000001'::uuid $$;
+create function pg_temp.as_staff(p_sql text) returns text language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sub', pg_temp.staff_id(), 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  execute p_sql;
+  perform set_config('role', 'none', true);
+  perform set_config('request.jwt.claims', '{}', true);
+  set constraints public.vouchers_release_guard immediate;
+  set constraints public.vouchers_release_guard deferred;
+  return 'ok';
+exception when others then
+  return case when sqlerrm ~ '^[A-Z_]+$' then sqlerrm else sqlstate end;
+end $$;
+insert into auth.users (id, email) values (pg_temp.staff_id(), 'vstate-staff@example.invalid');
+insert into public.profiles (id, email, role, is_active)
+values (pg_temp.staff_id(), 'vstate-staff@example.invalid', 'admin', true)
+on conflict (id) do update set role = excluded.role, is_active = excluded.is_active;
+-- What the live admin policies allow staff on bills. vouchers keeps the migration's revoke.
+grant select, insert, update, delete on public.bills to authenticated;
+insert into public.vouchers (voucher_id, expiry_date, value, source) values
+  ('VSTATE-S1', current_date + 30, 300, 'online_refund'),
+  ('VSTATE-S2', current_date + 30, 300, 'online_refund'),
+  ('VSTATE-S3', current_date + 30, 300, 'online_refund');
+
+do $$
+declare
+  t record;
+  other int := pg_temp.bill();
+  bx int := pg_temp.bill();
+  by_ int := pg_temp.bill();
+begin
+  for t in select * from (values ('VSTATE-S1', 'finalized'), ('VSTATE-S2', 'partial')) x(v, st) loop
+    declare
+      b int := pg_temp.bill(t.st);
+    begin
+      perform public.voucher_redeem(t.v, b);
+      perform pg_temp.ok(t.st || ': deleting the bill refused', pg_temp.as_staff(format(
+        'delete from public.bills where billid = %s', b)) <> 'ok');
+      perform pg_temp.ok(t.st || ': no bill_discard to free its voucher', pg_temp.as_staff(format(
+        'select public.bill_discard(%s)', b)) <> 'ok');
+      perform pg_temp.ok(t.st || ': voucher_release refused', pg_temp.as_staff(format(
+        'select public.voucher_release(%L, %s)', t.v, b)) <> 'ok');
+      perform pg_temp.ok(t.st || ': reopening the bill as a draft refused', pg_temp.as_staff(format(
+        'update public.bills set paymentstatus = ''draft'', finalized = false where billid = %s', b)) <> 'ok');
+      perform pg_temp.ok(t.st || ': writing the voucher free directly refused', pg_temp.as_staff(format(
+        'update public.vouchers set redeemed = false, redeemed_at = null, redeemed_billid = null
+          where voucher_id = %L', t.v)) <> 'ok');
+      perform pg_temp.ok(t.st || ': voucher still spent on the bill',
+        (pg_temp.voucher(t.v)).redeemed_billid = b and pg_temp.state(t.v) = 'redeemed');
+      perform pg_temp.ok(t.st || ': so it cannot pay another bill', not public.voucher_redeem(t.v, other));
+    end;
+  end loop;
+
+  -- bill_cancel frees it once; a second cancel or reopening the cancelled bill cannot free it again
+  -- once it pays for another sale.
+  update public.bills set customerid = -9301 where billid = bx;
+  perform public.voucher_redeem('VSTATE-S3', bx);
+  perform pg_temp.ok('bill_cancel frees the voucher of the sale it undoes', pg_temp.as_staff(format(
+    $q$select public.bill_cancel(gen_random_uuid(), %s, 'return_payment',
+       '{"expect": {"finalized": true, "paymentstatus": "finalized"}, "restore_older_stock": true}')$q$, bx)) = 'ok'
+    and pg_temp.state('VSTATE-S3') = 'available');
+  perform pg_temp.ok('the freed voucher pays one new sale', public.voucher_redeem('VSTATE-S3', by_));
+  perform pg_temp.ok('cancelling the cancelled bill again refused', pg_temp.as_staff(format(
+    $q$select public.bill_cancel(gen_random_uuid(), %s, 'return_payment',
+       '{"expect": {"finalized": true, "paymentstatus": "finalized"}, "restore_older_stock": true}')$q$, bx)) <> 'ok');
+  perform pg_temp.ok('reopening the cancelled bill refused', pg_temp.as_staff(format(
+    'update public.bills set paymentstatus = ''finalized'' where billid = %s', bx)) <> 'ok');
+  perform pg_temp.ok('the voucher stays spent on the new sale',
+    (pg_temp.voucher('VSTATE-S3')).redeemed_billid = by_ and not public.voucher_redeem('VSTATE-S3', other));
 end $$;
 
 -- ---------- hole 4: no delete, no edits once relied on ----------

@@ -29,12 +29,16 @@
 --   available -> redeemed (bill)    voucher_redeem (bill_save and the billing screen use it); the
 --                                   bill exists and is not cancelled
 --   redeemed (bill) -> available/expired
---                                   bill_cancel, voucher_release (a draft whose finalize failed),
---                                   bill_discard (a bill the billing screen just inserted and is
---                                   abandoning). Checked again at commit by the deferred trigger
+--                                   bill_cancel, voucher_release (a draft whose finalize failed).
+--                                   Checked again at commit by the deferred trigger
 --                                   vouchers_release_guard: the bill must by then be a draft,
 --                                   cancelled or deleted. bill_cancel releases before it marks
 --                                   the bill cancelled, so this cannot be checked any earlier.
+--                                   Only drafts can be deleted (trg_bills_status_insert_delete,
+--                                   schema/migration_bill_status_states.sql), so a deleted bill
+--                                   was a draft. Nothing deletes a bill to free its voucher: new
+--                                   bills are saved whole by bill_save, which leaves nothing to
+--                                   undo after a failure.
 --   delete                          only available or expired vouchers
 -- Once held or redeemed, voucher_id, value, expiry_date and customerid cannot change.
 -- Never: an online redemption undone, a redemption moved to another bill or order, a hold
@@ -193,7 +197,7 @@ create trigger vouchers_state_guard
   for each row execute function public._vouchers_guard_transition();
 
 -- A released in-store redemption is checked when the transaction commits, after bill_cancel
--- has marked its bill cancelled or bill_discard has deleted it.
+-- has marked its bill cancelled. A bill gone by then was a draft: only drafts can be deleted.
 create or replace function public._vouchers_check_release()
 returns trigger
 language plpgsql
@@ -224,7 +228,7 @@ create constraint trigger vouchers_release_guard
 
 -- Every legitimate writer is one of the security definer functions above (or service_role).
 -- The billing screen's direct update, which could free a live bill's voucher, is replaced by
--- voucher_release and bill_discard.
+-- voucher_release.
 revoke insert, update, delete, truncate on table public.vouchers from anon, authenticated;
 
 create or replace function public.voucher_redeem(p_voucher text, p_bill int)
@@ -274,40 +278,8 @@ begin
 end;
 $$;
 
--- Deletes a bill the billing screen just inserted and is abandoning after a failed step, with
--- the voucher it redeemed, in one transaction. The client used to release the voucher and
--- delete the bill as two requests, so a failed delete left a live bill with a free voucher.
-create or replace function public.bill_discard(p_billid int)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_bill public.bills;
-begin
-  if not public._is_staff_or_service() then
-    raise exception 'not authorized' using errcode = '42501';
-  end if;
-  select * into v_bill from public.bills b where b.billid = p_billid for update;
-  if not found then
-    return;
-  end if;
-  -- bill_cancel already undid a cancelled bill, and cancelled bills are kept as the record.
-  if v_bill.paymentstatus = 'cancelled' then
-    raise exception 'BILL_DISCARD_REFUSED' using errcode = 'P0001',
-      detail = format('bill %s is cancelled', p_billid);
-  end if;
-  update public.vouchers
-     set redeemed = false, redeemed_at = null, redeemed_billid = null
-   where redeemed_billid = p_billid and held_order_id is null;
-  delete from public.bills where billid = p_billid;
-end;
-$$;
 revoke all on function public.voucher_release(text, int) from public, anon;
-revoke all on function public.bill_discard(int) from public, anon;
 grant execute on function public.voucher_release(text, int) to authenticated, service_role;
-grant execute on function public.bill_discard(int) to authenticated, service_role;
 
 -- Run after schema/preflight_voucher_states.sql reports zero rows for every check, as a
 -- separate step (it scans the table but blocks no writes):

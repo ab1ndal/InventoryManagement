@@ -635,7 +635,7 @@ cleanup_bill_save
 # ---- voucher_redeem while bill_cancel holds the same bill: the redeem waits, then sees the bill
 # cancelled and is refused, so the voucher is never spent on a cancelled bill. Needs
 # schema/migration_bill_cancel.sql and schema/migration_voucher_states.sql. ----
-if [ "$("${PSQL[@]}" -c "select to_regprocedure('public.bill_discard(int)') is not null")" = "t" ]; then
+if [ "$("${PSQL[@]}" -c "select to_regprocedure('public.voucher_release(text,int)') is not null")" = "t" ]; then
   VC_CANCEL="select public.bill_cancel('cccc0000-0000-4000-8000-0000000000c1', -9201, 'return_payment',
     '{\"expect\": {\"finalized\": true, \"paymentstatus\": \"finalized\"}, \"restore_older_stock\": true}')"
   vc_cleanup() {
