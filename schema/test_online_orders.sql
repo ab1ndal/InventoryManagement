@@ -1173,7 +1173,11 @@ begin
   perform pg_temp.go_live();
   insert into public.vouchers (voucher_id, expiry_date, value, source) values ('SPENTVOUCHER0001', current_date + 30, 2000, 'online_refund');
   select * into r from pg_temp.mk_order(jsonb_build_array(jsonb_build_object('v', v, 'qty', 1)), '{"voucher_code":"SPENTVOUCHER0001"}');
+  -- Spent elsewhere while held, which the voucher triggers now refuse: written past them to
+  -- keep this check of confirm's own guard (schema/migration_voucher_states.sql).
+  set local session_replication_role = replica;
   update public.vouchers set redeemed = true, redeemed_at = now() where voucher_id = 'SPENTVOUCHER0001';
+  set local session_replication_role = origin;
   res := public.online_order_confirm_payment(r.order_ref, 'NO_GATEWAY', 0, 'INR');
   assert res ->> 'result' = 'refund_required' and res ->> 'reason' = 'holds_unavailable', 'spent voucher → refund_required, got ' || res::text;
   assert (select status from public.orders where id = r.order_id) = 'payment_failed', 'order failed';

@@ -539,6 +539,8 @@ create table if not exists public.productimages (
 -- live: Supabase default grants; the product_tags read policy reads it as the caller
 grant select on public.productimages to anon, authenticated;
 grant select on public.products to authenticated;
+-- live: Supabase default grants; schema/migration_voucher_states.sql revokes the writes
+grant all on public.vouchers to anon, authenticated, service_role;
 CREATE OR REPLACE FUNCTION public.is_admin()
  RETURNS boolean
  LANGUAGE sql

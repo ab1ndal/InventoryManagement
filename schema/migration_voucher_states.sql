@@ -15,17 +15,35 @@
 --              online_order_create_bos links the order's bill.
 --
 -- Allowed changes (trigger vouchers_state_guard; anything else raises VOUCHER_BAD_TRANSITION):
---   available -> held               online_order_create, online_order_confirm_payment re-hold
---   held      -> available/expired  _online_release_holds, orders delete (FK set null)
---   held      -> redeemed (online)  online_order_confirm_payment, same order, no bill yet
+--   insert                          only as available or expired: no redemption, hold or bill
+--   available -> held               online_order_create, online_order_confirm_payment re-hold;
+--                                   the order names this voucher (orders.voucher_code) and is
+--                                   pending_payment, or expired / payment_failed (late payment)
+--   held      -> available/expired  _online_release_holds, orders delete (FK set null); the order
+--                                   is gone or unpaid (pending_payment, expired, payment_failed,
+--                                   cancelled)
+--   held      -> redeemed (online)  online_order_confirm_payment: same order, now paid, names
+--                                   this voucher, no bill yet
 --   redeemed (online, no bill) -> redeemed (online, bill)
 --                                   online_order_create_bos, only the order's own bill
---   available -> redeemed (bill)    voucher_redeem (bill_save and the billing screen use it)
+--   available -> redeemed (bill)    voucher_redeem (bill_save and the billing screen use it); the
+--                                   bill exists and is not cancelled
 --   redeemed (bill) -> available/expired
---                                   bill_cancel, and the billing screen undoing a failed save
---                                   before it deletes the new bill
+--                                   bill_cancel, voucher_release (a draft whose finalize failed),
+--                                   bill_discard (a bill the billing screen just inserted and is
+--                                   abandoning). Checked again at commit by the deferred trigger
+--                                   vouchers_release_guard: the bill must by then be a draft,
+--                                   cancelled or deleted. bill_cancel releases before it marks
+--                                   the bill cancelled, so this cannot be checked any earlier.
+--   delete                          only available or expired vouchers
+-- Once held or redeemed, voucher_id, value, expiry_date and customerid cannot change.
 -- Never: an online redemption undone, a redemption moved to another bill or order, a hold
--- moved to another order, an expired voucher held or redeemed.
+-- moved to another order, an expired voucher held or redeemed, a live bill's voucher freed.
+--
+-- Staff no longer write vouchers directly: insert, update and delete are revoked from anon and
+-- authenticated, so every change goes through the security definer functions above. Releasing
+-- a redemption needs a draft, cancelled or deleted bill, and cancelled bills stay cancelled
+-- (schema/migration_bill_status_states.sql), so a voucher can never pay for two live bills.
 --
 -- The three checks are added NOT VALID, so rows written before this migration are not checked
 -- until the VALIDATE step at the end, after schema/preflight_voucher_states.sql reports zero.
@@ -34,7 +52,10 @@
 --
 -- voucher_redeem keeps its signature and grants; only its predicate now calls voucher_state.
 -- Its body is otherwise copied from schema/migration_atomic_shared_writes.sql, the only
--- migration that defines it. Never put BEGIN/COMMIT here (exec_sql runs it in a transaction).
+-- migration that defines it. The trigger refuses it for a missing or cancelled bill. A draft is
+-- allowed: the billing screen redeems before it marks a draft finalized, so a refusal leaves the
+-- draft untouched, and calls voucher_release if marking it finalized then fails.
+-- Never put BEGIN/COMMIT here (exec_sql runs it in a transaction).
 
 set local lock_timeout = '3s';
 
@@ -75,9 +96,39 @@ security definer
 set search_path = public
 as $$
 declare
-  v_from text := public.voucher_state(old);
-  v_to text := public.voucher_state(new);
+  v_from text;
+  v_to text;
+  v_order public.orders;
+  v_bill_status text;
 begin
+  if tg_op = 'INSERT' then
+    if new.redeemed or new.redeemed_at is not null or new.redeemed_billid is not null
+       or new.held_order_id is not null then
+      raise exception 'VOUCHER_BAD_TRANSITION' using errcode = '23514',
+        detail = format('voucher %s: a new voucher must be unspent and unheld', new.voucher_id);
+    end if;
+    return new;
+  end if;
+
+  v_from := public.voucher_state(old);
+  if tg_op = 'DELETE' then
+    if v_from in ('held', 'redeemed') then
+      raise exception 'VOUCHER_BAD_TRANSITION' using errcode = '23514',
+        detail = format('voucher %s: a %s voucher cannot be deleted', old.voucher_id, v_from);
+    end if;
+    return old;
+  end if;
+
+  v_to := public.voucher_state(new);
+  -- What the voucher is worth and whose it is are settled once an order or bill relies on it.
+  if v_from in ('held', 'redeemed')
+     and (new.voucher_id, new.value, new.expiry_date, new.customerid)
+         is distinct from (old.voucher_id, old.value, old.expiry_date, old.customerid) then
+    raise exception 'VOUCHER_BAD_TRANSITION' using errcode = '23514',
+      detail = format('voucher %s: code, value, expiry and customer are fixed while %s',
+                      old.voucher_id, v_from);
+  end if;
+
   if new.redeemed = old.redeemed
      and new.redeemed_at is not distinct from old.redeemed_at
      and new.redeemed_billid is not distinct from old.redeemed_billid
@@ -86,14 +137,25 @@ begin
   end if;
 
   if v_from = 'available' and v_to = 'held' then
-    return new;
+    select * into v_order from public.orders o where o.id = new.held_order_id;
+    if v_order.voucher_code = new.voucher_id
+       and v_order.status in ('pending_payment', 'expired', 'payment_failed') then
+      return new;
+    end if;
   end if;
   if v_from = 'held' and v_to in ('available', 'expired') and new.redeemed_billid is null then
-    return new;
+    -- A deleted order is already gone when its FK sets held_order_id to null.
+    select * into v_order from public.orders o where o.id = old.held_order_id;
+    if not found or v_order.status in ('pending_payment', 'expired', 'payment_failed', 'cancelled') then
+      return new;
+    end if;
   end if;
   if v_from = 'held' and v_to = 'redeemed'
      and new.held_order_id = old.held_order_id and new.redeemed_billid is null then
-    return new;
+    select * into v_order from public.orders o where o.id = new.held_order_id;
+    if v_order.status = 'paid' and v_order.voucher_code = new.voucher_id then
+      return new;
+    end if;
   end if;
   if v_from = 'redeemed' and v_to = 'redeemed'
      and old.held_order_id is not null and new.held_order_id = old.held_order_id
@@ -103,9 +165,17 @@ begin
   end if;
   if v_from = 'available' and v_to = 'redeemed'
      and new.held_order_id is null and new.redeemed_billid is not null then
-    return new;
+    -- KEY SHARE waits for a bill_cancel holding this bill, then reads the cancelled row, so a
+    -- voucher is never spent on a bill that is being cancelled. The FK check takes it anyway.
+    select b.paymentstatus into v_bill_status from public.bills b
+     where b.billid = new.redeemed_billid for key share;
+    if found and v_bill_status is distinct from 'cancelled' then
+      return new;
+    end if;
   end if;
-  if v_from = 'redeemed' and old.held_order_id is null and v_to in ('available', 'expired') then
+  -- The bill is checked at commit by vouchers_release_guard.
+  if v_from = 'redeemed' and old.held_order_id is null and old.redeemed_billid is not null
+     and v_to in ('available', 'expired') then
     return new;
   end if;
 
@@ -119,8 +189,43 @@ revoke all on function public._vouchers_guard_transition() from public, anon, au
 
 drop trigger if exists vouchers_state_guard on public.vouchers;
 create trigger vouchers_state_guard
-  before update on public.vouchers
+  before insert or update or delete on public.vouchers
   for each row execute function public._vouchers_guard_transition();
+
+-- A released in-store redemption is checked when the transaction commits, after bill_cancel
+-- has marked its bill cancelled or bill_discard has deleted it.
+create or replace function public._vouchers_check_release()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (select 1 from public.bills b
+              where b.billid = old.redeemed_billid
+                and b.paymentstatus is distinct from 'cancelled'
+                and not (b.paymentstatus = 'draft' and b.finalized is not true)) then
+    raise exception 'VOUCHER_BAD_TRANSITION' using errcode = '23514',
+      detail = format('voucher %s: bill %s still stands, so its voucher stays spent',
+                      old.voucher_id, old.redeemed_billid);
+  end if;
+  return null;
+end;
+$$;
+revoke all on function public._vouchers_check_release() from public, anon, authenticated;
+
+drop trigger if exists vouchers_release_guard on public.vouchers;
+create constraint trigger vouchers_release_guard
+  after update on public.vouchers
+  deferrable initially deferred
+  for each row
+  when (old.redeemed and not new.redeemed and old.redeemed_billid is not null)
+  execute function public._vouchers_check_release();
+
+-- Every legitimate writer is one of the security definer functions above (or service_role).
+-- The billing screen's direct update, which could free a live bill's voucher, is replaced by
+-- voucher_release and bill_discard.
+revoke insert, update, delete, truncate on table public.vouchers from anon, authenticated;
 
 create or replace function public.voucher_redeem(p_voucher text, p_bill int)
 returns boolean
@@ -139,6 +244,70 @@ begin
   return found;
 end;
 $$;
+
+-- Undoes this bill's redemption while the bill is still a draft: the billing screen's
+-- finalize redeemed the voucher and then failed to mark the draft finalized.
+create or replace function public.voucher_release(p_voucher text, p_bill int)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_bill public.bills;
+begin
+  if not public._is_staff_or_service() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  -- NO KEY UPDATE: a finalize of this draft waits until the release commits, and then marks a
+  -- bill whose voucher is free, which its own voucher_redeem must take again.
+  select * into v_bill from public.bills b where b.billid = p_bill for no key update;
+  if not found or v_bill.paymentstatus is distinct from 'draft' or v_bill.finalized is true then
+    raise exception 'VOUCHER_RELEASE_REFUSED' using errcode = 'P0001',
+      detail = format('bill %s is %s, not a draft, so voucher %s stays spent',
+                      p_bill, coalesce(v_bill.paymentstatus, 'missing'), p_voucher);
+  end if;
+  update public.vouchers
+     set redeemed = false, redeemed_at = null, redeemed_billid = null
+   where voucher_id = p_voucher and redeemed_billid = p_bill and held_order_id is null;
+  return found;
+end;
+$$;
+
+-- Deletes a bill the billing screen just inserted and is abandoning after a failed step, with
+-- the voucher it redeemed, in one transaction. The client used to release the voucher and
+-- delete the bill as two requests, so a failed delete left a live bill with a free voucher.
+create or replace function public.bill_discard(p_billid int)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_bill public.bills;
+begin
+  if not public._is_staff_or_service() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  select * into v_bill from public.bills b where b.billid = p_billid for update;
+  if not found then
+    return;
+  end if;
+  -- bill_cancel already undid a cancelled bill, and cancelled bills are kept as the record.
+  if v_bill.paymentstatus = 'cancelled' then
+    raise exception 'BILL_DISCARD_REFUSED' using errcode = 'P0001',
+      detail = format('bill %s is cancelled', p_billid);
+  end if;
+  update public.vouchers
+     set redeemed = false, redeemed_at = null, redeemed_billid = null
+   where redeemed_billid = p_billid and held_order_id is null;
+  delete from public.bills where billid = p_billid;
+end;
+$$;
+revoke all on function public.voucher_release(text, int) from public, anon;
+revoke all on function public.bill_discard(int) from public, anon;
+grant execute on function public.voucher_release(text, int) to authenticated, service_role;
+grant execute on function public.bill_discard(int) to authenticated, service_role;
 
 -- Run after schema/preflight_voucher_states.sql reports zero rows for every check, as a
 -- separate step (it scans the table but blocks no writes):
