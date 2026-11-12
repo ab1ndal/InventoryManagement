@@ -16,6 +16,7 @@ jest.mock("sonner", () => ({
 }));
 
 const mockChain = (table) => {
+  let updating = false;
   const chain = {
     select: (columns) => {
       mockSelects.push(String(columns));
@@ -25,6 +26,7 @@ const mockChain = (table) => {
     delete: () => chain,
     update: (payload) => {
       mockUpdates.push({ table, payload });
+      updating = true;
       return chain;
     },
     eq: () => chain,
@@ -35,7 +37,9 @@ const mockChain = (table) => {
     limit: () => chain,
     single: () => Promise.resolve({ data: table === "bills" ? mockBill : null, error: null }),
     maybeSingle: () => Promise.resolve({ data: null, error: null }),
-    then: (res, rej) => Promise.resolve({ data: [], error: null }).then(res, rej),
+    // A bill update returns the row it changed; none would mean the bill changed elsewhere.
+    then: (res, rej) =>
+      Promise.resolve({ data: updating && table === "bills" ? [{ billid: 330 }] : [], error: null }).then(res, rej),
   };
   return chain;
 };

@@ -70,6 +70,11 @@ const BILL_SAVE_ERRORS = {
   BILL_KEY_CONFLICT: "A bill from this window may already be saved. Close this window and check the bill list before entering it again.",
 };
 
+// Shown when an opened bill was paid, finalized or cancelled in another window since it loaded.
+const BILL_CHANGED_MESSAGE = "This bill changed in another window — reload";
+
+const sameAmount = (a, b) => (a == null ? null : Number(a)) === (b == null ? null : Number(b));
+
 // A payment entered today keeps the database's own time. recorded_at has no time zone, so an earlier
 // date is stored as midday, well clear of the day boundary.
 export const paymentDateFields = (date) =>
@@ -256,6 +261,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   // save releases its key, so a corrected retry still saves; a save whose answer was lost is
   // replayed, never saved twice.
   const saveKeyRef = useRef(null);
+  // The opened bill's payment state as this window last saw it: { paymentstatus, payment_amount }.
+  const openedStateRef = useRef(null);
   const [partialConfirmOpen, setPartialConfirmOpen] = useState(false);
   const [finalAmount, setFinalAmount] = useState("");
   const [voucherError, setVoucherError] = useState("");
@@ -324,6 +331,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       setLoadedNetAmount(null);
       newBillRef.current = null;
       saveKeyRef.current = null;
+      openedStateRef.current = null;
       setUnfinishedBill(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -456,6 +464,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setIsBackdated(bill.stock_reduced === false);
         setStockChoiceLocked(bill.stock_reduced === false);
         setBillPaymentStatus(bill.paymentstatus || "draft");
+        openedStateRef.current = { paymentstatus: bill.paymentstatus, payment_amount: bill.payment_amount };
         if (bill.net_amount != null) {
           setLoadedNetAmount(Number(bill.net_amount));
         }
@@ -956,6 +965,34 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         "Failed to save bill: " + error.message + (error.details ? ` (${error.details})` : ""),
     );
   };
+
+  // Saving an opened bill writes its status and amount received from what this window loaded.
+  // If another window has since recorded a payment, finalized or cancelled it, that write would
+  // undo it, so the save checks first and then writes only while the bill is still as loaded.
+  const assertBillUnchanged = async (id) => {
+    const { data, error } = await supabase
+      .from("bills")
+      .select("paymentstatus, payment_amount")
+      .eq("billid", id)
+      .single();
+    if (error) throw new Error("Could not check the bill: " + error.message);
+    const opened = openedStateRef.current;
+    if (data.paymentstatus !== opened.paymentstatus || !sameAmount(data.payment_amount, opened.payment_amount)) {
+      throw new Error(BILL_CHANGED_MESSAGE);
+    }
+  };
+  const whileUnchanged = (query) => {
+    const opened = openedStateRef.current;
+    const q = query.eq("paymentstatus", opened.paymentstatus);
+    return opened.payment_amount == null ? q.is("payment_amount", null) : q.eq("payment_amount", opened.payment_amount);
+  };
+  // No row updated means the bill changed between the check and the write. BILL_PAYMENTS_MISMATCH
+  // is the database refusing a total that disagrees with the bill's payments, for the same reason.
+  const billUpdateError = (error, updated, prefix) => {
+    if (error) return new Error(error.message === "BILL_PAYMENTS_MISMATCH" ? BILL_CHANGED_MESSAGE : prefix + error.message);
+    if (Array.isArray(updated) && updated.length === 0) return new Error(BILL_CHANGED_MESSAGE);
+    return null;
+  };
   const shownError = unfinishedBill
     ? {
         title: "Bill not finished",
@@ -1039,6 +1076,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           }
         }
 
+        await assertBillUnchanged(billId);
+
         // Step F: Delete old bill_items
         const { error: delErr } = await supabase
           .from("bill_items")
@@ -1073,7 +1112,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           exchangeCredit?.amount,
         );
 
-        const { error: updErr } = await supabase
+        const { data: updatedBill, error: updErr } = await whileUnchanged(supabase
           .from("bills")
           .update({
             customerid: selectedCustomerId || null,
@@ -1105,8 +1144,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               : 0,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .eq("billid", billId);
-        if (updErr) throw new Error("Failed to update bill: " + updErr.message);
+          .eq("billid", billId))
+          .select("billid");
+        const updateErr = billUpdateError(updErr, updatedBill, "Failed to update bill: ");
+        if (updateErr) throw updateErr;
 
         // Reconcile salesperson associations
         const { error: spDelErr } = await supabase
@@ -1462,6 +1503,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         });
       } else {
         // Existing bill (draft or re-finalization): full update
+        await assertBillUnchanged(activeBillId);
 
         // Capture original store_credit_used before overwriting (needed for delta on re-finalization)
         let origStoreCreditUsed = 0;
@@ -1522,7 +1564,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         }
 
         // Update bill row — all fields
-        const { error: billErr } = await supabase
+        const { data: updatedBill, error: billErr } = await whileUnchanged(supabase
           .from("bills")
           .update({
             ...billStatusFields(BILL_STATUS.FINALIZED),
@@ -1543,8 +1585,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             salesmethodid: salesMethodId || null,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .eq("billid", activeBillId);
-        if (billErr) throw billErr;
+          .eq("billid", activeBillId))
+          .select("billid");
+        const updateErr = billUpdateError(billErr, updatedBill, "");
+        if (updateErr) throw updateErr;
 
         // Delete + re-insert bill_items to reflect all edits and balance discount
         const { error: delErr } = await supabase
@@ -1775,6 +1819,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         paymentRecord = bill.payment;
       } else {
         // ── EXISTING DRAFT: delta stock validation + bill update (stock already decremented) ──
+        await assertBillUnchanged(activeBillId);
         const { data: existingItems } = await supabase
           .from("bill_items")
           .select("variantid, quantity")
@@ -1816,7 +1861,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           await redeemVoucher(appliedVoucher.voucher_id, activeBillId);
         }
 
-        const { error: billErr } = await supabase
+        const { data: updatedBill, error: billErr } = await whileUnchanged(supabase
           .from("bills")
           .update({
             customerid: selectedCustomerId || null,
@@ -1837,8 +1882,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             salesmethodid: hasInitialPayment ? salesMethodId : null,
             orderdate: backdatedDate + "T00:00:00+05:30",
           })
-          .eq("billid", activeBillId);
-        if (billErr) throw billErr;
+          .eq("billid", activeBillId))
+          .select("billid");
+        const updateErr = billUpdateError(billErr, updatedBill, "");
+        if (updateErr) throw updateErr;
 
         await supabase.from("bill_items").delete().eq("billid", activeBillId);
         const updatedPayload = buildBillItemsPayload(
@@ -2008,6 +2055,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       }
       addPaymentKeyRef.current = null;
       const { payment: newPayment, total_paid: totalPaid, remaining } = result;
+      // This window's own payment is not a change made elsewhere: a later save expects it.
+      openedStateRef.current = { paymentstatus: result.paymentstatus, payment_amount: totalPaid };
       const isFullyPaid = result.paymentstatus === BILL_STATUS.FINALIZED;
 
       const updatedPayments = [...billPayments, newPayment].sort(
