@@ -1,4 +1,4 @@
-import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields } from "../paymentHelpers";
+import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields, paymentStatusAfterEdit } from "../paymentHelpers";
 
 describe("storeCreditDeductionDelta", () => {
   test("deducts the full amount when the balance covers it", () => {
@@ -87,5 +87,31 @@ describe("firstPaymentMethodFields", () => {
 
   test("later payments leave the bill's method alone", () => {
     expect(firstPaymentMethodFields([{ amount: 100 }], 3)).toEqual({});
+  });
+});
+
+describe("paymentStatusAfterEdit", () => {
+  test("a draft stays a draft", () => {
+    expect(paymentStatusAfterEdit({ finalized: false, paymentStatus: "draft", payments: [], netAmount: 500 })).toBe("draft");
+  });
+
+  test("a bill paid in one go stays finalized", () => {
+    expect(paymentStatusAfterEdit({ finalized: true, paymentStatus: "finalized", payments: [], netAmount: 900 })).toBe("finalized");
+  });
+
+  test("a partial bill whose payments now cover the total becomes finalized", () => {
+    expect(paymentStatusAfterEdit({ finalized: true, paymentStatus: "partial", payments: [{ amount: 300 }], netAmount: 300 })).toBe("finalized");
+  });
+
+  test("a partial bill still short stays partial", () => {
+    expect(paymentStatusAfterEdit({ finalized: true, paymentStatus: "partial", payments: [{ amount: 300 }], netAmount: 800 })).toBe("partial");
+  });
+
+  test("a partial bill with nothing paid yet stays partial", () => {
+    expect(paymentStatusAfterEdit({ finalized: true, paymentStatus: "partial", payments: [], netAmount: 800 })).toBe("partial");
+  });
+
+  test("a bill paid in installments goes back to partial when items are added", () => {
+    expect(paymentStatusAfterEdit({ finalized: true, paymentStatus: "finalized", payments: [{ amount: 300 }, { amount: 500 }], netAmount: 1200 })).toBe("partial");
   });
 });

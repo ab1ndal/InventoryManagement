@@ -67,7 +67,8 @@ const baseBill = {
 };
 
 const stockTick = () => screen.getByRole("checkbox", { name: /Don't reduce stock/ });
-const saveDraft = () => screen.getByRole("button", { name: "Save Draft" });
+// "Save Draft" on a draft, "Save Changes" once the bill is finalized.
+const saveDraft = () => screen.getByRole("button", { name: /^Save (Draft|Changes)$/ });
 const finalize = () => screen.getByRole("button", { name: "Finalize" });
 const billUpdate = () => mockUpdates.find((u) => u.table === "bills").payload;
 

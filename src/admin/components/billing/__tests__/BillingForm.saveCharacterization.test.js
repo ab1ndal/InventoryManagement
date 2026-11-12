@@ -242,6 +242,8 @@ const normalised = () => {
   );
 };
 
+// "Save Draft" on a draft, "Save Changes" once the bill is finalized.
+const SAVE_BUTTON = /^Save (Draft|Changes)$/;
 const click = (name) => fireEvent.click(screen.getByRole("button", { name }));
 const clickLast = (name) => fireEvent.click(screen.getAllByRole("button", { name }).slice(-1)[0]);
 
@@ -257,7 +259,7 @@ async function openExisting(bill, { onSubmit } = {}) {
   mockDb.bill = bill;
   render(<BillingForm billId={330} open onOpenChange={() => {}} onSubmit={onSubmit} />);
   await screen.findAllByText("Kurti");
-  await waitFor(() => expect(screen.getByRole("button", { name: "Save Draft" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: SAVE_BUTTON })).toBeEnabled());
 }
 
 const setPayment = (amount, method) => {
@@ -280,7 +282,7 @@ async function partialFinalize(onSubmit) {
 }
 
 async function saveDraft(onSubmit) {
-  click("Save Draft");
+  click(SAVE_BUTTON);
   await done(onSubmit);
 }
 
