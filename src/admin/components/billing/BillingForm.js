@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct } from "./stockHelpers";
-import { tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields, paymentStatusAfterEdit } from "./paymentHelpers";
+import { storeCreditDeductionDelta, isWebsiteMethod, paymentStatusAfterEdit } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { BILL_STATUS, billStatusFields } from "../../lib/billStatus";
 import { Button } from "../../../components/ui/button";
@@ -54,6 +54,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../../components/ui/dialog";
+
+// bill_add_payment refusals, in words staff can act on.
+const ADD_PAYMENT_ERRORS = {
+  BILL_NOT_PAYABLE: "This bill is a draft or has been cancelled, so it cannot take a payment. Refresh the bill list.",
+  BILL_ONLINE: "This is a website order's bill. Its payments are handled from Online Orders.",
+  BILL_KEY_CONFLICT: "A payment from this screen may already be recorded. Reopen the bill to check before recording again.",
+};
 
 // A payment entered today keeps the database's own time. recorded_at has no time zone, so an earlier
 // date is stored as midday, well clear of the day boundary.
@@ -245,6 +252,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [addPaymentAmount, setAddPaymentAmount] = useState("");
   const [addPaymentMethodId, setAddPaymentMethodId] = useState(null);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const addPaymentKeyRef = useRef(null); // { attempt, key } for bill_add_payment
   const [partialConfirmOpen, setPartialConfirmOpen] = useState(false);
   const [finalAmount, setFinalAmount] = useState("");
   const [voucherError, setVoucherError] = useState("");
@@ -2053,48 +2061,34 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     }
     setIsAddingPayment(true);
     try {
-      const { data: billRow, error: billFetchErr } = await supabase
-        .from("bills")
-        .select("net_amount")
-        .eq("billid", billId)
-        .single();
-      if (billFetchErr) throw billFetchErr;
-      const netAmount = Number(billRow?.net_amount ?? 0);
-
-      const { data: newPayment, error: payErr } = await supabase
-        .from("bill_payments")
-        .insert({
-          billid: billId,
-          amount: amt,
-          salesmethodid: addPaymentMethodId,
-          ...paymentDateFields(addPaymentDate),
-        })
-        .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
-        .single();
-      if (payErr) throw new Error("Failed to record payment: " + payErr.message);
+      // The payment, payment_amount and status are one bill_add_payment transaction, judged from
+      // every payment on the bill rather than the ones this screen loaded. The key stays while
+      // the amount, method and date stay, so pressing again after an unknown outcome replays
+      // the first payment instead of recording it twice.
+      const attempt = `${billId}|${amt}|${addPaymentMethodId}|${addPaymentDate}`;
+      if (addPaymentKeyRef.current?.attempt !== attempt) {
+        addPaymentKeyRef.current = { attempt, key: crypto.randomUUID() };
+      }
+      const { data: result, error: payErr } = await supabase.rpc("bill_add_payment", {
+        p_key: addPaymentKeyRef.current.key,
+        p_billid: billId,
+        p_amount: amt,
+        p_salesmethodid: addPaymentMethodId,
+        p_recorded_at: paymentDateFields(addPaymentDate).recorded_at ?? null,
+      });
+      if (payErr) {
+        throw new Error(ADD_PAYMENT_ERRORS[payErr.message] || "Failed to record payment: " + payErr.message);
+      }
+      addPaymentKeyRef.current = null;
+      const { payment: newPayment, total_paid: totalPaid, remaining } = result;
+      const isFullyPaid = result.paymentstatus === BILL_STATUS.FINALIZED;
 
       const updatedPayments = [...billPayments, newPayment].sort(
         (a, b) => new Date(a.recorded_at) - new Date(b.recorded_at),
       );
-      const { totalPaid, remaining, isFullyPaid, paymentStatus } = tallyPayment(
-        billPayments,
-        amt,
-        netAmount,
-      );
       setBillPayments(updatedPayments);
       setAddPaymentAmount("");
       setAddPaymentMethodId(null);
-
-      // payment_amount is the running total received, so it moves with every payment
-      const { error: updErr } = await supabase
-        .from("bills")
-        .update({
-          payment_amount: totalPaid,
-          paymentstatus: paymentStatus,
-          ...firstPaymentMethodFields(billPayments, addPaymentMethodId),
-        })
-        .eq("billid", billId);
-      if (updErr) throw updErr;
       setPaymentAmount(String(totalPaid));
       // A later save writes salesMethodId back to the bill, so keep it in step
       if (billPayments.length === 0) setSalesMethodId(addPaymentMethodId);

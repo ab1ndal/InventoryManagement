@@ -2451,31 +2451,15 @@ Array [
 exports[`path G, record payment (pins current behaviour) pins current behaviour: payment that leaves a balance 1`] = `
 Array [
   Object {
-    "filters": Array [],
-    "kind": "table",
-    "op": "insert",
-    "payload": Object {
-      "amount": 50,
-      "billid": 330,
-      "salesmethodid": 2,
+    "args": Object {
+      "p_amount": 50,
+      "p_billid": 330,
+      "p_key": "00000000-0000-4000-8000-000000000001",
+      "p_recorded_at": null,
+      "p_salesmethodid": 2,
     },
-    "table": "bill_payments",
-  },
-  Object {
-    "filters": Array [
-      Array [
-        "eq",
-        "billid",
-        330,
-      ],
-    ],
-    "kind": "table",
-    "op": "update",
-    "payload": Object {
-      "payment_amount": 150,
-      "paymentstatus": "partial",
-    },
-    "table": "bills",
+    "fn": "bill_add_payment",
+    "kind": "rpc",
   },
   Object {
     "entry": Object {
@@ -2492,31 +2476,15 @@ Array [
 exports[`path G, record payment (pins current behaviour) pins current behaviour: payment that settles the bill 1`] = `
 Array [
   Object {
-    "filters": Array [],
-    "kind": "table",
-    "op": "insert",
-    "payload": Object {
-      "amount": 200,
-      "billid": 330,
-      "salesmethodid": 1,
+    "args": Object {
+      "p_amount": 200,
+      "p_billid": 330,
+      "p_key": "00000000-0000-4000-8000-000000000001",
+      "p_recorded_at": null,
+      "p_salesmethodid": 1,
     },
-    "table": "bill_payments",
-  },
-  Object {
-    "filters": Array [
-      Array [
-        "eq",
-        "billid",
-        330,
-      ],
-    ],
-    "kind": "table",
-    "op": "update",
-    "payload": Object {
-      "payment_amount": 300,
-      "paymentstatus": "finalized",
-    },
-    "table": "bills",
+    "fn": "bill_add_payment",
+    "kind": "rpc",
   },
   Object {
     "bucket": "invoices",

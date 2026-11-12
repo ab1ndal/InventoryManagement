@@ -107,6 +107,39 @@ begin
     pg_temp.try(format($q$update public.bills set pdf_url = 'x', notes = 'BSTATE edited' where billid = %s$q$, b)) = 'ok');
 end $$;
 
+-- Payments: only on part-paid and paid bills, by insert or by moving a row.
+do $$
+declare
+  t record;
+  b int;
+  m int;
+  open_bill int := pg_temp.bill('partial', true);
+  pay int;
+begin
+  insert into public.salesmethods (salesmethodid, methodname) values (-9301, 'BSTATE method') returning salesmethodid into m;
+  for t in select * from (values
+      ('draft', false, false),
+      ('partial', true, true),
+      ('finalized', true, true),
+      ('cancelled', false, false),
+      ('cancelled', true, false)) v(st, fin, allowed)
+  loop
+    b := pg_temp.bill(t.st, t.fin);
+    perform pg_temp.ok(format('payment on %s/%s %s', t.st, t.fin, case when t.allowed then 'allowed' else 'refused' end),
+      pg_temp.try(format('insert into public.bill_payments (billid, amount, salesmethodid) values (%s, 100, %s)', b, m))
+        = case when t.allowed then 'ok' else 'BILL_NOT_PAYABLE' end);
+  end loop;
+
+  insert into public.bill_payments (billid, amount, salesmethodid) values (open_bill, 100, m) returning payment_id into pay;
+  b := pg_temp.bill('cancelled', true);
+  perform pg_temp.ok('payment moved onto a cancelled bill refused',
+    pg_temp.try(format('update public.bill_payments set billid = %s where payment_id = %s', b, pay)) = 'BILL_NOT_PAYABLE');
+  -- A cancelled bill keeps its payments as the record of what was refunded.
+  update public.bills set paymentstatus = 'cancelled' where billid = open_bill;
+  perform pg_temp.ok('payment on a cancelled bill cannot be changed',
+    pg_temp.try(format('update public.bill_payments set amount = 1 where payment_id = %s', pay)) = 'BILL_NOT_PAYABLE');
+end $$;
+
 -- The preflight repairs still work on a row that was invalid before the migration.
 do $$
 declare

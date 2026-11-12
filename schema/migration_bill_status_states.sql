@@ -21,7 +21,10 @@
 -- migration does not read old rows and cannot fail on them, while every new insert and update
 -- is checked from now on. Validate them (step at the end) once preflight shows no violators.
 --
--- Errors: P0001 BILL_BAD_TRANSITION, detail holds the billid and both states.
+-- Also: bill_payments rows are refused on draft and cancelled bills (trigger at the end).
+--
+-- Errors: P0001 BILL_BAD_TRANSITION, detail holds the billid and both states; P0001
+-- BILL_NOT_PAYABLE for a payment on a draft or cancelled bill.
 
 set local lock_timeout = '3s';
 
@@ -70,6 +73,35 @@ drop trigger if exists trg_bills_status_transition on public.bills;
 create trigger trg_bills_status_transition
   before update of paymentstatus, finalized on public.bills
   for each row execute function public._bills_status_transition();
+
+-- Payments belong to part-paid and paid bills. Every path that records one (the screen's
+-- part-paid finalize, the CLI, bill_save, bill_add_payment) sets the bill to partial first.
+-- FOR SHARE waits for a bill_cancel in progress on the bill, then reads the status it left.
+-- Security definer so row security on bills cannot hide the bill and let the payment through.
+create or replace function public._bill_payments_bill_open()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status text;
+begin
+  select paymentstatus into v_status from public.bills where billid = new.billid for share;
+  -- A missing bill is left to the foreign key, which names it.
+  if found and v_status in ('draft', 'cancelled') then
+    raise exception 'BILL_NOT_PAYABLE' using errcode = 'P0001',
+      detail = format('bill %s is %s', new.billid, v_status);
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public._bill_payments_bill_open() from public, anon, authenticated;
+
+drop trigger if exists trg_bill_payments_bill_open on public.bill_payments;
+create trigger trg_bill_payments_bill_open
+  before insert or update on public.bill_payments
+  for each row execute function public._bill_payments_bill_open();
 
 -- Step 2, run separately once schema/preflight_bill_status_states.sql returns no violators.
 -- Each scans bills without blocking reads or writes.
