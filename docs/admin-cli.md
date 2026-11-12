@@ -304,10 +304,11 @@ become a new variant. Quote the size: `|` is a shell pipe.
 
 ## Bills
 
-`bill create` makes a **finalized, fully paid Bill of Supply**, writing what
-the billing screen's Finalize button writes for a new bill. `bill preview`
-shows all of it without writing. Not supported: drafts, discount codes,
-vouchers, store credit, exchanges, partial payment, salespersons, SMS. The
+`bill create` makes a **finalized Bill of Supply**, fully paid or part paid,
+writing what the billing screen's Finalize (or partial finalize) button writes
+for a new bill. `bill preview` shows all of it without writing. Not supported:
+drafts, discount codes, vouchers, store credit, exchanges, recording a later
+payment (use the Bills screen), salespersons, SMS. The
 bill's PDF is a separate step: [bill pdf](#bill-pdf).
 
 ### Bill spec
@@ -357,7 +358,8 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 |---|---|---|
 | `date` | yes | `YYYY-MM-DD`, stored as the bill date; the FY of the bill number follows it |
 | `payment.method` | yes | a sales method name (Cash, UPI, Card, Paytm, GPay, Mixed); not Website. Split payments: one combined amount, method `Mixed`, the split in `notes` |
-| `payment.amount` | yes | what the customer paid (the slip's net amount) |
+| `payment.amount` | yes | what the customer paid (the slip's net amount, or the first payment of a part-paid bill) |
+| `payment.balance_due` | no | what the customer still owes (slip "bal 3950"); > 0 makes a part-paid bill priced at `amount + balance_due` |
 | `location` | no | sales location name, default `Walk-In` |
 | `notes` | no | e.g. `"Paper bill 387; Cash 1000 + UPI 950"` |
 | `skip_stock` | no | `true` = don't touch stock (the screen's "backdated" checkbox); default reduces stock |
@@ -375,15 +377,22 @@ How amounts become a bill, as on the screen:
 - If the total is above the amount paid by up to ₹100, a balance discount
   trims the bill to exactly the amount paid (the screen's rule,
   `computeBalanceAdjustedTotals`). So set `payment.amount` to the slip's net
-  amount and the bill total will equal it.
+  amount and the bill total will equal it. For a part-paid bill the same
+  applies to `amount + balance_due`.
 - Refused, as on the screen: a line discount over 50%, `amount` above MRP,
-  payment off from the total by more than ₹100 (partial payment), not enough
+  payment (`amount + balance_due`) off from the line total by more than ₹100, not enough
   stock (unless `skip_stock`), unknown customer, variant, manual item, method
   or location.
 - Warned (non-blocking): a line discount over 30% (the screen asks to
   confirm), paying more than the total (recorded as is).
 - No `bill_payments` row: like the screen, a fully paid bill records payment
   as `payment_amount` + `salesmethodid` on the bill.
+- Part-paid (`balance_due` > 0), as the screen's partial finalize: the bill
+  gets `paymentstatus: "partial"`, `net_amount` (bill total), `final_amount`
+  (`amount + balance_due`) and `payment_amount` (first payment), plus one
+  `bill_payments` row for the first payment, dated the bill date at midday
+  (no `recorded_at` when the bill is dated today). Stock moves with reason
+  `bill_partial_finalize`. The rest is recorded later on the Bills screen.
 - Inventory lines get `cost_price: null` and manual lines the item's cost, as
   on the screen. Manual-item stock is not changed (the app never does).
 
@@ -399,7 +408,8 @@ rows that would be created first, with the ids the manual items will get;
 `payment_method`, `location`, the exact `bill` row and `bill_items` rows that
 would be inserted (bill number and ids are assigned on create), `stock` (per variant: `stock_before`, `change`,
 `stock_after`), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
-`grand_total`, `paid`) and `warnings`.
+`grand_total`, `paid`, and `balance_due` on a part-paid bill), `first_payment`
+(the `bill_payments` row a part-paid bill gets, else `null`) and `warnings`.
 
 ### bill create
 

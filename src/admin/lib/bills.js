@@ -2,9 +2,10 @@
 // Bill creation and read-back shared by the admin CLI and, later, the admin
 // screens. createBill reproduces BillingForm's direct "Finalize" of a new bill
 // (handleConfirmFinalize) for the common case: one customer, inventory and/or
-// manual items, per-line discount and alteration, fully paid by one method.
-// Out of scope: drafts, discount codes, vouchers, store credit, exchanges,
-// partial payment, salespersons, PDF/SMS.
+// manual items, per-line discount and alteration, paid by one method, either
+// in full or in part (handleConfirmPartialFinalize: first payment now, the
+// rest owed). Out of scope: drafts, discount codes, vouchers, store credit,
+// exchanges, salespersons, PDF/SMS.
 // A bill spec is one readable JSON per bill (see docs/admin-cli.md): customer
 // by id, by phone (optionally created if missing) or as a new guest; lines by
 // product code + colour/size, variant id, manual item id, or a manual item
@@ -17,6 +18,7 @@ import {
 } from "../components/billing/billUtils.js";
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
 import { customerName, money } from "../../utility/activitySummary.js";
+import { todayIST } from "../../utility/dateFormat.js";
 import { findCustomerByPhone, createCustomer } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
@@ -129,11 +131,13 @@ export function parseBillSpec(spec) {
     fail(`date: expected YYYY-MM-DD, got "${spec.date ?? ""}"`);
   }
   if (!isObj(spec.payment)) fail("payment is required: { method, amount }");
-  checkKeys(spec.payment, ["method", "amount"], "payment");
+  checkKeys(spec.payment, ["method", "amount", "balance_due"], "payment");
   const method = String(spec.payment.method ?? "").trim();
   if (!method) fail("payment.method is required (e.g. Cash, UPI)");
   const paid = num(spec.payment.amount, "payment.amount");
   if (paid <= 0) fail("payment.amount must be > 0");
+  const balanceDue = spec.payment.balance_due == null ? 0 : num(spec.payment.balance_due, "payment.balance_due");
+  if (balanceDue < 0) fail("payment.balance_due must be >= 0");
   if (!Array.isArray(spec.items) || spec.items.length === 0) fail("items: at least one item is required");
 
   const items = spec.items.map((it, i) => {
@@ -165,7 +169,7 @@ export function parseBillSpec(spec) {
     customer,
     date: spec.date,
     location: String(spec.location ?? DEFAULT_LOCATION).trim(),
-    payment: { method, amount: paid },
+    payment: { method, amount: paid, balance_due: balanceDue },
     notes: spec.notes ? String(spec.notes) : null,
     skip_stock: Boolean(spec.skip_stock),
     items,
@@ -412,8 +416,13 @@ export async function prepareBill(client, rawSpec) {
     }
   }
 
+  // A part-paid bill is priced at what the customer agreed to pay in all (the
+  // screen's "final amount"); the first payment is only part of it.
+  const partial = spec.payment.balance_due > 0;
+  const agreed = round2(spec.payment.amount + spec.payment.balance_due);
   const computed = computeBillTotals(items, [], [], 0, 0, DOC_TYPE);
   const totals = computeBalanceAdjustedTotals(computed, {
+    finalAmount: partial ? agreed : undefined,
     paymentAmount: spec.payment.amount,
     effectiveGrandTotal: computed.grandTotal,
     items,
@@ -422,14 +431,17 @@ export async function prepareBill(client, rawSpec) {
     voucherPreTax: 0,
     docType: DOC_TYPE,
   });
-  const diff = round2(spec.payment.amount - totals.grandTotal);
+  // Against the line total before the balance discount: the screen's final
+  // amount would otherwise discount away any shortfall.
+  const diff = round2(agreed - computed.grandTotal);
   if (Math.abs(diff) > PAYMENT_TOLERANCE) {
     fail(
-      `Payment ${spec.payment.amount} differs from the bill total ${totals.grandTotal} by ${Math.abs(diff)} ` +
-        `(over ₹${PAYMENT_TOLERANCE}); check line amounts — partial payment is not supported`,
+      `Payment ${agreed}${partial ? ` (${spec.payment.amount} paid + ${spec.payment.balance_due} due)` : ""} ` +
+        `differs from the bill total ${computed.grandTotal} by ${Math.abs(diff)} (over ₹${PAYMENT_TOLERANCE}); ` +
+        `check line amounts, or give payment.balance_due for a part payment`,
     );
   }
-  if (diff > 0) warnings.push(`Customer paid ₹${diff} more than the bill total ${totals.grandTotal} (the screen records it as is)`);
+  if (diff > 0) warnings.push(`Customer paid ₹${diff} more than the bill total ${computed.grandTotal} (the screen records it as is)`);
 
   const bill = {
     customerid: customer.customerid,
@@ -439,7 +451,9 @@ export async function prepareBill(client, rawSpec) {
     gst_total: totals.gstTotal,
     discount_total: totals.itemLevelDiscountTotal + totals.overallDiscount + totals.balanceDiscount,
     taxable_total: totals.taxableTotal,
-    paymentstatus: "finalized",
+    ...(partial
+      ? { net_amount: totals.grandTotal, final_amount: agreed, paymentstatus: "partial" }
+      : { paymentstatus: "finalized" }),
     finalized: true,
     applied_codes: [],
     payment_amount: spec.payment.amount,
@@ -467,7 +481,18 @@ export async function prepareBill(client, rawSpec) {
       balance_discount: totals.balanceDiscount,
       grand_total: totals.grandTotal,
       paid: spec.payment.amount,
+      ...(partial ? { balance_due: spec.payment.balance_due } : {}),
     },
+    // The first payment's ledger row, written only for a part-paid bill. A
+    // backdated payment is stored at midday, as the screen does (recorded_at
+    // has no time zone).
+    first_payment: partial
+      ? {
+          amount: spec.payment.amount,
+          salesmethodid: method.salesmethodid,
+          ...(spec.date === todayIST() ? {} : { recorded_at: `${spec.date}T12:00:00` }),
+        }
+      : null,
     warnings,
   };
 }
@@ -477,8 +502,11 @@ export async function prepareBill(client, rawSpec) {
  * in the same order: bill row (trigger assigns bill_number), bill_items
  * (bill row deleted if this fails), stock_adjust per inventory line, activity
  * log. A fully paid bill gets no bill_payments row — the screen records the
- * payment on the bill (payment_amount + salesmethodid). Stock failures do not
- * undo the bill (as in the screen); they are returned in stock_failures.
+ * payment on the bill (payment_amount + salesmethodid). A part-paid bill also
+ * gets its first bill_payments row, written before stock moves (the screen
+ * writes it after), so a failed payment insert can still remove the bill with
+ * nothing else changed. Stock failures do not undo the bill (as in the
+ * screen); they are returned in stock_failures.
  */
 export async function createBill(client, rawSpec, { dryRun = false, source = "via CLI" } = {}) {
   const planned = await prepareBill(client, rawSpec);
@@ -540,15 +568,26 @@ async function insertBill(client, prepared, source) {
     .single();
   if (billErr) throw new Error("Failed to save bill: " + billErr.message);
 
-  const rows = prepared.bill_items.map((r) => ({ ...r, billid: saved.billid }));
-  const { error: itemsErr } = await client.from("bill_items").insert(rows);
-  if (itemsErr) {
+  // bill_items cascade with the bill row.
+  const removeBill = async (what, err) => {
     const { error: delErr } = await client.from("bills").delete().eq("billid", saved.billid);
     throw new Error(
-      `Failed to save bill items: ${itemsErr.message}` +
+      `${what}: ${err.message}` +
         (delErr ? ` — AND removing bill ${saved.billid} failed: ${delErr.message}; delete it by hand` : ` (bill ${saved.billid} removed)`),
     );
+  };
+
+  const rows = prepared.bill_items.map((r) => ({ ...r, billid: saved.billid }));
+  const { error: itemsErr } = await client.from("bill_items").insert(rows);
+  if (itemsErr) await removeBill("Failed to save bill items", itemsErr);
+
+  if (prepared.first_payment) {
+    const { error: payErr } = await client
+      .from("bill_payments")
+      .insert({ billid: saved.billid, ...prepared.first_payment });
+    if (payErr) await removeBill("Failed to record payment", payErr);
   }
+  const partial = prepared.bill.paymentstatus === "partial";
 
   const stockFailures = [];
   for (const s of prepared.stock) {
@@ -556,7 +595,7 @@ async function insertBill(client, prepared, source) {
     const { error } = await client.rpc("stock_adjust", {
       p_variant: s.variantid,
       p_delta: s.change,
-      p_reason: "bill_finalize",
+      p_reason: partial ? "bill_partial_finalize" : "bill_finalize",
       p_ref: String(saved.billid),
     });
     if (error) stockFailures.push({ variantid: s.variantid, change: s.change, error: error.message });
@@ -566,7 +605,7 @@ async function insertBill(client, prepared, source) {
     action: "create",
     entityType: "bill",
     entityId: saved.bill_number || saved.billid,
-    summary: `Finalized bill #${saved.bill_number || "(no number)"} for ${customerName(prepared.customer)} — ${money(prepared.totals.grand_total)}, ${rows.length} items (${source})`,
+    summary: `Finalized bill ${partial ? "(partial) " : ""}#${saved.bill_number || "(no number)"} for ${customerName(prepared.customer)} — ${money(prepared.totals.grand_total)}, ${rows.length} items (${source})`,
   });
 
   return {
