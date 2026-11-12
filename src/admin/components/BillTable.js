@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageCircle, Globe } from "lucide-react";
 import { isWebsiteMethod, receivedAmount } from "./billing/paymentHelpers";
+import { round2 } from "./billing/billUtils";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
@@ -44,8 +45,17 @@ const isDeletableDraft = (bill) => !bill.finalized && bill.paymentstatus !== "ca
 
 // stock_reduced is null on bills saved before it existed: nobody recorded whether they moved stock,
 // so whoever cancels one decides.
-const billGivesStockBack = (bill, restoreOlderBill) =>
-  bill.stock_reduced == null ? restoreOlderBill : bill.stock_reduced;
+// bill_cancel refusals, in words staff can act on.
+const CANCEL_ERRORS = {
+  BILL_ALREADY_CANCELLED: "This bill is already cancelled. Refresh the list.",
+  BILL_STALE: "This bill changed since the list loaded. Refresh and try again.",
+  BILL_ONLINE: "Cancel website orders from the Orders screen.",
+  BILL_EXCHANGE_PAID_OUT:
+    "Part of the exchange credit on this bill was already paid out, and there is not enough refund or store credit to take it back. Cancelling would pay it twice, so the bill was not cancelled.",
+};
+
+// Cancelled bills are locked: a sale is redone as a new bill.
+const isEditableBill = (bill) => bill.paymentstatus !== "cancelled";
 
 export default function BillTable({ onEdit }) {
   const { toast } = useToast();
@@ -63,7 +73,10 @@ export default function BillTable({ onEdit }) {
   const [cancelBill, setCancelBill] = useState(null);
   const [resolveOpen, setResolveOpen] = useState(false);
   // Read once when the resolve dialog opens; the dialog text and the credit written both use it.
-  const [resolveFigures, setResolveFigures] = useState({ received: 0, storeCreditUsed: 0 });
+  const [resolveFigures, setResolveFigures] = useState({
+    received: 0, exchangeGiven: 0, exchangePaidOut: 0, creditTaken: 0, refund: 0, storeCreditUsed: 0,
+  });
+  const cancelKeyRef = useRef(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [restoreOlderBill, setRestoreOlderBill] = useState(true);
@@ -319,41 +332,10 @@ export default function BillTable({ onEdit }) {
     sort.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "";
 
   const openCancelFlow = (bill) => {
+    cancelKeyRef.current = null;
     setRestoreOlderBill(true);
     setCancelBill(bill);
     setConfirmOpen(true);
-  };
-
-  const stockOutcome = (bill) =>
-    billGivesStockBack(bill, restoreOlderBill) ? "Stock restored." : "Stock not changed.";
-
-  const restoreStockForBill = async (bill) => {
-    if (!billGivesStockBack(bill, restoreOlderBill)) return;
-    const billId = bill.billid;
-    // Both reads come before any write, so failing here leaves the bill and stock untouched.
-    const { data: billItems, error: itemsErr } = await supabase
-      .from("bill_items")
-      .select("bill_item_id, variantid, quantity")
-      .eq("billid", billId)
-      .not("variantid", "is", null);
-    if (itemsErr) throw new Error(`Could not read the bill's items, nothing was changed: ${itemsErr.message}`);
-
-    // Deduct already-exchanged quantities — those items were restocked at exchange time
-    const billItemIds = (billItems || []).map((bi) => bi.bill_item_id);
-    let exchangedQtyMap = {};
-    if (billItemIds.length > 0) {
-      const { data: exchanges, error: exchErr } = await supabase
-        .from("exchanges")
-        .select("original_bill_item_id, quantity")
-        .in("original_bill_item_id", billItemIds);
-      if (exchErr) throw new Error(`Could not read the bill's exchanges, nothing was changed: ${exchErr.message}`);
-      for (const ex of exchanges || []) {
-        exchangedQtyMap[ex.original_bill_item_id] =
-          (exchangedQtyMap[ex.original_bill_item_id] || 0) + Number(ex.quantity);
-      }
-    }
-
-    await restockItems(billId, billItems, exchangedQtyMap);
   };
 
   // Atomic stock + qty in the DB (online orders change the same stock concurrently).
@@ -384,44 +366,45 @@ export default function BillTable({ onEdit }) {
     }
   };
 
-  // Refund bills.store_credit_used back to customers.store_credit if > 0.
-  // No-op if the bill has no customer or the column is 0/null.
-  const refundStoreCreditForBill = async (billId, customerid) => {
-    if (!customerid) return;
-    const { data: billRow } = await supabase
-      .from("bills")
-      .select("store_credit_used")
-      .eq("billid", billId)
-      .single();
-    const refund = Number(billRow?.store_credit_used ?? 0);
-    if (!(refund > 0)) return;
-    const { error } = await supabase.rpc("store_credit_adjust", {
-      p_customer: customerid,
-      p_delta: refund,
-      p_reason: "bill_cancel_refund",
-      p_ref: String(billId),
+  // The whole cancel (stock, store credit, exchanges, voucher, discount usage, status) is one
+  // bill_cancel transaction. The key lives as long as the dialog, so pressing again after an
+  // unknown outcome replays the first cancel instead of doing it twice.
+  const runCancel = async (bill, mode) => {
+    if (!cancelKeyRef.current) cancelKeyRef.current = crypto.randomUUID();
+    const { data, error } = await supabase.rpc("bill_cancel", {
+      p_key: cancelKeyRef.current,
+      p_billid: bill.billid,
+      p_mode: mode,
+      p_options: {
+        expect: { finalized: Boolean(bill.finalized), paymentstatus: bill.paymentstatus },
+        restore_older_stock: restoreOlderBill,
+      },
     });
-    if (error) throw new Error("Store credit refund failed: " + error.message);
+    if (error) throw new Error(CANCEL_ERRORS[error.message] || error.message);
+    cancelKeyRef.current = null;
+    setBills((prev) =>
+      prev.map((b) => (b.billid === bill.billid ? { ...b, paymentstatus: "cancelled" } : b))
+    );
+    return data;
+  };
+
+  const stockOutcome = (result) =>
+    result.stock.length > 0 ? "Stock restored." : "Stock not changed.";
+
+  const closeCancel = () => {
+    cancelKeyRef.current = null;
+    setConfirmOpen(false);
+    setResolveOpen(false);
+    setCancelBill(null);
   };
 
   const handleCancelDraft = async (bill) => {
-    const { billid: billId, customerid } = bill;
     setCancelSaving(true);
     try {
-      await restoreStockForBill(bill);
-      await refundStoreCreditForBill(billId, customerid);
-      const { error } = await supabase
-        .from("bills")
-        .update({ paymentstatus: "cancelled" })
-        .eq("billid", billId);
-      if (error) throw error;
+      const result = await runCancel(bill, "draft");
       logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Cancelled draft bill #${bill.bill_number || "(no number)"} for ${customerName(bill.customers)} — ${money(bill.totalamount)}` });
-      toast({ title: `Bill #${billId} cancelled. ${stockOutcome(bill)}` });
-      setBills((prev) =>
-        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
-      );
-      setConfirmOpen(false);
-      setCancelBill(null);
+      toast({ title: `Bill #${bill.billid} cancelled. ${stockOutcome(result)}` });
+      closeCancel();
     } catch (e) {
       toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
     } finally {
@@ -429,41 +412,13 @@ export default function BillTable({ onEdit }) {
     }
   };
 
-  // WR-03: Reset voucher redemption if the bill used a promotional voucher
-  const unRedeemVoucherForBill = async (billId) => {
-    const { data: voucherRow } = await supabase
-      .from("vouchers")
-      .select("voucher_id")
-      .eq("redeemed_billid", billId)
-      .maybeSingle();
-    if (voucherRow) {
-      await supabase
-        .from("vouchers")
-        .update({ redeemed: false, redeemed_at: null, redeemed_billid: null })
-        .eq("voucher_id", voucherRow.voucher_id);
-    }
-  };
-
   const handleCancelFinalizedNoCustomer = async (bill) => {
-    const { billid: billId, customerid } = bill;
     setCancelSaving(true);
     try {
-      await restoreStockForBill(bill);
-      await refundStoreCreditForBill(billId, customerid);
-      await unRedeemVoucherForBill(billId);
-      await supabase.from("discount_usage").delete().eq("billid", billId);
-      const { error } = await supabase
-        .from("bills")
-        .update({ paymentstatus: "cancelled" })
-        .eq("billid", billId);
-      if (error) throw error;
+      const result = await runCancel(bill, "no_customer");
       logActivity({ action: "update", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Voided bill #${bill.bill_number || "(no number)"} — ${money(bill.totalamount)}` });
-      toast({ title: `Bill #${billId} cancelled. ${stockOutcome(bill)} No customer on record.` });
-      setBills((prev) =>
-        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
-      );
-      setConfirmOpen(false);
-      setCancelBill(null);
+      toast({ title: `Bill #${bill.billid} cancelled. ${stockOutcome(result)} No customer on record.` });
+      closeCancel();
     } catch (e) {
       toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
     } finally {
@@ -473,25 +428,12 @@ export default function BillTable({ onEdit }) {
 
   const handleResolveReturnPayment = async () => {
     if (!cancelBill) return;
-    const { billid: billId, customerid } = cancelBill;
     setCancelSaving(true);
     try {
-      await restoreStockForBill(cancelBill);
-      await refundStoreCreditForBill(billId, customerid);
-      await unRedeemVoucherForBill(billId);
-      await supabase.from("discount_usage").delete().eq("billid", billId);
-      const { error } = await supabase
-        .from("bills")
-        .update({ paymentstatus: "cancelled" })
-        .eq("billid", billId);
-      if (error) throw error;
-      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || "(no number)"} for ${customerName(cancelBill.customers)} (cash refund) — ${money(cancelBill.totalamount)}` });
-      toast({ title: `Bill #${billId} cancelled. ${stockOutcome(cancelBill)}` });
-      setBills((prev) =>
-        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
-      );
-      setResolveOpen(false);
-      setCancelBill(null);
+      const result = await runCancel(cancelBill, "return_payment");
+      logActivity({ action: "update", entityType: "bill", entityId: cancelBill.bill_number || cancelBill.billid, summary: `Voided bill #${cancelBill.bill_number || "(no number)"} for ${customerName(cancelBill.customers)} (cash refund ${money(result.refund)}) — ${money(cancelBill.totalamount)}` });
+      toast({ title: `Bill #${cancelBill.billid} cancelled. Hand back ${formatINR(result.refund, 2)}. ${stockOutcome(result)}` });
+      closeCancel();
     } catch (e) {
       toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
     } finally {
@@ -501,31 +443,14 @@ export default function BillTable({ onEdit }) {
 
   const handleResolveIssueStoreCredit = async () => {
     if (!cancelBill) return;
-    const { billid: billId, customerid, orderdate } = cancelBill;
-    const creditAmount = resolveFigures.received;
+    const { billid: billId, orderdate } = cancelBill;
     const customerDisplayName = cancelBill.customers
       ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
       : "";
     setCancelSaving(true);
     try {
-      await restoreStockForBill(cancelBill);
-      await refundStoreCreditForBill(billId, customerid);
-      if (creditAmount > 0) {
-        const { error: creditErr } = await supabase.rpc("store_credit_adjust", {
-          p_customer: customerid,
-          p_delta: creditAmount,
-          p_reason: "bill_cancel_credit",
-          p_ref: String(billId),
-        });
-        if (creditErr) throw new Error("Store credit could not be added: " + creditErr.message);
-      }
-      await unRedeemVoucherForBill(billId);
-      await supabase.from("discount_usage").delete().eq("billid", billId);
-      const { error } = await supabase
-        .from("bills")
-        .update({ paymentstatus: "cancelled" })
-        .eq("billid", billId);
-      if (error) throw error;
+      const result = await runCancel(cancelBill, "store_credit");
+      const creditAmount = Number(result.credit_added);
 
       const { data: receiptItems } = await supabase
         .from("bill_items")
@@ -559,11 +484,7 @@ export default function BillTable({ onEdit }) {
       toast({
         title: `Bill #${billId} cancelled. ${formatINR(creditAmount, 2)} store credit added to ${customerDisplayName || "customer"}'s account.`,
       });
-      setBills((prev) =>
-        prev.map((b) => (b.billid === billId ? { ...b, paymentstatus: "cancelled" } : b))
-      );
-      setResolveOpen(false);
-      setCancelBill(null);
+      closeCancel();
       setReceiptBill(null);
     } catch (e) {
       toast({ title: "Cancel failed", description: e.message, variant: "destructive" });
@@ -585,17 +506,36 @@ export default function BillTable({ onEdit }) {
     openResolveDialog(cancelBill);
   };
 
+  // Display only: bill_cancel works the refund out again under its lock, with the same rule.
   const openResolveDialog = async (bill) => {
     setCancelSaving(true);
     try {
       const { data, error } = await supabase
         .from("bills")
-        .select("payment_amount, store_credit_used, bill_payments(amount)")
+        .select(
+          "payment_amount, store_credit_used, exchange_credit_used, bill_payments(amount), " +
+            "bill_items(exchanges(credit_amount)), exchanges(credit_amount)"
+        )
         .eq("billid", bill.billid)
         .single();
       if (error) throw error;
+      const received = receivedAmount(data) ?? 0;
+      const exchangeGiven = round2(
+        (data.bill_items || []).flatMap((bi) => bi.exchanges || []).reduce((s, e) => s + Number(e.credit_amount), 0)
+      );
+      // Exchange credit that paid for this bill goes back to pending in full, so any of it the
+      // customer already took out here (cash back or store credit) comes off the refund first,
+      // then off store credit. Same rule as bill_cancel, which refuses when neither covers it.
+      const released = (data.exchanges || []).reduce((s, e) => s + Number(e.credit_amount), 0);
+      const exchangePaidOut = Math.max(0, round2(released - Number(data.exchange_credit_used ?? 0)));
+      const beforePaidOut = Math.max(0, round2(received - exchangeGiven));
+      const fromRefund = Math.min(exchangePaidOut, beforePaidOut);
       setResolveFigures({
-        received: receivedAmount(data) ?? 0,
+        received,
+        exchangeGiven,
+        exchangePaidOut,
+        creditTaken: round2(exchangePaidOut - fromRefund),
+        refund: round2(beforePaidOut - fromRefund),
         storeCreditUsed: Number(data.store_credit_used ?? 0),
       });
       setConfirmOpen(false);
@@ -864,6 +804,14 @@ export default function BillTable({ onEdit }) {
                         >
                           <Globe className="h-4 w-4" />
                         </span>
+                      ) : !isEditableBill(b) ? (
+                        <span
+                          className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground"
+                          title="Cancelled bill: create a new bill instead"
+                          aria-label="Cancelled bill, cannot be edited"
+                        >
+                          <Pencil className="h-4 w-4 opacity-30" />
+                        </span>
                       ) : (
                         <Button
                           size="icon"
@@ -994,10 +942,7 @@ export default function BillTable({ onEdit }) {
       <Dialog
         open={confirmOpen}
         onOpenChange={(o) => {
-          if (!o) {
-            setConfirmOpen(false);
-            setCancelBill(null);
-          }
+          if (!o) closeCancel();
         }}
       >
         <DialogContent className="bg-white max-w-md">
@@ -1056,10 +1001,7 @@ export default function BillTable({ onEdit }) {
             <Button
               variant="ghost"
               disabled={cancelSaving}
-              onClick={() => {
-                setConfirmOpen(false);
-                setCancelBill(null);
-              }}
+              onClick={closeCancel}
             >
               Keep Bill
             </Button>
@@ -1082,10 +1024,7 @@ export default function BillTable({ onEdit }) {
       <Dialog
         open={resolveOpen}
         onOpenChange={(o) => {
-          if (!o) {
-            setResolveOpen(false);
-            setCancelBill(null);
-          }
+          if (!o) closeCancel();
         }}
       >
         <DialogContent className="bg-white max-w-md max-h-[90vh] overflow-y-auto">
@@ -1096,6 +1035,34 @@ export default function BillTable({ onEdit }) {
                 `Bill #${cancelBill.billid} (${formatINR(cancelBill.totalamount ?? 0, 2)}) was finalized. Choose a resolution for the customer.`}
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span>Paid by the customer</span>
+              <span>{formatINR(resolveFigures.received, 2)}</span>
+            </div>
+            {resolveFigures.exchangeGiven > 0 && (
+              <div className="flex justify-between">
+                <span>Less exchange credit already given</span>
+                <span>−{formatINR(resolveFigures.exchangeGiven, 2)}</span>
+              </div>
+            )}
+            {resolveFigures.exchangePaidOut > 0 && (
+              <div className="flex justify-between">
+                <span>Less exchange credit already paid out</span>
+                <span>−{formatINR(resolveFigures.exchangePaidOut, 2)}</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold">
+              <span>To refund</span>
+              <span>{formatINR(resolveFigures.refund, 2)}</span>
+            </div>
+            {resolveFigures.creditTaken > 0 && (
+              <p className="text-xs text-muted-foreground">
+                The exchange credit goes back to pending in full, so {formatINR(resolveFigures.creditTaken, 2)} paid
+                out from it will be taken from the customer's store credit.
+              </p>
+            )}
+          </div>
           <div className="space-y-2 pt-2">
             <Button
               variant="outline"
@@ -1106,7 +1073,9 @@ export default function BillTable({ onEdit }) {
               <div className="text-left">
                 <div className="font-semibold">Return payment to customer</div>
                 <div className="text-xs text-muted-foreground">
-                  Reverses customer spend. No store credit issued.
+                  {resolveFigures.refund > 0
+                    ? `Hand back ${formatINR(resolveFigures.refund, 2)}. No store credit issued.`
+                    : "Nothing to hand back. No store credit issued."}
                 </div>
               </div>
             </Button>
@@ -1118,9 +1087,11 @@ export default function BillTable({ onEdit }) {
               <div className="text-left">
                 <div className="font-semibold">Issue store credit</div>
                 <div className="text-xs opacity-90">
-                  {resolveFigures.received > 0
-                    ? `${formatINR(resolveFigures.received, 2)} paid by the customer will be added to `
-                    : "Nothing was paid on this bill, so no store credit will be added to "}
+                  {resolveFigures.refund > 0
+                    ? `${formatINR(resolveFigures.refund, 2)} will be added to `
+                    : resolveFigures.received > 0
+                      ? "Nothing is left to refund after exchange credit, so no store credit will be added to "
+                      : "Nothing was paid on this bill, so no store credit will be added to "}
                   {cancelBill?.customers
                     ? `${cancelBill.customers.first_name} ${cancelBill.customers.last_name || ""}`.trim()
                     : "customer"}
@@ -1136,10 +1107,7 @@ export default function BillTable({ onEdit }) {
             <Button
               variant="ghost"
               disabled={cancelSaving}
-              onClick={() => {
-                setResolveOpen(false);
-                setCancelBill(null);
-              }}
+              onClick={closeCancel}
             >
               Go Back
             </Button>

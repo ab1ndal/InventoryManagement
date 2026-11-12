@@ -4,10 +4,17 @@ import BillTable from "../BillTable";
 // Step 0 of the transactional bill save work: each test pins every write the cancel and
 // delete-draft handlers make today, in order. The snapshots (committed beside this file)
 // are the record and include known flaws; do not "fix" a snapshot to match a better
-// behaviour. Reads are not recorded. CRA's jest config sets resetMocks: true, so state
+// behaviour. Reads are not recorded. Since 2026-11-12 every cancel is one bill_cancel call (its
+// transaction is tested in schema/test_bill_cancel.sql); delete-draft still writes directly. CRA's jest config sets resetMocks: true, so state
 // lives in plain objects reset in beforeEach.
 
 const mockDb = { writes: [], rows: [], current: null, items: [], voucher: null };
+
+// A fixed cancel key keeps the snapshots stable (jsdom has no crypto.randomUUID anyway).
+Object.defineProperty(global, "crypto", {
+  value: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
+  configurable: true,
+});
 
 const mockChain = (table) => {
   const s = { op: "select", payload: undefined, filters: [] };
@@ -47,7 +54,11 @@ jest.mock("../../../lib/supabaseClient", () => ({
     from: (table) => mockChain(table),
     rpc: (fn, args) => {
       mockDb.writes.push({ kind: "rpc", fn, args });
-      return Promise.resolve({ error: null });
+      return Promise.resolve(
+        fn === "bill_cancel"
+          ? { data: { stock: [], refund: 0, credit_added: 0, replayed: false }, error: null }
+          : { error: null }
+      );
     },
   },
 }));

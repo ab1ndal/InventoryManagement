@@ -658,14 +658,20 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   // Paid in installments (or finalized with nothing paid): payments live in bill_payments and are
   // recorded one by one, so the single Payment Amount box and Finalize do not apply.
   const paidInInstallments = billPaymentStatus === "partial" || billPayments.length > 0;
+  // Cancelled bills are locked: bill_cancel already put back stock and credit, so a save here
+  // would charge them again. A sale is redone as a new bill.
+  const billCancelled = billPaymentStatus === "cancelled";
   const saveBlocked =
+    billCancelled ||
     billPending ||
     discountsPending ||
     customerPending ||
     !backdatedDate ||
     billDateAfterPayment ||
     Boolean(unfinishedBill);
-  const saveBlockedReason = billPending
+  const saveBlockedReason = billCancelled
+    ? "Cancelled bill — create a new bill instead."
+    : billPending
     ? "Loading bill…"
     : discountsPending
       ? discountStatus === "failed"
@@ -799,7 +805,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   }, [finalAmount, computed, appliedStoreCredit, exchangeCredit]);
 
   const showPartialButton = useMemo(() => {
-    if (isFinalizedBill) return false;
+    if (isFinalizedBill || billPaymentStatus === "cancelled") return false;
     if (billPaymentStatus === "partial") return false;
     const { effectiveTotal } = computeCreditsApplied(
       computed.grandTotal,
@@ -2598,7 +2604,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                     {isSaving ? "Saving..." : "Partial Payment"}
                   </Button>
                 )}
-                {!paidInInstallments && (
+                {!paidInInstallments && !billCancelled && (
                   <Button disabled={isSaving || saveBlocked} onClick={openFinalizeConfirm}>
                     {isSaving ? "Saving..." : "Finalize"}
                   </Button>
