@@ -5,6 +5,8 @@
 --   scripts/test-db.sh up
 --   scripts/test-db.sh sql schema/migration_bill_stock_reduced.sql \
 --     schema/migration_bill_status_states.sql schema/test_bill_status_states.sql
+-- It also passes with every bill migration loaded (bill_save, bill_cancel, bill_cancel_marker,
+-- bill_add_payment, bill_payments_ledger): fixtures set the markers those functions set.
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -28,8 +30,19 @@ exception when others then
   return case when sqlstate = 'P0001' then sqlerrm else sqlstate end;
 end $$;
 
+-- Runs p_sql as bill_cancel does its status update: with app.bill_cancel on for that statement.
+create function pg_temp.as_cancel(p_sql text) returns text language plpgsql as $$
+declare
+  r text;
+begin
+  perform set_config('app.bill_cancel', 'on', true);
+  r := pg_temp.try(p_sql);
+  perform set_config('app.bill_cancel', '', true);
+  return r;
+end $$;
+
 -- A bill in the given state. A cancelled one is made the only way allowed, by cancelling a draft
--- or finalized bill.
+-- or finalized bill as bill_cancel does.
 create function pg_temp.bill(p_status text, p_finalized boolean) returns int language plpgsql as $$
 declare
   b int;
@@ -39,10 +52,19 @@ begin
                          when p_finalized then 'finalized' else 'draft' end, p_finalized)
   returning billid into b;
   if p_status = 'cancelled' then
-    update public.bills set paymentstatus = 'cancelled' where billid = b;
+    perform pg_temp.as_cancel(format($q$update public.bills set paymentstatus = 'cancelled' where billid = %s$q$, b));
   end if;
   return b;
 end $$;
+
+-- A payment row written the way bill_save and bill_add_payment write one.
+create function pg_temp.pay_sql(p_b int, p_m int) returns text language sql as $$
+  select format($q$do $p$ begin
+    perform set_config('app.bill_payment_writer', 'on', true);
+    insert into public.bill_payments (billid, amount, salesmethodid) values (%s, 100, %s);
+    perform set_config('app.bill_payment_writer', '', true);
+  end $p$ $q$, p_b, p_m)
+$$;
 
 -- Writes the state and reports the outcome; a refused write leaves the row as it was.
 create function pg_temp.move(p_b int, p_status text, p_finalized boolean) returns text language sql as $$
@@ -72,7 +94,8 @@ begin
     pg_temp.try($q$insert into public.bills (notes, finalized) values ('BSTATE', false)$q$) = '23514');
 end $$;
 
--- Transitions, each from a fresh bill.
+-- Transitions, each from a fresh bill. A change to cancelled is tried directly first, which is
+-- refused whatever the states (only bill_cancel cancels), then the way bill_cancel makes it.
 do $$
 declare
   t record;
@@ -101,7 +124,16 @@ begin
       ('cancelled', true, 'cancelled', true, true)) v(fs, ff, ts, tf, allowed)
   loop
     b := pg_temp.bill(t.fs, t.ff);
-    got := pg_temp.move(b, t.ts, t.tf);
+    if t.ts = 'cancelled' and t.fs <> 'cancelled' then
+      perform pg_temp.ok(format('%s/%s -> %s/%s directly refused', t.fs, t.ff, t.ts, t.tf),
+        pg_temp.move(b, t.ts, t.tf) in ('BILL_BAD_TRANSITION', '23514'));
+      perform pg_temp.ok(format('%s/%s -> %s/%s directly leaves the bill %s', t.fs, t.ff, t.ts, t.tf, t.fs),
+        (select paymentstatus from public.bills where billid = b) = t.fs);
+      got := pg_temp.as_cancel(format('update public.bills set paymentstatus = %L, finalized = %L where billid = %s',
+                                      t.ts, t.tf, b));
+    else
+      got := pg_temp.move(b, t.ts, t.tf);
+    end if;
     perform pg_temp.ok(format('%s/%s -> %s/%s %s', t.fs, t.ff, t.ts, t.tf,
                               case when t.allowed then 'allowed' else 'refused' end),
       (got = 'ok') = t.allowed);
@@ -110,13 +142,24 @@ begin
   end loop;
 end $$;
 
--- Other columns of a cancelled bill can still change (PDF, notes, slip photos).
+-- A cancelled bill is locked: only its PDF path can change. Its amounts, customer and links are
+-- the record of what bill_cancel undid and refunded.
 do $$
 declare
   b int := pg_temp.bill('cancelled', true);
+  c text;
 begin
-  perform pg_temp.ok('cancelled bill: other columns still update',
-    pg_temp.try(format($q$update public.bills set pdf_url = 'x', notes = 'BSTATE edited' where billid = %s$q$, b)) = 'ok');
+  perform pg_temp.ok('cancelled bill: pdf_url still updates',
+    pg_temp.try(format($q$update public.bills set pdf_url = 'x' where billid = %s$q$, b)) = 'ok');
+  foreach c in array array['notes = ''BSTATE edited''', 'totalamount = 1', 'net_amount = 1',
+                           'payment_amount = 99999', 'store_credit_used = 5', 'orderdate = ''2020-01-01''',
+                           'exchange_credit_used = 1', 'stock_reduced = false'] loop
+    perform pg_temp.ok(format('cancelled bill: %s refused', c),
+      pg_temp.try(format('update public.bills set %s where billid = %s', c, b)) = 'BILL_BAD_TRANSITION');
+  end loop;
+  perform pg_temp.ok('cancelled bill: the marker does not unlock it',
+    pg_temp.as_cancel(format('update public.bills set totalamount = 1 where billid = %s', b)) = 'BILL_BAD_TRANSITION');
+  perform pg_temp.ok('cancelled bill: nothing changed', (select totalamount is null and notes = 'BSTATE' from public.bills where billid = b));
 end $$;
 
 -- Inserting a cancelled bill is refused with the named error, not only by the checks.
@@ -127,8 +170,8 @@ begin
       = 'BILL_BAD_TRANSITION');
 end $$;
 
--- Deletes: a cancelled bill is kept; drafts go, and so does a just-saved finalized bill that
--- a failed save removes.
+-- Deletes: only drafts go. A part-paid, finalized or cancelled bill is kept, so what it took
+-- (stock, credit, a voucher, exchange credit) can only be given back by bill_cancel.
 do $$
 declare
   t record;
@@ -136,8 +179,8 @@ declare
 begin
   for t in select * from (values
       ('draft', false, true),
-      ('partial', true, true),
-      ('finalized', true, true),
+      ('partial', true, false),
+      ('finalized', true, false),
       ('cancelled', false, false),
       ('cancelled', true, false)) v(st, fin, allowed)
   loop
@@ -169,16 +212,16 @@ begin
   loop
     b := pg_temp.bill(t.st, t.fin);
     perform pg_temp.ok(format('payment on %s/%s %s', t.st, t.fin, case when t.allowed then 'allowed' else 'refused' end),
-      pg_temp.try(format('insert into public.bill_payments (billid, amount, salesmethodid) values (%s, 100, %s)', b, m))
-        = case when t.allowed then 'ok' else 'BILL_NOT_PAYABLE' end);
+      pg_temp.try(pg_temp.pay_sql(b, m)) = case when t.allowed then 'ok' else 'BILL_NOT_PAYABLE' end);
   end loop;
 
-  insert into public.bill_payments (billid, amount, salesmethodid) values (open_bill, 100, m) returning payment_id into pay;
+  perform pg_temp.try(pg_temp.pay_sql(open_bill, m));
+  select payment_id into strict pay from public.bill_payments where billid = open_bill;
   b := pg_temp.bill('cancelled', true);
   perform pg_temp.ok('payment moved onto a cancelled bill refused',
     pg_temp.try(format('update public.bill_payments set billid = %s where payment_id = %s', b, pay)) = 'BILL_NOT_PAYABLE');
   -- A cancelled bill keeps its payments as the record of what was refunded.
-  update public.bills set paymentstatus = 'cancelled' where billid = open_bill;
+  perform pg_temp.as_cancel(format($q$update public.bills set paymentstatus = 'cancelled' where billid = %s$q$, open_bill));
   perform pg_temp.ok('payment on a cancelled bill cannot be changed',
     pg_temp.try(format('update public.bill_payments set amount = 1 where payment_id = %s', pay)) = 'BILL_NOT_PAYABLE');
 end $$;

@@ -10,10 +10,15 @@
 -- stock_reduced is not part of the state: it records whether saving moved stock (the "Don't
 -- reduce stock" choice), which can be true or false in every state, and null on old bills.
 --
--- Allowed changes (enforced by the trigger below, on updates that set either column):
+-- Allowed changes (enforced by the trigger below, on every update):
 --   draft             -> draft, partial, finalized, cancelled (finalized stays false)
 --   partial/finalized -> partial, finalized (payments and edits move between them), cancelled
---   cancelled         -> nothing (owner decision 2026-11-12: cancelled bills are locked)
+--   cancelled         -> nothing (owner decision 2026-11-12: cancelled bills are locked). No
+--                        column but pdf_url may change on a cancelled bill: it is the record of
+--                        what was undone and refunded.
+-- Only bill_cancel makes a bill cancelled. It sets app.bill_cancel for its own update
+-- (schema/migration_bill_cancel_marker.sql); a direct update to 'cancelled' would skip the stock,
+-- credit, voucher and refund it does, so the trigger refuses it.
 -- A finalized bill never goes back to draft: it has a number, took stock and credit, and may
 -- have payments. The app names these states in src/admin/lib/billStatus.js.
 --
@@ -21,8 +26,10 @@
 -- migration does not read old rows and cannot fail on them, while every new insert and update
 -- is checked from now on. Validate them (step at the end) once preflight shows no violators.
 --
--- Also: no bill is inserted cancelled, a cancelled bill is never deleted, and bill_payments
--- rows are refused on draft and cancelled bills (triggers at the end).
+-- Also: no bill is inserted cancelled, only drafts can be deleted, and bill_payments rows are
+-- refused on draft and cancelled bills (triggers at the end).
+--
+-- Run schema/migration_bill_cancel_marker.sql first, or bill_cancel itself is refused.
 --
 -- Errors: P0001 BILL_BAD_TRANSITION, detail holds the billid and both states; P0001
 -- BILL_NOT_PAYABLE for a payment on a draft or cancelled bill.
@@ -47,12 +54,17 @@ set search_path = public
 as $$
 begin
   -- Old rows with a NULL or unknown state pass, so the preflight backfill can repair them.
+  -- pdf_url stays writable so a print already under way when the bill was cancelled can finish.
   if old.paymentstatus = 'cancelled'
-     and (new.paymentstatus is distinct from old.paymentstatus
-          or new.finalized is distinct from old.finalized) then
+     and (to_jsonb(new) - 'pdf_url') is distinct from (to_jsonb(old) - 'pdf_url') then
     raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
-      detail = format('bill %s is cancelled (finalized %s -> %s, %s -> %s)', old.billid,
+      detail = format('bill %s is cancelled and locked (finalized %s -> %s, %s -> %s)', old.billid,
                       old.finalized, new.finalized, old.paymentstatus, new.paymentstatus);
+  end if;
+  if new.paymentstatus = 'cancelled' and old.paymentstatus is distinct from 'cancelled'
+     and current_setting('app.bill_cancel', true) is distinct from 'on' then
+    raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
+      detail = format('bill %s: only bill_cancel can cancel a bill', old.billid);
   end if;
   if old.finalized is true and new.finalized is not true then
     raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
@@ -72,13 +84,16 @@ revoke all on function public._bills_status_transition() from public, anon, auth
 
 drop trigger if exists trg_bills_status_transition on public.bills;
 create trigger trg_bills_status_transition
-  before update of paymentstatus, finalized on public.bills
+  before update on public.bills
   for each row execute function public._bills_status_transition();
 
 -- Only bill_cancel makes a bill cancelled, after undoing its stock, credit and voucher, so a
--- bill cannot start out cancelled. A cancelled bill is the record of that undo and of the
--- refund, so it is never deleted. Drafts can still be deleted, and so can a just-saved
--- finalized bill that the screen or CLI removes when a later step of its save fails.
+-- bill cannot start out cancelled. Only a draft can be deleted. A finalized or part-paid bill
+-- took stock, store credit, a voucher or exchange credit; deleting it would free them without
+-- giving anything back (exchanges.new_billid is ON DELETE SET NULL, so the exchange credit could
+-- be spent again). A cancelled bill is the record of that undo and of the refund. Both go
+-- through bill_cancel instead. New finalized bills are saved by bill_save in one transaction,
+-- so no caller deletes one to undo a failed save any more.
 create or replace function public._bills_status_insert_delete()
 returns trigger
 language plpgsql
@@ -89,9 +104,12 @@ begin
     raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
       detail = 'a bill cannot be created cancelled; cancel it with bill_cancel';
   end if;
-  if tg_op = 'DELETE' and old.paymentstatus = 'cancelled' then
+  -- "is distinct from" so an old row with a NULL state is kept too; the preflight repairs those.
+  if tg_op = 'DELETE'
+     and (old.paymentstatus is distinct from 'draft' or old.finalized is distinct from false) then
     raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
-      detail = format('bill %s is cancelled and cannot be deleted', old.billid);
+      detail = format('bill %s is %s and cannot be deleted; only drafts can', old.billid,
+                      coalesce(old.paymentstatus, 'null'));
   end if;
   return case when tg_op = 'DELETE' then old else new end;
 end;

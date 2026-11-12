@@ -18,6 +18,12 @@ PSQL=("$PG_BIN/psql" -h "$DIR" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -qtA)
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 
+# Cleanup removes the finalized bills these cases create. Live bills refuse that (only drafts can
+# be deleted, schema/migration_bill_status_states.sql), so the cleanup turns that one trigger off
+# for its own statements, when it exists.
+BILLS_DELETE_ANY="do \$\$ begin if exists (select 1 from pg_trigger where tgname = 'trg_bills_status_insert_delete') then alter table public.bills disable trigger trg_bills_status_insert_delete; end if; end \$\$;"
+BILLS_DELETE_DRAFTS="do \$\$ begin if exists (select 1 from pg_trigger where tgname = 'trg_bills_status_insert_delete') then alter table public.bills enable trigger trg_bills_status_insert_delete; end if; end \$\$;"
+
 V1=11111111-1111-4111-8111-111111111111   # last unit
 V2=22222222-2222-4222-8222-222222222222   # shared with in-store
 
@@ -186,7 +192,9 @@ V3=33333333-3333-4333-8333-333333333333
 delete from public.exchanges where order_refund_id in (select r.id from public.order_refunds r join public.orders o on o.id = r.order_id where o.contact_name = 'Concurrency Offset');
 create temp table offset_bills as select bill_id from public.orders where contact_name = 'Concurrency Offset' and bill_id is not null;
 delete from public.orders where contact_name = 'Concurrency Offset';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from offset_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V3';
 delete from public.products where productid = 'CONC3';
 insert into public.products (productid, name, purchaseprice, retailprice) values ('CONC3', 'Conc three', 500, 1000);
@@ -229,7 +237,9 @@ update public.storefront_settings set checkout_live = false where id = 1;
 delete from public.exchanges where order_refund_id in (select r.id from public.order_refunds r join public.orders o on o.id = r.order_id where o.contact_name = 'Concurrency Offset');
 create temp table offset_bills as select bill_id from public.orders where contact_name = 'Concurrency Offset' and bill_id is not null;
 delete from public.orders where contact_name = 'Concurrency Offset';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from offset_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V3';
 delete from public.products where productid = 'CONC3';
 SQL
@@ -243,7 +253,9 @@ cleanup_return() {
 update public.storefront_settings set checkout_live = false where id = 1;
 create temp table ret_bills as select bill_id from public.orders where contact_name = 'Concurrency Return' and bill_id is not null;
 delete from public.orders where contact_name = 'Concurrency Return';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from ret_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V4';
 delete from public.products where productid = 'CONC4';
 SQL
@@ -306,7 +318,9 @@ update public.storefront_settings set checkout_live = false where id = 1;
 create temp table ex_bills as select bill_id from public.orders where contact_name = 'Concurrency Exchange' and bill_id is not null;
 delete from public.exchanges where original_bill_item_id in (select bill_item_id from public.bill_items where billid in (select bill_id from ex_bills));
 delete from public.orders where contact_name = 'Concurrency Exchange';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from ex_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V5';
 delete from public.products where productid = 'CONC5';
 delete from public.profiles where id = '$ADMIN5';
@@ -389,7 +403,9 @@ update public.storefront_settings set checkout_live = false where id = 1;
 create temp table eo_bills as select bill_id from public.orders where contact_name = 'Concurrency ExchOpen' and bill_id is not null;
 delete from public.exchanges where original_bill_item_id in (select bill_item_id from public.bill_items where billid in (select bill_id from eo_bills));
 delete from public.orders where contact_name = 'Concurrency ExchOpen';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from eo_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V6';
 delete from public.products where productid = 'CONC6';
 delete from public.profiles where id = '$ADMIN6';
@@ -472,7 +488,9 @@ cleanup_bill_save() {
   "${PSQL[@]}" > /dev/null <<SQL
 delete from public.bill_stock_moves where idempotency_key::text like 'cccc0000-%';
 delete from public.bill_save_log where idempotency_key::text like 'cccc0000-%';
+$BILLS_DELETE_ANY
 delete from public.bills where notes = '$BS_NOTE';
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$BS_V';
 delete from public.products where productid = 'CONCBS';
 SQL
