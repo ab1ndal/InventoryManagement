@@ -21,7 +21,8 @@
 -- migration does not read old rows and cannot fail on them, while every new insert and update
 -- is checked from now on. Validate them (step at the end) once preflight shows no violators.
 --
--- Also: bill_payments rows are refused on draft and cancelled bills (trigger at the end).
+-- Also: no bill is inserted cancelled, a cancelled bill is never deleted, and bill_payments
+-- rows are refused on draft and cancelled bills (triggers at the end).
 --
 -- Errors: P0001 BILL_BAD_TRANSITION, detail holds the billid and both states; P0001
 -- BILL_NOT_PAYABLE for a payment on a draft or cancelled bill.
@@ -73,6 +74,34 @@ drop trigger if exists trg_bills_status_transition on public.bills;
 create trigger trg_bills_status_transition
   before update of paymentstatus, finalized on public.bills
   for each row execute function public._bills_status_transition();
+
+-- Only bill_cancel makes a bill cancelled, after undoing its stock, credit and voucher, so a
+-- bill cannot start out cancelled. A cancelled bill is the record of that undo and of the
+-- refund, so it is never deleted. Drafts can still be deleted, and so can a just-saved
+-- finalized bill that the screen or CLI removes when a later step of its save fails.
+create or replace function public._bills_status_insert_delete()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' and new.paymentstatus = 'cancelled' then
+    raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
+      detail = 'a bill cannot be created cancelled; cancel it with bill_cancel';
+  end if;
+  if tg_op = 'DELETE' and old.paymentstatus = 'cancelled' then
+    raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
+      detail = format('bill %s is cancelled and cannot be deleted', old.billid);
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+revoke all on function public._bills_status_insert_delete() from public, anon, authenticated;
+
+drop trigger if exists trg_bills_status_insert_delete on public.bills;
+create trigger trg_bills_status_insert_delete
+  before insert or delete on public.bills
+  for each row execute function public._bills_status_insert_delete();
 
 -- Payments belong to part-paid and paid bills. Every path that records one (the screen's
 -- part-paid finalize, the CLI, bill_save, bill_add_payment) sets the bill to partial first.

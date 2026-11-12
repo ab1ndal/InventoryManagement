@@ -28,10 +28,21 @@ exception when others then
   return case when sqlstate = 'P0001' then sqlerrm else sqlstate end;
 end $$;
 
-create function pg_temp.bill(p_status text, p_finalized boolean) returns int language sql as $$
-  insert into public.bills (notes, paymentstatus, finalized) values ('BSTATE', p_status, p_finalized)
-  returning billid
-$$;
+-- A bill in the given state. A cancelled one is made the only way allowed, by cancelling a draft
+-- or finalized bill.
+create function pg_temp.bill(p_status text, p_finalized boolean) returns int language plpgsql as $$
+declare
+  b int;
+begin
+  insert into public.bills (notes, paymentstatus, finalized)
+  values ('BSTATE', case when p_status <> 'cancelled' then p_status
+                         when p_finalized then 'finalized' else 'draft' end, p_finalized)
+  returning billid into b;
+  if p_status = 'cancelled' then
+    update public.bills set paymentstatus = 'cancelled' where billid = b;
+  end if;
+  return b;
+end $$;
 
 -- Writes the state and reports the outcome; a refused write leaves the row as it was.
 create function pg_temp.move(p_b int, p_status text, p_finalized boolean) returns text language sql as $$
@@ -39,7 +50,8 @@ create function pg_temp.move(p_b int, p_status text, p_finalized boolean) return
                             p_status, p_finalized, p_b))
 $$;
 
--- Inserts: the four states with their allowed finalized values, nothing else.
+-- Inserts: draft, partial and finalized with their allowed finalized values, nothing else.
+-- Cancelled is refused: only bill_cancel makes a bill cancelled.
 do $$
 declare
   s text;
@@ -48,8 +60,8 @@ declare
 begin
   foreach s in array array['draft', 'partial', 'finalized', 'cancelled', 'paid', 'Finalized', null] loop
     foreach f in array array[true, false, null] loop
-      allowed := coalesce((f is false and s in ('draft', 'cancelled'))
-                          or (f is true and s in ('partial', 'finalized', 'cancelled')), false);
+      allowed := coalesce((f is false and s = 'draft')
+                          or (f is true and s in ('partial', 'finalized')), false);
       perform pg_temp.ok(format('insert %s/%s %s', coalesce(s, 'null'), coalesce(f::text, 'null'),
                                 case when allowed then 'allowed' else 'refused' end),
         (pg_temp.try(format('insert into public.bills (notes, paymentstatus, finalized) values (%L, %L, %L)',
@@ -105,6 +117,37 @@ declare
 begin
   perform pg_temp.ok('cancelled bill: other columns still update',
     pg_temp.try(format($q$update public.bills set pdf_url = 'x', notes = 'BSTATE edited' where billid = %s$q$, b)) = 'ok');
+end $$;
+
+-- Inserting a cancelled bill is refused with the named error, not only by the checks.
+do $$
+begin
+  perform pg_temp.ok('insert cancelled refused as BILL_BAD_TRANSITION',
+    pg_temp.try($q$insert into public.bills (notes, paymentstatus, finalized) values ('BSTATE', 'cancelled', true)$q$)
+      = 'BILL_BAD_TRANSITION');
+end $$;
+
+-- Deletes: a cancelled bill is kept; drafts go, and so does a just-saved finalized bill that
+-- a failed save removes.
+do $$
+declare
+  t record;
+  b int;
+begin
+  for t in select * from (values
+      ('draft', false, true),
+      ('partial', true, true),
+      ('finalized', true, true),
+      ('cancelled', false, false),
+      ('cancelled', true, false)) v(st, fin, allowed)
+  loop
+    b := pg_temp.bill(t.st, t.fin);
+    perform pg_temp.ok(format('delete %s/%s %s', t.st, t.fin, case when t.allowed then 'allowed' else 'refused' end),
+      pg_temp.try(format('delete from public.bills where billid = %s', b))
+        = case when t.allowed then 'ok' else 'BILL_BAD_TRANSITION' end);
+    perform pg_temp.ok(format('delete %s/%s leaves the row %s', t.st, t.fin, case when t.allowed then 'gone' else 'in place' end),
+      exists (select 1 from public.bills where billid = b) = not t.allowed);
+  end loop;
 end $$;
 
 -- Payments: only on part-paid and paid bills, by insert or by moving a row.
