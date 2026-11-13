@@ -10,11 +10,13 @@ import {
 import { Button } from "../../../components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { priceItem, money, round2 } from "./billUtils";
+import { EXCHANGED_QTY_UP } from "./stockHelpers";
 
 // exchangedQty: units of this saved line already exchanged for credit. The line then stays on the
-// bill with at least that quantity, unswapped and at its price (the database refuses otherwise,
+// bill with at least that quantity and no more than exchangedSavedQty (what it was saved with),
+// unswapped and at its price (the database refuses otherwise,
 // migration_bill_item_exchange_lock.sql), so the row says why instead of changing it.
-export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {}, docType = 'bos', isBackdated = false, exchangedQty = 0 }) {
+export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {}, docType = 'bos', isBackdated = false, exchangedQty = 0, exchangedSavedQty }) {
   const pricing = priceItem(item);
   const isBos = docType === 'bos';
   const isMeter = item.unit_type === "meter";
@@ -74,6 +76,8 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
                 : parseInt(e.target.value, 10);
               if (qty > 0 && qty < exchangedQty) {
                 setLockNote(`${exchangedQty} already exchanged, so the quantity cannot go below ${exchangedQty}`);
+              } else if (exchangedQty > 0 && exchangedSavedQty != null && qty > exchangedSavedQty) {
+                setLockNote(EXCHANGED_QTY_UP("This item", exchangedSavedQty));
               } else if (qty > 0) {
                 setLockNote(null);
                 onUpdate(item._id, { quantity: qty });

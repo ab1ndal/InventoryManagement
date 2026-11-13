@@ -323,7 +323,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const editKeyRef = useRef(null);
   // _id of every line bill_items holds for the opened bill (see saveBillItems).
   const savedItemIdsRef = useRef(new Set());
-  // Lines exchange credit was given for: { [_id]: { qty, name } }. They stay on the bill.
+  // Lines exchange credit was given for: { [_id]: { qty, savedQty, name } }. They stay on the bill.
   const [exchangedById, setExchangedById] = useState({});
   // Exchange credit already given from this bill's lines, as bill_cancel counts it.
   const [exchangeCreditGiven, setExchangeCreditGiven] = useState(0);
@@ -617,7 +617,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         for (const bi of billItems) {
           const qty = (bi.exchanges || []).reduce((n, e) => n + Number(e.quantity || 0), 0);
           creditGiven += (bi.exchanges || []).reduce((n, e) => n + Number(e.credit_amount || 0), 0);
-          if (bi.exchanges?.length) exchanged[String(bi.bill_item_id)] = { qty, name: bi.product_name || "Item" };
+          if (bi.exchanges?.length) {
+            exchanged[String(bi.bill_item_id)] = { qty, savedQty: Number(bi.quantity), name: bi.product_name || "Item" };
+          }
         }
         setExchangedById(exchanged);
         setExchangeCreditGiven(creditGiven);

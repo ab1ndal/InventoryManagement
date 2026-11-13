@@ -177,21 +177,28 @@ export function diffBillItems(savedIds, items, payload) {
   return { removeIds, updates, inserts, insertIds };
 }
 
+/** Why an exchanged line's quantity cannot go up: the new units were never sold, yet could be
+ * exchanged for credit again. Shared with ItemRow's note. */
+export const EXCHANGED_QTY_UP = (name, savedQty) =>
+  `${name}: already exchanged, so the quantity cannot go above ${savedQty}. Add more as a new item.`;
+
 /**
  * Why the form's lines cannot be saved over lines exchange credit was given for, one line per
- * problem, or null. Such a line stays on the bill with at least the exchanged quantity; the
- * database refuses anything else (BILL_ITEM_EXCHANGED, migration_bill_item_exchange_lock.sql).
+ * problem, or null. Such a line stays on the bill with at least the exchanged quantity and no more
+ * than its saved quantity; the database refuses anything else (BILL_ITEM_EXCHANGED,
+ * migration_bill_item_exchange_lock.sql).
  *
  * @param {Array} items - form items
- * @param {Object} exchangedById - { [_id]: { qty, name } } for saved lines with exchanges
+ * @param {Object} exchangedById - { [_id]: { qty, savedQty, name } } for saved lines with exchanges
  */
 export function exchangedLineProblems(items, exchangedById) {
   const byId = new Map(items.map((it) => [it._id, it]));
   const lines = [];
-  for (const [id, { qty, name }] of Object.entries(exchangedById || {})) {
+  for (const [id, { qty, savedQty, name }] of Object.entries(exchangedById || {})) {
     const it = byId.get(id);
     if (!it) lines.push(`${name}: ${qty} already exchanged, so it stays on the bill`);
     else if (Number(it.quantity) < qty) lines.push(`${name}: ${qty} already exchanged, so the quantity cannot go below ${qty}`);
+    else if (savedQty != null && Number(it.quantity) > savedQty) lines.push(EXCHANGED_QTY_UP(name, savedQty));
   }
   return lines.length > 0 ? lines.join("\n") : null;
 }
