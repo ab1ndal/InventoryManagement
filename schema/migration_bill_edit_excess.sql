@@ -26,6 +26,14 @@
 -- A refund or credit is final. Editing the bill back up later does not take it back: the bill
 -- becomes part-paid and the difference is collected as a new payment.
 --
+-- Exchange credit already given from the bill's own lines (exchanges joined through
+-- original_bill_item_id, exactly as bill_cancel counts exchange_credit_given) is money out of the
+-- bill too. Those lines stay on the bill (schema/migration_bill_item_exchange_lock.sql), so their
+-- value is in the new net. An edit with an excess whose new net is below the exchange credit
+-- given would pay part of the exchanged items back a second time, so it is refused
+-- (BILL_EXCHANGE_COUNTED). With the net at or above it, the excess (held - net) never exceeds
+-- held - exchange credit, which is what bill_cancel would pay back.
+--
 -- bill_edit(p_key, p_billid, p_payload) replaces the bill screen's direct update of an opened
 -- bill (BillingForm.handleSaveDraft). p_payload:
 --   expect  {paymentstatus, payment_amount} as the screen loaded them; anything else is
@@ -37,8 +45,9 @@
 --           for a refund and ignored for credit; recorded_at null means now.
 -- Errors (P0001, code as message, cause in detail): BILL_STALE, BILL_EXCESS_UNSETTLED (an
 -- excess and no choice), BILL_EXCESS_CHANGED (choice amount differs, or a choice with no
--- excess), BILL_EXCESS_NEEDS_CUSTOMER (store credit on a walk-in bill), BILL_ONLINE,
--- BILL_KEY_CONFLICT, BILL_BAD_PAYLOAD. A replay of the same key returns the first result.
+-- excess), BILL_EXCESS_NEEDS_CUSTOMER (store credit on a walk-in bill), BILL_EXCHANGE_COUNTED,
+-- BILL_ONLINE, BILL_KEY_CONFLICT, BILL_BAD_PAYLOAD (also a negative net_amount). A replay of the
+-- same key returns the first result.
 --
 -- schema/migration_bill_payments_ledger.sql (run after this) also refuses any other update
 -- that drops a paid bill's net below what it holds (BILL_EXCESS_UNSETTLED), so a direct write
@@ -102,6 +111,7 @@ declare
   v_held numeric;
   v_net numeric;
   v_excess numeric := 0;
+  v_exchange_out numeric;
   v_payment_amount numeric;
   v_status text;
   v_result jsonb;
@@ -169,8 +179,26 @@ begin
       v_held := round(coalesce(v_bill.payment_amount, 0), 2);
     end if;
     v_net := round(coalesce((v_new ->> 'net_amount')::numeric, 0), 2);
+    -- A negative net would make the excess larger than everything the shop holds.
+    if v_net < 0 then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = format('net_amount %s is negative', v_net);
+    end if;
     if v_bill.paymentstatus in ('partial', 'finalized') and v_held - v_net >= c_paid_in_full_tolerance then
       v_excess := v_held - v_net;
+    end if;
+
+    -- exchange_record takes these lines FOR UPDATE, so no exchange lands between this count
+    -- and the commit.
+    perform 1 from public.bill_items bi where bi.billid = p_billid order by bi.bill_item_id for share;
+    select coalesce(sum(e.credit_amount), 0) into v_exchange_out
+      from public.exchanges e
+      join public.bill_items bi on bi.bill_item_id = e.original_bill_item_id
+     where bi.billid = p_billid;
+    if v_excess > 0 and v_net < round(v_exchange_out, 2) then
+      raise exception 'BILL_EXCHANGE_COUNTED' using errcode = 'P0001',
+        detail = jsonb_build_object('exchange_credit_given', round(v_exchange_out, 2),
+                                    'net', v_net, 'excess', v_excess)::text;
     end if;
 
     v_customer := (v_new ->> 'customerid')::int;

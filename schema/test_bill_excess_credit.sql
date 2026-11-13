@@ -11,7 +11,8 @@
 --     schema/migration_bill_cancel_exchange_payout.sql schema/migration_bill_save_app_callers.sql \
 --     schema/migration_bill_cancel_marker.sql schema/migration_bill_status_states.sql \
 --     schema/migration_bill_add_payment.sql schema/migration_bill_edit_excess.sql \
---     schema/migration_bill_payments_ledger.sql schema/test_bill_excess_credit.sql
+--     schema/migration_bill_payments_ledger.sql schema/migration_bill_item_exchange_lock.sql \
+--     schema/test_bill_excess_credit.sql
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -42,6 +43,15 @@ begin
   perform set_config('role', 'authenticated', true);
   execute p_sql;
   perform set_config('role', 'none', true);
+  return 'ok';
+exception when others then
+  return case when sqlstate = 'P0001' then sqlerrm else sqlstate end;
+end $$;
+
+-- Exercise table invariants without RLS short-circuiting the statement first.
+create function pg_temp.as_owner(p_sql text) returns text language plpgsql as $$
+begin
+  execute p_sql;
   return 'ok';
 exception when others then
   return case when sqlstate = 'P0001' then sqlerrm else sqlstate end;
@@ -355,6 +365,29 @@ begin
     and (pg_temp.bill(b)).net_amount = 400 and pg_temp.held(b) = 0);
   perform pg_temp.ok('9 anon cannot call it',
     not has_function_privilege('anon', 'public.bill_edit(uuid, int, jsonb)', 'execute'));
+end $$;
+
+-- ---------- 10. a returned line cannot be erased and paid out again ----------
+do $$
+declare
+  b int := pg_temp.save(90, 1000, false);
+  bi int;
+begin
+  select bill_item_id into bi from public.bill_items where billid = b;
+  insert into public.exchanges
+    (original_bill_item_id, quantity, reason, customerid, credit_amount)
+  values (bi, 1, 'EXCESS already paid as exchange credit', -9601, 1000);
+
+  perform pg_temp.ok('10 exchanged bill item delete refused', pg_temp.as_owner(format(
+    'delete from public.bill_items where bill_item_id = %s', bi)) = 'BILL_ITEM_EXCHANGED');
+  perform pg_temp.ok('10 sold line and exchange history both remain',
+    exists (select 1 from public.bill_items where bill_item_id = bi)
+    and exists (select 1 from public.exchanges where original_bill_item_id = bi));
+
+  -- The screen deletes all lines before calculating an edit payout. Refusing that first step
+  -- means no bill, payment or customer-credit write can follow.
+  perform pg_temp.ok('10 no second payout was recorded', pg_temp.held(b) = 0
+    and pg_temp.credit(-9601) = 0 and (pg_temp.bill(b)).net_amount = 1000);
 end $$;
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _ex_checks;
