@@ -137,12 +137,11 @@ jest.mock("../AddItemDialog", () => (props) =>
 );
 
 
-// bill_save answers with the new bill, voucher_redeem (a draft's finalize) redeems; other RPCs succeed.
+// bill_save answers with the bill; other RPCs succeed.
 const mockRpcOk = (fn) => {
   if (fn === "bill_save") {
     return { data: { billid: 42, bill_number: "FY26-SG0042", replayed: false, negative_stock: [], payment: null }, error: null };
   }
-  if (fn === "voucher_redeem") return { data: true, error: null };
   return { data: 0, error: null };
 };
 // A bill_save refusal: supabase-js puts the code in message and the cause in details.
@@ -341,6 +340,32 @@ test("new partial: exchange credit already used elsewhere is refused with nothin
   expect(writesOtherThanSave()).toEqual([]);
 });
 
+test("new partial: store credit spent elsewhere is refused in plain words, with the balance now held", async () => {
+  mockDb.rpcResult = mockSaveRefused("BILL_CREDIT_SHORT", '{"balance": 120.5, "requested": 500}');
+  await renderUnpaidBill();
+  fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(mockToast.error[0][0]).toBe(
+    "This customer's store credit is now ₹120.50, less than this bill uses (it was used on another bill). " +
+      "Nothing was saved. Remove the customer and choose them again to load the new balance.",
+  );
+  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
+  expect(writesOtherThanSave()).toEqual([]);
+});
+
+test("new partial: more received than the bill comes to is refused in plain words", async () => {
+  mockDb.rpcResult = mockSaveRefused("BILL_OVERPAID", '{"net": 1000, "payment_amount": 9000}');
+  await renderUnpaidBill();
+  fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(mockToast.error[0][0]).toBe("The amount received is more than the bill's total. Nothing was saved. Check the amount.");
+  expect(writesOtherThanSave()).toEqual([]);
+});
+
 test("a successful finalize does not lock the form", async () => {
   const onSubmit = jest.fn();
   await renderBillPaidByStoreCredit(onSubmit);
@@ -354,7 +379,6 @@ const VOUCHER_ROW = {
   voucher_id: "VOUCH1", customerid: null, expiry_date: "2099-12-31",
   value: 100, redeemed: false, held_order_id: null,
 };
-const voucherWrites = () => mockDb.calls.filter((c) => c.table === "vouchers" && c.op !== "select");
 
 // A saved draft: 2 × Kurti @ ₹150, ₹200 left to pay once the ₹100 voucher is applied.
 const draftBill = (paymentAmount) => ({
@@ -388,26 +412,65 @@ const draftBill = (paymentAmount) => ({
   ],
 });
 
+// Finishing a draft is one bill_save call: the voucher, lines, stock, exchange links, credit and
+// discount use are written by the database in one transaction, so nothing is left to undo. Only
+// the new PDF's path is written afterwards.
+const DRAFT_WRITE_TABLES = ["bills", "bill_items", "bill_salespersons", "exchanges", "vouchers", "discount_usage", "bill_payments"];
+const isPdfPathWrite = (c) => c.table === "bills" && c.op === "update" && Object.keys(c.payload).join() === "pdf_url";
+const draftDirectWrites = () =>
+  mockDb.calls.filter((c) => DRAFT_WRITE_TABLES.includes(c.table) && c.op !== "select" && !isPdfPathWrite(c));
+
 test.each([
-  ["Finalize", "Confirm & Finalize", 200],
-  ["Partial Payment", "Confirm Partial Payment", 50],
+  ["Finalize", "Confirm & Finalize", 200, "finalize_draft"],
+  ["Partial Payment", "Confirm Partial Payment", 50, "partial_draft"],
 ])(
-  "a draft whose %s fails after redeeming the voucher releases it with voucher_release",
-  async (button, confirm, paid) => {
+  "a draft's %s with a voucher is one bill_save call, with no direct writes",
+  async (button, confirm, paid, op) => {
     mockDb.bill = draftBill(paid);
     mockDb.existingItems = [{ variantid: "v1", quantity: 2 }];
     mockDb.voucherRow = VOUCHER_ROW;
-    mockDb.failWrite = (c) => (c.table === "bills" && c.op === "update" ? "bill write down" : null);
     render(<BillingForm billId={330} open onOpenChange={() => {}} />);
     await screen.findAllByText("Kurti");
     await applyVoucher("VOUCH1");
     await screen.findAllByText(/Voucher #VOUCH1/);
     fireEvent.click(screen.getByRole("button", { name: button }));
     fireEvent.click(await screen.findByRole("button", { name: confirm }));
-    await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+    await waitFor(() => expect(rpcs("bill_save")).toHaveLength(1));
 
-    expect(rpcs("voucher_redeem")).toEqual([{ p_voucher: "VOUCH1", p_bill: 330 }]);
-    expect(rpcs("voucher_release")).toEqual([{ p_voucher: "VOUCH1", p_bill: 330 }]);
-    expect(voucherWrites()).toEqual([]);
+    const [call] = rpcs("bill_save");
+    expect(call.p_op).toBe(op);
+    expect(call.p_payload).toMatchObject({
+      billid: 330,
+      expect: { paymentstatus: "draft", payment_amount: paid },
+      voucher_id: "VOUCH1",
+      items: [expect.objectContaining({ bill_item_id: 11, billid: null, quantity: 2 })],
+    });
+    expect(call.p_payload.bill.document_type).toBeUndefined();
+    expect(rpcs("voucher_redeem")).toEqual([]);
+    expect(rpcs("voucher_release")).toEqual([]);
+    expect(rpcs("stock_adjust")).toEqual([]);
+    expect(rpcs("store_credit_adjust")).toEqual([]);
+    expect(draftDirectWrites()).toEqual([]);
   },
 );
+
+test.each([
+  ["Finalize", "Confirm & Finalize", 200],
+  ["Partial Payment", "Confirm Partial Payment", 50],
+])("a refused %s of a draft says why and writes nothing", async (button, confirm, paid) => {
+  mockDb.bill = draftBill(paid);
+  mockDb.existingItems = [{ variantid: "v1", quantity: 2 }];
+  mockDb.voucherRow = VOUCHER_ROW;
+  mockDb.rpcResult = mockSaveRefused("BILL_VOUCHER_REFUSED", "VOUCH1");
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await screen.findAllByText("Kurti");
+  await applyVoucher("VOUCH1");
+  await screen.findAllByText(/Voucher #VOUCH1/);
+  fireEvent.click(screen.getByRole("button", { name: button }));
+  fireEvent.click(await screen.findByRole("button", { name: confirm }));
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(mockToast.error.join(" ")).toMatch(/Voucher VOUCH1 can no longer be used/);
+  expect(draftDirectWrites()).toEqual([]);
+  expect(rpcs("bill_save")).toHaveLength(1);
+});

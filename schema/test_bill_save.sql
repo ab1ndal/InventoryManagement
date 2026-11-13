@@ -160,7 +160,7 @@ begin
     returning billid into v_used_bill;
   perform public.voucher_redeem('BSAVE-USED', v_used_bill);
   insert into public.exchanges (exchangeid, quantity, customerid, credit_amount) values
-    (-9001, 1, -9001, 100), (-9002, 1, -9001, 100);
+    (-9001, 1, -9001, 100), (-9002, 1, -9001, 100), (-9003, 1, -9002, 75.56), (-9004, 1, -9001, 20);
 end $$;
 
 -- ---------- row 1: unknown discount code, then the fixed retry; row 6: lost response; row 7: changed payload ----------
@@ -333,16 +333,25 @@ begin
   perform pg_temp.ok('row11 reason', (select reason from public.bill_stock_moves where billid = (r ->> 'billid')::int) = 'bill_partial_finalize');
 end $$;
 
--- ---------- store credit floor and exchange balance, as on the screen ----------
+-- ---------- store credit and exchange balance, as on the screen ----------
+-- A bill records exactly the credit the ledger takes (schema/migration_bill_save_drafts.sql). It used
+-- to keep the client's figure and take only the balance, so the difference came back on cancel.
 do $$
 declare
+  before jsonb := pg_temp.state();
   r jsonb;
 begin
+  perform pg_temp.ok('credit above the balance refused', pg_temp.try(pg_temp.k(11), 'finalize_create',
+    pg_temp.final_pl(pg_temp.v1(), 1, '{"exchange_balance_to_credit": 75.555, "exchange_ids": [-9003]}',
+                     '{"customerid": -9002, "store_credit_used": 80}')) = 'BILL_CREDIT_SHORT');
+  perform pg_temp.ok('refused credit changes nothing', pg_temp.state() = before);
   r := pg_temp.call(pg_temp.k(11), 'finalize_create',
-    pg_temp.final_pl(pg_temp.v1(), 1, '{"exchange_balance_to_credit": 75.555}', '{"customerid": -9002, "store_credit_used": 80}'));
-  perform pg_temp.ok('credit floor: bill keeps the client figure',
-    (select store_credit_used from public.bills where billid = (r ->> 'billid')::int) = 80);
-  perform pg_temp.ok('credit floor: only the balance is taken', (
+    -- The balance needs exchange credit behind it (schema/migration_bill_save_drafts.sql).
+    pg_temp.final_pl(pg_temp.v1(), 1, '{"exchange_balance_to_credit": 75.555, "exchange_ids": [-9003]}',
+                     '{"customerid": -9002, "store_credit_used": 50}'));
+  perform pg_temp.ok('credit: bill records what was taken',
+    (select store_credit_used from public.bills where billid = (r ->> 'billid')::int) = 50);
+  perform pg_temp.ok('credit: the whole balance is taken', (
     select count(*) from public.store_credit_ledger
      where customerid = -9002 and delta = -50 and balance_after = 0 and reason = 'bill_finalize' and ref_id = r ->> 'billid') = 1);
   perform pg_temp.ok('exchange balance added after, rounded as store_credit_adjust', (
@@ -356,10 +365,8 @@ begin
     select count(*) from public.store_credit_ledger
      where customerid = -9002 and delta = -10.5 and reason = 'bill_partial_finalize' and ref_id = r ->> 'billid') = 1);
 
-  r := pg_temp.call(pg_temp.k(13), 'finalize_create',
-    pg_temp.final_pl(pg_temp.v1(), 1, '{}', '{"customerid": null, "store_credit_used": 10}'));
-  perform pg_temp.ok('no customer, no credit move', (
-    select count(*) from public.store_credit_ledger where ref_id = r ->> 'billid') = 0);
+  perform pg_temp.ok('no customer, no credit to take', pg_temp.try(pg_temp.k(13), 'finalize_create',
+    pg_temp.final_pl(pg_temp.v1(), 1, '{}', '{"customerid": null, "store_credit_used": 10}')) = 'BILL_CREDIT_SHORT');
 end $$;
 
 -- ---------- refused requests: unsupported ops, refused keys, structure ----------
@@ -489,12 +496,12 @@ declare
   bill_txt text := '{"customerid": -9001, "notes": "BSAVE direct", "document_type": "invoice",
     "totalamount": 1234.5649999999999, "gst_total": 0.30000000000000004, "discount_total": 99.995,
     "taxable_total": 1234.565, "paymentstatus": "partial", "finalized": true, "applied_codes": ["BSAVE-TEST"],
-    "payment_amount": 100.005, "net_amount": 1.005, "final_amount": 2.675, "store_credit_used": 0,
+    "payment_amount": 100.005, "net_amount": 1222.22, "final_amount": 2.675, "store_credit_used": 0,
     "exchange_credit_used": 12.345, "exchange_source_bill": "FY26-TEST", "exchange_cash_refund": 3.335,
     "saleslocationid": -9001, "salesmethodid": -9001, "orderdate": "2026-04-01T00:00:00+05:30"}';
   item_txt text := '{"quantity": 1.2345, "mrp": 1000.555, "variantid": null, "product_name": "BSAVE item",
     "product_code": "BSAVEP1", "category": "X", "cost_price": 500.005, "alteration_charge": 10.005,
-    "discount_total": 3.335, "subtotal": 999.995, "gst_rate": 5.005, "gst_amount": 49.995, "total": 999.995,
+    "discount_total": 3.335, "subtotal": 999.995, "gst_rate": 5.005, "gst_amount": 49.995, "total": 1234.565,
     "stitch_type": "stitched", "unit_type": "metre", "salesperson_id": -9001}';
   pay_set_txt text := '{"amount": 100.005, "salesmethodid": -9001, "recorded_at": "2026-11-01T12:00:00"}';
   r jsonb;
@@ -502,8 +509,11 @@ declare
   direct_id int;
   drop_keys text[] := array['billid', 'bill_number', 'pdf_url'];
 begin
+  -- The exchange is there only so the exchange figures have credit behind them
+  -- (schema/migration_bill_save_drafts.sql); it does not change the bill row.
   r := pg_temp.call(pg_temp.k(50), 'partial_create', jsonb_build_object(
-    'bill', bill_txt::jsonb, 'items', jsonb_build_array(item_txt::jsonb), 'first_payment', pay_set_txt::jsonb));
+    'bill', bill_txt::jsonb, 'items', jsonb_build_array(item_txt::jsonb), 'first_payment', pay_set_txt::jsonb,
+    'exchange_ids', '[-9004]'::jsonb));
   rpc_id := (r ->> 'billid')::int;
 
   -- What PostgREST does: a typed record from the JSON text, with only the keys sent.
@@ -558,7 +568,8 @@ begin
   perform pg_temp.ok('row27 bill defaults', (
     select store_credit_used = 0 and exchange_credit_used = 0 and exchange_cash_refund = 0
            and applied_codes = '{}'::text[] and document_type = 'bos' and customerid is null
-           and orderdate = current_timestamp::timestamp and net_amount is null and final_amount is null
+           -- net_amount is worked out when left out: totalamount (none here) less credit used.
+           and orderdate = current_timestamp::timestamp and net_amount = 0 and final_amount is null
            and payment_amount is null and salesperson_ids = '{}'::int[] and pdf_url is null
       from public.bills where billid = (r ->> 'billid')::int));
   perform pg_temp.ok('row27 item defaults', (

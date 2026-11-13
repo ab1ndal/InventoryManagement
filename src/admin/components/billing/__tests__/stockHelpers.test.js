@@ -34,25 +34,21 @@ describe("buildBillItemsPayload discount distribution", () => {
   });
 });
 
-describe("diffBillItems", () => {
-  const { diffBillItems } = require("../stockHelpers");
+describe("linesWithSavedIds", () => {
+  const { linesWithSavedIds } = require("../stockHelpers");
   const items = [{ _id: "11" }, { _id: "uuid-new" }, { _id: "13" }];
   const payload = [{ product_name: "A" }, { product_name: "N" }, { product_name: "C" }];
 
-  test("saved lines update in place, new ones insert, missing ones delete", () => {
-    expect(diffBillItems(new Set(["11", "12", "13"]), items, payload)).toEqual({
-      removeIds: [12],
-      updates: [
-        { bill_item_id: 11, row: { product_name: "A" } },
-        { bill_item_id: 13, row: { product_name: "C" } },
-      ],
-      inserts: [{ product_name: "N" }],
-      insertIds: ["uuid-new"],
-    });
+  test("saved lines carry their id, new ones none; a line left out is simply not sent", () => {
+    expect(linesWithSavedIds(new Set(["11", "12", "13"]), items, payload)).toEqual([
+      { bill_item_id: 11, product_name: "A" },
+      { bill_item_id: null, product_name: "N" },
+      { bill_item_id: 13, product_name: "C" },
+    ]);
   });
 
-  test("a new draft's lines are all inserts", () => {
-    expect(diffBillItems(new Set(), items, payload)).toMatchObject({ removeIds: [], updates: [], inserts: payload });
+  test("a bill with no saved lines sends them all as new", () => {
+    expect(linesWithSavedIds(new Set(), items, payload).map((l) => l.bill_item_id)).toEqual([null, null, null]);
   });
 });
 

@@ -336,8 +336,10 @@ begin
     'update public.bills set net_amount = 600, totalamount = 600 where billid = %s', b)) = 'BILL_EXCESS_UNSETTLED');
   perform pg_temp.ok('8 direct update of a part-paid bill refused', pg_temp.as_admin(format(
     'update public.bills set net_amount = 400 where billid = %s', c)) = 'BILL_EXCESS_UNSETTLED');
+  -- Since schema/migration_bill_money_rpc_only.sql even that goes through bill_edit only.
   perform pg_temp.ok('8 direct update under a rupee below what is held passes', pg_temp.as_admin(format(
-    'update public.bills set net_amount = 999.5 where billid = %s', b)) = 'ok');
+    'update public.bills set net_amount = 999.5 where billid = %s', b))
+      = case when to_regproc('public._bills_money_via_rpc') is null then 'ok' else 'BILL_MONEY_DIRECT' end);
   perform pg_temp.ok('8 direct refund row refused', pg_temp.as_admin(format(
     'insert into public.bill_payments (billid, amount, salesmethodid, kind) values (%s, -100, -9601, %L)',
     c, 'refund')) = 'BILL_PAYMENT_DIRECT');
@@ -360,6 +362,9 @@ declare
 begin
   insert into public.bills (notes, paymentstatus, finalized, net_amount, payment_amount, customerid)
   values ('EXCESS draft', 'draft', false, 1000, 1000, -9601) returning billid into b;
+  -- A saved draft has its lines; the total cannot be above them.
+  insert into public.bill_items (billid, quantity, mrp, product_name, subtotal, gst_amount, total)
+  values (b, 1, 1000, 'EXCESS item', 1000, 0, 1000);
   perform pg_temp.ok('9 draft edit down needs no choice', pg_temp.as_admin(pg_temp.edit_sql(80, b,
     jsonb_set(pg_temp.payload(b, 400, 'draft'), '{bill,finalized}', 'false'))) = 'ok'
     and (pg_temp.bill(b)).net_amount = 400 and pg_temp.held(b) = 0);

@@ -189,7 +189,11 @@ do $$
 begin
   assert has_function_privilege('authenticated', 'public.stock_adjust(uuid,numeric,text,text)', 'execute'), 'authenticated runs stock_adjust';
   assert has_function_privilege('authenticated', 'public.store_credit_adjust(int,numeric,text,text,text,text)', 'execute'), 'authenticated runs store_credit_adjust';
-  assert has_function_privilege('authenticated', 'public.voucher_redeem(text,int)', 'execute'), 'authenticated runs voucher_redeem';
+  -- Staff ran voucher_redeem until schema/migration_voucher_redeem_internal.sql left it to bill_save
+  -- (that step also drops voucher_release, which schema/migration_voucher_states.sql added).
+  assert has_function_privilege('authenticated', 'public.voucher_redeem(text,int)', 'execute')
+         or (to_regproc('public.voucher_state') is not null
+             and to_regprocedure('public.voucher_release(text,int)') is null), 'authenticated runs voucher_redeem';
   assert not has_function_privilege('anon', 'public.stock_adjust(uuid,numeric,text,text)', 'execute'), 'anon must not run stock_adjust';
   assert not has_function_privilege('anon', 'public.voucher_redeem(text,int)', 'execute'), 'anon must not run voucher_redeem';
   assert not has_function_privilege('anon', 'public.online_order_create(jsonb,jsonb,uuid)', 'execute'), 'anon must not create orders';

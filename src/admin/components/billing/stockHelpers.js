@@ -148,33 +148,23 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
 }
 
 /**
- * How to save an opened bill's lines: change saved lines in place, delete the ones taken off and
- * insert the new ones. A saved line keeps its bill_item_id, which exchange credit given from it
- * points at (exchanges.original_bill_item_id); deleting and re-inserting every line used to drop
- * that link, so a later edit or cancel could pay the exchanged value back again.
+ * An opened bill's lines as bill_save's draft ops and bill_edit take them: each saved line carries
+ * its bill_item_id, so the database changes it in place; a new line has none and is inserted; a
+ * saved line left out is deleted (_bill_lines_save, migration_bill_save_drafts.sql). Keeping the id
+ * keeps exchange credit given from the line (exchanges.original_bill_item_id) pointing at it;
+ * deleting and re-inserting every line used to drop that link, so a later edit or cancel could pay
+ * the exchanged value back again.
  *
  * @param {Set<string>} savedIds - _id of each line as loaded from bill_items (String(bill_item_id))
  * @param {Array} items - form items, in the same order as payload
- * @param {Array} payload - buildBillItemsPayload(billid, items, ...)
- * @returns {{ removeIds: number[], updates: Array<{ bill_item_id: number, row: object }>, inserts: object[], insertIds: string[] }}
- *   insertIds are the form _ids of the inserted rows, in insert order.
+ * @param {Array} payload - buildBillItemsPayload(null, items, ...)
+ * @returns {Array} payload rows, each with bill_item_id (a number, or null for a new line)
  */
-export function diffBillItems(savedIds, items, payload) {
-  const kept = new Set();
-  const updates = [];
-  const inserts = [];
-  const insertIds = [];
-  items.forEach((it, idx) => {
-    if (savedIds.has(it._id)) {
-      kept.add(it._id);
-      updates.push({ bill_item_id: Number(it._id), row: payload[idx] });
-    } else {
-      inserts.push(payload[idx]);
-      insertIds.push(it._id);
-    }
-  });
-  const removeIds = [...savedIds].filter((id) => !kept.has(id)).map(Number);
-  return { removeIds, updates, inserts, insertIds };
+export function linesWithSavedIds(savedIds, items, payload) {
+  return payload.map((row, idx) => ({
+    bill_item_id: savedIds.has(items[idx]._id) ? Number(items[idx]._id) : null,
+    ...row,
+  }));
 }
 
 /** Why an exchanged line's quantity cannot go up: the new units were never sold, yet could be

@@ -232,12 +232,20 @@ begin
   perform pg_temp.ok('still spent on b1', (pg_temp.voucher('VSTATE-A')).redeemed_billid = b1);
   perform pg_temp.ok('so it cannot pay a second bill', not public.voucher_redeem('VSTATE-A', b2));
   perform pg_temp.ok('voucher_release refuses a finalized bill', pg_temp.try_commit(format(
-    'select public.voucher_release(''VSTATE-A'', %s)', b1)) = 'VOUCHER_RELEASE_REFUSED');
+    'select public.voucher_release(''VSTATE-A'', %s)', b1))
+    = case when to_regprocedure('public.voucher_release(text,int)') is null then '42883' else 'VOUCHER_RELEASE_REFUSED' end);
   perform pg_temp.ok('a partial bill counts as live', pg_temp.try_commit(format(
     'with b as (update public.bills set paymentstatus = ''partial'' where billid = %1$s returning billid)
      update public.vouchers set redeemed = false, redeemed_at = null, redeemed_billid = null
       where redeemed_billid = (select billid from b)', b1)) = 'VOUCHER_BAD_TRANSITION');
 end $$;
+
+-- Frees a draft's voucher as the owner, which is what voucher_release did; the function is gone
+-- since schema/migration_voucher_redeem_internal.sql, and fixtures below still need the undo.
+create function pg_temp.release_draft(p_v text, p_bill int) returns void language sql as $$
+  update public.vouchers set redeemed = false, redeemed_at = null, redeemed_billid = null
+   where voucher_id = p_v and redeemed_billid = p_bill and held_order_id is null
+$$;
 
 -- ---------- releases that are allowed: cancelled, draft ----------
 do $$
@@ -271,10 +279,17 @@ begin
     'select public.voucher_redeem(''VSTATE-A'', %s)', bc)) = 'VOUCHER_BAD_TRANSITION');
   perform pg_temp.ok('still available after redeem on a cancelled bill', pg_temp.state('VSTATE-A') = 'available');
 
-  -- hole 2: a draft's finalize redeems first; if marking it finalized fails, voucher_release
-  perform pg_temp.ok('voucher_redeem allowed on a draft', public.voucher_redeem('VSTATE-A', d));
-  r := pg_temp.try_commit(format('select public.voucher_release(''VSTATE-A'', %s)', d));
-  perform pg_temp.ok('voucher_release frees a draft''s voucher', r = 'ok' and pg_temp.state('VSTATE-A') = 'available');
+  -- hole 2: a draft's finalize redeems first; if marking it finalized fails, voucher_release.
+  -- Since schema/migration_voucher_redeem_internal.sql bill_save finishes a draft in one
+  -- transaction, so there is nothing to release and voucher_release is gone.
+  if to_regprocedure('public.voucher_release(text,int)') is not null then
+    perform pg_temp.ok('voucher_redeem allowed on a draft', public.voucher_redeem('VSTATE-A', d));
+    r := pg_temp.try_commit(format('select public.voucher_release(''VSTATE-A'', %s)', d));
+    perform pg_temp.ok('voucher_release frees a draft''s voucher', r = 'ok' and pg_temp.state('VSTATE-A') = 'available');
+  else
+    perform pg_temp.ok('no voucher_release, and staff cannot redeem outside bill_save',
+      not has_function_privilege('authenticated', 'public.voucher_redeem(text,int)', 'execute'));
+  end if;
   perform public.voucher_redeem('VSTATE-A', d);
   perform pg_temp.ok('releasing a draft''s voucher, then finalizing it, refused at commit', pg_temp.try_commit(format(
     'with v as (update public.vouchers set redeemed = false, redeemed_at = null, redeemed_billid = null
@@ -283,8 +298,8 @@ begin
       where billid = %1$s and exists (select 1 from v)', d)) = 'VOUCHER_BAD_TRANSITION');
   r := pg_temp.as_authenticated(format('select public.voucher_release(''VSTATE-A'', %s)', d));
   perform pg_temp.ok('voucher_release by an API caller without staff rights refused',
-    r = '42501' and pg_temp.state('VSTATE-A') = 'redeemed');
-  perform public.voucher_release('VSTATE-A', d);
+    r in ('42501', '42883') and pg_temp.state('VSTATE-A') = 'redeemed');
+  perform pg_temp.release_draft('VSTATE-A', d);
 end $$;
 
 -- ---------- a completed sale's voucher stays spent, whatever staff try ----------
@@ -429,7 +444,7 @@ begin
   perform pg_temp.ok('a bill-redeemed voucher cannot be held', pg_temp.try(format(
     'update public.vouchers set redeemed = false, redeemed_at = null, redeemed_billid = null,
        held_order_id = %L where voucher_id = ''VSTATE-A''', o2.id)) = 'VOUCHER_BAD_TRANSITION');
-  perform public.voucher_release('VSTATE-A', d);
+  perform pg_temp.release_draft('VSTATE-A', d);
 
   -- hole 3: a hold or an online redemption must match its order
   perform pg_temp.ok('holding for an order that names another voucher refused', pg_temp.try(format(
