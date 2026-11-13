@@ -227,6 +227,19 @@ async function redeemVoucher(voucherId, billId) {
   }
 }
 
+// Undoes this draft's redemption when its finalize redeemed the voucher and then failed to
+// mark the draft finalized. The database allows it only while the bill is still a draft, so
+// if the bill did get finalized the voucher stays spent on it.
+async function releaseDraftVoucher(voucherId, billId) {
+  const { error } = await supabase.rpc("voucher_release", {
+    p_voucher: voucherId,
+    p_bill: billId,
+  });
+  if (error) {
+    console.error(`voucher_release failed for voucher ${voucherId} on bill ${billId}:`, error.message);
+  }
+}
+
 function isAutoApplyEligible(d, items, today) {
   // Date guards (defensive — loadDiscounts already filters, but belt-and-suspenders)
   if (d.start_date && d.start_date > today) return false;
@@ -1724,7 +1737,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .eq("billid", activeBillId))
           .select("billid");
         const updateErr = billUpdateError(billErr, updatedBill, "");
-        if (updateErr) throw updateErr;
+        if (updateErr) {
+          if (appliedVoucher?.voucher_id && !isFinalizedBill) {
+            await releaseDraftVoucher(appliedVoucher.voucher_id, activeBillId);
+          }
+          throw updateErr;
+        }
 
         // Save bill_items in place, with all edits and the balance discount
         await saveItemsInPlace(activeBillId, buildBillItemsPayload(
@@ -2019,7 +2037,12 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .eq("billid", activeBillId))
           .select("billid");
         const updateErr = billUpdateError(billErr, updatedBill, "");
-        if (updateErr) throw updateErr;
+        if (updateErr) {
+          if (appliedVoucher?.voucher_id) {
+            await releaseDraftVoucher(appliedVoucher.voucher_id, activeBillId);
+          }
+          throw updateErr;
+        }
 
         await saveItemsInPlace(activeBillId, buildBillItemsPayload(
           activeBillId,

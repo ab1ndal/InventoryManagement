@@ -114,6 +114,8 @@ $$;
 
 -- ---------- fixtures: all created here, gone at rollback ----------
 do $$
+declare
+  v_used_bill int;
 begin
   insert into auth.users (id, email) values
     (pg_temp.admin_id(), 'bsave-admin@example.invalid'),
@@ -150,8 +152,13 @@ begin
   insert into public.vouchers (voucher_id, customerid, expiry_date, value) values
     ('BSAVE-GOOD', -9001, current_date + 30, 100),
     ('BSAVE-EXPIRED', -9001, current_date - 1, 100);
-  insert into public.vouchers (voucher_id, customerid, expiry_date, value, redeemed) values
-    ('BSAVE-USED', -9001, current_date + 30, 100, true);
+  insert into public.vouchers (voucher_id, customerid, expiry_date, value) values
+    ('BSAVE-USED', -9001, current_date + 30, 100);
+  -- A redemption must name its bill (schema/migration_voucher_states.sql). Notes stay off the
+  -- BSAVE prefix so the bill counts in pg_temp.state() ignore this one.
+  insert into public.bills (paymentstatus, finalized, notes) values ('finalized', true, 'Fixture used voucher')
+    returning billid into v_used_bill;
+  perform public.voucher_redeem('BSAVE-USED', v_used_bill);
   insert into public.exchanges (exchangeid, quantity, customerid, credit_amount) values
     (-9001, 1, -9001, 100), (-9002, 1, -9001, 100);
 end $$;

@@ -49,7 +49,7 @@
 | `customers` | `customers.sql` | Customer records. Phone is unique + E.164 format. Has ULID, loyalty tier, store credit, self-referential `referred_by` FK. |
 | `discounts` | `discounts.sql` | Discount rules: flat, percentage, buy-X-get-Y, fixed_price, conditional, bundled_pricing. Can target categories or specific product IDs. Supports auto-apply, exclusivity, per-customer limits, date range. |
 | `discount_usage` | `discount_usage.sql` | Audit log: which customer used which discount code on which bill. |
-| `vouchers` | `vouchers.sql` | Store credit vouchers issued on exchange/return or manually. Tied to a customer, have expiry, value, and redemption bill FK. Source: `exchange`, `manual`, `promo`. |
+| `vouchers` | `vouchers.sql` | Store credit vouchers issued on exchange/return or manually. Tied to a customer, have expiry, value, and redemption bill FK. Source: `exchange`, `manual`, `promo`, `online_refund`. State (available / expired / held / redeemed) comes from `voucher_state(v)`; checks and triggers fix the allowed changes (`migration_voucher_states.sql`). Staff cannot write it directly: `voucher_redeem`, `voucher_release` (draft only) and `bill_cancel` do. |
 | `exchanges` | `exchanges.sql` | Return/exchange records. References original `bill_items` row, quantity returned, credit amount, optional voucher issued. |
 
 ### Auth

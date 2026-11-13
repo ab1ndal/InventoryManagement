@@ -633,6 +633,48 @@ echo "bill_save vs counter holder: A_rc=$BS_A_RC B_rc=$BS_B_RC bills=$BS_BILLS n
 [ "$BS_BILLS" = "2" ] && [ "$BS_NUMBERS" = "2" ] || { echo "FAIL: two bills with distinct numbers expected"; fail=1; }
 cleanup_bill_save
 
+# ---- voucher_redeem while bill_cancel holds the same bill: the redeem waits, then sees the bill
+# cancelled and is refused, so the voucher is never spent on a cancelled bill. Needs
+# schema/migration_bill_cancel.sql and schema/migration_voucher_states.sql. ----
+if [ "$("${PSQL[@]}" -c "select to_regprocedure('public.voucher_release(text,int)') is not null")" = "t" ]; then
+  VC_CANCEL="select public.bill_cancel('cccc0000-0000-4000-8000-0000000000c1', -9201, 'return_payment',
+    '{\"expect\": {\"finalized\": true, \"paymentstatus\": \"finalized\"}, \"restore_older_stock\": true}')"
+  vc_cleanup() {
+    "${PSQL[@]}" > /dev/null <<SQL
+delete from public.vouchers where voucher_id = 'CONCVC-V';
+delete from public.bill_save_log where idempotency_key = 'cccc0000-0000-4000-8000-0000000000c1';
+$BILLS_DELETE_ANY
+delete from public.bills where billid = -9201;
+$BILLS_DELETE_DRAFTS
+delete from public.customers where customerid = -9201;
+SQL
+  }
+  vc_cleanup
+  "${PSQL[@]}" > /dev/null <<SQL
+insert into public.customers (customerid, customer_ulid, first_name) values (-9201, 'CONCVOUCHER000000000000001', 'Fixture');
+insert into public.bills (billid, customerid, notes, paymentstatus, finalized) values (-9201, -9201, 'Concurrency voucher', 'finalized', true);
+insert into public.vouchers (voucher_id, customerid, expiry_date, value) values ('CONCVC-V', -9201, current_date + 30, 100);
+SQL
+  set +e
+  "${PSQL[@]}" -c "begin" -c "$VC_CANCEL" -c "select pg_sleep(1.5)" -c "commit" > /dev/null 2> "$OUT/vc_a_err" &
+  PID_VC=$!
+  sleep 0.5
+  START=$(date +%s)
+  "${PSQL[@]}" -c "select public.voucher_redeem('CONCVC-V', -9201)" > /dev/null 2> "$OUT/vc_b_err"
+  VC_B_RC=$?
+  VC_WAITED=$(( $(date +%s) - START ))
+  wait "$PID_VC"
+  VC_A_RC=$?
+  set -e
+  VC_STATE="$("${PSQL[@]}" -c "select (select public.voucher_state(v) from public.vouchers v where voucher_id = 'CONCVC-V') || ' ' || (select paymentstatus from public.bills where billid = -9201)")"
+  echo "voucher_redeem vs bill_cancel: A_rc=$VC_A_RC B_rc=$VC_B_RC waitedB=${VC_WAITED}s state=$VC_STATE"
+  [ "$VC_A_RC" = "0" ] || { echo "FAIL: bill_cancel should succeed: $(cat "$OUT/vc_a_err")"; fail=1; }
+  [ "$VC_B_RC" != "0" ] && grep -q VOUCHER_BAD_TRANSITION "$OUT/vc_b_err" || { echo "FAIL: redeem on the cancelled bill must be refused"; fail=1; }
+  [ "$VC_STATE" = "available cancelled" ] || { echo "FAIL: voucher must stay available, bill cancelled"; fail=1; }
+  vc_cleanup
+else
+  echo "voucher_redeem vs bill_cancel: skipped (schema/migration_voucher_states.sql not applied)"
+fi
 # ---- bill_edit vs bill_add_payment on one part-paid bill (net 1000, 600 paid). A takes the last
 # 400 and holds its transaction; B saves an edit down to 400 from a screen opened before, choosing
 # store credit for 200. B must wait for A's bill lock, then see the payment and refuse: crediting
