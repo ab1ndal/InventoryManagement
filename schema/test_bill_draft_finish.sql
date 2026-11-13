@@ -610,5 +610,41 @@ begin
     'select count(*) from public.exchanges') = 'ok');
 end $$;
 
+-- ---------- 11. a bill paid with store credit and then exchanged never pays out twice ----------
+-- Paid 400 store credit + 600 cash, then 600 of it exchanged, then cancelled: what goes back to
+-- the customer in all (store credit, cash, exchange credit) must be the 1000 paid. Exchange credit
+-- is capped at the cash the bill holds (schema/migration_exchange_record_caps.sql), and bill_cancel
+-- returns the store credit in full and the cash less exchange credit given.
+do $$
+declare
+  b int;
+  li int;
+  r jsonb;
+  ex numeric;
+begin
+  insert into public.customers (customerid, customer_ulid, first_name, store_credit)
+  values (-9705, 'DFINFIXTURE000000000000005', 'Exchange', 400);
+  b := pg_temp.sold(110, 1, 600, '{}', '{"customerid": -9705, "store_credit_used": 400, "net_amount": 600}');
+  li := pg_temp.line_id(b);
+  perform pg_temp.ok('11 sale took the 400 credit', pg_temp.credit(-9705) = 0);
+
+  perform pg_temp.ok('11 exchange above the cash held refused', pg_temp.as_admin(format(
+    'select public.exchange_record(%s, -9705, %L)', b,
+    jsonb_build_array(jsonb_build_object('bill_item_id', li, 'quantity', 1, 'credit_amount', 1000)))) = 'EXCHANGE_OVER_HELD');
+  perform pg_temp.ok('11 exchange of the cash held recorded', pg_temp.as_admin(format(
+    'select public.exchange_record(%s, -9705, %L)', b,
+    jsonb_build_array(jsonb_build_object('bill_item_id', li, 'quantity', 1, 'credit_amount', 600)))) = 'ok');
+
+  r := pg_temp.rpc(format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(111), b, 'return_payment',
+    jsonb_build_object('expect', jsonb_build_object('finalized', true, 'paymentstatus', 'finalized'))));
+  select coalesce(sum(credit_amount), 0) into ex from public.exchanges e
+   where e.original_bill_item_id = li and e.new_billid is null;
+  perform pg_temp.ok('11 cancel: 400 credit back, no cash, 600 exchange credit pending',
+    (r ->> 'store_credit_refunded')::numeric = 400 and (r ->> 'refund')::numeric = 0
+    and pg_temp.credit(-9705) = 400 and ex = 600);
+  perform pg_temp.ok('11 total out equals the 1000 paid',
+    (r ->> 'store_credit_refunded')::numeric + (r ->> 'refund')::numeric + ex = 1000);
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;
