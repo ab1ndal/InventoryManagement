@@ -584,5 +584,17 @@ begin
   perform pg_temp.ok('8 the owner is not an API caller', (select payment_amount from public.bills where billid = b) = 1001);
 end $$;
 
+-- ---------- 9. vouchers are redeemed only inside bill_save ----------
+do $$
+declare
+  b int := pg_temp.sold(95, 1, 1000);
+begin
+  insert into public.vouchers (voucher_id, customerid, expiry_date, value) values ('DFIN-LATE', -9701, current_date + 30, 100);
+  perform pg_temp.ok('9 staff cannot spend a voucher on a finished bill', pg_temp.as_admin(format(
+    'select public.voucher_redeem(%L, %s)', 'DFIN-LATE', b)) = '42501'
+    and (select not redeemed from public.vouchers where voucher_id = 'DFIN-LATE'));
+  perform pg_temp.ok('9 voucher_release is gone', to_regprocedure('public.voucher_release(text,int)') is null);
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;
