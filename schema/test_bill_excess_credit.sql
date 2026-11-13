@@ -11,8 +11,8 @@
 --     schema/migration_bill_cancel_exchange_payout.sql schema/migration_bill_save_app_callers.sql \
 --     schema/migration_bill_cancel_marker.sql schema/migration_bill_status_states.sql \
 --     schema/migration_bill_add_payment.sql schema/migration_bill_edit_excess.sql \
---     schema/migration_bill_item_exchange_history_guard.sql \
---     schema/migration_bill_payments_ledger.sql schema/test_bill_excess_credit.sql
+--     schema/migration_bill_payments_ledger.sql schema/migration_bill_item_exchange_lock.sql \
+--     schema/test_bill_excess_credit.sql
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';

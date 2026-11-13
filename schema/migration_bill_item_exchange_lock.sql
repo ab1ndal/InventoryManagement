@@ -25,6 +25,9 @@
 -- Run after schema/migration_bill_payments_ledger.sql. Read-only check first: lines whose
 -- exchanges already lost their link (the trigger cannot bring those back).
 --   select count(*) from public.exchanges where original_bill_item_id is null;
+-- The bill screen now updates saved lines in place instead of deleting and re-inserting them, so
+-- staff need UPDATE on bill_items as well as INSERT and DELETE; check a policy allows it:
+--   select policyname, cmd, roles from pg_policies where tablename = 'bill_items';
 
 set local lock_timeout = '3s';
 
