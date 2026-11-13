@@ -4,6 +4,7 @@
 #   scripts/test-db.sh up
 #   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_holds.sql>
 #   scripts/test-db.sh sql schema/migration_bill_save.sql
+#   scripts/test-db.sh sql <the bill migrations listed in schema/test_bill_excess_credit.sql, from bill_stock_reduced>
 #   schema/test_harness/concurrency_test.sh
 # Session A confirms an order that holds the last unit and keeps its transaction open;
 # session B confirms a second order for the same unit (one from before stock holds, so it
@@ -674,6 +675,44 @@ SQL
 else
   echo "voucher_redeem vs bill_cancel: skipped (schema/migration_voucher_states.sql not applied)"
 fi
+# ---- bill_edit vs bill_add_payment on one part-paid bill (net 1000, 600 paid). A takes the last
+# 400 and holds its transaction; B saves an edit down to 400 from a screen opened before, choosing
+# store credit for 200. B must wait for A's bill lock, then see the payment and refuse: crediting
+# 200 on top of the 1000 now held would hand back money that was never over. ----
+cleanup_bill_edit() {
+  "${PSQL[@]}" > /dev/null <<SQL
+delete from public.store_credit_ledger where customerid = -9701;
+SQL
+  cleanup_bill_save
+  "${PSQL[@]}" > /dev/null <<SQL
+delete from public.customers where customerid = -9701;
+delete from public.salesmethods where salesmethodid = -9701;
+SQL
+}
+bs_fixture 5
+"${PSQL[@]}" > /dev/null <<SQL
+insert into public.customers (customerid, customer_ulid, first_name, store_credit) values (-9701, 'CONCEDITFIXTURE00000000001', 'Conc', 0);
+insert into public.salesmethods (salesmethodid, methodname) values (-9701, 'Conc cash');
+SQL
+BE_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 7)', 'partial_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"partial\",\"finalized\":true,\"net_amount\":1000,\"payment_amount\":600,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}],\"first_payment\":{\"amount\":600,\"salesmethodid\":-9701}}') ->> 'billid'")"
+BE_PAYLOAD="{\"expect\":{\"paymentstatus\":\"partial\",\"payment_amount\":600},\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"totalamount\":400,\"gst_total\":0,\"discount_total\":0,\"taxable_total\":400,\"net_amount\":400,\"applied_codes\":[],\"payment_amount\":600,\"final_amount\":null,\"saleslocationid\":null,\"salesmethodid\":-9701,\"paymentstatus\":\"finalized\",\"finalized\":true,\"store_credit_used\":0,\"orderdate\":\"2026-11-12T00:00:00+05:30\"},\"excess\":{\"mode\":\"store_credit\",\"amount\":200}}"
+"${PSQL[@]}" -c "begin" -c "select public.bill_add_payment('$(bs_key 8)', $BE_BILL, 400, -9701, null)" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+PID_BE=$!
+sleep 0.5
+set +e
+START=$(date +%s)
+"${PSQL[@]}" -c "select public.bill_edit('$(bs_key 9)', $BE_BILL, '$BE_PAYLOAD')" > /dev/null 2> "$OUT/be_b_err"
+BE_B_RC=$?
+BE_WAITED=$(( $(date +%s) - START ))
+set -e
+wait "$PID_BE"
+BE_CHECK="$("${PSQL[@]}" -c "select (select sum(amount) from public.bill_payments where billid = $BE_BILL) || ' ' || (select round(store_credit::numeric, 2) from public.customers where customerid = -9701) || ' ' || (select paymentstatus from public.bills where billid = $BE_BILL)")"
+read -r BE_HELD BE_CREDIT BE_STATUS <<< "$BE_CHECK"
+cleanup_bill_edit
+echo "bill_edit vs payment: B_rc=$BE_B_RC waitedB=${BE_WAITED}s held=$BE_HELD credit=$BE_CREDIT status=$BE_STATUS B_err=$(tr '\n' ' ' < "$OUT/be_b_err")"
+[ "$BE_B_RC" != "0" ] && grep -q 'BILL_STALE' "$OUT/be_b_err" || { echo "FAIL: the edit from before the payment should be refused as stale"; fail=1; }
+[ "$BE_HELD" = "1000.00" ] && [ "$BE_CREDIT" = "0.00" ] && [ "$BE_STATUS" = "finalized" ] || { echo "FAIL: bill should hold 1000 with no credit given"; fail=1; }
+[ "$BE_WAITED" -ge 1 ] || { echo "FAIL: the edit did not wait for the payment's bill lock"; fail=1; }
 
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"

@@ -9,25 +9,31 @@
 --     reads to work out the refund.
 --
 -- From now on:
---   1. bill_payments rows are inserted only by bill_save and bill_add_payment. Each sets
+--   1. bill_payments rows are inserted only by bill_save, bill_add_payment and bill_edit. Each sets
 --      app.bill_payment_writer to 'on' for its own insert; anything else is refused
 --      (BILL_PAYMENT_DIRECT). The marker is transaction-local and switched off straight after
 --      the insert, and PostgREST cannot set it, so table writes from the app cannot pass.
---   2. A payment's amount and bill never change (BILL_PAYMENT_LOCKED). Its method, date and
---      notes may be corrected.
+--   2. A payment's amount, bill and kind never change (BILL_PAYMENT_LOCKED). Its method, date
+--      and notes may be corrected. Refund and store credit rows are negative (kind, from
+--      schema/migration_bill_edit_excess.sql), so the sum is what the shop still holds.
 --   3. A payment row is deleted only with its draft bill (BILL_PAYMENT_LOCKED otherwise). When
 --      a draft is deleted the cascade finds the bill already gone, which is allowed.
---   4. Once a bill has bill_payments rows, an update that changes its payment_amount or
---      paymentstatus must leave payment_amount equal to their sum and the status the sum gives
+--   4. Once a bill has bill_payments rows, an update that changes its payment_amount,
+--      paymentstatus or net_amount must leave payment_amount equal to their sum and the status the sum gives
 --      (finalized when the shortfall is under one rupee, as bill_add_payment and tallyPayment
 --      judge it). Otherwise BILL_PAYMENTS_MISMATCH: the screen tells staff to reload.
 --      Bills paid in one go have no rows and keep payment_amount as entered, so the rule does
---      not apply to them. Updates that leave both columns alone (a PDF, notes, an item edit
+--      not apply to them. Updates that leave all three alone (a PDF, notes, an item edit
 --      that keeps the totals) pass even on an older bill whose total already disagrees, so
 --      existing rows cannot block the shop; the read-only query below lists those.
+--   5. An update may not drop a part-paid or paid bill's net amount a rupee or more below what
+--      the shop holds for it (its rows' sum, or payment_amount before the update for a bill
+--      paid in one go): BILL_EXCESS_UNSETTLED. bill_edit records the refund or store credit
+--      first, so its own update passes; any other write (the Finalize button on an opened
+--      bill, a direct API update) would leave the excess unrecorded.
 --
--- Run after schema/migration_bill_save_app_callers.sql and schema/migration_bill_add_payment.sql,
--- which set the marker, and after the app version that records every payment through them.
+-- Run after schema/migration_bill_save_app_callers.sql, schema/migration_bill_add_payment.sql and
+-- schema/migration_bill_edit_excess.sql, which set the marker (and add bill_payments.kind), and after the app version that records every payment through them.
 --
 -- Read-only check before running: bills whose payment_amount already disagrees with their rows.
 --   select b.billid, b.bill_number, b.paymentstatus, b.net_amount, b.payment_amount,
@@ -52,15 +58,16 @@ begin
   if tg_op = 'INSERT' then
     if current_setting('app.bill_payment_writer', true) is distinct from 'on' then
       raise exception 'BILL_PAYMENT_DIRECT' using errcode = 'P0001',
-        detail = format('bill %s: record payments with bill_save or bill_add_payment', new.billid);
+        detail = format('bill %s: record payments with bill_save, bill_add_payment or bill_edit', new.billid);
     end if;
     return new;
   end if;
 
   if tg_op = 'UPDATE' then
-    if new.amount is distinct from old.amount or new.billid is distinct from old.billid then
+    if new.amount is distinct from old.amount or new.billid is distinct from old.billid
+       or new.kind is distinct from old.kind then
       raise exception 'BILL_PAYMENT_LOCKED' using errcode = 'P0001',
-        detail = format('payment %s: amount and bill cannot change', old.payment_id);
+        detail = format('payment %s: amount, bill and kind cannot change', old.payment_id);
     end if;
     return new;
   end if;
@@ -93,10 +100,27 @@ declare
   v_rows int;
   v_paid numeric;
   v_status text;
+  v_held numeric;
 begin
+  -- Money held over after an edit must be refunded or credited (bill_edit), never dropped.
+  if old.paymentstatus in ('partial', 'finalized') and new.paymentstatus in ('partial', 'finalized')
+     and round(coalesce(new.net_amount, 0), 2) < round(coalesce(old.net_amount, 0), 2) then
+    if exists (select 1 from public.bill_payments p where p.billid = new.billid) then
+      select round(sum(p.amount), 2) into v_held from public.bill_payments p where p.billid = new.billid;
+    else
+      v_held := round(coalesce(old.payment_amount, 0), 2);
+    end if;
+    if v_held - round(coalesce(new.net_amount, 0), 2) >= c_paid_in_full_tolerance then
+      raise exception 'BILL_EXCESS_UNSETTLED' using errcode = 'P0001',
+        detail = jsonb_build_object('billid', new.billid, 'held', v_held, 'net', new.net_amount,
+                                    'excess', v_held - round(coalesce(new.net_amount, 0), 2))::text;
+    end if;
+  end if;
+
   if new.paymentstatus is null or new.paymentstatus not in ('partial', 'finalized')
      or (new.payment_amount is not distinct from old.payment_amount
-         and new.paymentstatus is not distinct from old.paymentstatus) then
+         and new.paymentstatus is not distinct from old.paymentstatus
+         and new.net_amount is not distinct from old.net_amount) then
     return new;
   end if;
 

@@ -180,9 +180,13 @@ begin
     'update public.bills set payment_amount = 200 where billid = %s', b)) = 'BILL_PAYMENTS_MISMATCH');
   perform pg_temp.ok('2 an edit leaving the payment fields alone still saves', pg_temp.as_admin(format(
     $q$update public.bills set notes = 'DCASH edited', totalamount = 1000 where billid = %s$q$, b)) = 'ok');
-  -- A return by edit (owner rule for part-paid bills): net drops to 600, status follows the payments.
-  perform pg_temp.ok('2 an edit consistent with the payments saves', pg_temp.as_admin(format(
-    $q$update public.bills set net_amount = 600, payment_amount = 1000, paymentstatus = 'finalized' where billid = %s$q$, b)) = 'ok');
+  -- A return by edit drops net to 600 while 1000 is held: the 400 must be refunded or credited
+  -- through bill_edit (schema/test_bill_excess_credit.sql), never left on the bill.
+  perform pg_temp.ok('2 a return by direct edit refused', pg_temp.as_admin(format(
+    $q$update public.bills set net_amount = 600, payment_amount = 1000, paymentstatus = 'finalized' where billid = %s$q$, b))
+      = 'BILL_EXCESS_UNSETTLED');
+  perform pg_temp.ok('2 an edit raising the total with the status the payments give saves', pg_temp.as_admin(format(
+    $q$update public.bills set net_amount = 1200, paymentstatus = 'partial' where billid = %s$q$, b)) = 'ok');
 end $$;
 
 -- ---------- 3. no payment past the balance ----------

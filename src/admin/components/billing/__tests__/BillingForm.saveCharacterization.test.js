@@ -374,7 +374,9 @@ describe("path B, edit draft (pins current behaviour)", () => {
     mockDb.existingItems = [{ variantid: "v1", quantity: 2 }];
     const onSubmit = jest.fn();
     await openExisting(
-      storedBill({ finalized: true, paymentstatus: "finalized", store_credit_used: 100, net_amount: 200 }),
+      // Paid in full: 100 of store credit and the 200 net. (It once said 300 received, which
+      // bill_edit now reads as 100 to give back.)
+      storedBill({ finalized: true, paymentstatus: "finalized", store_credit_used: 100, net_amount: 200, payment_amount: 200 }),
       { onSubmit },
     );
     await saveDraft(onSubmit);

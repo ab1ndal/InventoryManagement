@@ -1,4 +1,4 @@
-import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, paymentStatusAfterEdit } from "../paymentHelpers";
+import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, paymentStatusAfterEdit, editExcess, paymentRowLabel } from "../paymentHelpers";
 
 describe("storeCreditDeductionDelta", () => {
   test("deducts the full amount when the balance covers it", () => {
@@ -137,5 +137,35 @@ describe("same rule as bill_add_payment", () => {
     const t = tallyPayment(paid.map((a) => ({ amount: a })), amount, net);
     expect(t.paymentStatus).toBe(status);
     expect(t.remaining).toBe(remaining);
+  });
+});
+
+// Same cases as schema/test_bill_excess_credit.sql: bill_edit refuses a choice for another amount.
+describe("editExcess", () => {
+  test("part-paid bill edited below what was paid", () => {
+    expect(editExcess({ paymentStatus: "partial", payments: [{ amount: "600.00" }], netAmount: 400 })).toBe(200);
+  });
+  test("bill paid in one go uses payment_amount", () => {
+    expect(editExcess({ paymentStatus: "finalized", payments: [], paymentAmount: "1000.00", netAmount: 600 })).toBe(400);
+  });
+  test("refund and credit rows already given back are not counted again", () => {
+    const payments = [{ amount: 1000 }, { amount: -400, kind: "refund" }];
+    expect(editExcess({ paymentStatus: "finalized", payments, netAmount: 600 })).toBe(0);
+    expect(editExcess({ paymentStatus: "finalized", payments, netAmount: 500 })).toBe(100);
+  });
+  test("under a rupee over is not an excess", () => {
+    expect(editExcess({ paymentStatus: "finalized", payments: [], paymentAmount: 1000, netAmount: 999.5 })).toBe(0);
+  });
+  test("drafts hold no money", () => {
+    expect(editExcess({ paymentStatus: "draft", payments: [], paymentAmount: 1000, netAmount: 400 })).toBe(0);
+  });
+});
+
+describe("paymentRowLabel", () => {
+  test("names refunds and store credit rows", () => {
+    expect(paymentRowLabel({ kind: "payment", salesmethods: { methodname: "Cash" } })).toBe("Cash");
+    expect(paymentRowLabel({ kind: "refund", salesmethods: { methodname: "UPI" } })).toBe("Refund (UPI)");
+    expect(paymentRowLabel({ kind: "store_credit", salesmethods: null })).toBe("To store credit");
+    expect(paymentRowLabel({ salesmethods: null })).toBe("—");
   });
 });

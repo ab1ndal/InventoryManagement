@@ -15,8 +15,9 @@ export function sumPayments(payments) {
 }
 
 /**
- * Money actually received for a bill. bill_payments is the ledger of record, so sum it
- * when rows exist; bills paid in one go write no row and use bills.payment_amount.
+ * Money the shop holds for a bill. bill_payments is the ledger of record, so sum it when rows
+ * exist (refund and store credit rows are negative); bills paid in one go write no row and use
+ * bills.payment_amount.
  * Null when neither records anything.
  */
 export function receivedAmount(bill) {
@@ -66,6 +67,28 @@ export function paymentStatusAfterEdit({ finalized, paymentStatus, payments, net
   if (!finalized) return "draft";
   if (paymentStatus !== "partial" && !payments?.length) return "finalized";
   return coversNet(sumPayments(payments), round2(Number(netAmount || 0))) ? "finalized" : "partial";
+}
+
+/**
+ * Money an edit leaves the shop holding over: what it holds for the bill (its payment rows'
+ * sum, which nets refunds and store credit, or payment_amount for a bill paid in one go) less
+ * the new net. Only part-paid and paid bills hold money, and under a rupee is not counted.
+ * Staff then choose a refund or store credit; bill_edit (schema/migration_bill_edit_excess.sql)
+ * works it out the same way and refuses a choice for a different amount.
+ */
+export function editExcess({ paymentStatus, payments, paymentAmount, netAmount }) {
+  if (paymentStatus !== "partial" && paymentStatus !== "finalized") return 0;
+  const held = payments?.length ? sumPayments(payments) : round2(Number(paymentAmount || 0));
+  const excess = round2(held - round2(Number(netAmount || 0)));
+  return excess >= PAID_IN_FULL_TOLERANCE ? excess : 0;
+}
+
+/** What a bill_payments row was: a payment, money paid back, or money moved to store credit. */
+export function paymentRowLabel(p) {
+  const method = p?.salesmethods?.methodname || p?.methodname || "—";
+  if (p?.kind === "refund") return `Refund (${method})`;
+  if (p?.kind === "store_credit") return "To store credit";
+  return method;
 }
 
 /**
