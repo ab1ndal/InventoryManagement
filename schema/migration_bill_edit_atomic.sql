@@ -20,9 +20,23 @@
 -- A payload without items leaves lines, salespeople and stock alone, as before, so the screen
 -- from before this change keeps working until it reloads.
 --
--- Body copied from schema/migration_bill_edit_excess.sql; otherwise unchanged. Same signature,
+-- Store credit an edit cuts goes back to the customer. The screen keeps store credit paying for
+-- as much of the new total as it can (store_credit_used = least(used, new total)) and sends the
+-- net as the total less that credit, so a cut comes off the cash first: the excess over the net
+-- is cash (refunded or put on credit, as above), and credit goes back only for the part of the
+-- total cut below the credit used. Example, 1000 paid as 400 credit and 600 cash: an edit to 700
+-- gives back 300 cash and keeps the 400 credit; an edit to 300 gives back all 600 cash and 100
+-- credit (ledger reason bill_edit_credit_back). Either way edit then cancel returns 400 credit
+-- and 600 cash, the same as cancelling at once (bill_cancel returns credit in full and cash held).
+-- Also refused: store_credit_used on a draft (BILL_BAD_PAYLOAD; bill_cancel would give it back
+-- though none was taken), store_credit_used going up (BILL_BAD_PAYLOAD), and a new customer on a
+-- bill that used credit (BILL_CREDIT_CUSTOMER; cancel would give the first customer's credit to
+-- the second). The result gains store_credit_back.
+--
+-- Body copied from schema/migration_bill_edit_excess.sql with the changes above. Same signature,
 -- grants and error codes, plus BILL_ITEM_EXCHANGED and BILL_STALE (a line this window shows was
--- removed in another) from _bill_lines_save. The result gains negative_stock.
+-- removed in another) from _bill_lines_save, and BILL_CREDIT_CUSTOMER. The result gains
+-- negative_stock.
 --
 -- Run after schema/migration_bill_save_drafts.sql (_bill_lines_save).
 
@@ -59,6 +73,9 @@ declare
   v_payment_amount numeric;
   v_status text;
   v_negative jsonb := '[]'::jsonb;
+  v_credit_old numeric;
+  v_credit_new numeric;
+  v_credit_back numeric := 0;
   v_result jsonb;
   v_sqlstate text;
   v_message text;
@@ -216,6 +233,39 @@ begin
       v_status := 'finalized';
     end if;
 
+    -- Store credit. A part-paid or paid bill took store_credit_used from its customer when it was
+    -- finished; an edit that lowers it gives the cut back to that customer's credit here, in the
+    -- same transaction (it used to be dropped). A draft has taken none, so it must hold none:
+    -- bill_cancel gives store_credit_used back on any bill, a draft too.
+    v_credit_old := round(coalesce(v_bill.store_credit_used, 0), 2);
+    v_credit_new := round(coalesce((v_new ->> 'store_credit_used')::numeric, 0), 2);
+    if v_bill.paymentstatus = 'draft' and v_credit_new <> 0 then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = 'a draft takes no store credit until it is finished';
+    end if;
+    if v_bill.paymentstatus in ('partial', 'finalized') then
+      -- bill_cancel gives store_credit_used back to the bill's customer at the time, so the credit
+      -- would land with someone else.
+      if v_credit_old > 0 and v_customer is distinct from v_bill.customerid then
+        raise exception 'BILL_CREDIT_CUSTOMER' using errcode = 'P0001',
+          detail = jsonb_build_object('customerid', v_bill.customerid, 'store_credit_used', v_credit_old)::text;
+      end if;
+      -- Taking more would need the customer's balance, which only finishing a bill takes.
+      if v_credit_new > v_credit_old then
+        raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+          detail = format('store_credit_used cannot go up on an edit (%s -> %s)', v_credit_old, v_credit_new);
+      end if;
+      if v_credit_new < v_credit_old then
+        -- Website bills are refunded from the Orders screen.
+        if exists (select 1 from public.orders o where o.bill_id = p_billid) then
+          raise exception 'BILL_ONLINE' using errcode = 'P0001', detail = p_billid::text;
+        end if;
+        v_credit_back := v_credit_old - v_credit_new;
+        perform public._store_credit_apply(v_bill.customerid, v_credit_back, 'bill_edit_credit_back',
+                                           p_billid::text, 'instore', 'bill');
+      end if;
+    end if;
+
     -- orderdate is cast straight to timestamp, which keeps the date the client sent (as in
     -- bill_save); going through timestamptz could move it to the previous day.
     update public.bills set
@@ -247,6 +297,7 @@ begin
                   'mode', v_choice ->> 'mode', 'amount', v_excess, 'customerid',
                   case when v_choice ->> 'mode' = 'store_credit' then v_customer end) end,
       'negative_stock', v_negative,
+      'store_credit_back', v_credit_back,
       'replayed', false);
     update public.bill_save_log
        set billid = p_billid, result = v_result

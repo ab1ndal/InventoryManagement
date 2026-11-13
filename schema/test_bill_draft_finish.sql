@@ -451,5 +451,62 @@ begin
   perform pg_temp.ok('6 skip_stock moves none on edit', pg_temp.stock(pg_temp.v1()) = s1 - 2);
 end $$;
 
+-- ---------- 7. store credit an edit cuts goes back to the customer, after the cash ----------
+do $$
+declare
+  b int;
+  b2 int;
+  r jsonb;
+  q text;
+  li int;
+begin
+  insert into public.customers (customerid, customer_ulid, first_name, store_credit)
+  values (-9703, 'DFINFIXTURE000000000000003', 'Credit', 1000), (-9704, 'DFINFIXTURE000000000000004', 'Other', 0);
+
+  -- 1000 paid as 400 store credit and 600 cash.
+  b := pg_temp.sold(70, 1, 600, '{}', '{"customerid": -9703, "store_credit_used": 400, "net_amount": 600}');
+  li := pg_temp.line_id(b);
+  perform pg_temp.ok('7 credit taken at sale', pg_temp.credit(-9703) = 600);
+
+  -- Down to 700: the cut comes off the cash. Credit stays used, 300 cash goes back.
+  r := pg_temp.rpc(pg_temp.edit_sql(71, b, pg_temp.edit(b, 300,
+    jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1, 700)),
+    '{"excess": {"mode": "refund", "amount": 300, "salesmethodid": -9701}}', '{"totalamount": 700}')));
+  perform pg_temp.ok('7 cash first: 300 refunded, credit kept', (r ->> 'store_credit_back')::numeric = 0
+    and (r -> 'excess' ->> 'amount')::numeric = 300 and pg_temp.credit(-9703) = 600
+    and (pg_temp.bill(b)).store_credit_used = 400);
+
+  -- Down to 300: the rest of the cash goes back, and credit for the part below 400.
+  q := pg_temp.edit_sql(72, b, pg_temp.edit(b, 0,
+    jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1, 300)),
+    '{"excess": {"mode": "refund", "amount": 300, "salesmethodid": -9701}}',
+    '{"totalamount": 300, "store_credit_used": 300}'));
+  r := pg_temp.rpc(q);
+  perform pg_temp.ok('7 credit cut goes back', (r ->> 'store_credit_back')::numeric = 100 and pg_temp.credit(-9703) = 700
+    and (select count(*) from public.store_credit_ledger where customerid = -9703 and ref_id = b::text
+           and reason = 'bill_edit_credit_back' and delta = 100) = 1);
+  perform pg_temp.ok('7 replay gives nothing back twice',
+    (pg_temp.rpc(q) ->> 'replayed')::boolean and pg_temp.credit(-9703) = 700);
+
+  -- Cancel then gives back the 300 credit still used and no cash: 400 credit and 600 cash in all.
+  r := pg_temp.rpc(format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(73), b, 'return_payment',
+    jsonb_build_object('expect', jsonb_build_object('finalized', true, 'paymentstatus', 'finalized'))));
+  perform pg_temp.ok('7 edit then cancel returns exactly what was paid', pg_temp.credit(-9703) = 1000
+    and (r ->> 'refund')::numeric = 0
+    and (select -sum(amount) from public.bill_payments where billid = b and kind = 'refund') = 600);
+
+  -- Refused: credit on a draft, credit going up, another customer on a bill that used credit.
+  b2 := pg_temp.draft(-9703);
+  perform pg_temp.ok('7 a draft holds no store credit', pg_temp.as_admin(pg_temp.edit_sql(74, b2, pg_temp.edit(b2, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1)), '{}', '{"store_credit_used": 500}'))) = 'BILL_BAD_PAYLOAD');
+  b2 := pg_temp.sold(75, 1, 900, '{}', '{"customerid": -9703, "store_credit_used": 100, "net_amount": 900}');
+  perform pg_temp.ok('7 credit cannot go up', pg_temp.as_admin(pg_temp.edit_sql(76, b2, pg_temp.edit(b2, 900,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1)), '{}', '{"store_credit_used": 200}'))) = 'BILL_BAD_PAYLOAD');
+  perform pg_temp.ok('7 customer cannot change on a bill that used credit', pg_temp.as_admin(pg_temp.edit_sql(77, b2,
+    pg_temp.edit(b2, 900, jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1)), '{}',
+      '{"customerid": -9704}'))) = 'BILL_CREDIT_CUSTOMER');
+  perform pg_temp.ok('7 refusals moved no credit', pg_temp.credit(-9703) = 900 and pg_temp.credit(-9704) = 0);
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;
