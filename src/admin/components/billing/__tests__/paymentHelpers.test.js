@@ -169,3 +169,16 @@ describe("paymentRowLabel", () => {
     expect(paymentRowLabel({ salesmethods: null })).toBe("—");
   });
 });
+
+describe("excessCountsExchangeTwice (same rule as bill_edit BILL_EXCHANGE_COUNTED)", () => {
+  const { excessCountsExchangeTwice } = require("../paymentHelpers");
+  test("an excess with the net below the exchange credit given", () => {
+    expect(excessCountsExchangeTwice({ excess: 500, netAmount: 300, exchangeCreditGiven: 400 })).toBe(true);
+  });
+  test("net at the exchange credit given is fine", () => {
+    expect(excessCountsExchangeTwice({ excess: 500, netAmount: 300, exchangeCreditGiven: 300 })).toBe(false);
+  });
+  test("no excess, nothing paid back", () => {
+    expect(excessCountsExchangeTwice({ excess: 0, netAmount: 100, exchangeCreditGiven: 400 })).toBe(false);
+  });
+});

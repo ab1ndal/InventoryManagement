@@ -33,3 +33,42 @@ describe("buildBillItemsPayload discount distribution", () => {
     expect(sum).toBeCloseTo(balanceDiscount, 2);
   });
 });
+
+describe("diffBillItems", () => {
+  const { diffBillItems } = require("../stockHelpers");
+  const items = [{ _id: "11" }, { _id: "uuid-new" }, { _id: "13" }];
+  const payload = [{ product_name: "A" }, { product_name: "N" }, { product_name: "C" }];
+
+  test("saved lines update in place, new ones insert, missing ones delete", () => {
+    expect(diffBillItems(new Set(["11", "12", "13"]), items, payload)).toEqual({
+      removeIds: [12],
+      updates: [
+        { bill_item_id: 11, row: { product_name: "A" } },
+        { bill_item_id: 13, row: { product_name: "C" } },
+      ],
+      inserts: [{ product_name: "N" }],
+      insertIds: ["uuid-new"],
+    });
+  });
+
+  test("a new draft's lines are all inserts", () => {
+    expect(diffBillItems(new Set(), items, payload)).toMatchObject({ removeIds: [], updates: [], inserts: payload });
+  });
+});
+
+describe("exchangedLineProblems", () => {
+  const { exchangedLineProblems } = require("../stockHelpers");
+  const exchanged = { 11: { qty: 2, name: "Kurti" } };
+
+  test("none when the exchanged line stays at or above its exchanged quantity", () => {
+    expect(exchangedLineProblems([{ _id: "11", quantity: 2 }], exchanged)).toBeNull();
+    expect(exchangedLineProblems([{ _id: "11", quantity: 3 }], {})).toBeNull();
+  });
+
+  test("names a removed or reduced exchanged line", () => {
+    expect(exchangedLineProblems([], exchanged)).toBe("Kurti: 2 already exchanged, so it stays on the bill");
+    expect(exchangedLineProblems([{ _id: "11", quantity: 1 }], exchanged)).toBe(
+      "Kurti: 2 already exchanged, so the quantity cannot go below 2",
+    );
+  });
+});

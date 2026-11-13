@@ -83,6 +83,15 @@ export function editExcess({ paymentStatus, payments, paymentAmount, netAmount }
   return excess >= PAID_IN_FULL_TOLERANCE ? excess : 0;
 }
 
+/**
+ * True when paying back an edit's excess would pay exchanged items back a second time: the new
+ * net is below the exchange credit already given from this bill's lines, whose value the net
+ * still holds. bill_edit refuses the same case (BILL_EXCHANGE_COUNTED).
+ */
+export function excessCountsExchangeTwice({ excess, netAmount, exchangeCreditGiven }) {
+  return excess > 0 && round2(Number(netAmount || 0)) < round2(Number(exchangeCreditGiven || 0));
+}
+
 /** What a bill_payments row was: a payment, money paid back, or money moved to store credit. */
 export function paymentRowLabel(p) {
   const method = p?.salesmethods?.methodname || p?.methodname || "—";
