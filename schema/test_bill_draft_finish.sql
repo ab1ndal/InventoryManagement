@@ -508,5 +508,81 @@ begin
   perform pg_temp.ok('7 refusals moved no credit', pg_temp.credit(-9703) = 900 and pg_temp.credit(-9704) = 0);
 end $$;
 
+-- What the live admin policies allow staff on bills (the harness has no policies).
+grant select, insert, update, delete on public.bills to authenticated;
+grant usage on all sequences in schema public to authenticated;
+
+-- ---------- 8. what a bill holds changes only by recorded money; no direct money writes ----------
+do $$
+declare
+  b int := pg_temp.sold(80, 1, 1000);
+  li int := pg_temp.line_id(b);
+  d int;
+  r jsonb;
+begin
+  -- Re-finalize after adding an item: 500 more taken is recorded as a payment.
+  r := pg_temp.rpc(pg_temp.edit_sql(81, b, pg_temp.edit(b, 1500,
+    jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1), pg_temp.line(null, pg_temp.v2(), 1, 500)),
+    '{"discount_codes": ["DFIN-TEST"]}', '{"payment_amount": 1500, "totalamount": 1500}')));
+  perform pg_temp.ok('8 more received is a payment row', (select array_agg(amount order by payment_id)
+    from public.bill_payments where billid = b) = '{1000, 500}'
+    and (pg_temp.bill(b)).payment_amount = 1500 and (pg_temp.bill(b)).paymentstatus = 'finalized');
+  perform pg_temp.ok('8 discount use recorded on re-finalize', (select count(*) from public.discount_usage
+    where billid = b and code = 'DFIN-TEST') = 1);
+  perform pg_temp.ok('8 lowering what was received refused', pg_temp.as_admin(pg_temp.edit_sql(82, b,
+    pg_temp.edit(b, 1500, jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1)), '{}', '{"payment_amount": 1000}')))
+    = 'BILL_RECEIVED_CHANGED');
+  perform pg_temp.ok('8 raising it on a bill with payment rows refused', pg_temp.as_admin(pg_temp.edit_sql(83, b,
+    pg_temp.edit(b, 2000, jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1)), '{}', '{"payment_amount": 2000}')))
+    = 'BILL_RECEIVED_CHANGED');
+
+  b := pg_temp.sold(84, 1, 1000);
+  perform pg_temp.ok('8 more than the net refused', pg_temp.as_admin(pg_temp.edit_sql(85, b,
+    pg_temp.edit(b, 1200, jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}',
+      '{"payment_amount": 1300}'))) = 'BILL_OVERPAID');
+  r := pg_temp.rpc(pg_temp.edit_sql(86, b, pg_temp.edit(b, 1500,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}', '{"payment_amount": 1200}')));
+  perform pg_temp.ok('8 part of the rise received leaves the bill part-paid', (pg_temp.bill(b)).paymentstatus = 'partial'
+    and (pg_temp.bill(b)).payment_amount = 1200);
+  r := pg_temp.rpc(format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(87), b, 'return_payment',
+    jsonb_build_object('expect', jsonb_build_object('finalized', true, 'paymentstatus', 'partial'))));
+  perform pg_temp.ok('8 cancel refunds what was received, once', (r ->> 'refund')::numeric = 1200);
+
+  d := pg_temp.draft(-9701);
+  perform pg_temp.ok('8 a draft records no discount use', pg_temp.as_admin(pg_temp.edit_sql(88, d,
+    pg_temp.edit(d, 1000, jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)),
+      '{"discount_codes": ["DFIN-TEST"]}'))) = 'BILL_BAD_PAYLOAD');
+end $$;
+
+do $$
+declare
+  b int := pg_temp.sold(90, 1, 1000);
+  d int := pg_temp.draft(-9701);
+  has_lock boolean := to_regproc('public._bills_money_via_rpc') is not null;
+begin
+  perform pg_temp.ok('8 direct raise of what was received refused', has_lock and pg_temp.as_admin(format(
+    'update public.bills set payment_amount = 5000 where billid = %s', b)) = 'BILL_MONEY_DIRECT');
+  perform pg_temp.ok('8 direct store credit on a paid bill refused', pg_temp.as_admin(format(
+    'update public.bills set store_credit_used = 500 where billid = %s', b)) = 'BILL_MONEY_DIRECT');
+  perform pg_temp.ok('8 direct store credit on a draft refused', pg_temp.as_admin(format(
+    'update public.bills set store_credit_used = 500 where billid = %s', d)) = 'BILL_MONEY_DIRECT');
+  perform pg_temp.ok('8 direct finalize of a draft refused', pg_temp.as_admin(format(
+    $q$update public.bills set paymentstatus = 'finalized', finalized = true where billid = %s$q$, d)) = 'BILL_MONEY_DIRECT');
+  perform pg_temp.ok('8 direct insert of a finalized bill refused', pg_temp.as_admin(
+    $q$insert into public.bills (paymentstatus, finalized, notes, payment_amount) values ('finalized', true, 'DFIN', 900)$q$)
+    = 'BILL_MONEY_DIRECT');
+  perform pg_temp.ok('8 direct insert of a draft with credit refused', pg_temp.as_admin(
+    $q$insert into public.bills (paymentstatus, finalized, notes, store_credit_used) values ('draft', false, 'DFIN', 900)$q$)
+    = 'BILL_MONEY_DIRECT');
+  perform pg_temp.ok('8 a plain draft insert and its amounts still save', pg_temp.as_admin(
+    $q$insert into public.bills (paymentstatus, finalized, notes, payment_amount) values ('draft', false, 'DFIN', 900)$q$) = 'ok'
+    and pg_temp.as_admin(format('update public.bills set payment_amount = 950, net_amount = 950 where billid = %s', d)) = 'ok');
+  perform pg_temp.ok('8 notes and pdf path on a paid bill still save', pg_temp.as_admin(format(
+    $q$update public.bills set notes = 'DFIN note', pdf_url = 'x.pdf' where billid = %s$q$, b)) = 'ok');
+  -- A repair in the SQL editor runs as the owner, not as an API role.
+  update public.bills set payment_amount = 1001 where billid = b;
+  perform pg_temp.ok('8 the owner is not an API caller', (select payment_amount from public.bills where billid = b) = 1001);
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;

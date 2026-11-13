@@ -33,10 +33,20 @@
 -- bill that used credit (BILL_CREDIT_CUSTOMER; cancel would give the first customer's credit to
 -- the second). The result gains store_credit_back.
 --
+-- What a part-paid or paid bill holds (payment_amount) changes only by recorded money. bill_edit
+-- refuses lowering it (BILL_RECEIVED_CHANGED: give money back by taking items off, which records
+-- the excess) and raising it on a bill paid in instalments (Add Payment records those). On a bill
+-- paid in one go, Finalize after adding items may raise it: the increase is recorded as a
+-- bill_payments row (after a row for what was received before), up to the net amount
+-- (BILL_OVERPAID beyond it), and the status follows the rows. The screen's Finalize on an opened
+-- bill comes here now, instead of updating bills directly; schema/migration_bill_money_rpc_only.sql
+-- then refuses direct writes of these columns. It also sends discount_codes, which replace the
+-- bill's discount_usage rows (refused on a draft).
+--
 -- Body copied from schema/migration_bill_edit_excess.sql with the changes above. Same signature,
 -- grants and error codes, plus BILL_ITEM_EXCHANGED and BILL_STALE (a line this window shows was
--- removed in another) from _bill_lines_save, and BILL_CREDIT_CUSTOMER. The result gains
--- negative_stock.
+-- removed in another) from _bill_lines_save, BILL_CREDIT_CUSTOMER, BILL_RECEIVED_CHANGED and
+-- BILL_OVERPAID. The result gains negative_stock.
 --
 -- Run after schema/migration_bill_save_drafts.sql (_bill_lines_save).
 
@@ -51,7 +61,8 @@ as $$
 declare
   -- Same as PAID_IN_FULL_TOLERANCE in paymentHelpers.js and bill_add_payment.
   c_paid_in_full_tolerance constant numeric := 1;
-  c_payload_keys constant text[] := array['expect', 'bill', 'excess', 'items', 'salesperson_ids', 'skip_stock'];
+  c_payload_keys constant text[] := array['expect', 'bill', 'excess', 'items', 'salesperson_ids', 'skip_stock',
+                                          'discount_codes'];
   c_expect_keys constant text[] := array['paymentstatus', 'payment_amount'];
   c_bill_keys constant text[] := array[
     'customerid', 'notes', 'totalamount', 'gst_total', 'discount_total', 'taxable_total',
@@ -76,6 +87,7 @@ declare
   v_credit_old numeric;
   v_credit_new numeric;
   v_credit_back numeric := 0;
+  v_paid_new numeric;
   v_result jsonb;
   v_sqlstate text;
   v_message text;
@@ -233,6 +245,46 @@ begin
       v_status := 'finalized';
     end if;
 
+    -- What a part-paid or paid bill holds changes only by recorded money: a payment, or the refund
+    -- or credit of an excess above. Lowering payment_amount by hand would be an unrecorded refund;
+    -- raising it would make bill_cancel pay out money never received. Finalize on an opened bill
+    -- paid in one go (the screen's re-finalize) may raise it when more was taken for added items:
+    -- that is recorded as a payment, after a row for what was received before, as for an excess.
+    if v_excess = 0 and v_bill.paymentstatus in ('partial', 'finalized') then
+      v_paid_new := round(coalesce(v_payment_amount, 0), 2);
+      if v_paid_new < v_held or (v_paid_new > v_held and v_has_rows) then
+        raise exception 'BILL_RECEIVED_CHANGED' using errcode = 'P0001',
+          detail = jsonb_build_object('held', v_held, 'payment_amount', v_paid_new)::text;
+      end if;
+      if v_paid_new > v_held then
+        if exists (select 1 from public.orders o where o.bill_id = p_billid) then
+          raise exception 'BILL_ONLINE' using errcode = 'P0001', detail = p_billid::text;
+        end if;
+        if v_paid_new - v_net >= c_paid_in_full_tolerance then
+          raise exception 'BILL_OVERPAID' using errcode = 'P0001',
+            detail = jsonb_build_object('net', v_net, 'payment_amount', v_paid_new)::text;
+        end if;
+        if v_new ->> 'salesmethodid' is null then
+          raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+            detail = 'a payment method is needed for the money received';
+        end if;
+        perform set_config('app.bill_payment_writer', 'on', true);
+        if v_held > 0 then
+          insert into public.bill_payments (billid, amount, salesmethodid, recorded_at, kind)
+          values (p_billid, v_held, coalesce(v_bill.salesmethodid, (v_new ->> 'salesmethodid')::int),
+                  coalesce(v_bill.orderdate, localtimestamp), 'payment');
+        end if;
+        insert into public.bill_payments (billid, amount, salesmethodid, recorded_at, kind)
+        values (p_billid, v_paid_new - v_held, (v_new ->> 'salesmethodid')::int, localtimestamp, 'payment');
+        perform set_config('app.bill_payment_writer', '', true);
+        v_payment_amount := v_paid_new;
+        v_status := case when v_net - v_paid_new < c_paid_in_full_tolerance then 'finalized' else 'partial' end;
+      else
+        -- Unchanged, kept exactly as stored (null stays null).
+        v_payment_amount := v_bill.payment_amount;
+      end if;
+    end if;
+
     -- Store credit. A part-paid or paid bill took store_credit_used from its customer when it was
     -- finished; an edit that lowers it gives the cut back to that customer's credit here, in the
     -- same transaction (it used to be dropped). A draft has taken none, so it must hold none:
@@ -287,6 +339,17 @@ begin
       store_credit_used = (v_new ->> 'store_credit_used')::numeric,
       orderdate = (v_new ->> 'orderdate')::timestamp
     where billid = p_billid;
+
+    -- Re-finalize records the bill's discount codes again; a draft records none until finished.
+    if p_payload ? 'discount_codes' then
+      if v_bill.paymentstatus = 'draft' or jsonb_typeof(p_payload -> 'discount_codes') is distinct from 'array' then
+        raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+          detail = 'discount_codes is an array, for a part-paid or paid bill';
+      end if;
+      delete from public.discount_usage where billid = p_billid;
+      insert into public.discount_usage (customerid, code, billid)
+      select v_customer, c, p_billid from jsonb_array_elements_text(p_payload -> 'discount_codes') c;
+    end if;
 
     v_result := jsonb_build_object(
       'billid', p_billid,

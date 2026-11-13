@@ -185,8 +185,10 @@ begin
   perform pg_temp.ok('2 a return by direct edit refused', pg_temp.as_admin(format(
     $q$update public.bills set net_amount = 600, payment_amount = 1000, paymentstatus = 'finalized' where billid = %s$q$, b))
       = 'BILL_EXCESS_UNSETTLED');
+  -- Since schema/migration_bill_money_rpc_only.sql even that goes through bill_edit only.
   perform pg_temp.ok('2 an edit raising the total with the status the payments give saves', pg_temp.as_admin(format(
-    $q$update public.bills set net_amount = 1200, paymentstatus = 'partial' where billid = %s$q$, b)) = 'ok');
+    $q$update public.bills set net_amount = 1200, paymentstatus = 'partial' where billid = %s$q$, b))
+      = case when to_regproc('public._bills_money_via_rpc') is null then 'ok' else 'BILL_MONEY_DIRECT' end);
 end $$;
 
 -- ---------- 3. no payment past the balance ----------
