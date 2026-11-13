@@ -154,31 +154,31 @@ test("a bill marked paid in installments goes back to partial when payments fall
 });
 
 // Another window recorded the last ₹500 after this one opened the bill. Saving this window's
-// "partial, ₹300 received" over it would undo that payment and let the bill take more.
+// "partial, ₹300 received" over it would undo that payment and let the bill take more. bill_edit
+// checks the bill against what this window loaded, under the bill's lock, and refuses.
 test("a bill paid in another window since it opened is not saved over", async () => {
   render(<BillingForm billId={330} open onOpenChange={() => {}} />);
   await waitFor(() => expect(saveChanges()).toBeEnabled());
 
-  mockBillNow = () => ({ ...partialBill, paymentstatus: "finalized", payment_amount: 800 });
+  mockEditReply = { data: null, error: { message: "BILL_STALE" } };
   fireEvent.click(screen.getByRole("button", { name: "Remove Kurti" }));
   fireEvent.click(saveChanges());
 
   await waitFor(() => expect(mockToasts).toContain("This bill changed in another window — reload"));
-  expect(mockBillUpdates).toHaveLength(0);
+  expect(mockEdits[0].p_payload.expect).toEqual({ paymentstatus: "partial", payment_amount: 300 });
 });
 
-test("a payment landing between the check and the write is caught too", async () => {
+test("a refused edit saved nothing, lines included, and says only why", async () => {
   render(<BillingForm billId={330} open onOpenChange={() => {}} />);
   await waitFor(() => expect(saveChanges()).toBeEnabled());
 
   mockEditReply = { data: null, error: { message: "BILL_STALE" } };
   fireEvent.click(saveChanges());
 
-  // The lines were written before bill_edit refused, so the message must not say nothing was saved.
-  await waitFor(() => expect(mockToasts).toContain(
-    "This bill changed in another window — reload. The item changes were saved, but the bill's total and payment were not. Reopen the bill before saving again.",
-  ));
-  expect(mockBillUpdates).toHaveLength(1);
+  // The lines travel in the same bill_edit call, so its refusal undid them too.
+  await waitFor(() => expect(mockToasts).toEqual(["This bill changed in another window — reload"]));
+  expect(mockEdits).toHaveLength(1);
+  expect(mockEdits[0].p_payload.items.map((l) => l.bill_item_id)).toEqual([11, 12]);
 });
 
 test("an unchanged bill saves with no warning", async () => {

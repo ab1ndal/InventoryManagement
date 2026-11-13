@@ -220,42 +220,6 @@ Array [
 exports[`path B, edit draft (pins current behaviour) pins current behaviour: Save Draft on a finalized bill keeps it finalized and moves no stock 1`] = `
 Array [
   Object {
-    "filters": Array [
-      Array [
-        "eq",
-        "billid",
-        330,
-      ],
-      Array [
-        "eq",
-        "bill_item_id",
-        11,
-      ],
-    ],
-    "kind": "table",
-    "op": "update",
-    "payload": Object {
-      "alteration_charge": 0,
-      "billid": 330,
-      "category": null,
-      "cost_price": null,
-      "discount_total": 0,
-      "gst_amount": 0,
-      "gst_rate": null,
-      "mrp": 150,
-      "product_code": "BC25001",
-      "product_name": "Kurti",
-      "quantity": 2,
-      "salesperson_id": null,
-      "stitch_type": "unstitched",
-      "subtotal": 300,
-      "total": 300,
-      "unit_type": "piece",
-      "variantid": "v1",
-    },
-    "table": "bill_items",
-  },
-  Object {
     "args": Object {
       "p_billid": 330,
       "p_key": "00000000-0000-4000-8000-000000000001",
@@ -283,22 +247,34 @@ Array [
           "payment_amount": 200,
           "paymentstatus": "finalized",
         },
+        "items": Array [
+          Object {
+            "alteration_charge": 0,
+            "bill_item_id": 11,
+            "billid": null,
+            "category": null,
+            "cost_price": null,
+            "discount_total": 0,
+            "gst_amount": 0,
+            "gst_rate": null,
+            "mrp": 150,
+            "product_code": "BC25001",
+            "product_name": "Kurti",
+            "quantity": 2,
+            "salesperson_id": null,
+            "stitch_type": "unstitched",
+            "subtotal": 300,
+            "total": 300,
+            "unit_type": "piece",
+            "variantid": "v1",
+          },
+        ],
+        "salesperson_ids": Array [],
+        "skip_stock": false,
       },
     },
     "fn": "bill_edit",
     "kind": "rpc",
-  },
-  Object {
-    "filters": Array [
-      Array [
-        "eq",
-        "billid",
-        330,
-      ],
-    ],
-    "kind": "table",
-    "op": "delete",
-    "table": "bill_salespersons",
   },
   Object {
     "entry": Object {
@@ -314,42 +290,6 @@ Array [
 
 exports[`path B, edit draft (pins current behaviour) pins current behaviour: save an untouched draft with a salesperson 1`] = `
 Array [
-  Object {
-    "filters": Array [
-      Array [
-        "eq",
-        "billid",
-        330,
-      ],
-      Array [
-        "eq",
-        "bill_item_id",
-        11,
-      ],
-    ],
-    "kind": "table",
-    "op": "update",
-    "payload": Object {
-      "alteration_charge": 0,
-      "billid": 330,
-      "category": null,
-      "cost_price": null,
-      "discount_total": 0,
-      "gst_amount": 0,
-      "gst_rate": null,
-      "mrp": 150,
-      "product_code": "BC25001",
-      "product_name": "Kurti",
-      "quantity": 2,
-      "salesperson_id": null,
-      "stitch_type": "unstitched",
-      "subtotal": 300,
-      "total": 300,
-      "unit_type": "piece",
-      "variantid": "v1",
-    },
-    "table": "bill_items",
-  },
   Object {
     "args": Object {
       "p_billid": 330,
@@ -378,34 +318,36 @@ Array [
           "payment_amount": 300,
           "paymentstatus": "draft",
         },
+        "items": Array [
+          Object {
+            "alteration_charge": 0,
+            "bill_item_id": 11,
+            "billid": null,
+            "category": null,
+            "cost_price": null,
+            "discount_total": 0,
+            "gst_amount": 0,
+            "gst_rate": null,
+            "mrp": 150,
+            "product_code": "BC25001",
+            "product_name": "Kurti",
+            "quantity": 2,
+            "salesperson_id": null,
+            "stitch_type": "unstitched",
+            "subtotal": 300,
+            "total": 300,
+            "unit_type": "piece",
+            "variantid": "v1",
+          },
+        ],
+        "salesperson_ids": Array [
+          3,
+        ],
+        "skip_stock": false,
       },
     },
     "fn": "bill_edit",
     "kind": "rpc",
-  },
-  Object {
-    "filters": Array [
-      Array [
-        "eq",
-        "billid",
-        330,
-      ],
-    ],
-    "kind": "table",
-    "op": "delete",
-    "table": "bill_salespersons",
-  },
-  Object {
-    "filters": Array [],
-    "kind": "table",
-    "op": "insert",
-    "payload": Array [
-      Object {
-        "billid": 330,
-        "salesperson_id": 3,
-      },
-    ],
-    "table": "bill_salespersons",
   },
   Object {
     "entry": Object {

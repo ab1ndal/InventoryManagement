@@ -112,7 +112,7 @@ const openBill = async (onSubmit = () => {}) => {
   await waitFor(() => expect(saveChanges()).toBeEnabled());
 };
 
-test("saving keeps line ids: kept lines update in place, only the removed line is deleted", async () => {
+test("saving keeps line ids: kept lines go to bill_edit with their id, nothing is written directly", async () => {
   mockBill = { ...paidBill([line(11, "Kurti", 300), line(12, "Dupatta", 500)]), payment_amount: 300, net_amount: 300 };
   const onSubmit = jest.fn();
   await openBill(onSubmit);
@@ -121,15 +121,12 @@ test("saving keeps line ids: kept lines update in place, only the removed line i
   fireEvent.click(saveChanges());
   await waitFor(() => expect(onSubmit).toHaveBeenCalled());
 
-  const deletes = mockItemWrites.filter((w) => w.op === "delete");
-  expect(deletes).toEqual([
-    { op: "delete", payload: undefined, filters: [["eq", "billid", 330], ["in", "bill_item_id", [12]]] },
+  // bill_edit keeps line 11 in place and deletes line 12, in the bill's own transaction.
+  expect(mockEdits).toHaveLength(1);
+  expect(mockEdits[0].p_payload.items).toEqual([
+    expect.objectContaining({ bill_item_id: 11, billid: null, product_name: "Kurti", quantity: 1, mrp: 300 }),
   ]);
-  const updates = mockItemWrites.filter((w) => w.op === "update");
-  expect(updates).toHaveLength(1);
-  expect(updates[0].filters).toEqual([["eq", "billid", 330], ["eq", "bill_item_id", 11]]);
-  expect(updates[0].payload).toMatchObject({ billid: 330, product_name: "Kurti", quantity: 1, mrp: 300 });
-  expect(mockItemWrites.some((w) => w.op === "insert")).toBe(false);
+  expect(mockItemWrites).toEqual([]);
 });
 
 describe("an exchanged line", () => {
@@ -168,9 +165,8 @@ describe("an exchanged line", () => {
 
     await waitFor(() => expect(mockEdits).toHaveLength(1));
     expect(mockEdits[0].p_payload.excess).toEqual({ mode: "store_credit", amount: 500 });
-    expect(mockItemWrites.filter((w) => w.op === "delete")[0].filters).toEqual([
-      ["eq", "billid", 330], ["in", "bill_item_id", [12]],
-    ]);
+    expect(mockEdits[0].p_payload.items.map((l) => l.bill_item_id)).toEqual([11]);
+    expect(mockItemWrites).toEqual([]);
   });
 
   test("an edit paying back below the exchange credit given is stopped before any write", async () => {

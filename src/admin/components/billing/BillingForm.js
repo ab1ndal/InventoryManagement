@@ -83,8 +83,8 @@ const BILL_SAVE_ERRORS = {
 const EXCESS_USE_SAVE_CHANGES =
   "The customer has paid more than this bill now comes to. Use Save Changes to give the difference back as store credit or a refund.";
 
-// bill_edit refusals, in words staff can act on. A refused bill_edit changed nothing on the bill
-// row, but the screen saves the lines first (handleSaveDraft), so EDIT_LINES_SAVED says so.
+// bill_edit refusals, in words staff can act on. A refused bill_edit changed nothing: it saves the
+// lines, stock and salespeople in the same transaction as the bill row.
 const BILL_EDIT_ERRORS = {
   BILL_STALE: BILL_CHANGED_MESSAGE,
   BILL_PAYMENTS_MISMATCH: BILL_CHANGED_MESSAGE,
@@ -94,12 +94,8 @@ const BILL_EDIT_ERRORS = {
   BILL_ONLINE: "This is a website order's bill. Its refunds are handled from Online Orders.",
   BILL_KEY_CONFLICT: "This edit may already be saved. Reopen the bill to check before saving again.",
   BILL_EXCHANGE_COUNTED: "Part of this bill was already given back as exchange credit, so the new total cannot be paid back below it.",
+  BILL_ITEM_EXCHANGED: EXCHANGED_LINE_MESSAGE,
 };
-
-// The pre-checks in handleSaveDraft catch these refusals before any write; one that still comes
-// back from bill_edit means the bill changed in the moment between, after the lines were saved.
-const EDIT_LINES_SAVED =
-  "The item changes were saved, but the bill's total and payment were not. Reopen the bill before saving again.";
 
 // Save an opened bill's lines in place (diffBillItems), so a line's bill_item_id, which exchange
 // credit points at, survives the edit. savedIdsRef tracks what bill_items now holds, so a retry
@@ -1156,57 +1152,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           return;
         }
 
-        // Step B: Fetch existing bill_items for stock delta computation
-        const { data: existingItems, error: fetchErr } = await supabase
-          .from("bill_items")
-          .select("variantid, quantity")
-          .eq("billid", billId)
-          .not("variantid", "is", null);
-        if (fetchErr)
-          throw new Error(
-            "Could not fetch existing items: " + fetchErr.message,
-          );
-
-        const newInventoryItems = items.filter((it) => it.variantid);
-
-        // Stock delta computation + validation skipped for backdated bills
-        let deltaMap = {};
-        let stockMap = {};
+        // Stock check only: bill_edit moves the stock with the lines (skipped for backdated bills)
         if (!isBackdated) {
-          // Step C: Compute stock delta
-          deltaMap = computeStockDelta(existingItems || [], newInventoryItems);
-
-          // Step D: Fetch current stock for all affected variants
-          const allVariantIds = Object.keys(deltaMap);
-          if (allVariantIds.length > 0) {
-            const { data: stockData, error: stockErr } = await supabase
-              .from("productsizecolors")
-              .select("variantid, stock, size, color")
-              .in("variantid", allVariantIds);
-            if (stockErr)
-              throw new Error("Could not verify stock: " + stockErr.message);
-            stockMap = Object.fromEntries(
-              stockData.map((r) => [r.variantid, r]),
-            );
-          }
-
-          // Step E: Validate stock
-          const stockErrors = [];
-          for (const [vid, delta] of Object.entries(deltaMap)) {
-            const currentStock = stockMap[vid]?.stock ?? 0;
-            const finalStock = currentStock + delta;
-            if (finalStock < 0) {
-              const item = newInventoryItems.find((it) => it.variantid === vid);
-              const name = item?.product_name || vid;
-              const size = stockMap[vid]?.size || "";
-              const color = stockMap[vid]?.color || "";
-              stockErrors.push(
-                `${name} (${size}/${color}): would result in ${finalStock} stock`,
-              );
-            }
-          }
-          if (stockErrors.length > 0) {
-            showBlockingError("Insufficient stock", stockErrors.join("\n"));
+          const stockProblems = await editStockProblems(billId);
+          if (stockProblems) {
+            showBlockingError("Insufficient stock", stockProblems);
             return;
           }
         }
@@ -1238,24 +1188,14 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           return;
         }
 
-        await assertBillUnchanged(billId);
-
-        // Step F/G: Save bill_items in place
         // NOTE: routine edits never re-run the balance-forcing math (balanceAdjustedComputed) —
         // that mechanism exists only for the explicit "confirm partial finalize" action
         // (handleConfirmPartialFinalize). Reusing it here silently discounted away the cost of
         // any item added after a bill's finalAmount/paymentAmount was locked in.
         const totalsToUse = computed;
-        const billItemsPayload = buildBillItemsPayload(
-          billId,
-          items,
-          0,
-          totalsToUse.overallDiscount,
-          docType,
-        );
-        await saveItemsInPlace(billId, billItemsPayload);
 
-        // Step H: Update bills row, and settle any excess, in one transaction (bill_edit)
+        // Lines, stock, salespeople, the bills row and any excess, in one transaction (bill_edit),
+        // and only while the bill is as this window loaded it.
         const editBody = {
           expect: openedStateRef.current,
           bill: {
@@ -1289,6 +1229,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             orderdate: backdatedDate + "T00:00:00+05:30",
           },
           excess: excess > 0 ? settlement : null,
+          items: linesForSavedBill(buildBillItemsPayload(null, items, 0, totalsToUse.overallDiscount, docType)),
+          salesperson_ids: selectedSalespersonIds,
+          skip_stock: isBackdated,
         };
         const editBodyText = JSON.stringify(editBody);
         if (editKeyRef.current?.body !== editBodyText) {
@@ -1300,39 +1243,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           p_payload: editBody,
         });
         if (editErr) {
-          const refusal = BILL_EDIT_ERRORS[editErr.message] || "Failed to update bill: " + editErr.message;
-          throw new Error(`${refusal.endsWith(".") ? refusal : refusal + "."} ${EDIT_LINES_SAVED}`);
-        }
-
-        // Reconcile salesperson associations
-        const { error: spDelErr } = await supabase
-          .from("bill_salespersons")
-          .delete()
-          .eq("billid", billId);
-        if (spDelErr)
-          console.error("Failed to clear salespersons:", spDelErr.message);
-        if (selectedSalespersonIds.length > 0) {
-          const spPayload = selectedSalespersonIds.map((spId) => ({
-            billid: billId,
-            salesperson_id: spId,
-          }));
-          const { error: spInsErr } = await supabase
-            .from("bill_salespersons")
-            .insert(spPayload);
-          if (spInsErr)
-            console.error("Failed to save salespersons:", spInsErr.message);
-        }
-
-        // Step I: Apply stock deltas (skipped for backdated bills)
-        const stockFailures = [];
-        if (!isBackdated) {
-          stockFailures.push(
-            ...(await applyStockChanges(
-              Object.entries(deltaMap).filter(([, delta]) => delta !== 0),
-              "bill_draft_edit",
-              billId,
-            )),
-          );
+          throw new Error(BILL_EDIT_ERRORS[editErr.message] || "Failed to update bill: " + editErr.message);
         }
 
         // Step J: Success
@@ -1341,11 +1252,6 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           toast.success(`${billMoney(edited.excess.amount)} added to ${customerName || "the customer"}'s store credit`);
         } else if (edited?.excess?.mode === "refund") {
           toast.success(`Give the customer ${billMoney(edited.excess.amount)} back — recorded as a refund on the bill`);
-        }
-        if (stockFailures.length > 0) {
-          toast.error("Stock sync warning", {
-            description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
-          });
         }
         logActivity({ action: "update", entityType: "bill", entityId: effectiveBillNumber || billId, summary: `Edited draft bill #${effectiveBillNumber || "(no number)"} for ${customerName || "walk-in"} — ${money(totalsToUse.grandTotal)}, ${items.length} items` });
         onOpenChange?.(false);
