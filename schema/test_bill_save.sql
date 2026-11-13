@@ -160,7 +160,7 @@ begin
     returning billid into v_used_bill;
   perform public.voucher_redeem('BSAVE-USED', v_used_bill);
   insert into public.exchanges (exchangeid, quantity, customerid, credit_amount) values
-    (-9001, 1, -9001, 100), (-9002, 1, -9001, 100);
+    (-9001, 1, -9001, 100), (-9002, 1, -9001, 100), (-9003, 1, -9002, 75.56), (-9004, 1, -9001, 20);
 end $$;
 
 -- ---------- row 1: unknown discount code, then the fixed retry; row 6: lost response; row 7: changed payload ----------
@@ -339,7 +339,9 @@ declare
   r jsonb;
 begin
   r := pg_temp.call(pg_temp.k(11), 'finalize_create',
-    pg_temp.final_pl(pg_temp.v1(), 1, '{"exchange_balance_to_credit": 75.555}', '{"customerid": -9002, "store_credit_used": 80}'));
+    -- The balance needs exchange credit behind it (schema/migration_bill_save_drafts.sql).
+    pg_temp.final_pl(pg_temp.v1(), 1, '{"exchange_balance_to_credit": 75.555, "exchange_ids": [-9003]}',
+                     '{"customerid": -9002, "store_credit_used": 80}'));
   perform pg_temp.ok('credit floor: bill keeps the client figure',
     (select store_credit_used from public.bills where billid = (r ->> 'billid')::int) = 80);
   perform pg_temp.ok('credit floor: only the balance is taken', (
@@ -502,8 +504,11 @@ declare
   direct_id int;
   drop_keys text[] := array['billid', 'bill_number', 'pdf_url'];
 begin
+  -- The exchange is there only so the exchange figures have credit behind them
+  -- (schema/migration_bill_save_drafts.sql); it does not change the bill row.
   r := pg_temp.call(pg_temp.k(50), 'partial_create', jsonb_build_object(
-    'bill', bill_txt::jsonb, 'items', jsonb_build_array(item_txt::jsonb), 'first_payment', pay_set_txt::jsonb));
+    'bill', bill_txt::jsonb, 'items', jsonb_build_array(item_txt::jsonb), 'first_payment', pay_set_txt::jsonb,
+    'exchange_ids', '[-9004]'::jsonb));
   rpc_id := (r ->> 'billid')::int;
 
   -- What PostgREST does: a typed record from the JSON text, with only the keys sent.
