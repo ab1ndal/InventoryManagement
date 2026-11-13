@@ -1134,6 +1134,53 @@ begin
                             'values (%s, 1, 1000, %L, 1000, 0, 1000)', b, 'DFIN item')) = 'BILL_BAD_TRANSITION');
 end $$;
 
+-- H9: customer swapped on a bill paid with exchange credit whose balance went to store credit.
+-- Cancel took the balance back from the new customer while the first kept it.
+do $$
+declare
+  x int := pg_temp.newc(-9721, 0);
+  y int := pg_temp.newc(-9722, 500);
+  a int;
+  b int;
+  e int;
+  r text;
+begin
+  a := pg_temp.sold(210, 1, 1000, '{}', jsonb_build_object('customerid', x));
+  perform pg_temp.as_admin(format('select public.exchange_record(%s, %s, %L)', a, x,
+    jsonb_build_array(jsonb_build_object('bill_item_id', pg_temp.line_id(a), 'quantity', 1, 'credit_amount', 1000))));
+  select max(exchangeid) into e from public.exchanges where customerid = x;
+  b := (pg_temp.rpc(pg_temp.create_sql(211, 'finalize_create',
+         jsonb_build_object('customerid', x, 'totalamount', 500, 'exchange_credit_used', 500, 'payment_amount', 0),
+         jsonb_build_object('exchange_ids', jsonb_build_array(e), 'exchange_balance_to_credit', 500,
+                            'items', jsonb_build_array(pg_temp.line(null, pg_temp.v2(), 1, 500) - 'bill_item_id')))) ->> 'billid')::int;
+  perform pg_temp.ok('17 H9 balance put on the first customer''s credit', pg_temp.credit(x) = 500);
+  r := pg_temp.as_admin(pg_temp.edit_sql(212, b, pg_temp.edit(b, 500,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v2(), 1, 500)), '{}',
+    jsonb_build_object('customerid', y, 'totalamount', 500))));
+  perform pg_temp.ok('17 H9 customer swap on a bill paid with exchange credit refused',
+    r = 'BILL_CREDIT_CUSTOMER' and (pg_temp.bill(b)).customerid = x);
+  perform pg_temp.as_admin(pg_temp.cancel_sql(213, b, 'return_payment'));
+  perform pg_temp.ok('17 H9 cancel takes the balance back from the customer who got it',
+    pg_temp.credit(x) = 0 and pg_temp.credit(y) = 500
+    and (select new_billid is null from public.exchanges where exchangeid = e));
+
+  -- An edit's excess put on store credit ties the bill to that customer too.
+  a := pg_temp.sold(214, 2, 2000, '{}', jsonb_build_object('customerid', x));
+  perform pg_temp.as_admin(pg_temp.edit_sql(215, a, pg_temp.edit(a, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(a), pg_temp.v1(), 1, 1000)),
+    '{"excess": {"mode": "store_credit", "amount": 1000}}')));
+  perform pg_temp.ok('17 H9 customer swap after excess credit refused',
+    pg_temp.as_admin(pg_temp.edit_sql(216, a, pg_temp.edit(a, 1000,
+      jsonb_build_array(pg_temp.line(pg_temp.line_id(a), pg_temp.v1(), 1, 1000)), '{}',
+      jsonb_build_object('customerid', y)))) = 'BILL_CREDIT_CUSTOMER');
+  -- A plain cash bill can still change customer.
+  a := pg_temp.sold(217, 1, 1000, '{}', jsonb_build_object('customerid', x));
+  perform pg_temp.ok('17 H9 customer change on a cash bill still allowed',
+    pg_temp.as_admin(pg_temp.edit_sql(218, a, pg_temp.edit(a, 1000,
+      jsonb_build_array(pg_temp.line(pg_temp.line_id(a), pg_temp.v1(), 1, 1000)), '{}',
+      jsonb_build_object('customerid', y)))) = 'ok' and (pg_temp.bill(a)).customerid = y);
+end $$;
+
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;

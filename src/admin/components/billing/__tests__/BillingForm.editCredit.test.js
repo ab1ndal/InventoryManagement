@@ -122,7 +122,7 @@ test("a bill paid with store credit says why its customer cannot change", async 
   fireEvent.click(saveChanges());
 
   await waitFor(() => expect(mockToasts).toContain(
-    "This bill was paid partly with the customer's store credit, so the customer cannot be changed. Put the customer back, or cancel the bill and make a new one.",
+    "This bill used or gave the customer store credit or exchange credit, so the customer cannot be changed. Put the customer back, or cancel the bill and make a new one.",
   ));
   expect(mockEdits[0].p_payload.bill.store_credit_used).toBe(200);
 });

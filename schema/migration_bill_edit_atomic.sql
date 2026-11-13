@@ -34,6 +34,15 @@
 -- bill that used credit (BILL_CREDIT_CUSTOMER; cancel would give the first customer's credit to
 -- the second). The result gains store_credit_back.
 --
+-- The customer cannot change either on a bill that exchange credit paid or paid out
+-- (exchange_credit_used or exchange_cash_refund above 0, or an exchange linked to it) or that put
+-- store credit on its customer (a store_credit_ledger credit for this bill: exchange balance, an
+-- edit's excess or credit given back): BILL_CREDIT_CUSTOMER. bill_cancel takes exchange balance
+-- already paid out back from the bill's customer at the time, so after a swap it took it from the
+-- new customer while the first kept it. Refusing the swap was chosen over making bill_cancel look
+-- up who got each credit: every credit path in bill_cancel then keeps reading one customer, the
+-- bill's, and staff fix a wrong customer by cancelling and billing again, as for store credit.
+--
 -- A cancelled bill is locked (schema/migration_bill_status_states.sql): bill_edit refuses it up
 -- front (BILL_BAD_TRANSITION). Its lines were saved before the bills update, which passed the
 -- lock when every column was sent back unchanged, so lines and stock moved on a cancelled bill.
@@ -250,6 +259,17 @@ begin
     end if;
 
     v_customer := (v_new ->> 'customerid')::int;
+    -- bill_cancel settles exchange credit and takes back credit it paid out with the bill's
+    -- customer, so it must stay the one the credit went to (see the header).
+    if v_customer is distinct from v_bill.customerid
+       and (coalesce(v_bill.exchange_credit_used, 0) > 0 or coalesce(v_bill.exchange_cash_refund, 0) > 0
+            or exists (select 1 from public.exchanges e where e.new_billid = p_billid)
+            or exists (select 1 from public.store_credit_ledger l
+                        where l.ref_type = 'bill' and l.ref_id = p_billid::text and l.delta > 0)) then
+      raise exception 'BILL_CREDIT_CUSTOMER' using errcode = 'P0001',
+        detail = jsonb_build_object('customerid', v_bill.customerid,
+                                    'exchange_credit_used', v_bill.exchange_credit_used)::text;
+    end if;
     v_payment_amount := (v_new ->> 'payment_amount')::numeric;
     v_status := v_new ->> 'paymentstatus';
 

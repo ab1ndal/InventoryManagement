@@ -104,7 +104,7 @@ const BILL_EDIT_ERRORS = {
   BILL_KEY_CONFLICT: "This edit may already be saved. Reopen the bill to check before saving again.",
   BILL_EXCHANGE_COUNTED: "Part of this bill was already given back as exchange credit, so the new total cannot be paid back below it.",
   BILL_ITEM_EXCHANGED: EXCHANGED_LINE_MESSAGE,
-  BILL_CREDIT_CUSTOMER: "This bill was paid partly with the customer's store credit, so the customer cannot be changed. Put the customer back, or cancel the bill and make a new one.",
+  BILL_CREDIT_CUSTOMER: "This bill used or gave the customer store credit or exchange credit, so the customer cannot be changed. Put the customer back, or cancel the bill and make a new one.",
 };
 
 // Finalize on an opened finalized bill goes through bill_edit too; these refusals are its own.
