@@ -76,7 +76,8 @@ const BILL_CHANGED_MESSAGE = "This bill changed in another window — reload";
 const EXCESS_USE_SAVE_CHANGES =
   "The customer has paid more than this bill now comes to. Use Save Changes to give the difference back as store credit or a refund.";
 
-// bill_edit refusals, in words staff can act on. A refused edit changed nothing on the bill.
+// bill_edit refusals, in words staff can act on. A refused bill_edit changed nothing on the bill
+// row, but the screen saves the lines first (handleSaveDraft), so EDIT_LINES_SAVED says so.
 const BILL_EDIT_ERRORS = {
   BILL_STALE: BILL_CHANGED_MESSAGE,
   BILL_PAYMENTS_MISMATCH: BILL_CHANGED_MESSAGE,
@@ -85,8 +86,13 @@ const BILL_EDIT_ERRORS = {
   BILL_EXCESS_NEEDS_CUSTOMER: "Store credit needs a customer. Add the customer to the bill, or choose a cash refund.",
   BILL_ONLINE: "This is a website order's bill. Its refunds are handled from Online Orders.",
   BILL_KEY_CONFLICT: "This edit may already be saved. Reopen the bill to check before saving again.",
-  BILL_EXCHANGE_COUNTED: "Part of this bill was already given back as exchange credit, so the new total cannot be paid back below it. Nothing was saved. Reopen the bill.",
+  BILL_EXCHANGE_COUNTED: "Part of this bill was already given back as exchange credit, so the new total cannot be paid back below it.",
 };
+
+// The pre-checks in handleSaveDraft catch these refusals before any write; one that still comes
+// back from bill_edit means the bill changed in the moment between, after the lines were saved.
+const EDIT_LINES_SAVED =
+  "The item changes were saved, but the bill's total and payment were not. Reopen the bill before saving again.";
 
 const EXCHANGED_LINE_MESSAGE =
   "An exchanged item must stay on the bill with at least the exchanged quantity. Reopen the bill.";
@@ -1264,7 +1270,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           p_payload: editBody,
         });
         if (editErr) {
-          throw new Error(BILL_EDIT_ERRORS[editErr.message] || "Failed to update bill: " + editErr.message);
+          const refusal = BILL_EDIT_ERRORS[editErr.message] || "Failed to update bill: " + editErr.message;
+          throw new Error(`${refusal.endsWith(".") ? refusal : refusal + "."} ${EDIT_LINES_SAVED}`);
         }
 
         // Reconcile salesperson associations

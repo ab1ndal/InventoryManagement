@@ -174,7 +174,10 @@ test("a payment landing between the check and the write is caught too", async ()
   mockEditReply = { data: null, error: { message: "BILL_STALE" } };
   fireEvent.click(saveChanges());
 
-  await waitFor(() => expect(mockToasts).toContain("This bill changed in another window — reload"));
+  // The lines were written before bill_edit refused, so the message must not say nothing was saved.
+  await waitFor(() => expect(mockToasts).toContain(
+    "This bill changed in another window — reload. The item changes were saved, but the bill's total and payment were not. Reopen the bill before saving again.",
+  ));
   expect(mockBillUpdates).toHaveLength(1);
 });
 
