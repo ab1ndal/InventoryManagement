@@ -339,6 +339,7 @@ declare
   b2 int := pg_temp.draft(-9701, 2, false);
   s1 numeric := pg_temp.stock(pg_temp.v1());
   s2 numeric := pg_temp.stock(pg_temp.v2());
+  r text;
 begin
   perform pg_temp.rpc(pg_temp.save_sql(30, 'finalize_draft', pg_temp.finish(b, 'finalized',
     jsonb_build_array(pg_temp.line(null, pg_temp.v2(), 1)))));
@@ -347,15 +348,24 @@ begin
   perform pg_temp.ok('4 its stock given back, the new line''s taken',
     pg_temp.stock(pg_temp.v1()) = s1 + 3 and pg_temp.stock(pg_temp.v2()) = s2 - 1);
 
+  -- The screen sends the bill's own choice, which it locks once the bill is saved.
+  perform pg_temp.ok('4 a draft saved without stock refuses skip_stock false at finish',
+    pg_temp.as_admin(pg_temp.save_sql(33, 'finalize_draft', pg_temp.finish(b2, 'finalized',
+      jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 5))))) = 'BILL_BAD_PAYLOAD'
+    and (pg_temp.bill(b2)).paymentstatus = 'draft');
   perform pg_temp.rpc(pg_temp.save_sql(31, 'finalize_draft', pg_temp.finish(b2, 'finalized',
-    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 5)))));
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 5)), '{"skip_stock": true}')));
   perform pg_temp.ok('4 a bill saved without stock moves none later',
     pg_temp.stock(pg_temp.v1()) = s1 + 3 and (select quantity from public.bill_items where billid = b2) = 5);
 
+  -- A draft that took stock cannot be finished as "Don't reduce stock": bill_cancel would give
+  -- back lines it never took (17 has the whole case).
   b := pg_temp.draft(-9701, 1);
-  perform pg_temp.rpc(pg_temp.save_sql(32, 'finalize_draft', pg_temp.finish(b, 'finalized',
+  r := pg_temp.as_admin(pg_temp.save_sql(32, 'finalize_draft', pg_temp.finish(b, 'finalized',
     jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 4)), '{"skip_stock": true}')));
-  perform pg_temp.ok('4 skip_stock moves none', pg_temp.stock(pg_temp.v1()) = s1 + 3 - 1);
+  perform pg_temp.ok('4 skip_stock on a draft that took stock refused',
+    r = 'BILL_BAD_PAYLOAD' and pg_temp.stock(pg_temp.v1()) = s1 + 3 - 1
+    and (pg_temp.bill(b)).paymentstatus = 'draft' and pg_temp.lines(b) = jsonb_build_array(jsonb_build_array(pg_temp.v1(), 1)));
 end $$;
 
 -- ---------- 5. create ops: exchange checks apply there too ----------
@@ -444,11 +454,15 @@ begin
   perform pg_temp.ok('6 draft edit takes the extra stock', pg_temp.stock(pg_temp.v1()) = s1 - 2);
   perform pg_temp.ok('6 no moves rows on a screen draft', not exists (select 1 from public.bill_stock_moves where billid = b));
   perform pg_temp.rpc(pg_temp.edit_sql(68, b2, pg_temp.edit(b2, 3000,
-    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 3, 3000)))));
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 3, 3000)), '{"skip_stock": true}')));
   perform pg_temp.ok('6 a bill saved without stock moves none on edit', pg_temp.stock(pg_temp.v1()) = s1 - 2);
-  perform pg_temp.rpc(pg_temp.edit_sql(69, b, pg_temp.edit(b, 3000,
-    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 5, 5000)), '{"skip_stock": true}')));
-  perform pg_temp.ok('6 skip_stock moves none on edit', pg_temp.stock(pg_temp.v1()) = s1 - 2);
+  perform pg_temp.ok('6 skip_stock on a bill that took stock refused', pg_temp.as_admin(pg_temp.edit_sql(69, b,
+    pg_temp.edit(b, 3000, jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 5, 5000)),
+      '{"skip_stock": true}'))) = 'BILL_BAD_PAYLOAD'
+    and pg_temp.stock(pg_temp.v1()) = s1 - 2 and (select quantity from public.bill_items where billid = b) = 3);
+  perform pg_temp.ok('6 skip_stock false on a bill saved without stock refused', pg_temp.as_admin(pg_temp.edit_sql(70, b2,
+    pg_temp.edit(b2, 3000, jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1, 1000))))) = 'BILL_BAD_PAYLOAD'
+    and pg_temp.stock(pg_temp.v1()) = s1 - 2);
 end $$;
 
 -- ---------- 7. store credit an edit cuts goes back to the customer, after the cash ----------
@@ -1019,6 +1033,69 @@ begin
   perform pg_temp.ok('16 finalize_draft refuses the draft''s own negative exchange_cash_refund',
     r = 'BILL_BAD_PAYLOAD' and (pg_temp.bill(d)).paymentstatus = 'draft');
 end $$;
+
+-- ---------- 17. stock choice, cancelled lines, credit customer and discount use are the bill's ----------
+-- Steps after a refusal run through as_admin, so a refusal missing shows as a failed check, not an abort.
+create function pg_temp.newc(p_id int, p_credit numeric) returns int language sql as $$
+  insert into public.customers (customerid, customer_ulid, first_name, store_credit)
+  values (p_id, 'DFINFIXTURE' || lpad((-p_id)::text, 15, '0'), 'DFIN 17', p_credit) returning customerid
+$$;
+create function pg_temp.cancel_sql(p_key int, p_b int, p_mode text) returns text language sql as $$
+  select format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(p_key), p_b, p_mode,
+    jsonb_build_object('expect', (select jsonb_build_object('finalized', finalized, 'paymentstatus', paymentstatus)
+                                    from public.bills where billid = p_b)))
+$$;
+
+-- H6: skip_stock switched between edits made stock. 1 -> 5 with skip_stock moved nothing, 5 -> 1
+-- without it gave back 4, and cancel gave back nothing more: 3 created.
+do $$
+declare
+  s0 numeric := pg_temp.stock(pg_temp.v1());
+  b int := pg_temp.sold(200, 1, 1000, '{}', '{"customerid": -9702}');
+  r text;
+begin
+  r := pg_temp.as_admin(pg_temp.edit_sql(201, b, pg_temp.edit(b, 5000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 5, 5000)), '{"skip_stock": true}')));
+  perform pg_temp.ok('17 H6 skip_stock on an edit of a stock-taking bill refused',
+    r = 'BILL_BAD_PAYLOAD' and pg_temp.lines(b) = jsonb_build_array(jsonb_build_array(pg_temp.v1(), 1)));
+  r := pg_temp.as_admin(pg_temp.edit_sql(202, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1, 1000)))));
+  perform pg_temp.as_admin(pg_temp.cancel_sql(203, b, 'return_payment'));
+  perform pg_temp.ok('17 H6 sell, edit, cancel leaves stock as it was',
+    (pg_temp.bill(b)).paymentstatus = 'cancelled' and pg_temp.stock(pg_temp.v1()) = s0);
+end $$;
+
+-- Nor can stock_reduced be flipped by a direct write (section 8 granted the table): a draft saved
+-- without stock and then marked stock_reduced would have bill_cancel give back its lines.
+do $$
+declare
+  d int := pg_temp.draft(-9702, 1, false);
+begin
+  perform pg_temp.ok('17 stock_reduced cannot be changed directly', pg_temp.as_admin(format(
+    'update public.bills set stock_reduced = true where billid = %s', d)) = 'BILL_MONEY_DIRECT'
+    and (pg_temp.bill(d)).stock_reduced is false);
+end $$;
+
+-- H7: a draft that took 1 finished with skip_stock and 5, then cancelled, gave back 5: 4 created.
+do $$
+declare
+  s0 numeric := pg_temp.stock(pg_temp.v1());
+  d int := pg_temp.draft(-9702, 1);
+  r text;
+begin
+  r := pg_temp.as_admin(pg_temp.save_sql(204, 'finalize_draft', pg_temp.finish(d, 'finalized',
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 5, 5000)), '{"skip_stock": true}',
+    '{"customerid": -9702, "totalamount": 5000, "payment_amount": 5000}')));
+  perform pg_temp.ok('17 H7 finish with skip_stock on a draft that took stock refused',
+    r = 'BILL_BAD_PAYLOAD' and (pg_temp.bill(d)).paymentstatus = 'draft');
+  perform pg_temp.as_admin(pg_temp.save_sql(205, 'finalize_draft', pg_temp.finish(d, 'finalized',
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 5, 5000)), '{}',
+    '{"customerid": -9702, "totalamount": 5000, "payment_amount": 5000}')));
+  perform pg_temp.ok('17 H7 finish takes the 4 added', pg_temp.stock(pg_temp.v1()) = s0 - 5);
+  perform pg_temp.as_admin(pg_temp.cancel_sql(206, d, 'return_payment'));
+  perform pg_temp.ok('17 H7 draft, finish, cancel leaves stock as it was', pg_temp.stock(pg_temp.v1()) = s0);
+end $$;
+
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;

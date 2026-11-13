@@ -13,10 +13,11 @@
 --                    saved line left out is deleted (schema/migration_bill_save_drafts.sql,
 --                    _bill_lines_save). trg_bill_items_exchange_lock still guards exchanged lines.
 --   salesperson_ids  replaces the bill's salespeople.
---   skip_stock       "Don't reduce stock": no stock moves. None moves either for a bill saved with
---                    stock_reduced false.
--- Stock follows the change in lines, as the screen's computeStockDelta did, recorded in
--- bill_stock_moves only for a bill that already has moves (why: _bill_lines_save).
+--   skip_stock       "Don't reduce stock", as the bill was saved with: it cannot change after the
+--                    first save (BILL_BAD_PAYLOAD otherwise, see _bill_lines_save).
+-- Stock follows the change in lines, as the screen's computeStockDelta did, unless the bill's
+-- stock_reduced is false, recorded in bill_stock_moves only for a bill that already has moves
+-- (why: _bill_lines_save).
 -- A payload without items leaves lines, salespeople and stock alone, as before, so the screen
 -- from before this change keeps working until it reloads.
 --
@@ -182,9 +183,7 @@ begin
     -- The lines first, under the bill lock: a refusal below undoes them with everything else.
     if p_payload ? 'items' then
       v_negative := public._bill_lines_save(
-        p_billid, p_payload -> 'items',
-        coalesce((p_payload ->> 'skip_stock')::boolean, false) or v_bill.stock_reduced is false,
-        'bill_edit', p_key);
+        p_billid, p_payload -> 'items', (p_payload ->> 'skip_stock')::boolean, 'bill_edit', p_key);
       delete from public.bill_salespersons where billid = p_billid;
       insert into public.bill_salespersons (billid, salesperson_id)
       select distinct p_billid, s::int from jsonb_array_elements_text(p_payload -> 'salesperson_ids') s;

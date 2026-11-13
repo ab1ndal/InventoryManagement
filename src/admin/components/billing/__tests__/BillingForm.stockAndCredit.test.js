@@ -128,18 +128,20 @@ test("a saved bill that moved no stock keeps the tick on and locked", async () =
   expect(stockTick()).toBeDisabled();
 });
 
-test.each([[true], [null]])("a saved bill with stock_reduced %s leaves the tick off and free", async (stock_reduced) => {
+// The server refuses a different choice once the bill is saved (bill_edit, bill_save's draft ops).
+test.each([[true], [null]])("a saved bill with stock_reduced %s keeps the tick off and locked", async (stock_reduced) => {
   mockBill = { ...baseBill, stock_reduced };
   render(<BillingForm billId={330} open onOpenChange={() => {}} />);
   await waitFor(() => expect(finalize()).toBeEnabled());
   expect(stockTick()).not.toBeChecked();
-  expect(stockTick()).toBeEnabled();
+  expect(stockTick()).toBeDisabled();
 });
 
 test("a wrong amount is refused when the stock tick is on", async () => {
+  mockBill = { ...baseBill, stock_reduced: false };
   render(<BillingForm billId={330} open onOpenChange={() => {}} />);
   await waitFor(() => expect(finalize()).toBeEnabled());
-  fireEvent.click(stockTick());
+  expect(stockTick()).toBeChecked();
 
   fireEvent.click(finalize());
 
@@ -149,10 +151,10 @@ test("a wrong amount is refused when the stock tick is on", async () => {
 });
 
 test("a correct amount still goes through to the confirm step with the stock tick on", async () => {
-  mockBill = { ...baseBill, payment_amount: 5000 };
+  mockBill = { ...baseBill, payment_amount: 5000, stock_reduced: false };
   render(<BillingForm billId={330} open onOpenChange={() => {}} />);
   await waitFor(() => expect(finalize()).toBeEnabled());
-  fireEvent.click(stockTick());
+  expect(stockTick()).toBeChecked();
 
   fireEvent.click(finalize());
 

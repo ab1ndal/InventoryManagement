@@ -8,16 +8,19 @@
 --     bill_save does, or move a bill between partial and finalized past its payments;
 --   - set store_credit_used, exchange_credit_used or exchange_cash_refund, which bill_cancel gives
 --     back or claws back as if they were real (a draft too: cancel returns store_credit_used);
---   - insert a bill that starts out finalized with any of those.
+--   - insert a bill that starts out finalized with any of those;
+--   - flip stock_reduced, which decides whether later saves move stock and what bill_cancel gives
+--     back for a bill with no stock moves, so the bill gives back stock it never took.
 -- Since the bill screen now finishes drafts with bill_save (schema/migration_bill_save_drafts.sql)
 -- and saves opened bills with bill_edit (schema/migration_bill_edit_atomic.sql), no API caller needs
 -- these writes. So for the API roles (anon, authenticated, service_role):
 --   INSERT  only a draft (paymentstatus draft, finalized false) with no store credit, exchange
 --           credit or exchange cash refund. The screen's Save Draft on a new bill inserts exactly
 --           that.
---   UPDATE  paymentstatus, finalized, store_credit_used, exchange_credit_used and
---           exchange_cash_refund never change; payment_amount and net_amount change only while
---           the bill is a draft. Everything else (notes, pdf_url, ...) is as before.
+--   UPDATE  paymentstatus, finalized, store_credit_used, exchange_credit_used,
+--           exchange_cash_refund and stock_reduced never change; payment_amount and net_amount
+--           change only while the bill is a draft. Everything else (notes, pdf_url, ...) is as
+--           before. stock_reduced is set once, on insert (the screen's Save Draft, or bill_save).
 -- Anything else: P0001 BILL_MONEY_DIRECT, the columns in detail.
 --
 -- How the trigger tells the functions apart: it runs as the caller (security invoker), so
@@ -61,13 +64,13 @@ begin
   end if;
 
   if (new.paymentstatus, new.finalized, new.store_credit_used, new.exchange_credit_used,
-      new.exchange_cash_refund)
+      new.exchange_cash_refund, new.stock_reduced)
      is distinct from (old.paymentstatus, old.finalized, old.store_credit_used,
-                       old.exchange_credit_used, old.exchange_cash_refund)
+                       old.exchange_credit_used, old.exchange_cash_refund, old.stock_reduced)
      or (old.paymentstatus is distinct from 'draft'
          and (new.payment_amount, new.net_amount) is distinct from (old.payment_amount, old.net_amount)) then
     raise exception 'BILL_MONEY_DIRECT' using errcode = 'P0001',
-      detail = format('bill %s: status, amounts received and credit change only through bill_save, '
+      detail = format('bill %s: status, amounts received, credit and stock choice change only through bill_save, '
                       'bill_edit, bill_add_payment or bill_cancel', old.billid);
   end if;
   return new;

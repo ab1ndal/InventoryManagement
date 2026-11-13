@@ -239,7 +239,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const [effectiveBillId, setEffectiveBillId] = useState(null);
   const [effectiveBillNumber, setEffectiveBillNumber] = useState(null);
   const [isBackdated, setIsBackdated] = useState(false);
-  // A saved bill that moved no stock must keep moving none, or cancelling it could not tell what to restore.
+  // "Don't reduce stock" is fixed when a bill is first saved: the server refuses a change after that,
+  // since a bill that switched it between saves could give back stock it never took.
   const [stockChoiceLocked, setStockChoiceLocked] = useState(false);
   // An existing bill starts blank, not today: today's date looks real, and saving
   // before the bill loads would overwrite the saved date with it.
@@ -484,7 +485,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setDocType(bill.document_type || 'bos');
         setIsFinalizedBill(!!bill.finalized);
         setIsBackdated(bill.stock_reduced === false);
-        setStockChoiceLocked(bill.stock_reduced === false);
+        setStockChoiceLocked(true);
         setBillPaymentStatus(bill.paymentstatus || "draft");
         openedStateRef.current = { paymentstatus: bill.paymentstatus, payment_amount: bill.payment_amount };
         if (bill.net_amount != null) {
@@ -1491,7 +1492,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         flushSync(() => {
           setBillPaymentStatus("finalized");
           setEffectiveBillId(activeBillId);
-          if (isBackdated) setStockChoiceLocked(true);
+          setStockChoiceLocked(true);
         });
       } else if (!isFinalizedBill) {
         // A saved draft is finished by bill_save in one transaction (finalize_draft): its lines,
@@ -1579,7 +1580,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       flushSync(() => {
         setBillPaymentStatus("finalized");
         setEffectiveBillId(activeBillId);
-        if (isBackdated) setStockChoiceLocked(true);
+        setStockChoiceLocked(true);
       });
 
       // Steps 5-7: PDF generate + upload + pdf_url update
@@ -1741,7 +1742,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         setBillPayments(paymentRecord ? [paymentRecord] : []);
         setBillPaymentStatus("partial");
         setEffectiveBillId(activeBillId);
-        if (isBackdated) setStockChoiceLocked(true);
+        setStockChoiceLocked(true);
       });
       let pdfUrl = null;
       try {

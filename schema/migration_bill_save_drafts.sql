@@ -27,8 +27,13 @@
 --   exchange_balance_to_credit (finalize_draft only), first_payment (partial_draft only).
 --
 -- Stock follows the lines: for each variant, what the saved lines took less what the new lines
--- take is put back (or taken, when negative), as the screen's computeStockDelta did. None moves
--- when skip_stock is set ("Don't reduce stock") or the bill was saved with stock_reduced false.
+-- take is put back (or taken, when negative), as the screen's computeStockDelta did. "Don't reduce
+-- stock" belongs to the bill, not to one save: it is decided once, when the bill is first saved,
+-- and recorded as stock_reduced. Later saves move stock for line changes exactly when stock_reduced
+-- is not false, and a skip_stock sent that says otherwise is refused (BILL_BAD_PAYLOAD "Don't
+-- reduce stock can't change after the bill is saved"). When each save chose for itself, raising a
+-- line with skip_stock and lowering it again without gave back stock never taken, and bill_cancel
+-- of a stock-taking draft finished with skip_stock and more items gave back the extra too.
 -- bill_stock_moves rows are written only for a bill that already has some (one saved by
 -- bill_save): bill_cancel gives back the moves' sum when a bill has moves, and the saved lines'
 -- quantities when it has none, so a move row on a bill without them would make cancel return
@@ -96,8 +101,10 @@
 set local lock_timeout = '3s';
 
 -- Saves an opened bill's lines as a diff and moves stock for the change. The caller holds the
--- bill's row lock and has checked the bill may be edited. Returns the variants left below zero,
--- as [{variantid, stock}]. Billing never stops on stock, so nothing here floors it.
+-- bill's row lock and has checked the bill may be edited. Stock moves unless the bill's
+-- stock_reduced is false; p_skip_stock is the skip_stock the client sent (null if none), refused
+-- when it disagrees with the bill. Returns the variants left below zero, as [{variantid, stock}].
+-- Billing never stops on stock, so nothing here floors it.
 create or replace function public._bill_lines_save(p_billid int, p_items jsonb, p_skip_stock boolean,
                                                    p_reason text, p_key uuid)
 returns jsonb
@@ -113,6 +120,7 @@ declare
   v_ids int[];
   v_found int;
   v_has_moves boolean;
+  v_skip_stock boolean;
   v_variants uuid[];
   v_count int;
   v_delta_variants uuid[];
@@ -155,6 +163,12 @@ begin
       detail = format('bill %s no longer has every line this save names', p_billid);
   end if;
   v_has_moves := exists (select 1 from public.bill_stock_moves m where m.billid = p_billid);
+  -- Bills from before stock_reduced (null) kept moving stock on edits, so they still do.
+  select b.stock_reduced is false into v_skip_stock from public.bills b where b.billid = p_billid;
+  if p_skip_stock is not null and p_skip_stock is distinct from v_skip_stock then
+    raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+      detail = 'Don''t reduce stock can''t change after the bill is saved';
+  end if;
 
   -- Every variant the old or new lines name, locked in one order (as bill_save and bill_cancel).
   -- NO KEY UPDATE for the same reason as bill_save: online_order_create_bos holds the bill
@@ -243,7 +257,7 @@ begin
   for v_variant, v_delta in
     select * from unnest(v_delta_variants, v_deltas)
   loop
-    if p_skip_stock then
+    if v_skip_stock then
       if v_has_moves then
         select stock into v_after from public.productsizecolors where variantid = v_variant;
         insert into public.bill_stock_moves (billid, variantid, delta, stock_after, reason, idempotency_key)
@@ -467,9 +481,8 @@ begin
     v_customer := case when v_draft and not (v_bill ? 'customerid') then v_draft_row.customerid
                        else (v_bill ->> 'customerid')::int end;
     v_voucher := p_payload ->> 'voucher_id';
-    -- A bill saved with "Don't reduce stock" moves none on later saves either.
-    v_skip_stock := coalesce((p_payload ->> 'skip_stock')::boolean, false)
-                    or (v_draft and v_draft_row.stock_reduced is false);
+    -- A draft keeps the stock choice it was saved with: _bill_lines_save follows its stock_reduced.
+    v_skip_stock := coalesce((p_payload ->> 'skip_stock')::boolean, false);
     -- A draft op keeps a store_credit_used left out of the payload, so it takes that figure too.
     v_credit_used := round(coalesce((v_bill ->> 'store_credit_used')::numeric,
                                     case when v_draft then v_draft_row.store_credit_used end, 0), 2);
@@ -551,7 +564,8 @@ begin
       where b.billid = v_billid
       returning * into v_draft_row;
 
-      v_negative := public._bill_lines_save(v_billid, v_items, v_skip_stock, v_reason, p_key);
+      v_negative := public._bill_lines_save(v_billid, v_items, (p_payload ->> 'skip_stock')::boolean,
+                                            v_reason, p_key);
     else
       v_variants := array(
         select distinct (i ->> 'variantid')::uuid
