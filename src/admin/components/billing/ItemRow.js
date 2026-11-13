@@ -10,14 +10,20 @@ import {
 import { Button } from "../../../components/ui/button";
 import { Pencil, Trash2 } from "lucide-react";
 import { priceItem, money, round2 } from "./billUtils";
+import { EXCHANGED_QTY_UP } from "./stockHelpers";
 
-export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {}, docType = 'bos', isBackdated = false }) {
+// exchangedQty: units of this saved line already exchanged for credit. The line then stays on the
+// bill with at least that quantity and no more than exchangedSavedQty (what it was saved with),
+// unswapped and at its price (the database refuses otherwise,
+// migration_bill_item_exchange_lock.sql), so the row says why instead of changing it.
+export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonMap = {}, docType = 'bos', isBackdated = false, exchangedQty = 0, exchangedSavedQty }) {
   const pricing = priceItem(item);
   const isBos = docType === 'bos';
   const isMeter = item.unit_type === "meter";
   const overStock = !isBackdated && item.stock != null && Number(item.quantity) > item.stock;
   const [qtyRaw, setQtyRaw] = useState(null); // text while typing, so the field can sit empty
   const [discountRaw, setDiscountRaw] = useState(null);
+  const [lockNote, setLockNote] = useState(null);
   const [discountUnit, setDiscountUnit] = useState("amt"); // "pct" | "amt" — defaults to ₹ at entry time, per-item toggle stays available
   const base = Number(item.mrp || 0) * Number(item.quantity || 1);
 
@@ -33,6 +39,11 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
       <td className="px-2 py-1">
         <div className="font-medium">
           {item.productid || item.manual_code || "—"}
+          {exchangedQty > 0 && (
+            <span className="ml-1 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-800">
+              Exchanged {exchangedQty}
+            </span>
+          )}
         </div>
         <div className="text-xs text-muted-foreground">
           {item.product_name || item.manual_name || item.category || "—"}
@@ -40,6 +51,11 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
         {(item.color || item.size) && (
           <div className="text-xs text-muted-foreground">
             {[item.color, item.size].filter(Boolean).join(" / ")}
+          </div>
+        )}
+        {lockNote && (
+          <div role="status" className="mt-0.5 whitespace-normal text-xs text-destructive">
+            {lockNote}
           </div>
         )}
       </td>
@@ -58,7 +74,14 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
               const qty = isMeter
                 ? parseFloat(e.target.value)
                 : parseInt(e.target.value, 10);
-              if (qty > 0) onUpdate(item._id, { quantity: qty });
+              if (qty > 0 && qty < exchangedQty) {
+                setLockNote(`${exchangedQty} already exchanged, so the quantity cannot go below ${exchangedQty}`);
+              } else if (exchangedQty > 0 && exchangedSavedQty != null && qty > exchangedSavedQty) {
+                setLockNote(EXCHANGED_QTY_UP("This item", exchangedSavedQty));
+              } else if (qty > 0) {
+                setLockNote(null);
+                onUpdate(item._id, { quantity: qty });
+              }
             }}
             onBlur={() => setQtyRaw(null)}
             className="h-7 w-20 text-center"
@@ -177,7 +200,11 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
               size="icon"
               className="h-8 w-8"
               aria-label={`Edit ${item.product_name || "item"}`}
-              onClick={() => onEdit(item._id)}
+              onClick={() =>
+                exchangedQty > 0
+                  ? setLockNote("Already exchanged, so this item cannot be swapped or repriced")
+                  : onEdit(item._id)
+              }
             >
               <Pencil className="h-4 w-4" />
             </Button>
@@ -187,7 +214,11 @@ export default function ItemRow({ item, onUpdate, onRemove, onEdit, salespersonM
             size="icon"
             className="h-8 w-8 text-destructive hover:text-destructive"
             aria-label={`Remove ${item.product_name || "item"}`}
-            onClick={() => onRemove(item._id)}
+            onClick={() =>
+              exchangedQty > 0
+                ? setLockNote("Already exchanged, so this item stays on the bill")
+                : onRemove(item._id)
+            }
           >
             <Trash2 className="h-4 w-4" />
           </Button>

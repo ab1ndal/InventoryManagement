@@ -1059,7 +1059,9 @@ begin
   return u;
 end $$;
 
--- In-store bill with one line per element of p_lines: [{v: variant uuid | null, code, qty}]. Returns billid.
+-- Paid in-store bill with one line per element of p_lines: [{v: variant uuid | null, code, qty}].
+-- Returns billid. Paid in full, as exchange_record caps credit at what the bill received
+-- (schema/migration_exchange_record_caps.sql).
 create function pg_temp.instore_bill(p_lines jsonb) returns int language plpgsql as $$
 declare
   b int;
@@ -1071,6 +1073,9 @@ begin
     values (b, (e ->> 'qty')::numeric, 1000, (e ->> 'v')::uuid, 'Line ' || coalesce(e ->> 'code', ''), e ->> 'code',
             1000 * (e ->> 'qty')::numeric, 0, 1000 * (e ->> 'qty')::numeric);
   end loop;
+  update public.bills set net_amount = t.total, payment_amount = t.total
+    from (select sum(total) as total from public.bill_items where billid = b) t
+   where billid = b;
   return b;
 end $$;
 

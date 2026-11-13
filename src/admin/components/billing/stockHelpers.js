@@ -148,6 +148,62 @@ export function buildBillItemsPayload(billid, items, balanceDiscount = 0, overal
 }
 
 /**
+ * How to save an opened bill's lines: change saved lines in place, delete the ones taken off and
+ * insert the new ones. A saved line keeps its bill_item_id, which exchange credit given from it
+ * points at (exchanges.original_bill_item_id); deleting and re-inserting every line used to drop
+ * that link, so a later edit or cancel could pay the exchanged value back again.
+ *
+ * @param {Set<string>} savedIds - _id of each line as loaded from bill_items (String(bill_item_id))
+ * @param {Array} items - form items, in the same order as payload
+ * @param {Array} payload - buildBillItemsPayload(billid, items, ...)
+ * @returns {{ removeIds: number[], updates: Array<{ bill_item_id: number, row: object }>, inserts: object[], insertIds: string[] }}
+ *   insertIds are the form _ids of the inserted rows, in insert order.
+ */
+export function diffBillItems(savedIds, items, payload) {
+  const kept = new Set();
+  const updates = [];
+  const inserts = [];
+  const insertIds = [];
+  items.forEach((it, idx) => {
+    if (savedIds.has(it._id)) {
+      kept.add(it._id);
+      updates.push({ bill_item_id: Number(it._id), row: payload[idx] });
+    } else {
+      inserts.push(payload[idx]);
+      insertIds.push(it._id);
+    }
+  });
+  const removeIds = [...savedIds].filter((id) => !kept.has(id)).map(Number);
+  return { removeIds, updates, inserts, insertIds };
+}
+
+/** Why an exchanged line's quantity cannot go up: the new units were never sold, yet could be
+ * exchanged for credit again. Shared with ItemRow's note. */
+export const EXCHANGED_QTY_UP = (name, savedQty) =>
+  `${name}: already exchanged, so the quantity cannot go above ${savedQty}. Add more as a new item.`;
+
+/**
+ * Why the form's lines cannot be saved over lines exchange credit was given for, one line per
+ * problem, or null. Such a line stays on the bill with at least the exchanged quantity and no more
+ * than its saved quantity; the database refuses anything else (BILL_ITEM_EXCHANGED,
+ * migration_bill_item_exchange_lock.sql).
+ *
+ * @param {Array} items - form items
+ * @param {Object} exchangedById - { [_id]: { qty, savedQty, name } } for saved lines with exchanges
+ */
+export function exchangedLineProblems(items, exchangedById) {
+  const byId = new Map(items.map((it) => [it._id, it]));
+  const lines = [];
+  for (const [id, { qty, savedQty, name }] of Object.entries(exchangedById || {})) {
+    const it = byId.get(id);
+    if (!it) lines.push(`${name}: ${qty} already exchanged, so it stays on the bill`);
+    else if (Number(it.quantity) < qty) lines.push(`${name}: ${qty} already exchanged, so the quantity cannot go below ${qty}`);
+    else if (savedQty != null && Number(it.quantity) > savedQty) lines.push(EXCHANGED_QTY_UP(name, savedQty));
+  }
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/**
  * Back-calculate the quickDiscountPct from stored discount_total.
  * Used when loading bill_items from DB to reconstruct the form state.
  *

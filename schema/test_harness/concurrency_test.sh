@@ -4,6 +4,7 @@
 #   scripts/test-db.sh up
 #   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_holds.sql>
 #   scripts/test-db.sh sql schema/migration_bill_save.sql
+#   scripts/test-db.sh sql <the bill migrations listed in schema/test_bill_excess_credit.sql, from bill_stock_reduced>
 #   schema/test_harness/concurrency_test.sh
 # Session A confirms an order that holds the last unit and keeps its transaction open;
 # session B confirms a second order for the same unit (one from before stock holds, so it
@@ -17,6 +18,12 @@ PG_BIN="${PG_BIN:-$(cd /opt/homebrew/opt/postgresql@18 && pwd -P)/bin}"
 PSQL=("$PG_BIN/psql" -h "$DIR" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 -qtA)
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
+
+# Cleanup removes the finalized bills these cases create. Live bills refuse that (only drafts can
+# be deleted, schema/migration_bill_status_states.sql), so the cleanup turns that one trigger off
+# for its own statements, when it exists.
+BILLS_DELETE_ANY="do \$\$ begin if exists (select 1 from pg_trigger where tgname = 'trg_bills_status_insert_delete') then alter table public.bills disable trigger trg_bills_status_insert_delete; end if; end \$\$;"
+BILLS_DELETE_DRAFTS="do \$\$ begin if exists (select 1 from pg_trigger where tgname = 'trg_bills_status_insert_delete') then alter table public.bills enable trigger trg_bills_status_insert_delete; end if; end \$\$;"
 
 V1=11111111-1111-4111-8111-111111111111   # last unit
 V2=22222222-2222-4222-8222-222222222222   # shared with in-store
@@ -186,7 +193,9 @@ V3=33333333-3333-4333-8333-333333333333
 delete from public.exchanges where order_refund_id in (select r.id from public.order_refunds r join public.orders o on o.id = r.order_id where o.contact_name = 'Concurrency Offset');
 create temp table offset_bills as select bill_id from public.orders where contact_name = 'Concurrency Offset' and bill_id is not null;
 delete from public.orders where contact_name = 'Concurrency Offset';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from offset_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V3';
 delete from public.products where productid = 'CONC3';
 insert into public.products (productid, name, purchaseprice, retailprice) values ('CONC3', 'Conc three', 500, 1000);
@@ -229,7 +238,9 @@ update public.storefront_settings set checkout_live = false where id = 1;
 delete from public.exchanges where order_refund_id in (select r.id from public.order_refunds r join public.orders o on o.id = r.order_id where o.contact_name = 'Concurrency Offset');
 create temp table offset_bills as select bill_id from public.orders where contact_name = 'Concurrency Offset' and bill_id is not null;
 delete from public.orders where contact_name = 'Concurrency Offset';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from offset_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V3';
 delete from public.products where productid = 'CONC3';
 SQL
@@ -243,7 +254,9 @@ cleanup_return() {
 update public.storefront_settings set checkout_live = false where id = 1;
 create temp table ret_bills as select bill_id from public.orders where contact_name = 'Concurrency Return' and bill_id is not null;
 delete from public.orders where contact_name = 'Concurrency Return';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from ret_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V4';
 delete from public.products where productid = 'CONC4';
 SQL
@@ -306,7 +319,9 @@ update public.storefront_settings set checkout_live = false where id = 1;
 create temp table ex_bills as select bill_id from public.orders where contact_name = 'Concurrency Exchange' and bill_id is not null;
 delete from public.exchanges where original_bill_item_id in (select bill_item_id from public.bill_items where billid in (select bill_id from ex_bills));
 delete from public.orders where contact_name = 'Concurrency Exchange';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from ex_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V5';
 delete from public.products where productid = 'CONC5';
 delete from public.profiles where id = '$ADMIN5';
@@ -389,7 +404,9 @@ update public.storefront_settings set checkout_live = false where id = 1;
 create temp table eo_bills as select bill_id from public.orders where contact_name = 'Concurrency ExchOpen' and bill_id is not null;
 delete from public.exchanges where original_bill_item_id in (select bill_item_id from public.bill_items where billid in (select bill_id from eo_bills));
 delete from public.orders where contact_name = 'Concurrency ExchOpen';
+$BILLS_DELETE_ANY
 delete from public.bills where billid in (select bill_id from eo_bills);
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$V6';
 delete from public.products where productid = 'CONC6';
 delete from public.profiles where id = '$ADMIN6';
@@ -472,7 +489,9 @@ cleanup_bill_save() {
   "${PSQL[@]}" > /dev/null <<SQL
 delete from public.bill_stock_moves where idempotency_key::text like 'cccc0000-%';
 delete from public.bill_save_log where idempotency_key::text like 'cccc0000-%';
+$BILLS_DELETE_ANY
 delete from public.bills where notes = '$BS_NOTE';
+$BILLS_DELETE_DRAFTS
 delete from public.productsizecolors where variantid = '$BS_V';
 delete from public.products where productid = 'CONCBS';
 SQL
@@ -613,6 +632,74 @@ echo "bill_save vs counter holder: A_rc=$BS_A_RC B_rc=$BS_B_RC bills=$BS_BILLS n
 [ "$BS_A_RC" = "0" ] && [ "$BS_B_RC" = "0" ] || { echo "FAIL: no deadlock expected: $(cat "$OUT/bs_a_err" "$OUT/bs_b_err")"; fail=1; }
 [ "$BS_BILLS" = "2" ] && [ "$BS_NUMBERS" = "2" ] || { echo "FAIL: two bills with distinct numbers expected"; fail=1; }
 cleanup_bill_save
+
+# ---- bill_edit vs bill_add_payment on one part-paid bill (net 1000, 600 paid). A takes the last
+# 400 and holds its transaction; B saves an edit down to 400 from a screen opened before, choosing
+# store credit for 200. B must wait for A's bill lock, then see the payment and refuse: crediting
+# 200 on top of the 1000 now held would hand back money that was never over. ----
+cleanup_bill_edit() {
+  "${PSQL[@]}" > /dev/null <<SQL
+delete from public.store_credit_ledger where customerid = -9701;
+SQL
+  cleanup_bill_save
+  "${PSQL[@]}" > /dev/null <<SQL
+delete from public.customers where customerid = -9701;
+delete from public.salesmethods where salesmethodid = -9701;
+SQL
+}
+bs_fixture 5
+"${PSQL[@]}" > /dev/null <<SQL
+insert into public.customers (customerid, customer_ulid, first_name, store_credit) values (-9701, 'CONCEDITFIXTURE00000000001', 'Conc', 0);
+insert into public.salesmethods (salesmethodid, methodname) values (-9701, 'Conc cash');
+SQL
+BE_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 7)', 'partial_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"partial\",\"finalized\":true,\"net_amount\":1000,\"payment_amount\":600,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}],\"first_payment\":{\"amount\":600,\"salesmethodid\":-9701}}') ->> 'billid'")"
+BE_PAYLOAD="{\"expect\":{\"paymentstatus\":\"partial\",\"payment_amount\":600},\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"totalamount\":400,\"gst_total\":0,\"discount_total\":0,\"taxable_total\":400,\"net_amount\":400,\"applied_codes\":[],\"payment_amount\":600,\"final_amount\":null,\"saleslocationid\":null,\"salesmethodid\":-9701,\"paymentstatus\":\"finalized\",\"finalized\":true,\"store_credit_used\":0,\"orderdate\":\"2026-11-12T00:00:00+05:30\"},\"excess\":{\"mode\":\"store_credit\",\"amount\":200}}"
+"${PSQL[@]}" -c "begin" -c "select public.bill_add_payment('$(bs_key 8)', $BE_BILL, 400, -9701, null)" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+PID_BE=$!
+sleep 0.5
+set +e
+START=$(date +%s)
+"${PSQL[@]}" -c "select public.bill_edit('$(bs_key 9)', $BE_BILL, '$BE_PAYLOAD')" > /dev/null 2> "$OUT/be_b_err"
+BE_B_RC=$?
+BE_WAITED=$(( $(date +%s) - START ))
+set -e
+wait "$PID_BE"
+BE_CHECK="$("${PSQL[@]}" -c "select (select sum(amount) from public.bill_payments where billid = $BE_BILL) || ' ' || (select round(store_credit::numeric, 2) from public.customers where customerid = -9701) || ' ' || (select paymentstatus from public.bills where billid = $BE_BILL)")"
+read -r BE_HELD BE_CREDIT BE_STATUS <<< "$BE_CHECK"
+cleanup_bill_edit
+echo "bill_edit vs payment: B_rc=$BE_B_RC waitedB=${BE_WAITED}s held=$BE_HELD credit=$BE_CREDIT status=$BE_STATUS B_err=$(tr '\n' ' ' < "$OUT/be_b_err")"
+[ "$BE_B_RC" != "0" ] && grep -q 'BILL_STALE' "$OUT/be_b_err" || { echo "FAIL: the edit from before the payment should be refused as stale"; fail=1; }
+[ "$BE_HELD" = "1000.00" ] && [ "$BE_CREDIT" = "0.00" ] && [ "$BE_STATUS" = "finalized" ] || { echo "FAIL: bill should hold 1000 with no credit given"; fail=1; }
+[ "$BE_WAITED" -ge 1 ] || { echo "FAIL: the edit did not wait for the payment's bill lock"; fail=1; }
+
+# ---- exchange_record vs bill_cancel on one paid bill (1000). A cancels it to store credit and holds
+# its transaction; B exchanges the line for 1000. B must wait for A's bill lock, then see the bill
+# cancelled and refuse: an exchange on top of the cancel's 1000 credit would pay the item twice. ----
+bs_fixture 5
+"${PSQL[@]}" > /dev/null <<SQL
+insert into public.customers (customerid, customer_ulid, first_name, store_credit) values (-9701, 'CONCEDITFIXTURE00000000001', 'Conc', 0);
+insert into public.salesmethods (salesmethodid, methodname) values (-9701, 'Conc cash');
+SQL
+EC_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 10)', 'finalize_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"finalized\",\"finalized\":true,\"net_amount\":1000,\"payment_amount\":1000,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}]}') ->> 'billid'")"
+EC_BI="$("${PSQL[@]}" -c "select bill_item_id from public.bill_items where billid = $EC_BILL")"
+"${PSQL[@]}" -c "begin" -c "select public.bill_cancel('$(bs_key 11)', $EC_BILL, 'store_credit', '{\"expect\":{\"finalized\":true,\"paymentstatus\":\"finalized\"}}')" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+PID_EC=$!
+sleep 0.5
+set +e
+START=$(date +%s)
+"${PSQL[@]}" -c "select public.exchange_record($EC_BILL, -9701, '[{\"bill_item_id\":$EC_BI,\"quantity\":1,\"credit_amount\":1000,\"reason\":\"conc\"}]')" > /dev/null 2> "$OUT/ec_b_err"
+EC_B_RC=$?
+EC_WAITED=$(( $(date +%s) - START ))
+set -e
+wait "$PID_EC"
+EC_CHECK="$("${PSQL[@]}" -c "select (select count(*) from public.exchanges where original_bill_item_id = $EC_BI) || ' ' || (select round(store_credit::numeric, 2) from public.customers where customerid = -9701) || ' ' || (select paymentstatus from public.bills where billid = $EC_BILL)")"
+read -r EC_EXCHANGES EC_CREDIT EC_STATUS <<< "$EC_CHECK"
+"${PSQL[@]}" -c "delete from public.exchanges where original_bill_item_id = $EC_BI" > /dev/null
+cleanup_bill_edit
+echo "exchange vs cancel: B_rc=$EC_B_RC waitedB=${EC_WAITED}s exchanges=$EC_EXCHANGES credit=$EC_CREDIT status=$EC_STATUS B_err=$(tr '\n' ' ' < "$OUT/ec_b_err")"
+[ "$EC_B_RC" != "0" ] && grep -q 'EXCHANGE_BILL_NOT_FINAL' "$OUT/ec_b_err" || { echo "FAIL: the exchange should be refused on the cancelled bill"; fail=1; }
+[ "$EC_EXCHANGES" = "0" ] && [ "$EC_CREDIT" = "1000.00" ] && [ "$EC_STATUS" = "cancelled" ] || { echo "FAIL: only the cancel's 1000 credit should be given"; fail=1; }
+[ "$EC_WAITED" -ge 1 ] || { echo "FAIL: the exchange did not wait for the cancel's bill lock"; fail=1; }
 
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"

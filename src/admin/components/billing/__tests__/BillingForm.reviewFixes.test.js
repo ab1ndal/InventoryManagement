@@ -53,6 +53,8 @@ const mockChain = (table) => {
         else reply = { data: isSavedLookup ? mockDb.savedDiscounts : mockDb.activeDiscounts, error: null };
       }
       if (table === "salesmethods") reply = { data: [{ salesmethodid: 1, methodname: "Cash" }], error: null };
+      // A bill update returns the row it changed; none would mean the bill changed elsewhere.
+      if (table === "bills" && call.op === "update") reply = { data: [{ billid: 330 }], error: null };
       return Promise.resolve(reply).then(res, rej);
     },
   };

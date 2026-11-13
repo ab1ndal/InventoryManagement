@@ -9,6 +9,7 @@
  * not by the screen.
  */
 import { chromium } from "playwright";
+import { isCancelled, isLiveSale } from "../../src/admin/lib/billStatus.js";
 
 export const DEFAULT_APP_URL = "https://www.bindalscreations.com";
 const STEP_TIMEOUT_MS = 60_000;
@@ -31,7 +32,7 @@ export function browserSessionEntry(supabaseUrl, session) {
 async function readBill(client, billid) {
   const { data, error } = await client
     .from("bills")
-    .select("billid, bill_number, finalized, pdf_url")
+    .select("billid, bill_number, finalized, paymentstatus, pdf_url")
     .eq("billid", billid)
     .maybeSingle();
   if (error) throw error;
@@ -46,7 +47,10 @@ async function readBill(client, billid) {
  */
 export async function regenerateBillPdf({ client, supabaseUrl, appUrl = DEFAULT_APP_URL, billid, onSessionRotated }) {
   const before = await readBill(client, billid);
-  if (!before.finalized) throw new BillPdfError(`Bill ${before.bill_number ?? billid} is not finalized; only finalized bills have a PDF`);
+  // A cancelled bill keeps finalized, and the PDF layout has no cancelled mark, so a new PDF
+  // would print it as a valid sale.
+  if (isCancelled(before)) throw new BillPdfError(`Bill ${before.bill_number ?? billid} is cancelled; a cancelled bill gets no new PDF`);
+  if (!isLiveSale(before)) throw new BillPdfError(`Bill ${before.bill_number ?? billid} is not finalized; only finalized bills have a PDF`);
 
   const { data: auth, error: authErr } = await client.auth.getSession();
   if (authErr || !auth.session) throw new Error(`No CLI session to hand to the browser (${authErr?.message ?? "none"})`);

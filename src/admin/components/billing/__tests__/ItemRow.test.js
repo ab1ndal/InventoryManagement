@@ -61,3 +61,37 @@ test("no warning within stock, on backdated bills, or when stock is unknown", ()
   renderRow({}, { quantity: 6, stock: null });
   expect(screen.queryByText(/left$/)).not.toBeInTheDocument();
 });
+
+describe("an exchanged line", () => {
+  test("shows the exchanged badge and refuses removal and editing", () => {
+    const removed = [];
+    const edited = [];
+    renderRow({ exchangedQty: 1, onRemove: (id) => removed.push(id), onEdit: (id) => edited.push(id) });
+    expect(screen.getByText("Exchanged 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Remove/ }));
+    expect(screen.getByRole("status")).toHaveTextContent("stays on the bill");
+    fireEvent.click(screen.getByRole("button", { name: /^Edit/ }));
+    expect(screen.getByRole("status")).toHaveTextContent("cannot be swapped or repriced");
+    expect(removed).toEqual([]);
+    expect(edited).toEqual([]);
+  });
+
+  test("quantity cannot go below what was exchanged, but can stay at or above it", () => {
+    const updates = renderRow({ exchangedQty: 2 });
+    fireEvent.change(qtyInput(), { target: { value: "1" } });
+    expect(updates).toEqual([]);
+    expect(screen.getByRole("status")).toHaveTextContent("cannot go below 2");
+    fireEvent.change(screen.getByDisplayValue("1"), { target: { value: "2" } });
+    expect(updates).toEqual([{ quantity: 2 }]);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  test("quantity cannot go above what the line was saved with", () => {
+    const updates = renderRow({ exchangedQty: 1, exchangedSavedQty: 3 });
+    fireEvent.change(qtyInput(), { target: { value: "4" } });
+    expect(updates).toEqual([]);
+    expect(screen.getByRole("status")).toHaveTextContent("cannot go above 3");
+    fireEvent.change(screen.getByDisplayValue("4"), { target: { value: "3" } });
+    expect(updates).toEqual([{ quantity: 3 }]);
+  });
+});

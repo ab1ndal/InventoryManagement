@@ -7,6 +7,7 @@ import { Badge } from "../../components/ui/badge";
 import { Loader2, Pencil, FileText, Trash2, Ban, RefreshCw, MessageCircle, Globe } from "lucide-react";
 import { isWebsiteMethod, receivedAmount } from "./billing/paymentHelpers";
 import { round2 } from "./billing/billUtils";
+import { BILL_STATUS, isDraft, isCancelled, isLiveSale } from "../lib/billStatus";
 import { useToast } from "../../components/hooks/use-toast";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
@@ -40,8 +41,8 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-// A cancelled draft has already had its stock put back, so deleting it would put it back again.
-const isDeletableDraft = (bill) => !bill.finalized && bill.paymentstatus !== "cancelled";
+// Only a draft: a cancelled draft has already had its stock put back, so deleting it would put it back again.
+const isDeletableDraft = isDraft;
 
 // stock_reduced is null on bills saved before it existed: nobody recorded whether they moved stock,
 // so whoever cancels one decides.
@@ -55,7 +56,7 @@ const CANCEL_ERRORS = {
 };
 
 // Cancelled bills are locked: a sale is redone as a new bill.
-const isEditableBill = (bill) => bill.paymentstatus !== "cancelled";
+const isEditableBill = (bill) => !isCancelled(bill);
 
 export default function BillTable({ onEdit }) {
   const { toast } = useToast();
@@ -210,7 +211,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, stock_reduced, pdf_url, document_type, salesmethods(methodname), bill_payments(amount)"
+          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, stock_reduced, pdf_url, document_type, salesmethods(methodname), bill_payments(amount, kind)"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
@@ -278,11 +279,16 @@ export default function BillTable({ onEdit }) {
         const hasNext = (data || []).length > ROWS_PER_PAGE;
         const pageBills = (data || []).slice(0, ROWS_PER_PAGE);
 
-        // Amount Received = total cash collected for the bill (see receivedAmount).
+        // Amount Received = what the shop holds for the bill (see receivedAmount): money paid
+        // less any refund or store credit given back when it was edited, shown under it.
+        const givenBack = (b, kind) =>
+          round2((b.bill_payments || []).filter((p) => p.kind === kind).reduce((s, p) => s - Number(p.amount), 0));
         setBills(
           pageBills.map((b) => ({
             ...withOrderContact(b),
             amount_received: receivedAmount(b),
+            refunded: givenBack(b, "refund"),
+            credited: givenBack(b, "store_credit"),
           }))
         );
         setHasNextPage(hasNext);
@@ -383,7 +389,7 @@ export default function BillTable({ onEdit }) {
     if (error) throw new Error(CANCEL_ERRORS[error.message] || error.message);
     cancelKeyRef.current = null;
     setBills((prev) =>
-      prev.map((b) => (b.billid === bill.billid ? { ...b, paymentstatus: "cancelled" } : b))
+      prev.map((b) => (b.billid === bill.billid ? { ...b, paymentstatus: BILL_STATUS.CANCELLED } : b))
     );
     return data;
   };
@@ -764,6 +770,16 @@ export default function BillTable({ onEdit }) {
                         Credit: {formatINR(b.store_credit_used, 0)}
                       </div>
                     )}
+                    {b.refunded > 0 && (
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        Refunded: {formatINR(b.refunded, 0)}
+                      </div>
+                    )}
+                    {b.credited > 0 && (
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        To store credit: {formatINR(b.credited, 0)}
+                      </div>
+                    )}
                   </td>
                   <td className="p-2 text-center">
                     <Badge
@@ -853,7 +869,9 @@ export default function BillTable({ onEdit }) {
                           ? <Loader2 className="h-4 w-4 animate-spin" />
                           : <MessageCircle className="h-4 w-4" />}
                       </Button>
-                      {b.finalized && (
+                      {/* A cancelled bill keeps finalized, but the PDF has no cancelled mark, so a new
+                          one would print it as a valid sale. */}
+                      {isLiveSale(b) && (
                         <Button
                           size="icon"
                           variant="ghost"

@@ -19,6 +19,7 @@ import ReturnReceiptView from "../components/billing/ReturnReceiptView";
 import { generateInvoicePdf } from "../components/billing/generateInvoicePdf";
 import {
   buildReturnedQtyMap,
+  buildCreditGivenMap,
   buildReturnedItemsWithCredit,
   calcItemCredit,
   isExchangeEligible,
@@ -26,6 +27,14 @@ import {
   daysSinceBill,
   EXCHANGE_WINDOW_DAYS,
 } from "../components/billing/exchangeHelpers";
+
+// exchange_record refusals (schema/migration_exchange_record_caps.sql), in words staff can act on.
+// Nothing is recorded or restocked when one comes back.
+const EXCHANGE_ERRORS = {
+  EXCHANGE_BILL_NOT_FINAL: "Only a fully paid bill can be exchanged. This bill is not paid in full, or was changed or cancelled. Search for it again.",
+  EXCHANGE_OVER_LINE: "The credit is more than this item was sold for. Search for the bill again and retry.",
+  EXCHANGE_OVER_HELD: "This bill has already given back what the customer paid for it, as an earlier exchange, refund or store credit. No more credit can come from it.",
+};
 
 export default function ExchangePage() {
   const navigate = useNavigate();
@@ -245,11 +254,12 @@ export default function ExchangePage() {
       if (eligibleIds.length > 0) {
         const { data: ex } = await supabase
           .from("exchanges")
-          .select("original_bill_item_id, quantity")
+          .select("original_bill_item_id, quantity, credit_amount")
           .in("original_bill_item_id", eligibleIds);
         existing = ex || [];
       }
       const returnedQtyMap = buildReturnedQtyMap(existing);
+      const creditGivenMap = buildCreditGivenMap(existing);
 
       const augmented = allItems.map(item => {
         const eligible = isExchangeEligible(item);
@@ -258,7 +268,8 @@ export default function ExchangePage() {
           ? Math.max(0, Number(item.quantity || 0) - returnedQty)
           : 0;
         const isExchanged = eligible && returnedQty > 0 && maxReturnQty === 0;
-        return { ...item, isEligible: eligible, maxReturnQty, isExchanged };
+        const creditGiven = creditGivenMap[item.bill_item_id] || 0;
+        return { ...item, isEligible: eligible, maxReturnQty, isExchanged, returnedQty, creditGiven };
       });
 
       if (!augmented.some(item => item.isEligible && item.maxReturnQty > 0)) {
@@ -317,7 +328,7 @@ export default function ExchangePage() {
           manual_item_id: ri.manual_item_id || null,
         })),
       });
-      if (exErr) throw new Error(`Exchange record failed: ${exErr.message}`);
+      if (exErr) throw new Error(EXCHANGE_ERRORS[exErr.message] || `Exchange record failed: ${exErr.message}`);
 
       // Fire-and-forget: the helper never throws, so a logging problem cannot undo the saved exchange.
       logActivity({

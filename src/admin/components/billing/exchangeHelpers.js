@@ -42,11 +42,18 @@ export function computeCreditsApplied(grandTotal, storeCreditAvail, exchangeAmt)
  * Credit = effective payment made = bi.total × (returnQty / quantity).
  * bi.total is the post-GST, post-discount line total stored in bill_items
  * (matches priceItem().total = (mrp×qty − discount) + gst_amount).
+ * bi.returnedQty and bi.creditGiven (earlier exchanges of the line) keep the line's credits in
+ * all within its total: exchange_record refuses more (EXCHANGE_OVER_LINE,
+ * schema/migration_exchange_record_caps.sql), and this is the same cap, so for 200 over 3 units
+ * the last unit gets 66.66, not a third 66.67.
  */
 export function calcItemCredit(bi, returnQty) {
   if (!bi || returnQty <= 0) return 0;
   const fullQty = Number(bi.quantity || 1);
-  return round2(Number(bi.total || 0) * (returnQty / fullQty));
+  const total = Number(bi.total || 0);
+  const returned = Number(bi.returnedQty || 0);
+  const upToNow = round2(total * ((returned + returnQty) / fullQty)) - Number(bi.creditGiven || 0);
+  return Math.max(0, Math.min(round2(total * (returnQty / fullQty)), round2(upToNow)));
 }
 
 /** Sum already-returned qty per bill_item_id from existing exchanges rows. */
@@ -55,6 +62,16 @@ export function buildReturnedQtyMap(existingExchanges) {
   for (const ex of (existingExchanges || [])) {
     const id = ex.original_bill_item_id;
     map[id] = (map[id] || 0) + Number(ex.quantity || 0);
+  }
+  return map;
+}
+
+/** Sum credit already given per bill_item_id from existing exchanges rows. */
+export function buildCreditGivenMap(existingExchanges) {
+  const map = {};
+  for (const ex of (existingExchanges || [])) {
+    const id = ex.original_bill_item_id;
+    map[id] = round2((map[id] || 0) + Number(ex.credit_amount || 0));
   }
   return map;
 }

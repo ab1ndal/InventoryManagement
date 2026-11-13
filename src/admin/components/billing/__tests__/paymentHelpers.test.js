@@ -1,4 +1,4 @@
-import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, firstPaymentMethodFields, paymentStatusAfterEdit } from "../paymentHelpers";
+import { sumPayments, tallyPayment, storeCreditDeductionDelta, isWebsiteMethod, paymentStatusAfterEdit, editExcess, paymentRowLabel } from "../paymentHelpers";
 
 describe("storeCreditDeductionDelta", () => {
   test("deducts the full amount when the balance covers it", () => {
@@ -80,16 +80,6 @@ describe("isWebsiteMethod", () => {
   });
 });
 
-describe("firstPaymentMethodFields", () => {
-  test("first payment on a bill finalized unpaid sets the bill's method", () => {
-    expect(firstPaymentMethodFields([], 3)).toEqual({ salesmethodid: 3 });
-  });
-
-  test("later payments leave the bill's method alone", () => {
-    expect(firstPaymentMethodFields([{ amount: 100 }], 3)).toEqual({});
-  });
-});
-
 describe("paymentStatusAfterEdit", () => {
   test("a draft stays a draft", () => {
     expect(paymentStatusAfterEdit({ finalized: false, paymentStatus: "draft", payments: [], netAmount: 500 })).toBe("draft");
@@ -131,5 +121,64 @@ describe("paise left over from rounding", () => {
 
   test("a rupee or more short still leaves the bill partial", () => {
     expect(tallyPayment([{ amount: 1000 }], 499, 1500).paymentStatus).toBe("partial");
+  });
+});
+
+// The same cases as schema/test_bill_add_payment.sql, which checks bill_add_payment in the
+// database. Both must give these results.
+describe("same rule as bill_add_payment", () => {
+  test.each([
+    [1500.08, [500], 1000, "finalized", 0],
+    [1500.99, [500], 1000, "finalized", 0],
+    [1501, [500], 1000, "partial", 1],
+    [2000, [], 500, "partial", 1500],
+    [1000, [600], 600, "finalized", 0],
+  ])("net %p, paid %p, adding %p: %s", (net, paid, amount, status, remaining) => {
+    const t = tallyPayment(paid.map((a) => ({ amount: a })), amount, net);
+    expect(t.paymentStatus).toBe(status);
+    expect(t.remaining).toBe(remaining);
+  });
+});
+
+// Same cases as schema/test_bill_excess_credit.sql: bill_edit refuses a choice for another amount.
+describe("editExcess", () => {
+  test("part-paid bill edited below what was paid", () => {
+    expect(editExcess({ paymentStatus: "partial", payments: [{ amount: "600.00" }], netAmount: 400 })).toBe(200);
+  });
+  test("bill paid in one go uses payment_amount", () => {
+    expect(editExcess({ paymentStatus: "finalized", payments: [], paymentAmount: "1000.00", netAmount: 600 })).toBe(400);
+  });
+  test("refund and credit rows already given back are not counted again", () => {
+    const payments = [{ amount: 1000 }, { amount: -400, kind: "refund" }];
+    expect(editExcess({ paymentStatus: "finalized", payments, netAmount: 600 })).toBe(0);
+    expect(editExcess({ paymentStatus: "finalized", payments, netAmount: 500 })).toBe(100);
+  });
+  test("under a rupee over is not an excess", () => {
+    expect(editExcess({ paymentStatus: "finalized", payments: [], paymentAmount: 1000, netAmount: 999.5 })).toBe(0);
+  });
+  test("drafts hold no money", () => {
+    expect(editExcess({ paymentStatus: "draft", payments: [], paymentAmount: 1000, netAmount: 400 })).toBe(0);
+  });
+});
+
+describe("paymentRowLabel", () => {
+  test("names refunds and store credit rows", () => {
+    expect(paymentRowLabel({ kind: "payment", salesmethods: { methodname: "Cash" } })).toBe("Cash");
+    expect(paymentRowLabel({ kind: "refund", salesmethods: { methodname: "UPI" } })).toBe("Refund (UPI)");
+    expect(paymentRowLabel({ kind: "store_credit", salesmethods: null })).toBe("To store credit");
+    expect(paymentRowLabel({ salesmethods: null })).toBe("—");
+  });
+});
+
+describe("excessCountsExchangeTwice (same rule as bill_edit BILL_EXCHANGE_COUNTED)", () => {
+  const { excessCountsExchangeTwice } = require("../paymentHelpers");
+  test("an excess with the net below the exchange credit given", () => {
+    expect(excessCountsExchangeTwice({ excess: 500, netAmount: 300, exchangeCreditGiven: 400 })).toBe(true);
+  });
+  test("net at the exchange credit given is fine", () => {
+    expect(excessCountsExchangeTwice({ excess: 500, netAmount: 300, exchangeCreditGiven: 300 })).toBe(false);
+  });
+  test("no excess, nothing paid back", () => {
+    expect(excessCountsExchangeTwice({ excess: 0, netAmount: 100, exchangeCreditGiven: 400 })).toBe(false);
   });
 });

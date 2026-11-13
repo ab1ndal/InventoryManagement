@@ -18,6 +18,7 @@ import {
 import { toast } from "sonner";
 import { useTableFilters } from "../hooks/useTableFilters";
 import { logActivity } from "../../lib/activityLog";
+import { onlyLiveSales } from "../lib/billStatus";
 import { customerName } from "../../utility/activitySummary";
 import { Checkbox } from "../../components/ui/checkbox";
 import {
@@ -72,11 +73,11 @@ export default function CustomerTable({ onEditCustomer, refreshSignal }) {
 
     // 2. Fetch aggregation data from bills: only finalized, not cancelled.
     //    Aggregate in JS (small dataset, no RPC needed).
-    const { data: billsData, error: billsErr } = await supabase
-      .from("bills")
-      .select("customerid, totalamount, exchange_credit_used, orderdate, paymentstatus, finalized")
-      .eq("finalized", true)
-      .neq("paymentstatus", "cancelled");
+    const { data: billsData, error: billsErr } = await onlyLiveSales(
+      supabase
+        .from("bills")
+        .select("customerid, totalamount, exchange_credit_used, orderdate, paymentstatus, finalized"),
+    );
     if (billsErr) {
       console.error("Error fetching bills for aggregation:", billsErr.message);
       setCustomers(customersData || []);

@@ -4,6 +4,7 @@ import Plotly from "plotly.js-basic-dist-min";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui/tabs";
 import { supabase } from "../../../lib/supabaseClient";
 import { toast } from "sonner";
+import { onlyLiveSales } from "../../lib/billStatus";
 import {
   BILLS_START_YEAR,
   buildFyTotals,
@@ -65,11 +66,11 @@ export default function HistoricalTrends() {
         const [histRes, billsData] = await Promise.all([
           supabase.from("monthly_sales_history").select("fy_start_year, month_idx, net_amount"),
           fetchAllRows(() =>
-            supabase
-              .from("bills")
-              .select("net_amount, payment_amount, orderdate")
-              .eq("finalized", true)
-              .gte("orderdate", billsStart)
+            onlyLiveSales(
+              supabase
+                .from("bills")
+                .select("net_amount, payment_amount, orderdate")
+            ).gte("orderdate", billsStart)
           ),
         ]);
         if (histRes.error) throw histRes.error;

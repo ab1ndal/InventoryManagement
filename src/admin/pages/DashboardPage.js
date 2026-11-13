@@ -17,6 +17,7 @@ import DiscountTable from "../components/dashboard/DiscountTable";
 import HistoricalTrends from "../components/dashboard/HistoricalTrends";
 import FiguresDidNotLoad from "../components/FiguresDidNotLoad";
 import { fetchInChunks } from "../lib/fetchInChunks";
+import { onlyLiveSales } from "../lib/billStatus";
 
 const PAGE = 1000;
 const EMPTY = { bills: [], items: [] };
@@ -42,9 +43,11 @@ const iso = (d) => {
 
 async function fetchPeriod({ start, end }) {
   const bills = await fetchAllRows(() =>
-    supabase
-      .from("bills")
-      .select("billid, net_amount, payment_amount, orderdate, applied_codes")
+    onlyLiveSales(
+      supabase
+        .from("bills")
+        .select("billid, net_amount, payment_amount, orderdate, applied_codes")
+    )
       .gte("orderdate", iso(start))
       .lt("orderdate", iso(end))
   );
@@ -123,8 +126,8 @@ export default function DashboardPage() {
     (async () => {
       try {
         const [minRes, maxRes, spRes] = await Promise.all([
-          supabase.from("bills").select("orderdate").eq("finalized", true).order("orderdate", { ascending: true }).limit(1),
-          supabase.from("bills").select("orderdate").eq("finalized", true).order("orderdate", { ascending: false }).limit(1),
+          onlyLiveSales(supabase.from("bills").select("orderdate")).order("orderdate", { ascending: true }).limit(1),
+          onlyLiveSales(supabase.from("bills").select("orderdate")).order("orderdate", { ascending: false }).limit(1),
           supabase.from("salespersons").select("salesperson_id, name"),
         ]);
         if (minRes.error) throw minRes.error;

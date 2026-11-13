@@ -24,6 +24,7 @@ import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
 import { logActivityWith } from "./activity.js";
 import { listSlipPhotos } from "./billSlipPhotos.js";
+import { BILL_STATUS, billStatusFields } from "./billStatus.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -454,10 +455,8 @@ export async function prepareBill(client, rawSpec) {
     gst_total: totals.gstTotal,
     discount_total: totals.itemLevelDiscountTotal + totals.overallDiscount + totals.balanceDiscount,
     taxable_total: totals.taxableTotal,
-    ...(partial
-      ? { net_amount: totals.grandTotal, final_amount: agreed, paymentstatus: "partial" }
-      : { paymentstatus: "finalized" }),
-    finalized: true,
+    ...(partial ? { net_amount: totals.grandTotal, final_amount: agreed } : {}),
+    ...billStatusFields(partial ? BILL_STATUS.PARTIAL : BILL_STATUS.FINALIZED),
     // Bill cancel restores stock only when this is true; the column defaults to true.
     stock_reduced: !spec.skip_stock,
     applied_codes: [],
@@ -503,15 +502,14 @@ export async function prepareBill(client, rawSpec) {
 }
 
 /**
- * Creates a finalized bill, writing what BillingForm's direct Finalize writes,
- * in the same order: bill row (trigger assigns bill_number), bill_items
- * (bill row deleted if this fails), stock_adjust per inventory line, activity
- * log. A fully paid bill gets no bill_payments row — the screen records the
- * payment on the bill (payment_amount + salesmethodid). A part-paid bill also
- * gets its first bill_payments row, written before stock moves (the screen
- * writes it after), so a failed payment insert can still remove the bill with
- * nothing else changed. Stock failures do not undo the bill (as in the
- * screen); they are returned in stock_failures.
+ * Creates a finalized bill through bill_save, as BillingForm's Finalize and
+ * Partial Payment do: the bill row (trigger assigns bill_number), bill_items,
+ * stock and, for a part-paid bill, its first bill_payments row are one
+ * transaction, so a failure leaves nothing behind and no bill is ever deleted
+ * to undo one. A fully paid bill gets no bill_payments row — the screen
+ * records the payment on the bill (payment_amount + salesmethodid). The
+ * activity log is written after the save. negative_stock lists any variant the
+ * save took below zero (only possible if stock moved since the preview).
  */
 export async function createBill(client, rawSpec, { dryRun = false, source = "via CLI" } = {}) {
   const planned = await prepareBill(client, rawSpec);
@@ -566,51 +564,30 @@ async function createReferenced(client, rawSpec, planned, created, source) {
 }
 
 async function insertBill(client, prepared, source) {
-  const { data: saved, error: billErr } = await client
-    .from("bills")
-    .insert(prepared.bill)
-    .select("billid, bill_number")
-    .single();
-  if (billErr) throw new Error("Failed to save bill: " + billErr.message);
-
-  // bill_items cascade with the bill row.
-  const removeBill = async (what, err) => {
-    const { error: delErr } = await client.from("bills").delete().eq("billid", saved.billid);
-    throw new Error(
-      `${what}: ${err.message}` +
-        (delErr ? ` — AND removing bill ${saved.billid} failed: ${delErr.message}; delete it by hand` : ` (bill ${saved.billid} removed)`),
-    );
-  };
-
-  const rows = prepared.bill_items.map((r) => ({ ...r, billid: saved.billid }));
-  const { error: itemsErr } = await client.from("bill_items").insert(rows);
-  if (itemsErr) await removeBill("Failed to save bill items", itemsErr);
-
-  if (prepared.first_payment) {
-    const { error: payErr } = await client
-      .from("bill_payments")
-      .insert({ billid: saved.billid, ...prepared.first_payment });
-    if (payErr) await removeBill("Failed to record payment", payErr);
+  // bill_save takes the "don't reduce stock" choice as skip_stock and records stock_reduced from
+  // it, so the bill row goes without that column.
+  const { stock_reduced: stockReduced, ...bill } = prepared.bill;
+  // A fresh key per create: this process saves once and does not retry.
+  const { data: saved, error: saveErr } = await client.rpc("bill_save", {
+    p_key: crypto.randomUUID(),
+    p_op: prepared.bill.paymentstatus === BILL_STATUS.PARTIAL ? "partial_create" : "finalize_create",
+    p_payload: {
+      bill,
+      items: prepared.bill_items,
+      skip_stock: !stockReduced,
+      ...(prepared.first_payment ? { first_payment: prepared.first_payment } : {}),
+    },
+  });
+  if (saveErr) {
+    throw new Error("Failed to save bill: " + saveErr.message + (saveErr.details ? ` (${saveErr.details})` : ""));
   }
-  const partial = prepared.bill.paymentstatus === "partial";
-
-  const stockFailures = [];
-  for (const s of prepared.stock) {
-    if (s.change === 0) continue;
-    const { error } = await client.rpc("stock_adjust", {
-      p_variant: s.variantid,
-      p_delta: s.change,
-      p_reason: partial ? "bill_partial_finalize" : "bill_finalize",
-      p_ref: String(saved.billid),
-    });
-    if (error) stockFailures.push({ variantid: s.variantid, change: s.change, error: error.message });
-  }
+  const partial = prepared.bill.paymentstatus === BILL_STATUS.PARTIAL;
 
   await logActivityWith(client, {
     action: "create",
     entityType: "bill",
     entityId: saved.bill_number || saved.billid,
-    summary: `Finalized bill ${partial ? "(partial) " : ""}#${saved.bill_number || "(no number)"} for ${customerName(prepared.customer)} — ${money(prepared.totals.grand_total)}, ${rows.length} items (${source})`,
+    summary: `Finalized bill ${partial ? "(partial) " : ""}#${saved.bill_number || "(no number)"} for ${customerName(prepared.customer)} — ${money(prepared.totals.grand_total)}, ${prepared.bill_items.length} items (${source})`,
   });
 
   return {
@@ -619,7 +596,7 @@ async function insertBill(client, prepared, source) {
     customer: prepared.customer,
     totals: prepared.totals,
     stock: prepared.stock,
-    stock_failures: stockFailures,
+    negative_stock: saved.negative_stock ?? [],
     warnings: prepared.warnings,
   };
 }
