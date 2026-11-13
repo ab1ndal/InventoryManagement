@@ -53,14 +53,23 @@
 -- screen sends either the balance as it read it or the bill total, both in paise. A draft op with
 -- store_credit_used left out takes the figure the draft row holds, which it keeps.
 --
--- What the shop is paid, on every op: net is the net_amount sent (the part-paid ops send it), or
--- totalamount less store and exchange credit used (the screen's computeCreditsApplied). A paid
+-- Money figures, on every op: totalamount, store_credit_used, exchange_credit_used,
+-- exchange_cash_refund, exchange_balance_to_credit, payment_amount, net_amount and the first
+-- payment's amount must each be 0 or more and finite (BILL_BAD_PAYLOAD naming the field), as the
+-- value the op uses (a draft op's left-out key: the draft's). A negative credit used raised the net
+-- by as much, so a payment that large was accepted and bill_cancel then paid it out; a negative
+-- exchange balance or cash refund made room under BILL_EXCHANGE_OVER for credit no exchange held.
+--
+-- What the shop is paid, on every op: net is totalamount less store and exchange credit used,
+-- floored at 0, worked out here (the screen's computeCreditsApplied, which is also how the screen
+-- and the CLI work out the net_amount the part-paid ops send). A sent net_amount is not used: one
+-- above that let a part-paid bill record that much received (total 1000, net 9000, paid 8000). A paid
 -- bill may record up to ₹100 more than its net, the screen's and the CLI's own limit ("Must be
 -- within ₹100": cash handed over and kept); a part-paid bill a rupee less, as bill_edit and
 -- bill_add_payment. Beyond that: BILL_OVERPAID, detail {net, payment_amount}. bill_cancel refunds
 -- payment_amount, so a typo of 9000 on a 1000 bill would otherwise be paid out (or put on store
--- credit) as if received. The finalize ops do not send net_amount; the bill now stores the net
--- worked out here (it was left null, or a draft kept the stale net of its last Save Changes).
+-- credit) as if received. The bill stores the net worked out here (the finalize ops sent none and
+-- it was left null, or a draft kept the stale net of its last Save Changes).
 --
 -- Lock order for the draft ops: bill, voucher, lines, variants, customer, exchanges. bill_cancel
 -- and bill_edit take the bill first too; exchange_record takes the bill before its lines.
@@ -69,9 +78,9 @@
 -- (schema/migration_bill_edit_atomic.sql).
 --
 -- Body copied from schema/migration_bill_save_app_callers.sql (the latest definition); the create
--- ops are unchanged apart from the exchange, store credit and amount received checks above. Same
--- signature, grants and error codes, plus BILL_STALE, BILL_EXCHANGE_CUSTOMER, BILL_EXCHANGE_OVER,
--- BILL_CREDIT_SHORT and BILL_OVERPAID.
+-- ops are unchanged apart from the money, exchange, store credit and amount received checks
+-- above. Same signature, grants and error codes, plus BILL_STALE, BILL_EXCHANGE_CUSTOMER,
+-- BILL_EXCHANGE_OVER, BILL_CREDIT_SHORT and BILL_OVERPAID.
 --
 -- Run after schema/migration_voucher_states.sql (voucher_state) and before the app version that
 -- calls these ops.
@@ -295,6 +304,10 @@ declare
   v_exchange_balance numeric;
   v_exchange_total numeric;
   v_credit_used numeric;
+  v_total numeric;
+  v_exchange_used numeric;
+  v_exchange_cash numeric;
+  v_bad_field text;
   v_net numeric;
   v_paid numeric;
   v_variants uuid[];
@@ -450,17 +463,36 @@ begin
     -- A draft op keeps a store_credit_used left out of the payload, so it takes that figure too.
     v_credit_used := round(coalesce((v_bill ->> 'store_credit_used')::numeric,
                                     case when v_draft then v_draft_row.store_credit_used end, 0), 2);
-    -- The net the part-paid ops send, or the one the finalize ops leave out worked out as the
-    -- screen does. Other keys left out of a draft op keep the draft's value, so they are read
-    -- the same way; the draft's own net_amount is not (see the header).
-    v_net := round(coalesce((v_bill ->> 'net_amount')::numeric,
-                            greatest(0, coalesce((v_bill ->> 'totalamount')::numeric,
-                                                 case when v_draft then v_draft_row.totalamount end, 0)
-                                        - v_credit_used
-                                        - coalesce((v_bill ->> 'exchange_credit_used')::numeric,
-                                                   case when v_draft then v_draft_row.exchange_credit_used end, 0))), 2);
+    -- Keys left out of a draft op keep the draft's value, so they are read the same way. Not
+    -- rounded yet: the net below rounds once, as the screen's figure is rounded on save.
+    v_total := coalesce((v_bill ->> 'totalamount')::numeric,
+                        case when v_draft then v_draft_row.totalamount end, 0);
+    v_exchange_used := coalesce((v_bill ->> 'exchange_credit_used')::numeric,
+                                case when v_draft then v_draft_row.exchange_credit_used end, 0);
+    v_exchange_cash := coalesce((v_bill ->> 'exchange_cash_refund')::numeric,
+                                case when v_draft then v_draft_row.exchange_cash_refund end, 0);
     v_paid := round(coalesce((v_bill ->> 'payment_amount')::numeric,
                              case when v_draft then v_draft_row.payment_amount end, 0), 2);
+    -- NaN sorts above Infinity, so ">= Infinity" refuses both (see the header).
+    select f into v_bad_field
+      from (values (1, 'totalamount', v_total),
+                   (2, 'store_credit_used', v_credit_used),
+                   (3, 'exchange_credit_used', v_exchange_used),
+                   (4, 'exchange_cash_refund', v_exchange_cash),
+                   (5, 'exchange_balance_to_credit', v_exchange_balance),
+                   (6, 'payment_amount', v_paid),
+                   (7, 'net_amount', (v_bill ->> 'net_amount')::numeric),
+                   (8, 'first_payment amount', (v_payment ->> 'amount')::numeric)) x(n, f, v)
+     where v < 0 or v >= 'Infinity'::numeric
+     order by n
+     limit 1;
+    if v_bad_field is not null then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = format('%s must be 0 or more', v_bad_field);
+    end if;
+    -- Worked out as the screen does; never the net_amount sent (see the header), nor the
+    -- draft's own (that is the net of its last Save Changes).
+    v_net := round(greatest(0, v_total - v_credit_used - v_exchange_used), 2);
     v_exchange_ids := array(
       select distinct e::int
         from jsonb_array_elements_text(coalesce(nullif(p_payload -> 'exchange_ids', 'null'::jsonb), '[]'::jsonb)) e);
@@ -565,11 +597,7 @@ begin
     end if;
     -- What the bill takes from the exchanges, puts on store credit and pays out in cash cannot
     -- add up to more than they hold.
-    if round(coalesce((v_bill ->> 'exchange_credit_used')::numeric,
-                      case when v_draft then v_draft_row.exchange_credit_used end, 0), 2)
-       + round(v_exchange_balance, 2)
-       + round(coalesce((v_bill ->> 'exchange_cash_refund')::numeric,
-                        case when v_draft then v_draft_row.exchange_cash_refund end, 0), 2)
+    if round(v_exchange_used, 2) + round(v_exchange_balance, 2) + round(v_exchange_cash, 2)
        - round(v_exchange_total, 2) > c_exchange_rounding then
       raise exception 'BILL_EXCHANGE_OVER' using errcode = 'P0001',
         detail = jsonb_build_object('exchange_credit', round(v_exchange_total, 2))::text;

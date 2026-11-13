@@ -697,7 +697,7 @@ bs_fixture 5
 insert into public.customers (customerid, customer_ulid, first_name, store_credit) values (-9701, 'CONCEDITFIXTURE00000000001', 'Conc', 0);
 insert into public.salesmethods (salesmethodid, methodname) values (-9701, 'Conc cash');
 SQL
-BE_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 7)', 'partial_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"partial\",\"finalized\":true,\"net_amount\":1000,\"payment_amount\":600,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}],\"first_payment\":{\"amount\":600,\"salesmethodid\":-9701}}') ->> 'billid'")"
+BE_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 7)', 'partial_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"partial\",\"finalized\":true,\"totalamount\":1000,\"net_amount\":1000,\"payment_amount\":600,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}],\"first_payment\":{\"amount\":600,\"salesmethodid\":-9701}}') ->> 'billid'")"
 BE_PAYLOAD="{\"expect\":{\"paymentstatus\":\"partial\",\"payment_amount\":600},\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"totalamount\":400,\"gst_total\":0,\"discount_total\":0,\"taxable_total\":400,\"net_amount\":400,\"applied_codes\":[],\"payment_amount\":600,\"final_amount\":null,\"saleslocationid\":null,\"salesmethodid\":-9701,\"paymentstatus\":\"finalized\",\"finalized\":true,\"store_credit_used\":0,\"orderdate\":\"2026-11-12T00:00:00+05:30\"},\"excess\":{\"mode\":\"store_credit\",\"amount\":200}}"
 "${PSQL[@]}" -c "begin" -c "select public.bill_add_payment('$(bs_key 8)', $BE_BILL, 400, -9701, null)" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
 PID_BE=$!
@@ -725,7 +725,7 @@ bs_fixture 5
 insert into public.customers (customerid, customer_ulid, first_name, store_credit) values (-9701, 'CONCEDITFIXTURE00000000001', 'Conc', 0);
 insert into public.salesmethods (salesmethodid, methodname) values (-9701, 'Conc cash');
 SQL
-EC_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 10)', 'finalize_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"finalized\",\"finalized\":true,\"net_amount\":1000,\"payment_amount\":1000,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}]}') ->> 'billid'")"
+EC_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 10)', 'finalize_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"finalized\",\"finalized\":true,\"totalamount\":1000,\"net_amount\":1000,\"payment_amount\":1000,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}]}') ->> 'billid'")"
 EC_BI="$("${PSQL[@]}" -c "select bill_item_id from public.bill_items where billid = $EC_BILL")"
 "${PSQL[@]}" -c "begin" -c "select public.bill_cancel('$(bs_key 11)', $EC_BILL, 'store_credit', '{\"expect\":{\"finalized\":true,\"paymentstatus\":\"finalized\"}}')" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
 PID_EC=$!

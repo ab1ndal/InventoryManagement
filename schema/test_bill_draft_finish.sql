@@ -843,5 +843,110 @@ begin
   perform pg_temp.ok('15 cancel refunds the 1000 received', (r ->> 'refund')::numeric = 1000);
 end $$;
 
+-- ---------- 16. money figures from the client are 0 or more, and the net is the server's ----------
+-- As pg_temp.as_admin, with the error's detail too.
+create function pg_temp.as_admin_detail(p_sql text) returns text language plpgsql as $$
+declare
+  v_detail text;
+begin
+  perform set_config('request.jwt.claims',
+    jsonb_build_object('sub', pg_temp.admin_id(), 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  execute p_sql;
+  perform set_config('role', 'none', true);
+  return 'ok';
+exception when others then
+  get stacked diagnostics v_detail = pg_exception_detail;
+  return sqlerrm || ': ' || coalesce(v_detail, '');
+end $$;
+
+-- A new bill as the screen's create ops send it, for one 1000 line.
+create function pg_temp.create_sql(p_key int, p_op text, p_bill jsonb, p_extra jsonb default '{}') returns text language sql as $$
+  select pg_temp.save_sql(p_key, p_op, jsonb_build_object(
+    'bill', jsonb_build_object('customerid', -9711, 'notes', 'DFIN money', 'totalamount', 1000,
+      'paymentstatus', case when p_op like 'partial%' then 'partial' else 'finalized' end, 'finalized', true,
+      'payment_amount', 1000, 'salesmethodid', -9701, 'orderdate', '2026-11-12T00:00:00+05:30') || p_bill,
+    'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')) || p_extra)
+$$;
+
+do $$
+declare
+  b int;
+  d int;
+  r text;
+  j jsonb;
+  bills_before int;
+begin
+  insert into public.customers (customerid, customer_ulid, first_name, store_credit) values
+    (-9711, 'DFINFIXTURE000000000000011', 'Money', 0);
+
+  -- bill_save: a negative credit used raised the net, so 1600 was taken on a 1000 bill (and
+  -- bill_cancel to store credit then gave 1600).
+  select count(*) into bills_before from public.bills where customerid = -9711;
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(170, 'finalize_create',
+    '{"store_credit_used": -500, "payment_amount": 1600}'));
+  perform pg_temp.ok('16 finalize_create refuses store_credit_used -500',
+    r = 'BILL_BAD_PAYLOAD: store_credit_used must be 0 or more');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(171, 'finalize_create',
+    '{"exchange_credit_used": -500, "payment_amount": 1600}'));
+  perform pg_temp.ok('16 finalize_create refuses exchange_credit_used -500',
+    r = 'BILL_BAD_PAYLOAD: exchange_credit_used must be 0 or more');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(172, 'finalize_create', '{"payment_amount": -50}'));
+  perform pg_temp.ok('16 finalize_create refuses payment_amount -50',
+    r = 'BILL_BAD_PAYLOAD: payment_amount must be 0 or more');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(173, 'finalize_create', '{"exchange_cash_refund": -500}'));
+  perform pg_temp.ok('16 finalize_create refuses exchange_cash_refund -500',
+    r = 'BILL_BAD_PAYLOAD: exchange_cash_refund must be 0 or more');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(174, 'finalize_create', '{}',
+    '{"exchange_balance_to_credit": -500}'));
+  perform pg_temp.ok('16 finalize_create refuses exchange_balance_to_credit -500',
+    r = 'BILL_BAD_PAYLOAD: exchange_balance_to_credit must be 0 or more');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(175, 'finalize_create', '{"totalamount": -1000, "payment_amount": 0}'));
+  perform pg_temp.ok('16 finalize_create refuses totalamount -1000',
+    r = 'BILL_BAD_PAYLOAD: totalamount must be 0 or more');
+  r := pg_temp.as_admin(pg_temp.create_sql(176, 'finalize_create', '{"totalamount": "Infinity", "payment_amount": 9000}'));
+  perform pg_temp.ok('16 finalize_create refuses an infinite total', r = 'BILL_BAD_PAYLOAD');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(177, 'partial_create', '{"net_amount": -5, "payment_amount": 0}'));
+  perform pg_temp.ok('16 partial_create refuses net_amount -5',
+    r = 'BILL_BAD_PAYLOAD: net_amount must be 0 or more');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(178, 'partial_create', '{"payment_amount": -10}',
+    '{"first_payment": {"amount": -10, "salesmethodid": -9701}}'));
+  perform pg_temp.ok('16 partial_create refuses a negative first payment',
+    r = 'BILL_BAD_PAYLOAD: payment_amount must be 0 or more');
+  -- A net sent above the lines' let a part-paid bill record 8000 received on 1000.
+  r := pg_temp.as_admin(pg_temp.create_sql(179, 'partial_create', '{"net_amount": 9000, "payment_amount": 8000}',
+    '{"first_payment": {"amount": 8000, "salesmethodid": -9701}}'));
+  perform pg_temp.ok('16 partial_create ignores a sent net of 9000 on 1000: overpaid', r = 'BILL_OVERPAID');
+  r := pg_temp.as_admin(pg_temp.create_sql(180, 'finalize_create', '{"net_amount": 9000, "payment_amount": 9000}'));
+  perform pg_temp.ok('16 finalize_create ignores a sent net of 9000 on 1000: overpaid', r = 'BILL_OVERPAID');
+  perform pg_temp.ok('16 nothing refused was saved',
+    (select count(*) from public.bills where customerid = -9711) = bills_before
+    and pg_temp.credit(-9711) = 0);
+  -- A sent net below it is not stored either: the bill keeps what the lines come to.
+  j := pg_temp.rpc(pg_temp.create_sql(181, 'partial_create', '{"net_amount": 5, "payment_amount": 400}',
+    '{"first_payment": {"amount": 400, "salesmethodid": -9701}}'));
+  perform pg_temp.ok('16 partial_create stores its own net', (pg_temp.bill((j ->> 'billid')::int)).net_amount = 1000);
+
+  -- The draft ops, the same.
+  d := pg_temp.draft(-9711);
+  r := pg_temp.as_admin_detail(pg_temp.save_sql(182, 'finalize_draft', pg_temp.finish(d, 'finalized',
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+    '{"customerid": -9711, "store_credit_used": -500, "payment_amount": 1600}')));
+  perform pg_temp.ok('16 finalize_draft refuses store_credit_used -500',
+    r = 'BILL_BAD_PAYLOAD: store_credit_used must be 0 or more' and (pg_temp.bill(d)).paymentstatus = 'draft');
+  r := pg_temp.as_admin(pg_temp.save_sql(183, 'partial_draft', pg_temp.finish(d, 'partial',
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)),
+    '{"first_payment": {"amount": 8000, "salesmethodid": -9701}}',
+    '{"customerid": -9711, "net_amount": 9000, "payment_amount": 8000}')));
+  perform pg_temp.ok('16 partial_draft ignores a sent net of 9000 on 1000: overpaid',
+    r = 'BILL_OVERPAID' and (pg_temp.bill(d)).paymentstatus = 'draft');
+  -- A key the draft op leaves out is checked as the draft holds it.
+  update public.bills set exchange_cash_refund = -500 where billid = d;
+  r := pg_temp.as_admin(pg_temp.save_sql(184, 'finalize_draft', pg_temp.finish(d, 'finalized',
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}', '{"customerid": -9711}')));
+  perform pg_temp.ok('16 finalize_draft refuses the draft''s own negative exchange_cash_refund',
+    r = 'BILL_BAD_PAYLOAD' and (pg_temp.bill(d)).paymentstatus = 'draft');
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;

@@ -496,7 +496,7 @@ declare
   bill_txt text := '{"customerid": -9001, "notes": "BSAVE direct", "document_type": "invoice",
     "totalamount": 1234.5649999999999, "gst_total": 0.30000000000000004, "discount_total": 99.995,
     "taxable_total": 1234.565, "paymentstatus": "partial", "finalized": true, "applied_codes": ["BSAVE-TEST"],
-    "payment_amount": 100.005, "net_amount": 1001.005, "final_amount": 2.675, "store_credit_used": 0,
+    "payment_amount": 100.005, "net_amount": 1222.22, "final_amount": 2.675, "store_credit_used": 0,
     "exchange_credit_used": 12.345, "exchange_source_bill": "FY26-TEST", "exchange_cash_refund": 3.335,
     "saleslocationid": -9001, "salesmethodid": -9001, "orderdate": "2026-04-01T00:00:00+05:30"}';
   item_txt text := '{"quantity": 1.2345, "mrp": 1000.555, "variantid": null, "product_name": "BSAVE item",
