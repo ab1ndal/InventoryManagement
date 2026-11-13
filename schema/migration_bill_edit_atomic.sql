@@ -58,6 +58,9 @@
 -- then refuses direct writes of these columns. It also sends discount_codes, which are added to
 -- the bill's discount_usage rows (refused on a draft). Rows already there stay: dropping them
 -- freed a once-per-customer code the bill had used, to be used again. Only bill_cancel removes them.
+-- A customer change moves them to the new customer, so the code counts as used by whoever the
+-- bill is for. A change to no customer (walk-in) leaves them with the old one: customerid cannot
+-- be null, and dropping them would free the code for the old customer again.
 --
 -- A draft stays a draft here: paymentstatus and finalized cannot change on one (BILL_BAD_PAYLOAD).
 -- Finishing it is bill_save's finalize_draft or partial_draft, which record the payment, credit,
@@ -421,8 +424,11 @@ begin
       orderdate = (v_new ->> 'orderdate')::timestamp
     where billid = p_billid;
 
+    -- Uses already recorded stay, under the bill's customer (see the header).
+    if v_customer is distinct from v_bill.customerid and v_customer is not null then
+      update public.discount_usage set customerid = v_customer where billid = p_billid;
+    end if;
     -- Re-finalize records codes the bill did not use before; a draft records none until finished.
-    -- Uses already recorded stay (see the header).
     if p_payload ? 'discount_codes' then
       if v_bill.paymentstatus = 'draft' or jsonb_typeof(p_payload -> 'discount_codes') is distinct from 'array' then
         raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',

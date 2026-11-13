@@ -1200,5 +1200,32 @@ begin
     not exists (select 1 from public.discount_usage where billid = b));
 end $$;
 
+-- G7: since uses stay on an edit, a customer change left them under the old customer: the new
+-- one could use a once-per-customer code again and the old one stayed blocked.
+do $$
+declare
+  x int := pg_temp.newc(-9731, 0);
+  y int := pg_temp.newc(-9732, 0);
+  b int;
+  r text;
+begin
+  update public.discounts set once_per_customer = true where code = 'DFIN-TEST';
+  b := pg_temp.sold(223, 1, 1000, '{"discount_codes": ["DFIN-TEST"]}', jsonb_build_object('customerid', x));
+  r := pg_temp.as_admin(pg_temp.edit_sql(224, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1, 1000)), '{"discount_codes": ["DFIN-TEST"]}',
+    jsonb_build_object('customerid', y, 'applied_codes', jsonb_build_array('DFIN-TEST')))));
+  perform pg_temp.ok('17 G7 customer change moves the bill''s discount use to the new customer',
+    r = 'ok' and (select array_agg(customerid) from public.discount_usage where billid = b) = array[y]);
+  -- To no customer (walk-in): customerid cannot be null, and dropping the use would free the
+  -- code for the old customer, so it stays with them.
+  r := pg_temp.as_admin(pg_temp.edit_sql(225, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1, 1000)), '{}',
+    jsonb_build_object('customerid', null))));
+  perform pg_temp.ok('17 G7 change to walk-in keeps the use with the last customer',
+    r = 'ok' and (pg_temp.bill(b)).customerid is null
+    and (select array_agg(customerid) from public.discount_usage where billid = b) = array[y]);
+  update public.discounts set once_per_customer = false where code = 'DFIN-TEST';
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;
