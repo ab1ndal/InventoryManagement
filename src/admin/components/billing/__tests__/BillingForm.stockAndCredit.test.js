@@ -6,7 +6,7 @@ const mockToasts = [];
 let mockBill;
 const mockUpdates = [];
 const mockSelects = [];
-// Error a direct bills update gets back from the database, if any.
+// Error a direct bills update or bill_edit gets back from the database, if any.
 let mockBillUpdateError = null;
 
 jest.mock("sonner", () => ({
@@ -61,7 +61,10 @@ jest.mock("../../../../lib/supabaseClient", () => ({
     from: (table) => mockChain(table),
     // An opened bill is saved through bill_edit; recorded as that bill's update.
     rpc: (name, args) => {
-      if (name === "bill_edit") mockUpdates.push({ table: "bills", payload: args.p_payload.bill });
+      if (name === "bill_edit") {
+        mockUpdates.push({ table: "bills", payload: args.p_payload.bill });
+        if (mockBillUpdateError) return Promise.resolve({ data: null, error: mockBillUpdateError });
+      }
       return Promise.resolve({ data: { billid: 330, excess: null }, error: null });
     },
     auth: { getSession: async () => ({ data: { session: null } }) },
@@ -187,9 +190,9 @@ test("a draft has used no credit yet, so it still offers the balance like a new 
   expect(screen.getByText("Paid via Store Credit")).toBeInTheDocument();
 });
 
-// Finalize on an opened bill writes the bill directly; when that leaves the customer having paid
-// more than the bill, the database refuses it and staff are sent to Save Changes, which records
-// the refund or store credit.
+// Finalize on an opened bill saves through bill_edit with no excess choice; when that leaves the
+// customer having paid more than the bill, bill_edit refuses it and staff are sent to Save
+// Changes, which asks how to give the difference back.
 test("Finalize below what was paid points staff to Save Changes", async () => {
   mockBill = { ...baseBill, finalized: true, paymentstatus: "finalized", payment_amount: 5000, net_amount: 5000 };
   mockBillUpdateError = { message: "BILL_EXCESS_UNSETTLED" };
@@ -200,4 +203,21 @@ test("Finalize below what was paid points staff to Save Changes", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Confirm & Finalize" }));
 
   await waitFor(() => expect(mockToasts.some((t) => /Use Save Changes to give the difference back/.test(t))).toBe(true));
+});
+
+// What a paid bill holds changes only by recorded money, so bill_edit refuses Finalize lowering the
+// amount received; staff are told how to give money back instead.
+test("Finalize lowering what was received says how to give money back", async () => {
+  mockBill = { ...baseBill, finalized: true, paymentstatus: "finalized", payment_amount: 5000, net_amount: 5000 };
+  mockBillUpdateError = { message: "BILL_RECEIVED_CHANGED" };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(finalize()).toBeEnabled());
+
+  fireEvent.click(finalize());
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm & Finalize" }));
+
+  await waitFor(() => expect(mockToasts).toContain(
+    "The amount received cannot be lowered here. To give money back, take the items off and use Save Changes.",
+  ));
+  expect(mockUpdates.filter((u) => u.table === "bills")).toHaveLength(1);
 });
