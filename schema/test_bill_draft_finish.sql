@@ -646,5 +646,27 @@ begin
     (r ->> 'store_credit_refunded')::numeric + (r ->> 'refund')::numeric + ex = 1000);
 end $$;
 
+-- ---------- 13. a draft is finished only by bill_save ----------
+do $$
+declare
+  d int := pg_temp.draft(-9701);
+  st text;
+begin
+  foreach st in array array['finalized', 'partial'] loop
+    perform pg_temp.ok('13 bill_edit cannot make a draft ' || st, pg_temp.as_admin(pg_temp.edit_sql(130, d,
+      pg_temp.edit(d, 1000, jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+        jsonb_build_object('paymentstatus', st, 'finalized', true, 'payment_amount', 5000)))) = 'BILL_BAD_PAYLOAD');
+  end loop;
+  perform pg_temp.ok('13 nor mark it finalized while calling it a draft', pg_temp.as_admin(pg_temp.edit_sql(131, d,
+    pg_temp.edit(d, 1000, jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"finalized": true}'))) = 'BILL_BAD_PAYLOAD');
+  perform pg_temp.ok('13 the draft is still a draft with nothing received', (pg_temp.bill(d)).paymentstatus = 'draft'
+    and not (pg_temp.bill(d)).finalized and (pg_temp.bill(d)).payment_amount is null
+    and not exists (select 1 from public.bill_payments where billid = d));
+  perform pg_temp.ok('13 Save Changes on a draft still saves', pg_temp.as_admin(pg_temp.edit_sql(132, d,
+    pg_temp.edit(d, 1000, jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"payment_amount": 900}'))) = 'ok' and (pg_temp.bill(d)).payment_amount = 900);
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;

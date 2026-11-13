@@ -43,6 +43,10 @@
 -- then refuses direct writes of these columns. It also sends discount_codes, which replace the
 -- bill's discount_usage rows (refused on a draft).
 --
+-- A draft stays a draft here: paymentstatus and finalized cannot change on one (BILL_BAD_PAYLOAD).
+-- Finishing it is bill_save's finalize_draft or partial_draft, which record the payment, credit,
+-- voucher and exchanges; the screen's Save Changes on a draft sends it back as a draft.
+--
 -- Body copied from schema/migration_bill_edit_excess.sql with the changes above. Same signature,
 -- grants and error codes, plus BILL_ITEM_EXCHANGED and BILL_STALE (a line this window shows was
 -- removed in another) from _bill_lines_save, BILL_CREDIT_CUSTOMER, BILL_RECEIVED_CHANGED and
@@ -149,6 +153,16 @@ begin
       raise exception 'BILL_STALE' using errcode = 'P0001',
         detail = jsonb_build_object('paymentstatus', v_bill.paymentstatus,
                                     'payment_amount', v_bill.payment_amount)::text;
+    end if;
+
+    -- A draft has recorded no payment, taken no credit and spent no voucher or exchange. Finishing
+    -- one does all of that and is bill_save's finalize_draft or partial_draft; here it would let a
+    -- draft become paid with any payment_amount and no payment row, which bill_cancel pays out.
+    if v_bill.paymentstatus = 'draft'
+       and (v_new ->> 'paymentstatus' is distinct from 'draft'
+            or (v_new ->> 'finalized')::boolean is distinct from false) then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = 'a draft is finished only by bill_save';
     end if;
 
     -- The lines first, under the bill lock: a refusal below undoes them with everything else.
