@@ -541,6 +541,8 @@ grant select on public.productimages to anon, authenticated;
 grant select on public.products to authenticated;
 -- live: Supabase default grants; schema/migration_voucher_states.sql revokes the writes
 grant all on public.vouchers to anon, authenticated, service_role;
+-- live: Supabase default grants; schema/migration_exchanges_rpc_only.sql revokes the writes
+grant all on public.exchanges to anon, authenticated, service_role;
 CREATE OR REPLACE FUNCTION public.is_admin()
  RETURNS boolean
  LANGUAGE sql

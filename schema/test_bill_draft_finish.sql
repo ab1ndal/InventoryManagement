@@ -596,5 +596,19 @@ begin
   perform pg_temp.ok('9 voucher_release is gone', to_regprocedure('public.voucher_release(text,int)') is null);
 end $$;
 
+-- ---------- 10. exchanges are written only by the database functions ----------
+do $$
+begin
+  perform pg_temp.ok('10 staff cannot unlink a spent exchange', pg_temp.as_admin(
+    'update public.exchanges set new_billid = null where exchangeid = -9701') = '42501'
+    and (select new_billid from public.exchanges where exchangeid = -9701) is not null);
+  perform pg_temp.ok('10 staff cannot mint exchange credit', pg_temp.as_admin(
+    'insert into public.exchanges (quantity, customerid, credit_amount) values (1, -9701, 5000)') = '42501');
+  perform pg_temp.ok('10 staff cannot delete an exchange', pg_temp.as_admin(
+    'delete from public.exchanges where exchangeid = -9702') = '42501');
+  perform pg_temp.ok('10 staff still read exchanges', pg_temp.as_admin(
+    'select count(*) from public.exchanges') = 'ok');
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;
