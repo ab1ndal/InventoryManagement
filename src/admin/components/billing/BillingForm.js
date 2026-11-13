@@ -1130,6 +1130,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           .from("bill_items")
           .delete()
           .eq("billid", billId);
+        if (delErr?.message?.includes("BILL_ITEM_EXCHANGED")) {
+          throw new Error(
+            "This bill has an exchanged item and cannot be edited safely. Add replacement purchases on a new bill.",
+          );
+        }
         if (delErr)
           throw new Error("Failed to remove old items: " + delErr.message);
 
