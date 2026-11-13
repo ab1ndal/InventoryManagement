@@ -34,6 +34,11 @@
 -- bill that used credit (BILL_CREDIT_CUSTOMER; cancel would give the first customer's credit to
 -- the second). The result gains store_credit_back.
 --
+-- A cancelled bill is locked (schema/migration_bill_status_states.sql): bill_edit refuses it up
+-- front (BILL_BAD_TRANSITION). Its lines were saved before the bills update, which passed the
+-- lock when every column was sent back unchanged, so lines and stock moved on a cancelled bill.
+-- trg_bill_items_cancelled_lock (end of this file) refuses any line write on a cancelled bill too.
+--
 -- What a part-paid or paid bill holds (payment_amount) changes only by recorded money. bill_edit
 -- refuses lowering it (BILL_RECEIVED_CHANGED: give money back by taking items off, which records
 -- the excess) and raising it on a bill paid in instalments (Add Payment records those). On a bill
@@ -168,6 +173,12 @@ begin
       raise exception 'BILL_STALE' using errcode = 'P0001',
         detail = jsonb_build_object('paymentstatus', v_bill.paymentstatus,
                                     'payment_amount', v_bill.payment_amount)::text;
+    end if;
+
+    -- Cancelled bills are locked; bill_cancel already gave back their stock, credit and payment.
+    if v_bill.paymentstatus = 'cancelled' then
+      raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
+        detail = format('bill %s is cancelled and locked', p_billid);
     end if;
 
     -- A draft has recorded no payment, taken no credit and spent no voucher or exchange. Finishing
@@ -426,3 +437,42 @@ $$;
 
 revoke all on function public.bill_edit(uuid, int, jsonb) from public, anon;
 grant execute on function public.bill_edit(uuid, int, jsonb) to authenticated, service_role;
+
+-- A cancelled bill's lines are its record of what was sold and given back. No API caller writes
+-- them, and the bills row's own lock (trg_bills_status_transition) does not cover them. A
+-- cancelled bill cannot be deleted, so no cascade reaches here. A maintenance update of line
+-- text (as the colour and size migrations did) must skip cancelled bills or disable this trigger
+-- for its transaction.
+create or replace function public._bill_items_cancelled_lock()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_billids int[];
+begin
+  if tg_op = 'INSERT' then
+    v_billids := array[new.billid];
+  elsif tg_op = 'DELETE' then
+    v_billids := array[old.billid];
+  else
+    v_billids := array[old.billid, new.billid];
+  end if;
+  if exists (select 1 from public.bills b
+              where b.billid = any (v_billids) and b.paymentstatus = 'cancelled') then
+    raise exception 'BILL_BAD_TRANSITION' using errcode = 'P0001',
+      detail = format('bill %s is cancelled and its lines are locked', v_billids[1]);
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public._bill_items_cancelled_lock() from public, anon, authenticated;
+
+drop trigger if exists trg_bill_items_cancelled_lock on public.bill_items;
+create trigger trg_bill_items_cancelled_lock
+  before insert or update or delete on public.bill_items
+  for each row execute function public._bill_items_cancelled_lock();

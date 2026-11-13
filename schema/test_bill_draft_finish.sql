@@ -1096,6 +1096,44 @@ begin
   perform pg_temp.ok('17 H7 draft, finish, cancel leaves stock as it was', pg_temp.stock(pg_temp.v1()) = s0);
 end $$;
 
+-- H8: bill_edit on a cancelled bill, every column sent back as it is, rewrote its lines and stock.
+do $$
+declare
+  b int := pg_temp.sold(207, 1, 1000, '{}', '{"customerid": -9702}');
+  s1 numeric;
+  r text;
+  p jsonb;
+  li int;
+begin
+  li := pg_temp.line_id(b);
+  perform pg_temp.as_admin(pg_temp.cancel_sql(208, b, 'return_payment'));
+  -- As on production, where staff write lines directly for drafts.
+  grant select, insert, update, delete on public.bill_items to authenticated;
+  s1 := pg_temp.stock(pg_temp.v1());
+  p := (select jsonb_build_object(
+          'expect', jsonb_build_object('paymentstatus', x.paymentstatus, 'payment_amount', x.payment_amount),
+          'bill', jsonb_build_object('customerid', x.customerid, 'notes', x.notes, 'totalamount', x.totalamount,
+            'gst_total', x.gst_total, 'discount_total', x.discount_total, 'taxable_total', x.taxable_total,
+            'net_amount', x.net_amount, 'applied_codes', to_jsonb(x.applied_codes), 'payment_amount', x.payment_amount,
+            'final_amount', x.final_amount, 'saleslocationid', x.saleslocationid, 'salesmethodid', x.salesmethodid,
+            'paymentstatus', x.paymentstatus, 'finalized', x.finalized, 'store_credit_used', x.store_credit_used,
+            'orderdate', x.orderdate),
+          'items', jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1) || '{"quantity": 0.5}'),
+          'salesperson_ids', '[]'::jsonb, 'skip_stock', false)
+        from public.bills x where x.billid = b);
+  r := pg_temp.as_admin(pg_temp.edit_sql(209, b, p));
+  perform pg_temp.ok('17 H8 bill_edit on a cancelled bill refused',
+    r = 'BILL_BAD_TRANSITION' and (select quantity from public.bill_items where bill_item_id = li) = 1
+    and pg_temp.stock(pg_temp.v1()) = s1);
+  perform pg_temp.ok('17 H8 a cancelled bill''s line cannot be updated',
+    pg_temp.as_admin(format('update public.bill_items set quantity = 0.5 where bill_item_id = %s', li)) = 'BILL_BAD_TRANSITION');
+  perform pg_temp.ok('17 H8 nor deleted',
+    pg_temp.as_admin(format('delete from public.bill_items where bill_item_id = %s', li)) = 'BILL_BAD_TRANSITION');
+  perform pg_temp.ok('17 H8 nor a line added',
+    pg_temp.as_admin(format('insert into public.bill_items (billid, quantity, mrp, product_name, subtotal, gst_amount, total) '
+                            'values (%s, 1, 1000, %L, 1000, 0, 1000)', b, 'DFIN item')) = 'BILL_BAD_TRANSITION');
+end $$;
+
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;
