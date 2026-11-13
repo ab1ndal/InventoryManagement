@@ -745,5 +745,103 @@ begin
       '{"payment_amount": 900}'))) = 'ok' and (pg_temp.bill(d)).payment_amount = 900);
 end $$;
 
+-- ---------- 14. a bill cannot record more received than it comes to ----------
+do $$
+declare
+  d int;
+  b int;
+  r jsonb;
+begin
+  perform pg_temp.ok('14 9000 received on a 1000 bill refused', pg_temp.as_admin(pg_temp.save_sql(140, 'finalize_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', -9701, 'notes', 'DFIN over', 'totalamount', 1000,
+        'paymentstatus', 'finalized', 'finalized', true, 'payment_amount', 9000, 'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')))) = 'BILL_OVERPAID');
+  perform pg_temp.ok('14 a rupee past the screen''s ₹100 refused', pg_temp.as_admin(pg_temp.save_sql(141, 'finalize_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', -9701, 'notes', 'DFIN over', 'totalamount', 1000,
+        'paymentstatus', 'finalized', 'finalized', true, 'payment_amount', 1100.01, 'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')))) = 'BILL_OVERPAID');
+  -- The screen and the CLI let staff record up to ₹100 over the total as received.
+  b := pg_temp.sold(142, 1, 1100, '{}', '{"net_amount": null}');
+  perform pg_temp.ok('14 up to ₹100 over is recorded, net stored', (pg_temp.bill(b)).payment_amount = 1100
+    and (pg_temp.bill(b)).net_amount = 1000);
+  -- Credit lowers what is due: 1000 cash on a 1000 bill that also used 400 credit is 400 over.
+  perform pg_temp.ok('14 credit counts against what is due', pg_temp.as_admin(pg_temp.save_sql(143, 'finalize_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', -9701, 'notes', 'DFIN over', 'totalamount', 1000,
+        'paymentstatus', 'finalized', 'finalized', true, 'payment_amount', 1000, 'store_credit_used', 400,
+        'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')))) = 'BILL_OVERPAID');
+
+  d := pg_temp.draft(-9701);
+  perform pg_temp.ok('14 a draft finished with 5000 received on 1000 refused', pg_temp.as_admin(pg_temp.save_sql(144, 'finalize_draft',
+    pg_temp.finish(d, 'finalized', jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"payment_amount": 5000}'))) = 'BILL_OVERPAID' and (pg_temp.bill(d)).paymentstatus = 'draft');
+  perform pg_temp.ok('14 a part-paid finish at or above its net refused', pg_temp.as_admin(pg_temp.save_sql(145, 'partial_draft',
+    pg_temp.finish(d, 'partial', jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)),
+      '{"first_payment": {"amount": 1001, "salesmethodid": -9701}}', '{"payment_amount": 1001, "net_amount": 1000}')))
+    = 'BILL_OVERPAID');
+  perform pg_temp.ok('14 nor a new part-paid one', pg_temp.as_admin(pg_temp.save_sql(146, 'partial_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', -9701, 'notes', 'DFIN over', 'totalamount', 1000,
+        'net_amount', 1000, 'paymentstatus', 'partial', 'finalized', true, 'payment_amount', 9000,
+        'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id'),
+      'first_payment', jsonb_build_object('amount', 9000, 'salesmethodid', -9701)))) = 'BILL_OVERPAID');
+
+  -- A draft's stale net (from its last Save Changes) is replaced by the finish's.
+  update public.bills set net_amount = 5 where billid = d;
+  r := pg_temp.rpc(pg_temp.save_sql(147, 'finalize_draft',
+    pg_temp.finish(d, 'finalized', jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"payment_amount": 1000}')));
+  perform pg_temp.ok('14 finished draft stores its own net', (pg_temp.bill(d)).net_amount = 1000
+    and (pg_temp.bill(d)).payment_amount = 1000);
+end $$;
+
+-- ---------- 15. bills from before net_amount was stored (net null) still edit, exchange, cancel ----------
+-- Most paid-in-one-go bills on production have net_amount null (finalize never wrote it).
+do $$
+declare
+  b int;
+  li int;
+  r jsonb;
+begin
+  insert into public.bills (customerid, notes, document_type, totalamount, gst_total, discount_total, taxable_total,
+                            paymentstatus, finalized, applied_codes, payment_amount, net_amount, salesmethodid,
+                            orderdate, stock_reduced)
+  values (-9701, 'DFIN legacy', 'bos', 1500, 0, 0, 1500, 'finalized', true, '{}', 1500, null, -9701,
+          '2026-11-12', true)
+  returning billid into b;
+  insert into public.bill_items (billid, quantity, mrp, variantid, product_name, product_code, subtotal, gst_amount, total)
+  values (b, 1, 1000, pg_temp.v1(), 'DFIN item', 'DFP1', 1000, 0, 1000)
+  returning bill_item_id into li;
+  insert into public.bill_items (billid, quantity, mrp, variantid, product_name, product_code, subtotal, gst_amount, total)
+  values (b, 1, 500, pg_temp.v2(), 'DFIN item', 'DFP1', 500, 0, 500);
+  perform pg_temp.ok('15 a payment on it is still nothing due', pg_temp.as_admin(format(
+    'select public.bill_add_payment(%L, %s, 100, -9701, null)', pg_temp.k(150), b)) = 'BILL_NOTHING_DUE');
+  perform pg_temp.ok('15 exchange within the cash held recorded', pg_temp.as_admin(format(
+    'select public.exchange_record(%s, -9701, %L)', b,
+    jsonb_build_array(jsonb_build_object('bill_item_id', li, 'quantity', 1, 'credit_amount', 500)))) = 'ok');
+  -- Taking the 500 line off leaves 500 of the 1500 received over; staff put it on store credit.
+  r := pg_temp.rpc(pg_temp.edit_sql(151, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1)),
+    '{"excess": {"mode": "store_credit", "amount": 500}}')));
+  perform pg_temp.ok('15 edit settles the excess over a null net', (r -> 'excess' ->> 'amount')::numeric = 500
+    and (pg_temp.bill(b)).net_amount = 1000 and (pg_temp.bill(b)).payment_amount = 1000
+    and (select sum(amount) from public.bill_payments where billid = b) = 1000);
+  r := pg_temp.rpc(format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(152), b, 'return_payment',
+    jsonb_build_object('expect', jsonb_build_object('finalized', true, 'paymentstatus', 'finalized'))));
+  perform pg_temp.ok('15 cancel pays back the cash held less exchange credit: 1500 out in all',
+    (r ->> 'refund')::numeric = 500);
+
+  -- Cancelled straight away, a null-net bill refunds what was received.
+  insert into public.bills (customerid, notes, document_type, totalamount, paymentstatus, finalized, payment_amount,
+                            net_amount, salesmethodid, orderdate, stock_reduced)
+  values (-9701, 'DFIN legacy', 'bos', 1000, 'finalized', true, 1000, null, -9701, '2026-11-12', false)
+  returning billid into b;
+  insert into public.bill_items (billid, quantity, mrp, variantid, product_name, product_code, subtotal, gst_amount, total)
+  values (b, 1, 1000, pg_temp.v1(), 'DFIN item', 'DFP1', 1000, 0, 1000);
+  r := pg_temp.rpc(format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(153), b, 'return_payment',
+    jsonb_build_object('expect', jsonb_build_object('finalized', true, 'paymentstatus', 'finalized'))));
+  perform pg_temp.ok('15 cancel refunds the 1000 received', (r ->> 'refund')::numeric = 1000);
+end $$;
+
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;

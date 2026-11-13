@@ -78,6 +78,7 @@ const BILL_SAVE_ERRORS = {
   BILL_KEY_CONFLICT: "A bill from this window may already be saved. Close this window and check the bill list before entering it again.",
   BILL_STALE: BILL_CHANGED_MESSAGE,
   BILL_ITEM_EXCHANGED: EXCHANGED_LINE_MESSAGE,
+  BILL_OVERPAID: "The amount received is more than the bill's total. Nothing was saved. Check the amount.",
 };
 
 // BILL_CREDIT_SHORT: the customer's store credit was spent elsewhere (another window, another bill)

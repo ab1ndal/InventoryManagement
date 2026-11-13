@@ -53,6 +53,15 @@
 -- screen sends either the balance as it read it or the bill total, both in paise. A draft op with
 -- store_credit_used left out takes the figure the draft row holds, which it keeps.
 --
+-- What the shop is paid, on every op: net is the net_amount sent (the part-paid ops send it), or
+-- totalamount less store and exchange credit used (the screen's computeCreditsApplied). A paid
+-- bill may record up to ₹100 more than its net, the screen's and the CLI's own limit ("Must be
+-- within ₹100": cash handed over and kept); a part-paid bill a rupee less, as bill_edit and
+-- bill_add_payment. Beyond that: BILL_OVERPAID, detail {net, payment_amount}. bill_cancel refunds
+-- payment_amount, so a typo of 9000 on a 1000 bill would otherwise be paid out (or put on store
+-- credit) as if received. The finalize ops do not send net_amount; the bill now stores the net
+-- worked out here (it was left null, or a draft kept the stale net of its last Save Changes).
+--
 -- Lock order for the draft ops: bill, voucher, lines, variants, customer, exchanges. bill_cancel
 -- and bill_edit take the bill first too; exchange_record takes the bill before its lines.
 --
@@ -60,9 +69,9 @@
 -- (schema/migration_bill_edit_atomic.sql).
 --
 -- Body copied from schema/migration_bill_save_app_callers.sql (the latest definition); the create
--- ops are unchanged apart from the exchange and store credit checks above. Same signature, grants
--- and error codes, plus BILL_STALE, BILL_EXCHANGE_CUSTOMER, BILL_EXCHANGE_OVER and
--- BILL_CREDIT_SHORT.
+-- ops are unchanged apart from the exchange, store credit and amount received checks above. Same
+-- signature, grants and error codes, plus BILL_STALE, BILL_EXCHANGE_CUSTOMER, BILL_EXCHANGE_OVER,
+-- BILL_CREDIT_SHORT and BILL_OVERPAID.
 --
 -- Run after schema/migration_voucher_states.sql (voucher_state) and before the app version that
 -- calls these ops.
@@ -261,6 +270,11 @@ declare
     'exchange_balance_to_credit', 'first_payment', 'discount_codes', 'billid'];
   c_expect_keys constant text[] := array['paymentstatus', 'payment_amount'];
   c_payment_keys constant text[] := array['amount', 'salesmethodid', 'recorded_at'];
+  -- Same as PAID_IN_FULL_TOLERANCE in paymentHelpers.js and bill_add_payment.
+  c_paid_in_full_tolerance constant numeric := 1;
+  -- How far a paid bill's amount received may be above its net: the screen's "Must be within
+  -- ₹100" (BillingForm.openFinalizeConfirm) and the CLI's PAYMENT_TOLERANCE.
+  c_received_over_net constant numeric := 100;
   -- Each of the three exchange figures is rounded to paise in the browser.
   c_exchange_rounding constant numeric := 0.01;
 
@@ -281,6 +295,8 @@ declare
   v_exchange_balance numeric;
   v_exchange_total numeric;
   v_credit_used numeric;
+  v_net numeric;
+  v_paid numeric;
   v_variants uuid[];
   v_count int;
   v_linked int;
@@ -434,6 +450,17 @@ begin
     -- A draft op keeps a store_credit_used left out of the payload, so it takes that figure too.
     v_credit_used := round(coalesce((v_bill ->> 'store_credit_used')::numeric,
                                     case when v_draft then v_draft_row.store_credit_used end, 0), 2);
+    -- The net the part-paid ops send, or the one the finalize ops leave out worked out as the
+    -- screen does. Other keys left out of a draft op keep the draft's value, so they are read
+    -- the same way; the draft's own net_amount is not (see the header).
+    v_net := round(coalesce((v_bill ->> 'net_amount')::numeric,
+                            greatest(0, coalesce((v_bill ->> 'totalamount')::numeric,
+                                                 case when v_draft then v_draft_row.totalamount end, 0)
+                                        - v_credit_used
+                                        - coalesce((v_bill ->> 'exchange_credit_used')::numeric,
+                                                   case when v_draft then v_draft_row.exchange_credit_used end, 0))), 2);
+    v_paid := round(coalesce((v_bill ->> 'payment_amount')::numeric,
+                             case when v_draft then v_draft_row.payment_amount end, 0), 2);
     v_exchange_ids := array(
       select distinct e::int
         from jsonb_array_elements_text(coalesce(nullif(p_payload -> 'exchange_ids', 'null'::jsonb), '[]'::jsonb)) e);
@@ -468,7 +495,8 @@ begin
                              when v_bill -> 'applied_codes' = 'null'::jsonb then null
                              else array(select jsonb_array_elements_text(v_bill -> 'applied_codes')) end,
         payment_amount = case when v_bill ? 'payment_amount' then (v_bill ->> 'payment_amount')::numeric else b.payment_amount end,
-        net_amount = case when v_bill ? 'net_amount' then (v_bill ->> 'net_amount')::numeric else b.net_amount end,
+        -- Not the draft's own: that is the net of its last Save Changes, which may be stale.
+        net_amount = v_net,
         final_amount = case when v_bill ? 'final_amount' then (v_bill ->> 'final_amount')::numeric else b.final_amount end,
         store_credit_used = case when v_bill ? 'store_credit_used' then (v_bill ->> 'store_credit_used')::numeric else b.store_credit_used end,
         exchange_credit_used = case when v_bill ? 'exchange_credit_used' then (v_bill ->> 'exchange_credit_used')::numeric else b.exchange_credit_used end,
@@ -547,6 +575,12 @@ begin
         detail = jsonb_build_object('exchange_credit', round(v_exchange_total, 2))::text;
     end if;
 
+    if (v_status = 'finalized' and v_paid - v_net > c_received_over_net)
+       or (v_status = 'partial' and v_paid - v_net >= c_paid_in_full_tolerance) then
+      raise exception 'BILL_OVERPAID' using errcode = 'P0001',
+        detail = jsonb_build_object('net', v_net, 'payment_amount', v_paid)::text;
+    end if;
+
     if not v_draft then
       -- orderdate is cast straight to timestamp, which drops the +05:30 and keeps the date the
       -- client sent. Going through timestamptz would move it to the previous day, which can
@@ -570,7 +604,7 @@ begin
              when v_bill -> 'applied_codes' = 'null'::jsonb then null
              else array(select jsonb_array_elements_text(v_bill -> 'applied_codes')) end,
         (v_bill ->> 'payment_amount')::numeric,
-        (v_bill ->> 'net_amount')::numeric,
+        v_net,
         (v_bill ->> 'final_amount')::numeric,
         case when v_bill ? 'store_credit_used' then (v_bill ->> 'store_credit_used')::numeric else 0 end,
         case when v_bill ? 'exchange_credit_used' then (v_bill ->> 'exchange_credit_used')::numeric else 0 end,

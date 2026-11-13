@@ -355,6 +355,17 @@ test("new partial: store credit spent elsewhere is refused in plain words, with 
   expect(writesOtherThanSave()).toEqual([]);
 });
 
+test("new partial: more received than the bill comes to is refused in plain words", async () => {
+  mockDb.rpcResult = mockSaveRefused("BILL_OVERPAID", '{"net": 1000, "payment_amount": 9000}');
+  await renderUnpaidBill();
+  fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(mockToast.error[0][0]).toBe("The amount received is more than the bill's total. Nothing was saved. Check the amount.");
+  expect(writesOtherThanSave()).toEqual([]);
+});
+
 test("a successful finalize does not lock the form", async () => {
   const onSubmit = jest.fn();
   await renderBillPaidByStoreCredit(onSubmit);
