@@ -5,6 +5,8 @@
 #   scripts/test-db.sh sql <the migrations listed in schema/test_online_orders_holds.sql>
 #   scripts/test-db.sh sql schema/migration_bill_save.sql
 #   scripts/test-db.sh sql <the bill migrations listed in schema/test_bill_excess_credit.sql, from bill_stock_reduced>
+#   scripts/test-db.sh sql <the later bill and voucher migrations, through migration_bill_save_drafts.sql
+#                           and after it, for the finalize_draft cases>
 #   schema/test_harness/concurrency_test.sh
 # Session A confirms an order that holds the last unit and keeps its transaction open;
 # session B confirms a second order for the same unit (one from before stock holds, so it
@@ -636,7 +638,8 @@ cleanup_bill_save
 # ---- voucher_redeem while bill_cancel holds the same bill: the redeem waits, then sees the bill
 # cancelled and is refused, so the voucher is never spent on a cancelled bill. Needs
 # schema/migration_bill_cancel.sql and schema/migration_voucher_states.sql. ----
-if [ "$("${PSQL[@]}" -c "select to_regprocedure('public.voucher_release(text,int)') is not null")" = "t" ]; then
+# Detected by voucher_state: schema/migration_voucher_redeem_internal.sql drops voucher_release later.
+if [ "$("${PSQL[@]}" -c "select to_regproc('public.voucher_state') is not null")" = "t" ]; then
   VC_CANCEL="select public.bill_cancel('cccc0000-0000-4000-8000-0000000000c1', -9201, 'return_payment',
     '{\"expect\": {\"finalized\": true, \"paymentstatus\": \"finalized\"}, \"restore_older_stock\": true}')"
   vc_cleanup() {
@@ -742,6 +745,128 @@ echo "exchange vs cancel: B_rc=$EC_B_RC waitedB=${EC_WAITED}s exchanges=$EC_EXCH
 [ "$EC_B_RC" != "0" ] && grep -q 'EXCHANGE_BILL_NOT_FINAL' "$OUT/ec_b_err" || { echo "FAIL: the exchange should be refused on the cancelled bill"; fail=1; }
 [ "$EC_EXCHANGES" = "0" ] && [ "$EC_CREDIT" = "1000.00" ] && [ "$EC_STATUS" = "cancelled" ] || { echo "FAIL: only the cancel's 1000 credit should be given"; fail=1; }
 [ "$EC_WAITED" -ge 1 ] || { echo "FAIL: the exchange did not wait for the cancel's bill lock"; fail=1; }
+
+# ---- bill_save finalize_draft on a saved draft vs bill_cancel, vs a second finish spending the same
+# exchange, and vs exchange_record. Needs schema/migration_bill_save_drafts.sql. ----
+if "${PSQL[@]}" -c "select prosrc like '%finalize_draft%' from pg_proc where proname = 'bill_save'" | grep -q t; then
+  df_cleanup() {
+    "${PSQL[@]}" > /dev/null <<SQL
+delete from public.exchanges where exchangeid between -9799 and -9790
+   or original_bill_item_id in (select bi.bill_item_id from public.bill_items bi join public.bills b using (billid)
+                                 where b.notes = '$BS_NOTE');
+SQL
+    cleanup_bill_edit
+  }
+  df_fixture() {
+    bs_fixture 5
+    "${PSQL[@]}" > /dev/null <<SQL
+insert into public.customers (customerid, customer_ulid, first_name, store_credit) values (-9701, 'CONCEDITFIXTURE00000000001', 'Conc', 0);
+insert into public.salesmethods (salesmethodid, methodname) values (-9701, 'Conc cash');
+insert into public.exchanges (exchangeid, quantity, customerid, credit_amount) values (-9791, 1, -9701, 300);
+SQL
+  }
+  # A draft as the screen's Save Draft makes it: bill row, one line, stock taken. Prints "billid line".
+  df_draft() {
+    "${PSQL[@]}" -c "with b as (insert into public.bills (customerid, notes, paymentstatus, finalized, totalamount, salesmethodid, stock_reduced)
+        values (-9701, '$BS_NOTE', 'draft', false, 1000, -9701, true) returning billid),
+      i as (insert into public.bill_items (billid, quantity, mrp, variantid, product_name, subtotal, gst_amount, total)
+        select billid, 1, 1000, '$BS_V', 'Conc', 1000, 0, 1000 from b returning billid, bill_item_id),
+      s as (select public._stock_apply('$BS_V', -1))
+      select billid || ' ' || bill_item_id from i, s"
+  }
+  df_finish() { # key op billid line [exchange]
+    local status=finalized paid=700 extra=''
+    [ "$2" = partial_draft ] && status=partial && extra=",\"first_payment\":{\"amount\":700,\"salesmethodid\":-9701}"
+    echo "select public.bill_save('$(bs_key "$1")', '$2', '{\"billid\":$3,\"expect\":{\"paymentstatus\":\"draft\",\"payment_amount\":null},\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"$status\",\"finalized\":true,\"payment_amount\":$paid,\"net_amount\":700,\"exchange_credit_used\":300,\"salesmethodid\":-9701},\"items\":[{\"bill_item_id\":$4,\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}],\"exchange_ids\":[-9791]$extra}')"
+  }
+  DF_CANCEL_EXPECT='{"expect":{"finalized":false,"paymentstatus":"draft"}}'
+
+  # 1. A cancels the draft and holds; B finishes it from a screen opened before. B waits for the
+  # bill lock, then finds it cancelled: BILL_STALE, and the exchange stays unspent.
+  df_fixture
+  read -r DF_BILL DF_LINE <<< "$(df_draft)"
+  "${PSQL[@]}" -c "begin" -c "select public.bill_cancel('$(bs_key 20)', $DF_BILL, 'draft', '$DF_CANCEL_EXPECT')" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+  PID_DF=$!
+  sleep 0.5
+  set +e
+  START=$(date +%s)
+  "${PSQL[@]}" -c "$(df_finish 21 finalize_draft "$DF_BILL" "$DF_LINE")" > /dev/null 2> "$OUT/df1_b_err"
+  DF_B_RC=$?
+  DF_WAITED=$(( $(date +%s) - START ))
+  set -e
+  wait "$PID_DF"
+  read -r DF_STATUS DF_LINKED DF_STOCK <<< "$("${PSQL[@]}" -c "select (select paymentstatus from public.bills where billid = $DF_BILL) || ' ' || (select count(new_billid) from public.exchanges where exchangeid = -9791) || ' ' || (select stock from public.productsizecolors where variantid = '$BS_V')")"
+  df_cleanup
+  echo "finalize_draft vs cancel: B_rc=$DF_B_RC waitedB=${DF_WAITED}s status=$DF_STATUS linked=$DF_LINKED stock=$DF_STOCK B_err=$(tr '\n' ' ' < "$OUT/df1_b_err")"
+  [ "$DF_B_RC" != "0" ] && grep -q 'BILL_STALE' "$OUT/df1_b_err" || { echo "FAIL: finishing a draft being cancelled should be stale"; fail=1; }
+  [ "$DF_STATUS" = "cancelled" ] && [ "$DF_LINKED" = "0" ] && [ "$DF_STOCK" = "5.000" ] || { echo "FAIL: the cancel alone should stand"; fail=1; }
+  [ "$DF_WAITED" -ge 1 ] || { echo "FAIL: the finish did not wait for the cancel's bill lock"; fail=1; }
+
+  # 2. The other way round: A finishes and holds; B cancels the draft it loaded. B waits, then the
+  # bill is finalized: BILL_STALE, and the finish stands with its exchange.
+  df_fixture
+  read -r DF_BILL DF_LINE <<< "$(df_draft)"
+  "${PSQL[@]}" -c "begin" -c "$(df_finish 22 finalize_draft "$DF_BILL" "$DF_LINE")" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+  PID_DF=$!
+  sleep 0.5
+  set +e
+  START=$(date +%s)
+  "${PSQL[@]}" -c "select public.bill_cancel('$(bs_key 23)', $DF_BILL, 'draft', '$DF_CANCEL_EXPECT')" > /dev/null 2> "$OUT/df2_b_err"
+  DF_B_RC=$?
+  DF_WAITED=$(( $(date +%s) - START ))
+  set -e
+  wait "$PID_DF"
+  read -r DF_STATUS DF_LINKED <<< "$("${PSQL[@]}" -c "select (select paymentstatus from public.bills where billid = $DF_BILL) || ' ' || (select coalesce(new_billid, 0) from public.exchanges where exchangeid = -9791)")"
+  df_cleanup
+  echo "cancel vs finalize_draft: B_rc=$DF_B_RC waitedB=${DF_WAITED}s status=$DF_STATUS linked=$DF_LINKED B_err=$(tr '\n' ' ' < "$OUT/df2_b_err")"
+  [ "$DF_B_RC" != "0" ] && grep -q 'BILL_STALE' "$OUT/df2_b_err" || { echo "FAIL: cancelling a draft being finished should be stale"; fail=1; }
+  [ "$DF_STATUS" = "finalized" ] && [ "$DF_LINKED" = "$DF_BILL" ] || { echo "FAIL: the finish alone should stand"; fail=1; }
+  [ "$DF_WAITED" -ge 1 ] || { echo "FAIL: the cancel did not wait for the finish's bill lock"; fail=1; }
+
+  # 3. Two drafts finished at once with the same exchange credit: A holds; B (part-paid finish)
+  # waits on the exchange row, then finds it spent: BILL_EXCHANGE_USED. The credit is spent once.
+  df_fixture
+  read -r DF_BILL DF_LINE <<< "$(df_draft)"
+  read -r DF_BILL2 DF_LINE2 <<< "$(df_draft)"
+  "${PSQL[@]}" -c "begin" -c "$(df_finish 24 finalize_draft "$DF_BILL" "$DF_LINE")" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+  PID_DF=$!
+  sleep 0.5
+  set +e
+  START=$(date +%s)
+  "${PSQL[@]}" -c "$(df_finish 25 partial_draft "$DF_BILL2" "$DF_LINE2")" > /dev/null 2> "$OUT/df3_b_err"
+  DF_B_RC=$?
+  DF_WAITED=$(( $(date +%s) - START ))
+  set -e
+  wait "$PID_DF"
+  read -r DF_LINKED DF_STATUS2 <<< "$("${PSQL[@]}" -c "select (select coalesce(new_billid, 0) from public.exchanges where exchangeid = -9791) || ' ' || (select paymentstatus from public.bills where billid = $DF_BILL2)")"
+  df_cleanup
+  echo "two finishes, one exchange: B_rc=$DF_B_RC waitedB=${DF_WAITED}s linked=$DF_LINKED statusB=$DF_STATUS2 B_err=$(tr '\n' ' ' < "$OUT/df3_b_err")"
+  [ "$DF_B_RC" != "0" ] && grep -q 'BILL_EXCHANGE_USED' "$OUT/df3_b_err" || { echo "FAIL: the second finish should find the exchange spent"; fail=1; }
+  [ "$DF_LINKED" = "$DF_BILL" ] && [ "$DF_STATUS2" = "draft" ] || { echo "FAIL: the exchange should pay for the first bill only"; fail=1; }
+  [ "$DF_WAITED" -ge 1 ] || { echo "FAIL: the second finish did not wait for the exchange lock"; fail=1; }
+
+  # 4. A finishes the draft and holds; B records an exchange on its line. B waits for the bill lock,
+  # then sees a paid bill and its kept line, and records the exchange within the cash held (700).
+  df_fixture
+  read -r DF_BILL DF_LINE <<< "$(df_draft)"
+  "${PSQL[@]}" -c "begin" -c "$(df_finish 26 finalize_draft "$DF_BILL" "$DF_LINE")" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+  PID_DF=$!
+  sleep 0.5
+  set +e
+  START=$(date +%s)
+  "${PSQL[@]}" -c "select public.exchange_record($DF_BILL, -9701, '[{\"bill_item_id\":$DF_LINE,\"quantity\":1,\"credit_amount\":700,\"reason\":\"conc\"}]')" > /dev/null 2> "$OUT/df4_b_err"
+  DF_B_RC=$?
+  DF_WAITED=$(( $(date +%s) - START ))
+  set -e
+  wait "$PID_DF"
+  DF_EXCHANGES="$("${PSQL[@]}" -c "select count(*) from public.exchanges where original_bill_item_id = $DF_LINE")"
+  df_cleanup
+  echo "exchange_record vs finalize_draft: B_rc=$DF_B_RC waitedB=${DF_WAITED}s exchanges=$DF_EXCHANGES B_err=$(tr '\n' ' ' < "$OUT/df4_b_err")"
+  [ "$DF_B_RC" = "0" ] && [ "$DF_EXCHANGES" = "1" ] || { echo "FAIL: the exchange should be recorded on the finished bill's kept line"; fail=1; }
+  [ "$DF_WAITED" -ge 1 ] || { echo "FAIL: the exchange did not wait for the finish's bill lock"; fail=1; }
+else
+  echo "finalize_draft cases: skipped (schema/migration_bill_save_drafts.sql not applied)"
+fi
 
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"
