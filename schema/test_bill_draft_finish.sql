@@ -646,6 +646,83 @@ begin
     (r ->> 'store_credit_refunded')::numeric + (r ->> 'refund')::numeric + ex = 1000);
 end $$;
 
+-- ---------- 12. a bill records exactly the store credit the ledger took ----------
+do $$
+declare
+  d int;
+  b int;
+  r jsonb;
+  before_ledger int;
+begin
+  insert into public.customers (customerid, customer_ulid, first_name, store_credit) values
+    (-9707, 'DFINFIXTURE000000000000007', 'Twice', 500),
+    (-9708, 'DFINFIXTURE000000000000008', 'Held', 400);
+
+  -- -9702 has no credit. Before, the finish recorded 800 and took 0 (the floor at the balance),
+  -- and bill_edit cutting it to 0 then gave 800 back: credit minted.
+  d := pg_temp.draft(-9702);
+  perform pg_temp.ok('12 credit the customer does not have is refused', pg_temp.as_admin(pg_temp.save_sql(120, 'finalize_draft',
+    pg_temp.finish(d, 'finalized', jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"customerid": -9702, "store_credit_used": 800, "payment_amount": 200}'))) = 'BILL_CREDIT_SHORT');
+  perform pg_temp.ok('12 refused finish leaves the draft and the balance', (pg_temp.bill(d)).paymentstatus = 'draft'
+    and (pg_temp.bill(d)).store_credit_used = 0 and pg_temp.credit(-9702) = 0
+    and not exists (select 1 from public.store_credit_ledger where customerid = -9702));
+  -- So an edit cutting the credit to 0 has none to give back that was never taken.
+  perform pg_temp.as_admin(pg_temp.edit_sql(121, d,
+    pg_temp.edit(d, 1000, jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"store_credit_used": 0}')));
+  perform pg_temp.ok('12 no credit minted by a later edit', pg_temp.credit(-9702) = 0);
+
+  -- The same 500 spent from two windows: the second finds it gone.
+  d := pg_temp.draft(-9707);
+  b := pg_temp.sold(122, 1, 500, '{}', '{"customerid": -9707, "store_credit_used": 500, "net_amount": 500}');
+  perform pg_temp.ok('12 first bill took the 500', pg_temp.credit(-9707) = 0 and (pg_temp.bill(b)).store_credit_used = 500
+    and (select sum(delta) from public.store_credit_ledger where customerid = -9707 and ref_id = b::text) = -500);
+  perform pg_temp.ok('12 stale draft cannot spend it again', pg_temp.as_admin(pg_temp.save_sql(123, 'finalize_draft',
+    pg_temp.finish(d, 'finalized', jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"customerid": -9707, "store_credit_used": 500, "payment_amount": 500}'))) = 'BILL_CREDIT_SHORT');
+  perform pg_temp.ok('12 second window''s new bill cannot either', pg_temp.as_admin(pg_temp.save_sql(124, 'finalize_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', -9707, 'notes', 'DFIN twice', 'totalamount', 1000,
+        'paymentstatus', 'finalized', 'finalized', true, 'payment_amount', 500, 'store_credit_used', 500,
+        'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')))) = 'BILL_CREDIT_SHORT');
+  perform pg_temp.ok('12 nor a part-paid one', pg_temp.as_admin(pg_temp.save_sql(125, 'partial_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', -9707, 'notes', 'DFIN twice', 'totalamount', 1000,
+        'net_amount', 500, 'paymentstatus', 'partial', 'finalized', true, 'payment_amount', 0,
+        'store_credit_used', 500, 'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')))) = 'BILL_CREDIT_SHORT');
+  perform pg_temp.ok('12 store credit on a bill with no customer refused', pg_temp.as_admin(pg_temp.save_sql(126, 'finalize_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', null, 'notes', 'DFIN nobody', 'totalamount', 1000,
+        'paymentstatus', 'finalized', 'finalized', true, 'payment_amount', 990, 'store_credit_used', 10,
+        'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')))) = 'BILL_CREDIT_SHORT');
+
+  -- The whole balance, to the paisa, is fine; a paisa more is not.
+  perform pg_temp.ok('12 a paisa over the balance refused', pg_temp.as_admin(pg_temp.save_sql(127, 'finalize_create',
+    jsonb_build_object('bill', jsonb_build_object('customerid', -9708, 'notes', 'DFIN edge', 'totalamount', 1000,
+        'paymentstatus', 'finalized', 'finalized', true, 'payment_amount', 599.99, 'store_credit_used', 400.01,
+        'salesmethodid', -9701),
+      'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), 1) - 'bill_item_id')))) = 'BILL_CREDIT_SHORT');
+
+  -- H3: a draft holding store_credit_used (from before the direct-write lock) and a finish that
+  -- leaves the key out. Before, the bill kept 300 and the ledger took nothing.
+  d := pg_temp.draft(-9708);
+  update public.bills set store_credit_used = 300 where billid = d;
+  before_ledger := (select count(*) from public.store_credit_ledger where customerid = -9708);
+  r := pg_temp.rpc(pg_temp.save_sql(128, 'finalize_draft',
+    pg_temp.finish(d, 'finalized', jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"customerid": -9708, "payment_amount": 700}') #- '{bill,store_credit_used}'));
+  perform pg_temp.ok('12 a draft''s own credit figure is taken when the finish leaves it out',
+    (pg_temp.bill(d)).store_credit_used = 300 and pg_temp.credit(-9708) = 100
+    and (select count(*) from public.store_credit_ledger where customerid = -9708) = before_ledger + 1
+    and (select delta from public.store_credit_ledger where customerid = -9708 and ref_id = d::text) = -300);
+  d := pg_temp.draft(-9702);
+  update public.bills set store_credit_used = 300 where billid = d;
+  perform pg_temp.ok('12 and refused when the balance is short', pg_temp.as_admin(pg_temp.save_sql(129, 'finalize_draft',
+    pg_temp.finish(d, 'finalized', jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+      '{"customerid": -9702, "payment_amount": 700}') #- '{bill,store_credit_used}')) = 'BILL_CREDIT_SHORT');
+end $$;
+
 -- ---------- 13. a draft is finished only by bill_save ----------
 do $$
 declare

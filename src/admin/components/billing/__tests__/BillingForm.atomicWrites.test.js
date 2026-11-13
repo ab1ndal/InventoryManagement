@@ -340,6 +340,21 @@ test("new partial: exchange credit already used elsewhere is refused with nothin
   expect(writesOtherThanSave()).toEqual([]);
 });
 
+test("new partial: store credit spent elsewhere is refused in plain words, with the balance now held", async () => {
+  mockDb.rpcResult = mockSaveRefused("BILL_CREDIT_SHORT", '{"balance": 120.5, "requested": 500}');
+  await renderUnpaidBill();
+  fireEvent.click(await screen.findByRole("button", { name: "Partial Payment" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Partial Payment" }));
+  await waitFor(() => expect(mockToast.error.length).toBeGreaterThan(0));
+
+  expect(mockToast.error[0][0]).toBe(
+    "This customer's store credit is now ₹120.50, less than this bill uses (it was used on another bill). " +
+      "Nothing was saved. Remove the customer and choose them again to load the new balance.",
+  );
+  expect(screen.queryByText(/was saved but not finished/)).not.toBeInTheDocument();
+  expect(writesOtherThanSave()).toEqual([]);
+});
+
 test("a successful finalize does not lock the form", async () => {
   const onSubmit = jest.fn();
   await renderBillPaidByStoreCredit(onSubmit);

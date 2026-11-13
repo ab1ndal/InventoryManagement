@@ -333,18 +333,25 @@ begin
   perform pg_temp.ok('row11 reason', (select reason from public.bill_stock_moves where billid = (r ->> 'billid')::int) = 'bill_partial_finalize');
 end $$;
 
--- ---------- store credit floor and exchange balance, as on the screen ----------
+-- ---------- store credit and exchange balance, as on the screen ----------
+-- A bill records exactly the credit the ledger takes (schema/migration_bill_save_drafts.sql). It used
+-- to keep the client's figure and take only the balance, so the difference came back on cancel.
 do $$
 declare
+  before jsonb := pg_temp.state();
   r jsonb;
 begin
+  perform pg_temp.ok('credit above the balance refused', pg_temp.try(pg_temp.k(11), 'finalize_create',
+    pg_temp.final_pl(pg_temp.v1(), 1, '{"exchange_balance_to_credit": 75.555, "exchange_ids": [-9003]}',
+                     '{"customerid": -9002, "store_credit_used": 80}')) = 'BILL_CREDIT_SHORT');
+  perform pg_temp.ok('refused credit changes nothing', pg_temp.state() = before);
   r := pg_temp.call(pg_temp.k(11), 'finalize_create',
     -- The balance needs exchange credit behind it (schema/migration_bill_save_drafts.sql).
     pg_temp.final_pl(pg_temp.v1(), 1, '{"exchange_balance_to_credit": 75.555, "exchange_ids": [-9003]}',
-                     '{"customerid": -9002, "store_credit_used": 80}'));
-  perform pg_temp.ok('credit floor: bill keeps the client figure',
-    (select store_credit_used from public.bills where billid = (r ->> 'billid')::int) = 80);
-  perform pg_temp.ok('credit floor: only the balance is taken', (
+                     '{"customerid": -9002, "store_credit_used": 50}'));
+  perform pg_temp.ok('credit: bill records what was taken',
+    (select store_credit_used from public.bills where billid = (r ->> 'billid')::int) = 50);
+  perform pg_temp.ok('credit: the whole balance is taken', (
     select count(*) from public.store_credit_ledger
      where customerid = -9002 and delta = -50 and balance_after = 0 and reason = 'bill_finalize' and ref_id = r ->> 'billid') = 1);
   perform pg_temp.ok('exchange balance added after, rounded as store_credit_adjust', (
@@ -358,10 +365,8 @@ begin
     select count(*) from public.store_credit_ledger
      where customerid = -9002 and delta = -10.5 and reason = 'bill_partial_finalize' and ref_id = r ->> 'billid') = 1);
 
-  r := pg_temp.call(pg_temp.k(13), 'finalize_create',
-    pg_temp.final_pl(pg_temp.v1(), 1, '{}', '{"customerid": null, "store_credit_used": 10}'));
-  perform pg_temp.ok('no customer, no credit move', (
-    select count(*) from public.store_credit_ledger where ref_id = r ->> 'billid') = 0);
+  perform pg_temp.ok('no customer, no credit to take', pg_temp.try(pg_temp.k(13), 'finalize_create',
+    pg_temp.final_pl(pg_temp.v1(), 1, '{}', '{"customerid": null, "store_credit_used": 10}')) = 'BILL_CREDIT_SHORT');
 end $$;
 
 -- ---------- refused requests: unsupported ops, refused keys, structure ----------

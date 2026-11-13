@@ -80,6 +80,14 @@ const BILL_SAVE_ERRORS = {
   BILL_ITEM_EXCHANGED: EXCHANGED_LINE_MESSAGE,
 };
 
+// BILL_CREDIT_SHORT: the customer's store credit was spent elsewhere (another window, another bill)
+// since this screen loaded it. bill_save's detail is {balance, requested}.
+const creditShortMessage = (details) => {
+  const { balance } = JSON.parse(details || "{}");
+  const now = balance == null ? "" : ` is now ₹${Number(balance).toFixed(2)}`;
+  return `This customer's store credit${now}, less than this bill uses (it was used on another bill). Nothing was saved. Remove the customer and choose them again to load the new balance.`;
+};
+
 const EXCESS_USE_SAVE_CHANGES =
   "The customer has paid more than this bill now comes to. Use Save Changes to give the difference back as store credit or a refund.";
 
@@ -989,6 +997,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         `Voucher ${payload.voucher_id} can no longer be used (already redeemed, expired or reserved for an online order). Bill not finalized.`,
       );
     }
+    if (error.message === "BILL_CREDIT_SHORT") throw new Error(creditShortMessage(error.details));
     throw new Error(
       BILL_SAVE_ERRORS[error.message] ||
         "Failed to save bill: " + error.message + (error.details ? ` (${error.details})` : ""),

@@ -44,6 +44,15 @@
 -- The voucher must be available, or already redeemed on this same draft (a finish of the old
 -- screen that redeemed and then failed): BILL_VOUCHER_REFUSED otherwise.
 --
+-- Store credit, on every op: the bill records exactly what the ledger takes. Before, the create
+-- ops recorded the client's store_credit_used but took only what the balance held (floored at 0,
+-- as the screen's storeCreditDeductionDelta), so the same credit could pay for two bills from two
+-- windows or a stale draft, and bill_cancel or bill_edit then gave back credit that never left.
+-- Now store_credit_used above the customer's balance, read under the customer lock, or on a bill
+-- with no customer, is refused: BILL_CREDIT_SHORT, detail {balance, requested}. No tolerance: the
+-- screen sends either the balance as it read it or the bill total, both in paise. A draft op with
+-- store_credit_used left out takes the figure the draft row holds, which it keeps.
+--
 -- Lock order for the draft ops: bill, voucher, lines, variants, customer, exchanges. bill_cancel
 -- and bill_edit take the bill first too; exchange_record takes the bill before its lines.
 --
@@ -51,8 +60,9 @@
 -- (schema/migration_bill_edit_atomic.sql).
 --
 -- Body copied from schema/migration_bill_save_app_callers.sql (the latest definition); the create
--- ops are unchanged apart from the two exchange checks above. Same signature, grants and
--- error codes, plus BILL_STALE, BILL_EXCHANGE_CUSTOMER and BILL_EXCHANGE_OVER.
+-- ops are unchanged apart from the exchange and store credit checks above. Same signature, grants
+-- and error codes, plus BILL_STALE, BILL_EXCHANGE_CUSTOMER, BILL_EXCHANGE_OVER and
+-- BILL_CREDIT_SHORT.
 --
 -- Run after schema/migration_voucher_states.sql (voucher_state) and before the app version that
 -- calls these ops.
@@ -251,8 +261,6 @@ declare
     'exchange_balance_to_credit', 'first_payment', 'discount_codes', 'billid'];
   c_expect_keys constant text[] := array['paymentstatus', 'payment_amount'];
   c_payment_keys constant text[] := array['amount', 'salesmethodid', 'recorded_at'];
-  -- Matches Number.EPSILON in the browser's round2, so the credit floor rounds identically.
-  c_js_epsilon constant double precision := 2.220446049250313e-16;
   -- Each of the three exchange figures is rounded to paise in the browser.
   c_exchange_rounding constant numeric := 0.01;
 
@@ -281,8 +289,7 @@ declare
   v_variant uuid;
   v_qty numeric;
   v_after numeric;
-  v_balance double precision;
-  v_delta numeric;
+  v_balance numeric;
   v_negative jsonb := '[]'::jsonb;
   v_payment_row public.bill_payments;
   v_payment_result jsonb;
@@ -424,7 +431,9 @@ begin
     -- A bill saved with "Don't reduce stock" moves none on later saves either.
     v_skip_stock := coalesce((p_payload ->> 'skip_stock')::boolean, false)
                     or (v_draft and v_draft_row.stock_reduced is false);
-    v_credit_used := coalesce((v_bill ->> 'store_credit_used')::numeric, 0);
+    -- A draft op keeps a store_credit_used left out of the payload, so it takes that figure too.
+    v_credit_used := round(coalesce((v_bill ->> 'store_credit_used')::numeric,
+                                    case when v_draft then v_draft_row.store_credit_used end, 0), 2);
     v_exchange_ids := array(
       select distinct e::int
         from jsonb_array_elements_text(coalesce(nullif(p_payload -> 'exchange_ids', 'null'::jsonb), '[]'::jsonb)) e);
@@ -492,9 +501,14 @@ begin
     end if;
 
     if v_customer is not null and (v_credit_used > 0 or v_exchange_balance > 0) then
-      select c.store_credit into v_balance from public.customers c
+      select round(c.store_credit::numeric, 2) into v_balance from public.customers c
        where c.customerid = v_customer
          for no key update;
+    end if;
+    -- Another window or a stale draft may have spent the credit since the screen read it.
+    if v_credit_used > 0 and (v_customer is null or v_credit_used > coalesce(v_balance, 0)) then
+      raise exception 'BILL_CREDIT_SHORT' using errcode = 'P0001',
+        detail = jsonb_build_object('balance', coalesce(v_balance, 0), 'requested', v_credit_used)::text;
     end if;
 
     v_exchange_total := 0;
@@ -666,13 +680,9 @@ begin
     select v_customer, c, v_billid
       from jsonb_array_elements_text(coalesce(nullif(p_payload -> 'discount_codes', 'null'::jsonb), '[]'::jsonb)) c;
 
-    if v_customer is not null and v_credit_used > 0 then
-      -- Same formula and double precision arithmetic as storeCreditDeductionDelta in the
-      -- browser, so the floor at 0 gives the same paise, now read under the customer lock.
-      v_balance := coalesce(v_balance, 0);
-      v_delta := (floor(((greatest(0::double precision, v_balance - v_credit_used::double precision) - v_balance)
-                         + c_js_epsilon) * 100 + 0.5) / 100)::numeric;
-      perform public._store_credit_apply(v_customer, v_delta, v_reason, v_billid::text, 'instore', 'bill');
+    -- Exactly what the bill records: the balance was checked above, under the same lock.
+    if v_credit_used > 0 then
+      perform public._store_credit_apply(v_customer, -v_credit_used, v_reason, v_billid::text, 'instore', 'bill');
     end if;
 
     if v_customer is not null and v_exchange_balance > 0 then
