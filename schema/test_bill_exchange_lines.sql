@@ -1,11 +1,13 @@
--- Tests for schema/migration_bill_item_exchange_lock.sql and the exchange check in bill_edit
--- (schema/migration_bill_edit_excess.sql): exchange credit given from a bill's line is never paid
--- back a second time by editing the bill. The whole file is one transaction that always rolls
--- back, and its final select returns only pass and fail counts. A failed check also raises a
--- WARNING naming it.
--- Run locally (the bill migrations listed in schema/test_bill_excess_credit.sql, then):
+-- Tests for schema/migration_bill_item_exchange_lock.sql, the exchange check in bill_edit
+-- (schema/migration_bill_edit_excess.sql) and exchange_record's caps
+-- (schema/migration_exchange_record_caps.sql): exchange credit given from a bill's line is never
+-- paid back a second time by editing the bill, and never more than the line or the bill held.
+-- The whole file is one transaction that always rolls back, and its final select returns only
+-- pass and fail counts. A failed check also raises a WARNING naming it.
+-- Run locally (the online order migrations through migration_online_returns.sql, the bill
+-- migrations listed in schema/test_bill_excess_credit.sql, then):
 --   scripts/test-db.sh sql schema/migration_bill_item_exchange_lock.sql \
---     schema/test_bill_exchange_lines.sql
+--     schema/migration_exchange_record_caps.sql schema/test_bill_exchange_lines.sql
 begin;
 set local lock_timeout = '2s';
 set local statement_timeout = '20s';
@@ -69,6 +71,22 @@ create function pg_temp.save(p_key int, p_qty_a int default 1) returns int langu
     ->> 'billid')::int
 $$;
 
+-- A part-paid bill like save(): 1000 due, p_paid received as its first payment.
+create function pg_temp.save_partial(p_key int, p_paid numeric) returns int language sql as $$
+  select (pg_temp.rpc(format('select public.bill_save(%L, %L, %L)', pg_temp.k(p_key), 'partial_create',
+    jsonb_build_object(
+      'bill', jsonb_build_object('customerid', -9701, 'notes', 'XLINES', 'totalamount', 1000,
+        'gst_total', 0, 'discount_total', 0, 'taxable_total', 1000, 'paymentstatus', 'partial',
+        'finalized', true, 'payment_amount', p_paid, 'net_amount', 1000, 'salesmethodid', -9701),
+      'items', jsonb_build_array(
+        jsonb_build_object('quantity', 1, 'mrp', 500, 'variantid', pg_temp.v1(),
+          'product_name', 'A', 'product_code', 'XLP1', 'subtotal', 500, 'gst_amount', 0, 'total', 500),
+        jsonb_build_object('quantity', 1, 'mrp', 500, 'variantid', pg_temp.v2(),
+          'product_name', 'B', 'product_code', 'XLP2', 'subtotal', 500, 'gst_amount', 0, 'total', 500)),
+      'first_payment', jsonb_build_object('amount', p_paid, 'salesmethodid', -9701))))
+    ->> 'billid')::int
+$$;
+
 create function pg_temp.line(p_b int, p_name text) returns int language sql as $$
   select bill_item_id from public.bill_items where billid = p_b and product_name = p_name
 $$;
@@ -78,6 +96,21 @@ create function pg_temp.exchange(p_b int, p_line int, p_qty int, p_credit numeri
   select pg_temp.rpc(format('select to_jsonb(public.exchange_record(%s, -9701, %L))', p_b,
     jsonb_build_array(jsonb_build_object('bill_item_id', p_line, 'quantity', p_qty,
                                          'credit_amount', p_credit, 'reason', 'XLINES'))))
+$$;
+
+-- The same as an API call that may be refused: 'ok', or the error message.
+create function pg_temp.exchange_sql(p_b int, p_items jsonb) returns text language sql as $$
+  select format('select public.exchange_record(%s, -9701, %L)', p_b, p_items)
+$$;
+create function pg_temp.ex(p_line int, p_qty int, p_credit numeric) returns jsonb language sql as $$
+  select jsonb_build_object('bill_item_id', p_line, 'quantity', p_qty, 'credit_amount', p_credit, 'reason', 'XLINES')
+$$;
+create function pg_temp.try_exchange(p_b int, p_line int, p_qty int, p_credit numeric) returns text language sql as $$
+  select pg_temp.as_admin(pg_temp.exchange_sql(p_b, jsonb_build_array(pg_temp.ex(p_line, p_qty, p_credit))))
+$$;
+create function pg_temp.credit_out(p_b int) returns numeric language sql as $$
+  select coalesce(sum(e.credit_amount), 0) from public.exchanges e
+    join public.bill_items bi on bi.bill_item_id = e.original_bill_item_id where bi.billid = p_b
 $$;
 
 -- bill_edit payload as BillingForm.handleSaveDraft sends it.
@@ -264,6 +297,148 @@ begin
   values (d, 1, 500, pg_temp.v1(), 'D', 500, 0, 500);
   r := pg_temp.as_admin(format('delete from public.bills where billid = %s', d));
   perform pg_temp.ok('6 draft with lines deleted', r = 'ok' and not exists (select 1 from public.bill_items where billid = d));
+end $$;
+
+-- ---------- 7. Hole B 1: credit already given back by bill_edit counts against exchanges ----------
+-- Gate review repro: paid 1000, edited down to 600 with 400 to store credit, then both 500 lines
+-- exchanged: 1400 out for 1000 in.
+do $$
+declare
+  b int := pg_temp.save(51);
+  s0 numeric := (select stock from public.productsizecolors where variantid = pg_temp.v1());
+begin
+  perform pg_temp.reset_credit();
+  perform pg_temp.rpc(pg_temp.edit_sql(52, b, pg_temp.payload(b, 600, '{"mode": "store_credit", "amount": 400}')));
+  perform pg_temp.ok('7 the edit put 400 on store credit; the shop holds 600',
+    pg_temp.credit() = 400 and pg_temp.held(b) = 600);
+
+  perform pg_temp.ok('7 both lines at 500 in one call refused',
+    pg_temp.as_admin(pg_temp.exchange_sql(b, jsonb_build_array(
+      pg_temp.ex(pg_temp.line(b, 'A'), 1, 500), pg_temp.ex(pg_temp.line(b, 'B'), 1, 500)))) = 'EXCHANGE_OVER_HELD');
+  perform pg_temp.ok('7 a refused call records and restocks nothing',
+    pg_temp.credit_out(b) = 0
+    and (select stock from public.productsizecolors where variantid = pg_temp.v1()) = s0);
+  perform pg_temp.ok('7 one line at 500 is within the 600 held',
+    pg_temp.try_exchange(b, pg_temp.line(b, 'A'), 1, 500) = 'ok');
+  perform pg_temp.ok('7 the other line at 500 is refused: 1000 out for 600 held',
+    pg_temp.try_exchange(b, pg_temp.line(b, 'B'), 1, 500) = 'EXCHANGE_OVER_HELD');
+  perform pg_temp.ok('7 the other line for what is left, 100, is fine',
+    pg_temp.try_exchange(b, pg_temp.line(b, 'B'), 1, 100) = 'ok');
+  perform pg_temp.ok('7 in all: 400 credit + 600 exchange for 1000 paid',
+    pg_temp.credit() + pg_temp.credit_out(b) = 1000);
+end $$;
+
+-- ---------- 8. Hole B 2: a line's credit is capped at its value, and its quantity cannot go up ----------
+-- Gate review repro: A exchanged once, its quantity raised to 2, then exchanged again: 1000
+-- credit for one 500 item.
+do $$
+declare
+  b int := pg_temp.save(61);
+  a int;
+begin
+  a := pg_temp.line(b, 'A');
+  perform pg_temp.ok('8 credit above the line''s value refused',
+    pg_temp.try_exchange(b, a, 1, 500.01) = 'EXCHANGE_OVER_LINE');
+  perform pg_temp.ok('8 a negative credit refused', pg_temp.try_exchange(b, a, 1, -1) like '%credit_amount must be zero or more%');
+  perform pg_temp.ok('8 A exchanged at its value', pg_temp.try_exchange(b, a, 1, 500) = 'ok');
+  perform pg_temp.ok('8 raising the exchanged line''s quantity refused',
+    pg_temp.as_admin(format('update public.bill_items set quantity = 2 where bill_item_id = %s', a)) = 'BILL_ITEM_EXCHANGED');
+  perform pg_temp.ok('8 raising it with its total refused too',
+    pg_temp.as_admin(format('update public.bill_items set quantity = 2, total = 1000, subtotal = 1000 where bill_item_id = %s', a))
+      = 'BILL_ITEM_EXCHANGED');
+  perform pg_temp.ok('8 A cannot be exchanged a second time',
+    pg_temp.try_exchange(b, a, 1, 500) = format('item %s already returned (1 of 1)', a));
+  perform pg_temp.ok('8 A gave 500 once', pg_temp.credit_out(b) = 500);
+end $$;
+
+-- Without the quantity lock, the line cap alone holds: earlier credit on the line counts.
+do $$
+declare
+  b int := pg_temp.save(62);
+  a int;
+begin
+  a := pg_temp.line(b, 'A');
+  perform pg_temp.try_exchange(b, a, 1, 500);
+  alter table public.bill_items disable trigger trg_bill_items_exchange_lock;
+  update public.bill_items set quantity = 2 where bill_item_id = a;
+  alter table public.bill_items enable trigger trg_bill_items_exchange_lock;
+  perform pg_temp.ok('8 a raised quantity with the same total gives nothing more',
+    pg_temp.try_exchange(b, a, 1, 500) = 'EXCHANGE_OVER_LINE' and pg_temp.try_exchange(b, a, 1, 0) = 'ok');
+end $$;
+
+-- ---------- 9. Hole B 3: only a paid bill is an exchange source ----------
+-- Gate review repro: 100 paid of 1000, exchanged for 1000 credit; cancel then refunded 0.
+do $$
+declare
+  b int := pg_temp.save_partial(71, 100);
+  d int;
+begin
+  perform pg_temp.ok('9 part-paid bill refused',
+    pg_temp.try_exchange(b, pg_temp.line(b, 'A'), 1, 500) = 'EXCHANGE_BILL_NOT_FINAL'
+    and pg_temp.credit_out(b) = 0);
+  insert into public.bills (customerid, paymentstatus, finalized, totalamount, net_amount)
+  values (-9701, 'draft', false, 500, 500) returning billid into d;
+  insert into public.bill_items (billid, quantity, mrp, variantid, product_name, subtotal, gst_amount, total)
+  values (d, 1, 500, pg_temp.v1(), 'D', 500, 0, 500);
+  perform pg_temp.ok('9 draft refused', pg_temp.try_exchange(d, pg_temp.line(d, 'D'), 1, 500) = 'EXCHANGE_BILL_NOT_FINAL');
+end $$;
+
+do $$
+declare
+  b int := pg_temp.save(72);
+begin
+  perform pg_temp.rpc(pg_temp.cancel_sql(73, b));
+  perform pg_temp.ok('9 cancelled bill refused',
+    pg_temp.try_exchange(b, pg_temp.line(b, 'A'), 1, 500) = 'EXCHANGE_BILL_NOT_FINAL');
+end $$;
+
+-- ---------- 10. legitimate exchanges still go through ----------
+do $$
+declare
+  b int := pg_temp.save(81);
+  b3 int := pg_temp.save(82, 3);
+  a3 int;
+begin
+  perform pg_temp.ok('10 both lines of a paid bill, one call each, up to what was paid',
+    pg_temp.try_exchange(b, pg_temp.line(b, 'A'), 1, 500) = 'ok'
+    and pg_temp.try_exchange(b, pg_temp.line(b, 'B'), 1, 500) = 'ok'
+    and pg_temp.credit_out(b) = 1000);
+
+  -- A: 3 units for 500. One at a time the client asks 166.67, 166.66, 166.67 (exchangeHelpers).
+  a3 := pg_temp.line(b3, 'A');
+  perform pg_temp.ok('10 partial quantity at its share', pg_temp.try_exchange(b3, a3, 1, 166.67) = 'ok');
+  perform pg_temp.ok('10 a second unit rounding up past the line total refused',
+    pg_temp.try_exchange(b3, a3, 1, 166.67) = 'EXCHANGE_OVER_LINE');
+  perform pg_temp.ok('10 the second unit at what is left of its share',
+    pg_temp.try_exchange(b3, a3, 1, 166.66) = 'ok');
+  perform pg_temp.ok('10 a lower amount than the share is accepted',
+    pg_temp.try_exchange(b3, pg_temp.line(b3, 'B'), 1, 400) = 'ok');
+  perform pg_temp.ok('10 the last unit of A',
+    pg_temp.try_exchange(b3, a3, 1, 166.67) = 'ok');
+  perform pg_temp.ok('10 line A gave exactly its total',
+    (select sum(credit_amount) from public.exchanges where original_bill_item_id = a3) = 500);
+end $$;
+
+-- A bill paid a few paise short counts as paid in full (bill_add_payment's tolerance), so its
+-- lines exchange at their full value.
+do $$
+declare
+  b int;
+begin
+  b := (pg_temp.rpc(format('select public.bill_save(%L, %L, %L)', pg_temp.k(91), 'finalize_create',
+    jsonb_build_object(
+      'bill', jsonb_build_object('customerid', -9701, 'notes', 'XLINES', 'totalamount', 1000,
+        'gst_total', 0, 'discount_total', 0, 'taxable_total', 1000, 'paymentstatus', 'finalized',
+        'finalized', true, 'payment_amount', 999.5, 'net_amount', 1000, 'salesmethodid', -9701),
+      'items', jsonb_build_array(
+        jsonb_build_object('quantity', 1, 'mrp', 500, 'variantid', pg_temp.v1(),
+          'product_name', 'A', 'product_code', 'XLP1', 'subtotal', 500, 'gst_amount', 0, 'total', 500),
+        jsonb_build_object('quantity', 1, 'mrp', 500, 'variantid', pg_temp.v2(),
+          'product_name', 'B', 'product_code', 'XLP2', 'subtotal', 500, 'gst_amount', 0, 'total', 500)))))
+    ->> 'billid')::int;
+  perform pg_temp.ok('10 paise-short paid bill: both lines at full value',
+    pg_temp.as_admin(pg_temp.exchange_sql(b, jsonb_build_array(
+      pg_temp.ex(pg_temp.line(b, 'A'), 1, 500), pg_temp.ex(pg_temp.line(b, 'B'), 1, 500)))) = 'ok');
 end $$;
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _xl_checks;

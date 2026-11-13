@@ -71,4 +71,12 @@ describe("exchangedLineProblems", () => {
       "Kurti: 2 already exchanged, so the quantity cannot go below 2",
     );
   });
+
+  test("names an exchanged line raised above its saved quantity", () => {
+    const saved = { 11: { qty: 1, savedQty: 2, name: "Kurti" } };
+    expect(exchangedLineProblems([{ _id: "11", quantity: 2 }], saved)).toBeNull();
+    expect(exchangedLineProblems([{ _id: "11", quantity: 3 }], saved)).toBe(
+      "Kurti: already exchanged, so the quantity cannot go above 2. Add more as a new item.",
+    );
+  });
 });

@@ -85,4 +85,13 @@ describe("an exchanged line", () => {
     expect(updates).toEqual([{ quantity: 2 }]);
     expect(screen.queryByRole("status")).toBeNull();
   });
+
+  test("quantity cannot go above what the line was saved with", () => {
+    const updates = renderRow({ exchangedQty: 1, exchangedSavedQty: 3 });
+    fireEvent.change(qtyInput(), { target: { value: "4" } });
+    expect(updates).toEqual([]);
+    expect(screen.getByRole("status")).toHaveTextContent("cannot go above 3");
+    fireEvent.change(screen.getByDisplayValue("4"), { target: { value: "3" } });
+    expect(updates).toEqual([{ quantity: 3 }]);
+  });
 });

@@ -46,6 +46,7 @@ export default function ItemTable({ items, setItems, onEdit, salespersonMap = {}
                 docType={docType}
                 isBackdated={isBackdated}
                 exchangedQty={exchangedById[it._id]?.qty || 0}
+                exchangedSavedQty={exchangedById[it._id]?.savedQty}
               />
             ))}
             {items.length === 0 && (

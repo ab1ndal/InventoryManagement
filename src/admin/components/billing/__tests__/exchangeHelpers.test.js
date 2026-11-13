@@ -1,6 +1,7 @@
 import {
   calcItemCredit,
   buildReturnedQtyMap,
+  buildCreditGivenMap,
   buildReturnedItemsWithCredit,
   computeCreditsApplied,
   isExchangeEligible,
@@ -43,6 +44,31 @@ describe("calcItemCredit", () => {
   it("rounds to 2 decimal places", () => {
     // total=10, qty=3, returnQty=1 → 10/3 = 3.333... → rounds to 3.33
     expect(calcItemCredit({ quantity: 3, total: 10 }, 1)).toBe(3.33);
+  });
+
+  // Same cap as exchange_record (EXCHANGE_OVER_LINE): a line never gives out more than its total.
+  it("keeps one-at-a-time exchanges of a line within its total", () => {
+    const line = { quantity: 3, total: 200 };
+    expect(calcItemCredit(line, 1)).toBe(66.67);
+    expect(calcItemCredit({ ...line, returnedQty: 1, creditGiven: 66.67 }, 1)).toBe(66.66);
+    expect(calcItemCredit({ ...line, returnedQty: 2, creditGiven: 133.33 }, 1)).toBe(66.67);
+  });
+
+  it("gives nothing more once the line's credit is used up", () => {
+    // An online refund offset can give a unit's value before an in-store exchange of the rest.
+    expect(calcItemCredit({ quantity: 2, total: 1000, returnedQty: 1, creditGiven: 1000 }, 1)).toBe(0);
+    expect(calcItemCredit({ quantity: 2, total: 1000, returnedQty: 1, creditGiven: 0 }, 1)).toBe(500);
+  });
+});
+
+describe("buildCreditGivenMap", () => {
+  it("sums credit per bill_item_id", () => {
+    expect(buildCreditGivenMap([
+      { original_bill_item_id: 10, credit_amount: "66.67" },
+      { original_bill_item_id: 10, credit_amount: 66.66 },
+      { original_bill_item_id: 11, credit_amount: 500 },
+    ])).toEqual({ 10: 133.33, 11: 500 });
+    expect(buildCreditGivenMap(null)).toEqual({});
   });
 });
 
