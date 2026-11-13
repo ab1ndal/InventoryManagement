@@ -95,6 +95,7 @@ const BILL_EDIT_ERRORS = {
   BILL_KEY_CONFLICT: "This edit may already be saved. Reopen the bill to check before saving again.",
   BILL_EXCHANGE_COUNTED: "Part of this bill was already given back as exchange credit, so the new total cannot be paid back below it.",
   BILL_ITEM_EXCHANGED: EXCHANGED_LINE_MESSAGE,
+  BILL_CREDIT_CUSTOMER: "This bill was paid partly with the customer's store credit, so the customer cannot be changed. Put the customer back, or cancel the bill and make a new one.",
 };
 
 // Save an opened bill's lines in place (diffBillItems), so a line's bill_item_id, which exchange
@@ -669,7 +670,9 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     // D-16: auto-apply the full balance; Summary/computation will clamp to grandTotal
     const balance = Number(data?.store_credit ?? 0);
     setCustomerStoreCreditBalance(balance);
-    setAppliedStoreCredit(balance);
+    // A finalized bill keeps the credit it took (loadBill sets it): another customer's balance was
+    // never taken, and bill_edit refuses store credit going up.
+    if (!isFinalizedBill) setAppliedStoreCredit(balance);
     setAvailableExchangeCredit(exchangeCreditProp ? null : pendingExchangeCredit(data?.exchanges));
     // D-05: hides once_per_customer discounts already used. This bill's own use does not count,
     // or reopening it would drop the discount it was finalized with.
