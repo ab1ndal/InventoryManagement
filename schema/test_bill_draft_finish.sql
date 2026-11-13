@@ -131,6 +131,42 @@ create function pg_temp.bill(p_b int) returns public.bills language sql as $$
   select * from public.bills where billid = p_b
 $$;
 
+
+-- A new finalized bill from bill_save (it records stock moves), paid in one go.
+create function pg_temp.sold(p_key int, p_qty numeric default 1, p_paid numeric default 1000,
+                             p_extra jsonb default '{}', p_bill jsonb default '{}') returns int language sql as $$
+  select (pg_temp.rpc(pg_temp.save_sql(p_key, 'finalize_create', jsonb_build_object(
+    'bill', jsonb_build_object('customerid', -9701, 'notes', 'DFIN sold', 'totalamount', 1000 * p_qty,
+      'gst_total', 0, 'discount_total', 0, 'taxable_total', 1000 * p_qty, 'paymentstatus', 'finalized',
+      'finalized', true, 'payment_amount', p_paid, 'net_amount', 1000 * p_qty, 'salesmethodid', -9701,
+      'orderdate', '2026-11-12T00:00:00+05:30') || p_bill,
+    'items', jsonb_build_array(pg_temp.line(null, pg_temp.v1(), p_qty, 1000 * p_qty) - 'bill_item_id')) || p_extra))
+    ->> 'billid')::int
+$$;
+
+-- bill_edit payload as BillingForm.handleSaveDraft sends it.
+create function pg_temp.edit(p_b int, p_net numeric, p_items jsonb, p_extra jsonb default '{}',
+                             p_bill jsonb default '{}') returns jsonb language sql as $$
+  select jsonb_build_object(
+    'expect', (select jsonb_build_object('paymentstatus', b.paymentstatus, 'payment_amount', b.payment_amount)
+                 from public.bills b where b.billid = p_b),
+    'bill', (select jsonb_build_object('customerid', b.customerid, 'notes', 'DFIN edit',
+               'totalamount', p_net, 'gst_total', 0, 'discount_total', 0, 'taxable_total', p_net,
+               'net_amount', p_net, 'applied_codes', '[]'::jsonb, 'payment_amount', b.payment_amount,
+               'final_amount', null, 'saleslocationid', null, 'salesmethodid', -9701,
+               'paymentstatus', b.paymentstatus, 'finalized', b.finalized,
+               'store_credit_used', b.store_credit_used, 'orderdate', '2026-11-12T00:00:00+05:30')
+             from public.bills b where b.billid = p_b) || p_bill,
+    'items', p_items, 'salesperson_ids', '[]'::jsonb, 'skip_stock', false, 'excess', null) || p_extra
+$$;
+create function pg_temp.edit_sql(p_key int, p_b int, p_payload jsonb) returns text language sql as $$
+  select format('select public.bill_edit(%L, %s, %L)', pg_temp.k(p_key), p_b, p_payload)
+$$;
+create function pg_temp.lines(p_b int) returns jsonb language sql as $$
+  select coalesce(jsonb_agg(jsonb_build_array(variantid, quantity) order by bill_item_id), '[]'::jsonb)
+    from public.bill_items where billid = p_b
+$$;
+
 -- ---------- fixtures: all created here, gone at rollback ----------
 do $$
 declare
@@ -340,6 +376,79 @@ begin
   p := jsonb_set(p, '{exchange_ids}', '[-9703]');
   perform pg_temp.ok('5 an exchange with no customer can be used',
     pg_temp.as_admin(pg_temp.save_sql(42, 'finalize_create', p)) = 'ok');
+end $$;
+
+-- ---------- 6. bill_edit saves the lines, stock and salespeople with the bill ----------
+do $$
+declare
+  b int := pg_temp.sold(60, 1);
+  li int := pg_temp.line_id(b);
+  s1 numeric;
+  s2 numeric;
+  r jsonb;
+begin
+  s1 := pg_temp.stock(pg_temp.v1());
+  s2 := pg_temp.stock(pg_temp.v2());
+  r := pg_temp.rpc(pg_temp.edit_sql(61, b, pg_temp.edit(b, 3000,
+    jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 2, 2000), pg_temp.line(null, pg_temp.v2(), 1)),
+    '{"salesperson_ids": [-9701]}')));
+  perform pg_temp.ok('6 saved line updated in place', (select quantity from public.bill_items where bill_item_id = li) = 2);
+  perform pg_temp.ok('6 new line inserted', pg_temp.lines(b) = jsonb_build_array(
+    jsonb_build_array(pg_temp.v1(), 2), jsonb_build_array(pg_temp.v2(), 1)));
+  perform pg_temp.ok('6 stock moved by the change', pg_temp.stock(pg_temp.v1()) = s1 - 1 and pg_temp.stock(pg_temp.v2()) = s2 - 1);
+  perform pg_temp.ok('6 moves recorded on a bill_save bill', (select count(*) from public.bill_stock_moves
+    where billid = b and reason = 'bill_edit' and idempotency_key = pg_temp.k(61)) = 2);
+  perform pg_temp.ok('6 salesperson replaced', (select array_agg(salesperson_id) from public.bill_salespersons where billid = b) = '{-9701}');
+  perform pg_temp.ok('6 bill row saved', (pg_temp.bill(b)).totalamount = 3000 and (pg_temp.bill(b)).notes = 'DFIN edit');
+
+  -- Cancel gives back everything the bill now holds, read from its moves.
+  perform pg_temp.rpc(format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(62), b, 'store_credit',
+    jsonb_build_object('expect', jsonb_build_object('finalized', true, 'paymentstatus', 'finalized'))));
+  perform pg_temp.ok('6 cancel returns the edited stock', pg_temp.stock(pg_temp.v1()) = s1 + 1 and pg_temp.stock(pg_temp.v2()) = s2);
+end $$;
+
+do $$
+declare
+  b int := pg_temp.sold(63, 2, 2000);
+  li int := pg_temp.line_id(b);
+  before jsonb;
+  s1 numeric;
+begin
+  before := pg_temp.lines(b);
+  s1 := pg_temp.stock(pg_temp.v1());
+  -- Taking a unit off a paid bill leaves money held over, and no choice was sent: refused, and
+  -- the lines stay as they were (they used to be saved before bill_edit refused).
+  perform pg_temp.ok('6 refused edit', pg_temp.as_admin(pg_temp.edit_sql(64, b,
+    pg_temp.edit(b, 1000, jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1))))) = 'BILL_EXCESS_UNSETTLED');
+  perform pg_temp.ok('6 refused edit kept the lines and stock', pg_temp.lines(b) = before and pg_temp.stock(pg_temp.v1()) = s1);
+
+  -- An exchanged line cannot be dropped through bill_edit either.
+  insert into public.exchanges (original_bill_item_id, quantity, customerid, credit_amount) values (li, 1, -9701, 500);
+  perform pg_temp.ok('6 exchanged line kept', pg_temp.as_admin(pg_temp.edit_sql(65, b,
+    pg_temp.edit(b, 2000, jsonb_build_array(pg_temp.line(null, pg_temp.v2(), 2, 2000))))) = 'BILL_ITEM_EXCHANGED');
+  perform pg_temp.ok('6 nothing changed', pg_temp.lines(b) = before and pg_temp.stock(pg_temp.v1()) = s1);
+
+  -- Without items, lines and stock are left alone (the screen from before this change).
+  perform pg_temp.rpc(pg_temp.edit_sql(66, b, pg_temp.edit(b, 2000, null) - 'items' - 'salesperson_ids' - 'skip_stock'));
+  perform pg_temp.ok('6 no items leaves lines alone', pg_temp.lines(b) = before and (pg_temp.bill(b)).notes = 'DFIN edit');
+end $$;
+
+do $$
+declare
+  b int := pg_temp.draft(-9701, 1);
+  b2 int := pg_temp.draft(-9701, 1, false);
+  s1 numeric := pg_temp.stock(pg_temp.v1());
+begin
+  perform pg_temp.rpc(pg_temp.edit_sql(67, b, pg_temp.edit(b, 3000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 3, 3000)))));
+  perform pg_temp.ok('6 draft edit takes the extra stock', pg_temp.stock(pg_temp.v1()) = s1 - 2);
+  perform pg_temp.ok('6 no moves rows on a screen draft', not exists (select 1 from public.bill_stock_moves where billid = b));
+  perform pg_temp.rpc(pg_temp.edit_sql(68, b2, pg_temp.edit(b2, 3000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 3, 3000)))));
+  perform pg_temp.ok('6 a bill saved without stock moves none on edit', pg_temp.stock(pg_temp.v1()) = s1 - 2);
+  perform pg_temp.rpc(pg_temp.edit_sql(69, b, pg_temp.edit(b, 3000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 5, 5000)), '{"skip_stock": true}')));
+  perform pg_temp.ok('6 skip_stock moves none on edit', pg_temp.stock(pg_temp.v1()) = s1 - 2);
 end $$;
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;

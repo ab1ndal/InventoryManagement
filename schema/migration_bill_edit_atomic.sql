@@ -1,0 +1,265 @@
+-- bill_edit saves the lines too: one transaction for an opened bill's lines, stock, salespeople,
+-- bill row and any excess.
+--
+-- The bill screen's Save Changes wrote the lines (delete, update, insert), then called bill_edit
+-- for the bill row and the excess, then rewrote the salespeople and moved stock with one
+-- stock_adjust per variant. A bill_edit refusal (another window paid the bill, the excess moved)
+-- came after the lines were saved, so the bill was left with new lines and its old total ("the
+-- item changes were saved, but the bill total wasn't"); a failure after it left stock unmoved.
+--
+-- p_payload gains three keys, sent together by the screen:
+--   items            every line the bill keeps, as for bill_save's draft ops: a saved line carries
+--                    its bill_item_id and is updated in place, a line without one is inserted, a
+--                    saved line left out is deleted (schema/migration_bill_save_drafts.sql,
+--                    _bill_lines_save). trg_bill_items_exchange_lock still guards exchanged lines.
+--   salesperson_ids  replaces the bill's salespeople.
+--   skip_stock       "Don't reduce stock": no stock moves. None moves either for a bill saved with
+--                    stock_reduced false.
+-- Stock follows the change in lines, as the screen's computeStockDelta did, recorded in
+-- bill_stock_moves only for a bill that already has moves (why: _bill_lines_save).
+-- A payload without items leaves lines, salespeople and stock alone, as before, so the screen
+-- from before this change keeps working until it reloads.
+--
+-- Body copied from schema/migration_bill_edit_excess.sql; otherwise unchanged. Same signature,
+-- grants and error codes, plus BILL_ITEM_EXCHANGED and BILL_STALE (a line this window shows was
+-- removed in another) from _bill_lines_save. The result gains negative_stock.
+--
+-- Run after schema/migration_bill_save_drafts.sql (_bill_lines_save).
+
+set local lock_timeout = '3s';
+
+create or replace function public.bill_edit(p_key uuid, p_billid int, p_payload jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  -- Same as PAID_IN_FULL_TOLERANCE in paymentHelpers.js and bill_add_payment.
+  c_paid_in_full_tolerance constant numeric := 1;
+  c_payload_keys constant text[] := array['expect', 'bill', 'excess', 'items', 'salesperson_ids', 'skip_stock'];
+  c_expect_keys constant text[] := array['paymentstatus', 'payment_amount'];
+  c_bill_keys constant text[] := array[
+    'customerid', 'notes', 'totalamount', 'gst_total', 'discount_total', 'taxable_total',
+    'net_amount', 'applied_codes', 'payment_amount', 'final_amount', 'saleslocationid',
+    'salesmethodid', 'paymentstatus', 'finalized', 'store_credit_used', 'orderdate'];
+  c_excess_keys constant text[] := array['mode', 'amount', 'salesmethodid', 'recorded_at'];
+
+  v_saved jsonb;
+  v_expect jsonb;
+  v_new jsonb;
+  v_choice jsonb;
+  v_bill public.bills;
+  v_customer int;
+  v_has_rows boolean;
+  v_held numeric;
+  v_net numeric;
+  v_excess numeric := 0;
+  v_exchange_out numeric;
+  v_payment_amount numeric;
+  v_status text;
+  v_negative jsonb := '[]'::jsonb;
+  v_result jsonb;
+  v_sqlstate text;
+  v_message text;
+begin
+  if not public._is_staff_or_service() then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if p_key is null or p_billid is null or jsonb_typeof(p_payload) is distinct from 'object' then
+    raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+      detail = 'key, billid and a payload object are required';
+  end if;
+
+  begin
+    v_saved := public._bill_claim_key(p_key, 'edit',
+      jsonb_build_object('billid', p_billid, 'payload', p_payload));
+    if v_saved is not null then
+      return v_saved;
+    end if;
+
+    v_expect := p_payload -> 'expect';
+    v_new := p_payload -> 'bill';
+    v_choice := nullif(p_payload -> 'excess', 'null'::jsonb);
+    if exists (select 1 from jsonb_object_keys(p_payload) k where k <> all (c_payload_keys))
+       or jsonb_typeof(v_expect) is distinct from 'object'
+       or (select array_agg(k order by k) from jsonb_object_keys(v_expect) k)
+          is distinct from (select array_agg(k order by k) from unnest(c_expect_keys) k)
+       or jsonb_typeof(v_new) is distinct from 'object'
+       or (select array_agg(k order by k) from jsonb_object_keys(v_new) k)
+          is distinct from (select array_agg(k order by k) from unnest(c_bill_keys) k) then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = 'payload needs expect (paymentstatus, payment_amount) and every bill key';
+    end if;
+    if (p_payload ? 'items' or p_payload ? 'salesperson_ids')
+       and (jsonb_typeof(p_payload -> 'items') is distinct from 'array'
+            or jsonb_typeof(p_payload -> 'salesperson_ids') is distinct from 'array') then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = 'items and salesperson_ids are sent together, as arrays';
+    end if;
+    if v_choice is not null
+       and (jsonb_typeof(v_choice) <> 'object'
+            or exists (select 1 from jsonb_object_keys(v_choice) k where k <> all (c_excess_keys))
+            or v_choice ->> 'mode' is null or v_choice ->> 'mode' not in ('refund', 'store_credit')
+            or v_choice ->> 'amount' is null
+            or (v_choice ->> 'mode' = 'refund' and v_choice ->> 'salesmethodid' is null)) then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = 'excess needs mode refund or store_credit, the amount, and a method for a refund';
+    end if;
+
+    -- NO KEY UPDATE serializes with bill_add_payment and bill_cancel on this bill without
+    -- blocking foreign key checks from rows that reference it.
+    select * into v_bill from public.bills where billid = p_billid for no key update;
+    if not found then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = format('bill %s not found', p_billid);
+    end if;
+
+    if v_bill.paymentstatus is distinct from v_expect ->> 'paymentstatus'
+       or v_bill.payment_amount is distinct from (v_expect ->> 'payment_amount')::numeric then
+      raise exception 'BILL_STALE' using errcode = 'P0001',
+        detail = jsonb_build_object('paymentstatus', v_bill.paymentstatus,
+                                    'payment_amount', v_bill.payment_amount)::text;
+    end if;
+
+    -- The lines first, under the bill lock: a refusal below undoes them with everything else.
+    if p_payload ? 'items' then
+      v_negative := public._bill_lines_save(
+        p_billid, p_payload -> 'items',
+        coalesce((p_payload ->> 'skip_stock')::boolean, false) or v_bill.stock_reduced is false,
+        'bill_edit', p_key);
+      delete from public.bill_salespersons where billid = p_billid;
+      insert into public.bill_salespersons (billid, salesperson_id)
+      select distinct p_billid, s::int from jsonb_array_elements_text(p_payload -> 'salesperson_ids') s;
+    end if;
+
+    -- What the shop holds: the payment rows' sum, or what was entered for a bill paid in one go.
+    v_has_rows := exists (select 1 from public.bill_payments p where p.billid = p_billid);
+    if v_has_rows then
+      select round(sum(p.amount), 2) into v_held from public.bill_payments p where p.billid = p_billid;
+    else
+      v_held := round(coalesce(v_bill.payment_amount, 0), 2);
+    end if;
+    v_net := round(coalesce((v_new ->> 'net_amount')::numeric, 0), 2);
+    -- A negative net would make the excess larger than everything the shop holds.
+    if v_net < 0 then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = format('net_amount %s is negative', v_net);
+    end if;
+    if v_bill.paymentstatus in ('partial', 'finalized') and v_held - v_net >= c_paid_in_full_tolerance then
+      v_excess := v_held - v_net;
+    end if;
+
+    -- exchange_record takes these lines FOR UPDATE, so no exchange lands between this count
+    -- and the commit.
+    perform 1 from public.bill_items bi where bi.billid = p_billid order by bi.bill_item_id for share;
+    select coalesce(sum(e.credit_amount), 0) into v_exchange_out
+      from public.exchanges e
+      join public.bill_items bi on bi.bill_item_id = e.original_bill_item_id
+     where bi.billid = p_billid;
+    if v_excess > 0 and v_net < round(v_exchange_out, 2) then
+      raise exception 'BILL_EXCHANGE_COUNTED' using errcode = 'P0001',
+        detail = jsonb_build_object('exchange_credit_given', round(v_exchange_out, 2),
+                                    'net', v_net, 'excess', v_excess)::text;
+    end if;
+
+    v_customer := (v_new ->> 'customerid')::int;
+    v_payment_amount := (v_new ->> 'payment_amount')::numeric;
+    v_status := v_new ->> 'paymentstatus';
+
+    if v_excess = 0 and v_choice is not null then
+      raise exception 'BILL_EXCESS_CHANGED' using errcode = 'P0001',
+        detail = jsonb_build_object('excess', 0)::text;
+    end if;
+    if v_excess > 0 then
+      if v_choice is null then
+        raise exception 'BILL_EXCESS_UNSETTLED' using errcode = 'P0001',
+          detail = jsonb_build_object('excess', v_excess)::text;
+      end if;
+      -- Staff chose for the amount they were shown; a different amount means the bill moved.
+      if round((v_choice ->> 'amount')::numeric, 2) <> v_excess then
+        raise exception 'BILL_EXCESS_CHANGED' using errcode = 'P0001',
+          detail = jsonb_build_object('excess', v_excess)::text;
+      end if;
+      -- Website bills are refunded through the payment gateway from the Orders screen.
+      if exists (select 1 from public.orders o where o.bill_id = p_billid) then
+        raise exception 'BILL_ONLINE' using errcode = 'P0001', detail = p_billid::text;
+      end if;
+      if v_choice ->> 'mode' = 'store_credit' and v_customer is null then
+        raise exception 'BILL_EXCESS_NEEDS_CUSTOMER' using errcode = 'P0001',
+          detail = jsonb_build_object('excess', v_excess)::text;
+      end if;
+
+      -- bill_payments takes rows only from the bill RPCs, which set this for their own inserts
+      -- (schema/migration_bill_payments_ledger.sql).
+      perform set_config('app.bill_payment_writer', 'on', true);
+      if not v_has_rows then
+        if v_bill.salesmethodid is null then
+          raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+            detail = format('bill %s has no payment method to record what was received', p_billid);
+        end if;
+        insert into public.bill_payments (billid, amount, salesmethodid, recorded_at, kind)
+        values (p_billid, v_held, v_bill.salesmethodid, coalesce(v_bill.orderdate, localtimestamp), 'payment');
+      end if;
+      insert into public.bill_payments (billid, amount, salesmethodid, recorded_at, kind)
+      values (p_billid, -v_excess,
+              case when v_choice ->> 'mode' = 'refund' then (v_choice ->> 'salesmethodid')::int end,
+              coalesce((v_choice ->> 'recorded_at')::timestamp, localtimestamp),
+              v_choice ->> 'mode');
+      perform set_config('app.bill_payment_writer', '', true);
+
+      if v_choice ->> 'mode' = 'store_credit' then
+        perform public._store_credit_apply(v_customer, v_excess, 'bill_edit_excess',
+                                           p_billid::text, 'instore', 'bill');
+      end if;
+      v_payment_amount := v_net;
+      v_status := 'finalized';
+    end if;
+
+    -- orderdate is cast straight to timestamp, which keeps the date the client sent (as in
+    -- bill_save); going through timestamptz could move it to the previous day.
+    update public.bills set
+      customerid = v_customer,
+      notes = v_new ->> 'notes',
+      totalamount = (v_new ->> 'totalamount')::numeric,
+      gst_total = (v_new ->> 'gst_total')::numeric,
+      discount_total = (v_new ->> 'discount_total')::numeric,
+      taxable_total = (v_new ->> 'taxable_total')::numeric,
+      net_amount = (v_new ->> 'net_amount')::numeric,
+      applied_codes = case when v_new -> 'applied_codes' = 'null'::jsonb then null
+                           else array(select jsonb_array_elements_text(v_new -> 'applied_codes')) end,
+      payment_amount = v_payment_amount,
+      final_amount = (v_new ->> 'final_amount')::numeric,
+      saleslocationid = (v_new ->> 'saleslocationid')::int,
+      salesmethodid = (v_new ->> 'salesmethodid')::int,
+      paymentstatus = v_status,
+      finalized = (v_new ->> 'finalized')::boolean,
+      store_credit_used = (v_new ->> 'store_credit_used')::numeric,
+      orderdate = (v_new ->> 'orderdate')::timestamp
+    where billid = p_billid;
+
+    v_result := jsonb_build_object(
+      'billid', p_billid,
+      'bill_number', v_bill.bill_number,
+      'paymentstatus', v_status,
+      'payment_amount', v_payment_amount,
+      'excess', case when v_excess > 0 then jsonb_build_object(
+                  'mode', v_choice ->> 'mode', 'amount', v_excess, 'customerid',
+                  case when v_choice ->> 'mode' = 'store_credit' then v_customer end) end,
+      'negative_stock', v_negative,
+      'replayed', false);
+    update public.bill_save_log
+       set billid = p_billid, result = v_result
+     where idempotency_key = p_key;
+    return v_result;
+  exception
+    when data_exception or integrity_constraint_violation then
+      get stacked diagnostics v_sqlstate = returned_sqlstate, v_message = message_text;
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = format('%s: %s', v_sqlstate, v_message);
+  end;
+end;
+$$;
+
+revoke all on function public.bill_edit(uuid, int, jsonb) from public, anon;
+grant execute on function public.bill_edit(uuid, int, jsonb) to authenticated, service_role;
