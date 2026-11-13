@@ -52,6 +52,15 @@
 -- removed in another) from _bill_lines_save, BILL_CREDIT_CUSTOMER, BILL_RECEIVED_CHANGED and
 -- BILL_OVERPAID. The result gains negative_stock.
 --
+-- Money figures: totalamount, store_credit_used, payment_amount, net_amount and the excess amount
+-- must each be 0 or more and finite (BILL_BAD_PAYLOAD naming the field). A negative
+-- store_credit_used read as a cut below what the bill took and gave the difference to the
+-- customer as credit (0 -> -500 credited 500). The net is not the one sent: it is totalamount
+-- less the store_credit_used sent and the bill's exchange_credit_used, floored at 0, as the
+-- screen works it out (computeCreditsApplied over the same total and credits). A lower net sent
+-- would make an excess to refund or credit that the lines do not; a higher one, room to record
+-- more received. The bill stores this net.
+--
 -- Run after schema/migration_bill_save_drafts.sql (_bill_lines_save).
 
 set local lock_timeout = '3s';
@@ -92,6 +101,7 @@ declare
   v_credit_new numeric;
   v_credit_back numeric := 0;
   v_paid_new numeric;
+  v_bad_field text;
   v_result jsonb;
   v_sqlstate text;
   v_message text;
@@ -183,12 +193,24 @@ begin
     else
       v_held := round(coalesce(v_bill.payment_amount, 0), 2);
     end if;
-    v_net := round(coalesce((v_new ->> 'net_amount')::numeric, 0), 2);
-    -- A negative net would make the excess larger than everything the shop holds.
-    if v_net < 0 then
+    -- NaN sorts above Infinity, so ">= Infinity" refuses both (see the header).
+    select f into v_bad_field
+      from (values (1, 'totalamount', (v_new ->> 'totalamount')::numeric),
+                   (2, 'store_credit_used', (v_new ->> 'store_credit_used')::numeric),
+                   (3, 'payment_amount', (v_new ->> 'payment_amount')::numeric),
+                   (4, 'net_amount', (v_new ->> 'net_amount')::numeric),
+                   (5, 'excess amount', (v_choice ->> 'amount')::numeric)) x(n, f, v)
+     where v < 0 or v >= 'Infinity'::numeric
+     order by n
+     limit 1;
+    if v_bad_field is not null then
       raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
-        detail = format('net_amount %s is negative', v_net);
+        detail = format('%s must be 0 or more', v_bad_field);
     end if;
+    -- Worked out as the screen does, never the net_amount sent (see the header).
+    v_net := round(greatest(0, coalesce((v_new ->> 'totalamount')::numeric, 0)
+                               - coalesce((v_new ->> 'store_credit_used')::numeric, 0)
+                               - coalesce(v_bill.exchange_credit_used, 0)), 2);
     if v_bill.paymentstatus in ('partial', 'finalized') and v_held - v_net >= c_paid_in_full_tolerance then
       v_excess := v_held - v_net;
     end if;
@@ -299,10 +321,13 @@ begin
       end if;
     end if;
 
-    -- Store credit. A part-paid or paid bill took store_credit_used from its customer when it was
-    -- finished; an edit that lowers it gives the cut back to that customer's credit here, in the
-    -- same transaction (it used to be dropped). A draft has taken none, so it must hold none:
-    -- bill_cancel gives store_credit_used back on any bill, a draft too.
+    -- Store credit (never below 0: refused with the other money figures above). A part-paid or
+    -- paid bill took store_credit_used from its customer when it was finished; an edit that
+    -- lowers it gives the cut back to that customer's credit here, in the same transaction (it
+    -- used to be dropped). A draft has taken none, so it must hold none: bill_cancel gives
+    -- store_credit_used back on any bill, a draft too. A draft saved before may still hold some:
+    -- schema/preflight_bill_money_rpc_only.sql check 1 lists them (none on prod, 2026-11-13), and
+    -- schema/migration_bill_money_rpc_only.sql stops new direct writes of it.
     v_credit_old := round(coalesce(v_bill.store_credit_used, 0), 2);
     v_credit_new := round(coalesce((v_new ->> 'store_credit_used')::numeric, 0), 2);
     if v_bill.paymentstatus = 'draft' and v_credit_new <> 0 then
@@ -341,7 +366,7 @@ begin
       gst_total = (v_new ->> 'gst_total')::numeric,
       discount_total = (v_new ->> 'discount_total')::numeric,
       taxable_total = (v_new ->> 'taxable_total')::numeric,
-      net_amount = (v_new ->> 'net_amount')::numeric,
+      net_amount = v_net,
       applied_codes = case when v_new -> 'applied_codes' = 'null'::jsonb then null
                            else array(select jsonb_array_elements_text(v_new -> 'applied_codes')) end,
       payment_amount = v_payment_amount,

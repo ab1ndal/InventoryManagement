@@ -501,10 +501,12 @@ begin
     jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1)), '{}', '{"store_credit_used": 500}'))) = 'BILL_BAD_PAYLOAD');
   b2 := pg_temp.sold(75, 1, 900, '{}', '{"customerid": -9703, "store_credit_used": 100, "net_amount": 900}');
   perform pg_temp.ok('7 credit cannot go up', pg_temp.as_admin(pg_temp.edit_sql(76, b2, pg_temp.edit(b2, 900,
-    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1)), '{}', '{"store_credit_used": 200}'))) = 'BILL_BAD_PAYLOAD');
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1)),
+    '{"excess": {"mode": "refund", "amount": 100, "salesmethodid": -9701}}',
+    '{"store_credit_used": 200, "totalamount": 1000}'))) = 'BILL_BAD_PAYLOAD');
   perform pg_temp.ok('7 customer cannot change on a bill that used credit', pg_temp.as_admin(pg_temp.edit_sql(77, b2,
     pg_temp.edit(b2, 900, jsonb_build_array(pg_temp.line(pg_temp.line_id(b2), pg_temp.v1(), 1)), '{}',
-      '{"customerid": -9704}'))) = 'BILL_CREDIT_CUSTOMER');
+      '{"customerid": -9704, "totalamount": 1000}'))) = 'BILL_CREDIT_CUSTOMER');
   perform pg_temp.ok('7 refusals moved no credit', pg_temp.credit(-9703) = 900 and pg_temp.credit(-9704) = 0);
 end $$;
 
@@ -878,7 +880,41 @@ declare
   bills_before int;
 begin
   insert into public.customers (customerid, customer_ulid, first_name, store_credit) values
-    (-9711, 'DFINFIXTURE000000000000011', 'Money', 0);
+    (-9711, 'DFINFIXTURE000000000000011', 'Money', 0),
+    (-9712, 'DFINFIXTURE000000000000012', 'Money credit', 300);
+
+  -- bill_edit: a negative store_credit_used read as a cut and credited the customer the difference.
+  b := pg_temp.sold(160, 1, 1000, '{}', '{"customerid": -9711}');
+  r := pg_temp.as_admin_detail(pg_temp.edit_sql(161, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}', '{"store_credit_used": -500}')));
+  perform pg_temp.ok('16 edit refuses store_credit_used 0 -> -500, no credit given',
+    r = 'BILL_BAD_PAYLOAD: store_credit_used must be 0 or more'
+    and pg_temp.credit(-9711) = 0 and (pg_temp.bill(b)).store_credit_used = 0);
+  b := pg_temp.sold(162, 1, 700, '{}', '{"customerid": -9712, "store_credit_used": 300}');
+  r := pg_temp.as_admin(pg_temp.edit_sql(163, b, pg_temp.edit(b, 700,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}',
+    '{"store_credit_used": -200, "totalamount": 1000}')));
+  perform pg_temp.ok('16 edit refuses store_credit_used 300 -> -200, no credit given',
+    r = 'BILL_BAD_PAYLOAD' and pg_temp.credit(-9712) = 0 and (pg_temp.bill(b)).store_credit_used = 300);
+
+  -- bill_edit: a net sent below what the lines and credit come to made an excess to credit.
+  b := pg_temp.sold(164, 1, 1000, '{}', '{"customerid": -9711}');
+  r := pg_temp.as_admin(pg_temp.edit_sql(165, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)),
+    '{"excess": {"mode": "store_credit", "amount": 1000}}', '{"net_amount": 0}')));
+  perform pg_temp.ok('16 edit works out the net itself: a sent net of 0 makes no excess',
+    r = 'BILL_EXCESS_CHANGED' and pg_temp.credit(-9711) = 0);
+  j := pg_temp.rpc(pg_temp.edit_sql(166, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}', '{"net_amount": 0}')));
+  perform pg_temp.ok('16 edit stores its own net, not the one sent',
+    j ->> 'excess' is null and (pg_temp.bill(b)).net_amount = 1000 and pg_temp.credit(-9711) = 0);
+  r := pg_temp.as_admin(pg_temp.edit_sql(167, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)),
+    '{"excess": {"mode": "store_credit", "amount": -5}}')));
+  perform pg_temp.ok('16 edit refuses a negative excess amount', r = 'BILL_BAD_PAYLOAD');
+  r := pg_temp.as_admin(pg_temp.edit_sql(168, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}', '{"totalamount": "NaN"}')));
+  perform pg_temp.ok('16 edit refuses a total that is not a number', r = 'BILL_BAD_PAYLOAD');
 
   -- bill_save: a negative credit used raised the net, so 1600 was taken on a 1000 bill (and
   -- bill_cancel to store credit then gave 1600).
