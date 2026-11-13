@@ -60,6 +60,14 @@
 -- by as much, so a payment that large was accepted and bill_cancel then paid it out; a negative
 -- exchange balance or cash refund made room under BILL_EXCHANGE_OVER for credit no exchange held.
 --
+-- totalamount may not be more than the bill's line totals add up to, plus a rupee of rounding,
+-- checked on the lines as saved in the same transaction: BILL_BAD_PAYLOAD "totalamount is more
+-- than the lines add up to". Otherwise a raised total raised the net, and with it what a bill
+-- could record received and bill_cancel pay out. It cannot be matched exactly (a voucher's pre-tax
+-- discount is not spread over the lines, lines round one by one, Bill of Supply lines carry the
+-- full alteration charge), but bill-level discounts only lower the total, so it is never above
+-- them: on production every bill but one keeps to this (FY26-000012, a legacy bill with no lines).
+--
 -- What the shop is paid, on every op: net is totalamount less store and exchange credit used,
 -- floored at 0, worked out here (the screen's computeCreditsApplied, which is also how the screen
 -- and the CLI work out the net_amount the part-paid ops send). A sent net_amount is not used: one
@@ -284,6 +292,8 @@ declare
   -- How far a paid bill's amount received may be above its net: the screen's "Must be within
   -- ₹100" (BillingForm.openFinalizeConfirm) and the CLI's PAYMENT_TOLERANCE.
   c_received_over_net constant numeric := 100;
+  -- How far totalamount may be above its lines' totals: rounding, line by line versus once.
+  c_total_over_lines constant numeric := 1;
   -- Each of the three exchange figures is rounded to paise in the browser.
   c_exchange_rounding constant numeric := 0.01;
 
@@ -679,6 +689,12 @@ begin
         (i ->> 'salesperson_id')::int
       from jsonb_array_elements(v_items) with ordinality as t(i, ord)
       order by ord;
+    end if;
+
+    if v_total - (select coalesce(sum(bi.total), 0) from public.bill_items bi where bi.billid = v_billid)
+       > c_total_over_lines then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = 'totalamount is more than the lines add up to';
     end if;
 
     -- A draft's salespeople are replaced, as the screen did.

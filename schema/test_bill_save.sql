@@ -501,7 +501,7 @@ declare
     "saleslocationid": -9001, "salesmethodid": -9001, "orderdate": "2026-04-01T00:00:00+05:30"}';
   item_txt text := '{"quantity": 1.2345, "mrp": 1000.555, "variantid": null, "product_name": "BSAVE item",
     "product_code": "BSAVEP1", "category": "X", "cost_price": 500.005, "alteration_charge": 10.005,
-    "discount_total": 3.335, "subtotal": 999.995, "gst_rate": 5.005, "gst_amount": 49.995, "total": 999.995,
+    "discount_total": 3.335, "subtotal": 999.995, "gst_rate": 5.005, "gst_amount": 49.995, "total": 1234.565,
     "stitch_type": "stitched", "unit_type": "metre", "salesperson_id": -9001}';
   pay_set_txt text := '{"amount": 100.005, "salesmethodid": -9001, "recorded_at": "2026-11-01T12:00:00"}';
   r jsonb;

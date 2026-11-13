@@ -519,6 +519,7 @@ do $$
 declare
   b int := pg_temp.sold(80, 1, 1000);
   li int := pg_temp.line_id(b);
+  li2 int;
   d int;
   r jsonb;
 begin
@@ -529,21 +530,24 @@ begin
   perform pg_temp.ok('8 more received is a payment row', (select array_agg(amount order by payment_id)
     from public.bill_payments where billid = b) = '{1000, 500}'
     and (pg_temp.bill(b)).payment_amount = 1500 and (pg_temp.bill(b)).paymentstatus = 'finalized');
+  select max(bill_item_id) into li2 from public.bill_items where billid = b;
   perform pg_temp.ok('8 discount use recorded on re-finalize', (select count(*) from public.discount_usage
     where billid = b and code = 'DFIN-TEST') = 1);
   perform pg_temp.ok('8 lowering what was received refused', pg_temp.as_admin(pg_temp.edit_sql(82, b,
-    pg_temp.edit(b, 1500, jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1)), '{}', '{"payment_amount": 1000}')))
+    pg_temp.edit(b, 1500, jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1), pg_temp.line(li2, pg_temp.v2(), 1, 500)),
+      '{}', '{"payment_amount": 1000}')))
     = 'BILL_RECEIVED_CHANGED');
   perform pg_temp.ok('8 raising it on a bill with payment rows refused', pg_temp.as_admin(pg_temp.edit_sql(83, b,
-    pg_temp.edit(b, 2000, jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1)), '{}', '{"payment_amount": 2000}')))
+    pg_temp.edit(b, 2000, jsonb_build_array(pg_temp.line(li, pg_temp.v1(), 1), pg_temp.line(li2, pg_temp.v2(), 1, 500),
+      pg_temp.line(null, pg_temp.v2(), 1, 500)), '{}', '{"payment_amount": 2000}')))
     = 'BILL_RECEIVED_CHANGED');
 
   b := pg_temp.sold(84, 1, 1000);
   perform pg_temp.ok('8 more than the net refused', pg_temp.as_admin(pg_temp.edit_sql(85, b,
-    pg_temp.edit(b, 1200, jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}',
+    pg_temp.edit(b, 1200, jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1, 1200)), '{}',
       '{"payment_amount": 1300}'))) = 'BILL_OVERPAID');
   r := pg_temp.rpc(pg_temp.edit_sql(86, b, pg_temp.edit(b, 1500,
-    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}', '{"payment_amount": 1200}')));
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1, 1500)), '{}', '{"payment_amount": 1200}')));
   perform pg_temp.ok('8 part of the rise received leaves the bill part-paid', (pg_temp.bill(b)).paymentstatus = 'partial'
     and (pg_temp.bill(b)).payment_amount = 1200);
   r := pg_temp.rpc(format('select public.bill_cancel(%L, %s, %L, %L)', pg_temp.k(87), b, 'return_payment',
@@ -976,6 +980,38 @@ begin
     '{"customerid": -9711, "net_amount": 9000, "payment_amount": 8000}')));
   perform pg_temp.ok('16 partial_draft ignores a sent net of 9000 on 1000: overpaid',
     r = 'BILL_OVERPAID' and (pg_temp.bill(d)).paymentstatus = 'draft');
+  -- A total above what the lines add up to (plus a rupee) raised the net and what could be received.
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(185, 'finalize_create', '{"totalamount": 5000, "payment_amount": 5000}'));
+  perform pg_temp.ok('16 finalize_create refuses a total above its lines',
+    r = 'BILL_BAD_PAYLOAD: totalamount is more than the lines add up to');
+  r := pg_temp.as_admin_detail(pg_temp.create_sql(186, 'partial_create', '{"totalamount": 5000, "payment_amount": 4000}',
+    '{"first_payment": {"amount": 4000, "salesmethodid": -9701}}'));
+  perform pg_temp.ok('16 partial_create refuses a total above its lines',
+    r = 'BILL_BAD_PAYLOAD: totalamount is more than the lines add up to');
+  perform pg_temp.ok('16 a total a rupee over its lines is rounding',
+    pg_temp.as_admin(pg_temp.create_sql(187, 'finalize_create', '{"totalamount": 1001, "payment_amount": 1001}')) = 'ok');
+  r := pg_temp.as_admin_detail(pg_temp.save_sql(188, 'finalize_draft', pg_temp.finish(d, 'finalized',
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)), '{}',
+    '{"customerid": -9711, "totalamount": 5000, "payment_amount": 5000}')));
+  perform pg_temp.ok('16 finalize_draft refuses a total above its lines',
+    r = 'BILL_BAD_PAYLOAD: totalamount is more than the lines add up to' and (pg_temp.bill(d)).paymentstatus = 'draft');
+  r := pg_temp.as_admin_detail(pg_temp.save_sql(189, 'partial_draft', pg_temp.finish(d, 'partial',
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(d), pg_temp.v1(), 1)),
+    '{"first_payment": {"amount": 4000, "salesmethodid": -9701}}',
+    '{"customerid": -9711, "totalamount": 5000, "payment_amount": 4000}')));
+  perform pg_temp.ok('16 partial_draft refuses a total above its lines',
+    r = 'BILL_BAD_PAYLOAD: totalamount is more than the lines add up to' and (pg_temp.bill(d)).paymentstatus = 'draft');
+  b := pg_temp.sold(190, 1, 1000, '{}', '{"customerid": -9711}');
+  r := pg_temp.as_admin_detail(pg_temp.edit_sql(191, b, pg_temp.edit(b, 5000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1)), '{}', '{"salesmethodid": -9701, "payment_amount": 5000}')));
+  perform pg_temp.ok('16 edit refuses a total above its lines',
+    r = 'BILL_BAD_PAYLOAD: totalamount is more than the lines add up to'
+    and (pg_temp.bill(b)).payment_amount = 1000 and (pg_temp.bill(b)).totalamount = 1000);
+  r := pg_temp.as_admin_detail(pg_temp.edit_sql(192, b, pg_temp.edit(b, 5000, null, '{}',
+    '{"salesmethodid": -9701, "payment_amount": 5000}') - 'items' - 'salesperson_ids' - 'skip_stock'));
+  perform pg_temp.ok('16 edit without items refuses a total above the saved lines',
+    r = 'BILL_BAD_PAYLOAD: totalamount is more than the lines add up to' and (pg_temp.bill(b)).payment_amount = 1000);
+
   -- A key the draft op leaves out is checked as the draft holds it.
   update public.bills set exchange_cash_refund = -500 where billid = d;
   r := pg_temp.as_admin(pg_temp.save_sql(184, 'finalize_draft', pg_temp.finish(d, 'finalized',

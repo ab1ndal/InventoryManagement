@@ -362,6 +362,9 @@ declare
 begin
   insert into public.bills (notes, paymentstatus, finalized, net_amount, payment_amount, customerid)
   values ('EXCESS draft', 'draft', false, 1000, 1000, -9601) returning billid into b;
+  -- A saved draft has its lines; the total cannot be above them.
+  insert into public.bill_items (billid, quantity, mrp, product_name, subtotal, gst_amount, total)
+  values (b, 1, 1000, 'EXCESS item', 1000, 0, 1000);
   perform pg_temp.ok('9 draft edit down needs no choice', pg_temp.as_admin(pg_temp.edit_sql(80, b,
     jsonb_set(pg_temp.payload(b, 400, 'draft'), '{bill,finalized}', 'false'))) = 'ok'
     and (pg_temp.bill(b)).net_amount = 400 and pg_temp.held(b) = 0);

@@ -59,7 +59,9 @@
 -- less the store_credit_used sent and the bill's exchange_credit_used, floored at 0, as the
 -- screen works it out (computeCreditsApplied over the same total and credits). A lower net sent
 -- would make an excess to refund or credit that the lines do not; a higher one, room to record
--- more received. The bill stores this net.
+-- more received. The bill stores this net. totalamount may not be more than the bill's lines add
+-- up to (as saved by this edit, or as saved before when items are left out) plus a rupee, as in
+-- bill_save (schema/migration_bill_save_drafts.sql): BILL_BAD_PAYLOAD.
 --
 -- Run after schema/migration_bill_save_drafts.sql (_bill_lines_save).
 
@@ -74,6 +76,8 @@ as $$
 declare
   -- Same as PAID_IN_FULL_TOLERANCE in paymentHelpers.js and bill_add_payment.
   c_paid_in_full_tolerance constant numeric := 1;
+  -- As bill_save: rounding, line by line versus once.
+  c_total_over_lines constant numeric := 1;
   c_payload_keys constant text[] := array['expect', 'bill', 'excess', 'items', 'salesperson_ids', 'skip_stock',
                                           'discount_codes'];
   c_expect_keys constant text[] := array['paymentstatus', 'payment_amount'];
@@ -184,6 +188,13 @@ begin
       delete from public.bill_salespersons where billid = p_billid;
       insert into public.bill_salespersons (billid, salesperson_id)
       select distinct p_billid, s::int from jsonb_array_elements_text(p_payload -> 'salesperson_ids') s;
+    end if;
+
+    if (v_new ->> 'totalamount')::numeric
+       - (select coalesce(sum(bi.total), 0) from public.bill_items bi where bi.billid = p_billid)
+       > c_total_over_lines then
+      raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
+        detail = 'totalamount is more than the lines add up to';
     end if;
 
     -- What the shop holds: the payment rows' sum, or what was entered for a bill paid in one go.
