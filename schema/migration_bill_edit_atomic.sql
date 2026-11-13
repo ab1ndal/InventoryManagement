@@ -55,8 +55,9 @@
 -- bill_payments row (after a row for what was received before), up to the net amount
 -- (BILL_OVERPAID beyond it), and the status follows the rows. The screen's Finalize on an opened
 -- bill comes here now, instead of updating bills directly; schema/migration_bill_money_rpc_only.sql
--- then refuses direct writes of these columns. It also sends discount_codes, which replace the
--- bill's discount_usage rows (refused on a draft).
+-- then refuses direct writes of these columns. It also sends discount_codes, which are added to
+-- the bill's discount_usage rows (refused on a draft). Rows already there stay: dropping them
+-- freed a once-per-customer code the bill had used, to be used again. Only bill_cancel removes them.
 --
 -- A draft stays a draft here: paymentstatus and finalized cannot change on one (BILL_BAD_PAYLOAD).
 -- Finishing it is bill_save's finalize_draft or partial_draft, which record the payment, credit,
@@ -420,15 +421,17 @@ begin
       orderdate = (v_new ->> 'orderdate')::timestamp
     where billid = p_billid;
 
-    -- Re-finalize records the bill's discount codes again; a draft records none until finished.
+    -- Re-finalize records codes the bill did not use before; a draft records none until finished.
+    -- Uses already recorded stay (see the header).
     if p_payload ? 'discount_codes' then
       if v_bill.paymentstatus = 'draft' or jsonb_typeof(p_payload -> 'discount_codes') is distinct from 'array' then
         raise exception 'BILL_BAD_PAYLOAD' using errcode = 'P0001',
           detail = 'discount_codes is an array, for a part-paid or paid bill';
       end if;
-      delete from public.discount_usage where billid = p_billid;
       insert into public.discount_usage (customerid, code, billid)
-      select v_customer, c, p_billid from jsonb_array_elements_text(p_payload -> 'discount_codes') c;
+      select distinct v_customer, c, p_billid
+        from jsonb_array_elements_text(p_payload -> 'discount_codes') c
+       where not exists (select 1 from public.discount_usage du where du.billid = p_billid and du.code = c);
     end if;
 
     v_result := jsonb_build_object(

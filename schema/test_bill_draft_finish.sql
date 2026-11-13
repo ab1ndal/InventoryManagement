@@ -1181,6 +1181,24 @@ begin
       jsonb_build_object('customerid', y)))) = 'ok' and (pg_temp.bill(a)).customerid = y);
 end $$;
 
+-- Discount use: re-finalize with no codes deleted the bill's discount_usage rows, so a
+-- once-per-customer code could be used again.
+do $$
+declare
+  b int := pg_temp.sold(219, 1, 1000, '{"discount_codes": ["DFIN-TEST"]}', '{"customerid": -9702}');
+begin
+  perform pg_temp.as_admin(pg_temp.edit_sql(220, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1, 1000)), '{"discount_codes": []}')));
+  perform pg_temp.ok('17 discount use stays when an edit sends no codes',
+    (select count(*) from public.discount_usage where billid = b and code = 'DFIN-TEST') = 1);
+  perform pg_temp.as_admin(pg_temp.edit_sql(221, b, pg_temp.edit(b, 1000,
+    jsonb_build_array(pg_temp.line(pg_temp.line_id(b), pg_temp.v1(), 1, 1000)), '{"discount_codes": ["DFIN-TEST"]}')));
+  perform pg_temp.ok('17 a code sent again is not recorded twice',
+    (select count(*) from public.discount_usage where billid = b and code = 'DFIN-TEST') = 1);
+  perform pg_temp.as_admin(pg_temp.cancel_sql(222, b, 'return_payment'));
+  perform pg_temp.ok('17 cancel still frees the code',
+    not exists (select 1 from public.discount_usage where billid = b));
+end $$;
 
 select count(*) filter (where passed) as pass, count(*) filter (where not passed) as fail from _df_checks;
 rollback;
