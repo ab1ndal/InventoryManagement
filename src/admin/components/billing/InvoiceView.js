@@ -2,6 +2,7 @@ import React, { forwardRef } from "react";
 import logo from "../../../assets/LOGO-Bill.png";
 import { getFreeItems, valueOfDiscount } from './billUtils';
 import { computeCreditsApplied } from './exchangeHelpers';
+import { paymentRowLabel } from './paymentHelpers';
 import { QRCodeSVG } from "qrcode.react";
 import {
   WHATSAPP_COMMUNITY_INVITE_URL,
@@ -595,7 +596,7 @@ const InvoiceView = forwardRef(function InvoiceView(
                 <tr key={p.payment_id ?? i} style={{ borderBottom: "1px solid #f3f4f6" }}>
                   <td style={{ padding: "2px 4px" }}>{formatDate(String(p.recorded_at).slice(0, 10))}</td>
                   <td style={{ padding: "2px 4px" }}>
-                    {p.salesmethods?.methodname || p.methodname || "—"}
+                    {paymentRowLabel(p)}
                   </td>
                   <td style={{ padding: "2px 4px", textAlign: "right" }}>
                     ₹{Number(p.amount).toFixed(2)}

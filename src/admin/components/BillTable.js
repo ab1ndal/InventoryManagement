@@ -211,7 +211,7 @@ export default function BillTable({ onEdit }) {
       let query = supabase
         .from("bills")
         .select(
-          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, stock_reduced, pdf_url, document_type, salesmethods(methodname), bill_payments(amount)"
+          "billid, bill_number, customerid, customers(first_name, last_name), orders(contact_name, contact_phone), orderdate, totalamount, gst_total, discount_total, payment_amount, net_amount, store_credit_used, exchange_credit_used, paymentstatus, finalized, stock_reduced, pdf_url, document_type, salesmethods(methodname), bill_payments(amount, kind)"
         )
         .order(SORTABLE_COLUMNS[sort.key] || DEFAULT_SORT.key, {
           ascending: sort.dir === "asc",
@@ -279,11 +279,16 @@ export default function BillTable({ onEdit }) {
         const hasNext = (data || []).length > ROWS_PER_PAGE;
         const pageBills = (data || []).slice(0, ROWS_PER_PAGE);
 
-        // Amount Received = total cash collected for the bill (see receivedAmount).
+        // Amount Received = what the shop holds for the bill (see receivedAmount): money paid
+        // less any refund or store credit given back when it was edited, shown under it.
+        const givenBack = (b, kind) =>
+          round2((b.bill_payments || []).filter((p) => p.kind === kind).reduce((s, p) => s - Number(p.amount), 0));
         setBills(
           pageBills.map((b) => ({
             ...withOrderContact(b),
             amount_received: receivedAmount(b),
+            refunded: givenBack(b, "refund"),
+            credited: givenBack(b, "store_credit"),
           }))
         );
         setHasNextPage(hasNext);
@@ -763,6 +768,16 @@ export default function BillTable({ onEdit }) {
                     {Number(b.store_credit_used) > 0 && (
                       <div className="text-xs text-muted-foreground tabular-nums">
                         Credit: {formatINR(b.store_credit_used, 0)}
+                      </div>
+                    )}
+                    {b.refunded > 0 && (
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        Refunded: {formatINR(b.refunded, 0)}
+                      </div>
+                    )}
+                    {b.credited > 0 && (
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        To store credit: {formatINR(b.credited, 0)}
                       </div>
                     )}
                   </td>

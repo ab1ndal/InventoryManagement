@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
 import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct } from "./stockHelpers";
-import { storeCreditDeductionDelta, isWebsiteMethod, paymentStatusAfterEdit } from "./paymentHelpers";
+import { storeCreditDeductionDelta, isWebsiteMethod, paymentStatusAfterEdit, editExcess } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { BILL_STATUS, billStatusFields } from "../../lib/billStatus";
 import { Button } from "../../../components/ui/button";
@@ -73,6 +73,20 @@ const BILL_SAVE_ERRORS = {
 // Shown when an opened bill was paid, finalized or cancelled in another window since it loaded.
 const BILL_CHANGED_MESSAGE = "This bill changed in another window — reload";
 
+const EXCESS_USE_SAVE_CHANGES =
+  "The customer has paid more than this bill now comes to. Use Save Changes to give the difference back as store credit or a refund.";
+
+// bill_edit refusals, in words staff can act on. A refused edit changed nothing on the bill.
+const BILL_EDIT_ERRORS = {
+  BILL_STALE: BILL_CHANGED_MESSAGE,
+  BILL_PAYMENTS_MISMATCH: BILL_CHANGED_MESSAGE,
+  BILL_EXCESS_UNSETTLED: BILL_CHANGED_MESSAGE,
+  BILL_EXCESS_CHANGED: BILL_CHANGED_MESSAGE,
+  BILL_EXCESS_NEEDS_CUSTOMER: "Store credit needs a customer. Add the customer to the bill, or choose a cash refund.",
+  BILL_ONLINE: "This is a website order's bill. Its refunds are handled from Online Orders.",
+  BILL_KEY_CONFLICT: "This edit may already be saved. Reopen the bill to check before saving again.",
+};
+
 const sameAmount = (a, b) => (a == null ? null : Number(a)) === (b == null ? null : Number(b));
 
 // A payment entered today keeps the database's own time. recorded_at has no time zone, so an earlier
@@ -102,7 +116,7 @@ const BILL_SELECT =
   "orderdate, customerid, notes, payment_amount, final_amount, saleslocationid, salesmethodid, bill_number, " +
   "finalized, pdf_url, paymentstatus, stock_reduced, net_amount, totalamount, store_credit_used, exchange_credit_used, exchange_source_bill, " +
   `document_type, applied_codes, customers(${CUSTOMER_SELECT}), ` +
-  "bill_payments(payment_id, amount, salesmethodid, recorded_at, notes, salesmethods(methodname)), " +
+  "bill_payments(payment_id, amount, kind, salesmethodid, recorded_at, notes, salesmethods(methodname)), " +
   "bill_items(*, productsizecolors(size, color)), " +
   "bill_salespersons(salesperson_id, salespersons(name)), " +
   "linked_exchanges:exchanges(exchangeid, credit_amount, quantity, product_name, bill_items(product_name))";
@@ -263,6 +277,13 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   const saveKeyRef = useRef(null);
   // The opened bill's payment state as this window last saw it: { paymentstatus, payment_amount }.
   const openedStateRef = useRef(null);
+  // An edit that leaves the shop holding more than the new net waits here for staff to choose
+  // a refund or store credit: { amount }.
+  const [excessPrompt, setExcessPrompt] = useState(null);
+  const [excessMode, setExcessMode] = useState(null); // "store_credit" | "refund" | null
+  const [excessMethodId, setExcessMethodId] = useState(null);
+  // { key, body } for bill_edit: a retry of the same edit replays instead of settling twice.
+  const editKeyRef = useRef(null);
   const [partialConfirmOpen, setPartialConfirmOpen] = useState(false);
   const [finalAmount, setFinalAmount] = useState("");
   const [voucherError, setVoucherError] = useState("");
@@ -332,6 +353,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       newBillRef.current = null;
       saveKeyRef.current = null;
       openedStateRef.current = null;
+      editKeyRef.current = null;
+      setExcessPrompt(null);
       setUnfinishedBill(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -988,7 +1011,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
   };
   // No row updated means the bill changed between the check and the write. BILL_PAYMENTS_MISMATCH
   // is the database refusing a total that disagrees with the bill's payments, for the same reason.
+  // BILL_EXCESS_UNSETTLED: Finalize on an opened bill took it below what the customer paid; only
+  // Save Changes records the refund or store credit for that.
   const billUpdateError = (error, updated, prefix) => {
+    if (error?.message === "BILL_EXCESS_UNSETTLED") return new Error(EXCESS_USE_SAVE_CHANGES);
     if (error) return new Error(error.message === "BILL_PAYMENTS_MISMATCH" ? BILL_CHANGED_MESSAGE : prefix + error.message);
     if (Array.isArray(updated) && updated.length === 0) return new Error(BILL_CHANGED_MESSAGE);
     return null;
@@ -1007,7 +1033,8 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
     setBlockingError(null);
   }, [items, paymentAmount, salesMethodId]);
 
-  const handleSaveDraft = async () => {
+  // settlement: the refund or store credit staff chose for an excess, { mode, amount, salesmethodid }.
+  const handleSaveDraft = async (settlement = null) => {
     setBlockingError(null);
     if (saveBlocked) return;
     setIsSaving(true);
@@ -1076,6 +1103,26 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
           }
         }
 
+        const { effectiveTotal: editEffectiveTotal } = computeCreditsApplied(
+          computed.grandTotal,
+          appliedStoreCredit,
+          exchangeCredit?.amount,
+        );
+        // Taking items off a paid bill can leave the shop holding more than the new net. Staff
+        // choose what happens to it before anything is written; bill_edit records it with the bill.
+        const excess = editExcess({
+          paymentStatus: openedStateRef.current?.paymentstatus,
+          payments: billPayments,
+          paymentAmount: openedStateRef.current?.payment_amount,
+          netAmount: editEffectiveTotal,
+        });
+        if (excess > 0 && settlement?.amount !== excess) {
+          setExcessMode(selectedCustomerId ? "store_credit" : null);
+          setExcessMethodId(salesMethodId);
+          setExcessPrompt({ amount: excess });
+          return;
+        }
+
         await assertBillUnchanged(billId);
 
         // Step F: Delete old bill_items
@@ -1105,16 +1152,10 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
         if (insErr)
           throw new Error("Failed to save updated items: " + insErr.message);
 
-        // Step H: Update bills row
-        const { effectiveTotal: editEffectiveTotal } = computeCreditsApplied(
-          totalsToUse.grandTotal,
-          appliedStoreCredit,
-          exchangeCredit?.amount,
-        );
-
-        const { data: updatedBill, error: updErr } = await whileUnchanged(supabase
-          .from("bills")
-          .update({
+        // Step H: Update bills row, and settle any excess, in one transaction (bill_edit)
+        const editBody = {
+          expect: openedStateRef.current,
+          bill: {
             customerid: selectedCustomerId || null,
             notes: notes || null,
             totalamount: totalsToUse.grandTotal,
@@ -1143,11 +1184,21 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 )
               : 0,
             orderdate: backdatedDate + "T00:00:00+05:30",
-          })
-          .eq("billid", billId))
-          .select("billid");
-        const updateErr = billUpdateError(updErr, updatedBill, "Failed to update bill: ");
-        if (updateErr) throw updateErr;
+          },
+          excess: excess > 0 ? settlement : null,
+        };
+        const editBodyText = JSON.stringify(editBody);
+        if (editKeyRef.current?.body !== editBodyText) {
+          editKeyRef.current = { key: crypto.randomUUID(), body: editBodyText };
+        }
+        const { data: edited, error: editErr } = await supabase.rpc("bill_edit", {
+          p_key: editKeyRef.current.key,
+          p_billid: billId,
+          p_payload: editBody,
+        });
+        if (editErr) {
+          throw new Error(BILL_EDIT_ERRORS[editErr.message] || "Failed to update bill: " + editErr.message);
+        }
 
         // Reconcile salesperson associations
         const { error: spDelErr } = await supabase
@@ -1182,6 +1233,11 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
 
         // Step J: Success
         toast.success(isFinalizedBill ? `Bill saved — #${effectiveBillNumber || billId}` : `Draft saved — Bill #${billId}`);
+        if (edited?.excess?.mode === "store_credit") {
+          toast.success(`${billMoney(edited.excess.amount)} added to ${customerName || "the customer"}'s store credit`);
+        } else if (edited?.excess?.mode === "refund") {
+          toast.success(`Give the customer ${billMoney(edited.excess.amount)} back — recorded as a refund on the bill`);
+        }
         if (stockFailures.length > 0) {
           toast.error("Stock sync warning", {
             description: `Stock could not be updated for ${stockFailures.length} variant(s). Please recheck inventory.`,
@@ -2558,7 +2614,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
                 <Button variant="outline" onClick={requestClose}>
                   Cancel
                 </Button>
-                <Button disabled={isSaving || saveBlocked} onClick={handleSaveDraft}>
+                <Button disabled={isSaving || saveBlocked} onClick={() => handleSaveDraft()}>
                   {isSaving ? "Saving..." : isFinalizedBill ? "Save Changes" : "Save Draft"}
                 </Button>
                 {showPartialButton && (
@@ -2755,6 +2811,84 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
               }}
             >
               Discard Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Owner rule 2026-11-12: money an edit leaves over is given back, as store credit (the
+          usual choice) or cash. A walk-in bill has no one to credit, so nothing is picked for it. */}
+      <Dialog open={!!excessPrompt} onOpenChange={(o) => !o && setExcessPrompt(null)}>
+        <DialogContent className="bg-white max-w-md">
+          <DialogHeader>
+            <DialogTitle>Give back {excessPrompt ? billMoney(excessPrompt.amount) : ""}</DialogTitle>
+            <DialogDescription>
+              The customer has paid {excessPrompt ? billMoney(excessPrompt.amount) : ""} more than the new bill total.
+              Choose how they get it back.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <label className={`flex items-center gap-2 ${selectedCustomerId ? "cursor-pointer" : "opacity-60"}`}>
+              <input
+                type="radio"
+                name="excessMode"
+                value="store_credit"
+                disabled={!selectedCustomerId}
+                checked={excessMode === "store_credit"}
+                onChange={() => setExcessMode("store_credit")}
+              />
+              Add to {customerName ? `${customerName}'s` : "the customer's"} store credit
+            </label>
+            {!selectedCustomerId && (
+              <p className="text-xs text-muted-foreground">
+                Walk-in bill: add the customer to the bill first to give store credit.
+              </p>
+            )}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="excessMode"
+                value="refund"
+                checked={excessMode === "refund"}
+                onChange={() => setExcessMode("refund")}
+              />
+              Cash refund
+            </label>
+            {excessMode === "refund" && (
+              <Select
+                value={excessMethodId ? String(excessMethodId) : ""}
+                onValueChange={(v) => setExcessMethodId(Number(v))}
+              >
+                <SelectTrigger className="w-40" aria-label="Refund method">
+                  <SelectValue placeholder="Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {salesMethods.filter((m) => !isWebsiteMethod(m)).map((m) => (
+                    <SelectItem key={m.salesmethodid} value={String(m.salesmethodid)}>
+                      {m.methodname}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" disabled={isSaving} onClick={() => setExcessPrompt(null)}>
+              Keep Editing
+            </Button>
+            <Button
+              disabled={isSaving || !excessMode || (excessMode === "refund" && !excessMethodId)}
+              onClick={() => {
+                const settlement = {
+                  mode: excessMode,
+                  amount: excessPrompt.amount,
+                  ...(excessMode === "refund" ? { salesmethodid: excessMethodId } : {}),
+                };
+                setExcessPrompt(null);
+                handleSaveDraft(settlement);
+              }}
+            >
+              Save and give back
             </Button>
           </div>
         </DialogContent>

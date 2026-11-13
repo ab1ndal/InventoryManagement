@@ -6,6 +6,8 @@ const mockToasts = [];
 let mockBill;
 const mockUpdates = [];
 const mockSelects = [];
+// Error a direct bills update gets back from the database, if any.
+let mockBillUpdateError = null;
 
 jest.mock("sonner", () => ({
   toast: {
@@ -39,14 +41,29 @@ const mockChain = (table) => {
     maybeSingle: () => Promise.resolve({ data: null, error: null }),
     // A bill update returns the row it changed; none would mean the bill changed elsewhere.
     then: (res, rej) =>
-      Promise.resolve({ data: updating && table === "bills" ? [{ billid: 330 }] : [], error: null }).then(res, rej),
+      Promise.resolve(
+        updating && table === "bills" && mockBillUpdateError
+          ? { data: null, error: mockBillUpdateError }
+          : { data: updating && table === "bills" ? [{ billid: 330 }] : [], error: null },
+      ).then(res, rej),
   };
   return chain;
 };
 
+// jsdom has no crypto.randomUUID (bill_edit's key).
+Object.defineProperty(global, "crypto", {
+  configurable: true,
+  value: { randomUUID: () => "00000000-0000-4000-8000-000000000001" },
+});
+
 jest.mock("../../../../lib/supabaseClient", () => ({
   supabase: {
     from: (table) => mockChain(table),
+    // An opened bill is saved through bill_edit; recorded as that bill's update.
+    rpc: (name, args) => {
+      if (name === "bill_edit") mockUpdates.push({ table: "bills", payload: args.p_payload.bill });
+      return Promise.resolve({ data: { billid: 330, excess: null }, error: null });
+    },
     auth: { getSession: async () => ({ data: { session: null } }) },
   },
 }));
@@ -81,6 +98,7 @@ beforeEach(() => {
   mockUpdates.length = 0;
   mockSelects.length = 0;
   mockBill = baseBill;
+  mockBillUpdateError = null;
   clearBillingLookups();
 });
 
@@ -167,4 +185,19 @@ test("a draft has used no credit yet, so it still offers the balance like a new 
   await waitFor(() => expect(saveDraft()).toBeEnabled());
 
   expect(screen.getByText("Paid via Store Credit")).toBeInTheDocument();
+});
+
+// Finalize on an opened bill writes the bill directly; when that leaves the customer having paid
+// more than the bill, the database refuses it and staff are sent to Save Changes, which records
+// the refund or store credit.
+test("Finalize below what was paid points staff to Save Changes", async () => {
+  mockBill = { ...baseBill, finalized: true, paymentstatus: "finalized", payment_amount: 5000, net_amount: 5000 };
+  mockBillUpdateError = { message: "BILL_EXCESS_UNSETTLED" };
+  render(<BillingForm billId={330} open onOpenChange={() => {}} />);
+  await waitFor(() => expect(finalize()).toBeEnabled());
+
+  fireEvent.click(finalize());
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm & Finalize" }));
+
+  await waitFor(() => expect(mockToasts.some((t) => /Use Save Changes to give the difference back/.test(t))).toBe(true));
 });

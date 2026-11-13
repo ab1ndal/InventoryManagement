@@ -1,6 +1,7 @@
 // src/admin/components/billing/PaymentHistory.js
 import { money } from "./billUtils";
 import { formatDate } from "../../../utility/dateFormat";
+import { paymentRowLabel } from "./paymentHelpers";
 
 // recorded_at has no time zone, so its date is read as written. Parsing it would shift it by a day in
 // a browser outside India.
@@ -25,7 +26,7 @@ export default function PaymentHistory({ payments, netAmount }) {
           {payments.map((p) => (
             <tr key={p.payment_id} className="border-b last:border-0">
               <td className="py-1">{fmtDate(p.recorded_at)}</td>
-              <td className="py-1">{p.salesmethods?.methodname || "—"}</td>
+              <td className="py-1">{paymentRowLabel(p)}</td>
               <td className="py-1 text-right tabular-nums">{money(p.amount)}</td>
             </tr>
           ))}

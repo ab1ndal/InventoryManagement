@@ -137,7 +137,7 @@ export async function loadBillPdfData(billId) {
   let billPayments = [];
   const { data: paymentsData } = await supabase
     .from("bill_payments")
-    .select("payment_id, amount, salesmethodid, recorded_at, salesmethods(methodname)")
+    .select("payment_id, amount, kind, salesmethodid, recorded_at, salesmethods(methodname)")
     .eq("billid", billId)
     .order("recorded_at", { ascending: true });
   if (paymentsData) billPayments = paymentsData;
