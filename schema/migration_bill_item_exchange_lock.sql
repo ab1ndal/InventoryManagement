@@ -12,6 +12,9 @@
 --   - it cannot be deleted, on its own or with its bill (BILL_ITEM_EXCHANGED);
 --   - its bill, variant and MRP cannot change, and its quantity cannot go below the exchanged
 --     quantity (BILL_ITEM_EXCHANGED). Discount, salesperson and the other columns stay editable.
+--   - its quantity cannot go up either (BILL_ITEM_EXCHANGED): a raised quantity made units that
+--     were never sold free to exchange again (2026-11-12 gate review, "Hole B" case 2). The bill
+--     screen shows exchanged lines read-only, so no flow of its own raises one.
 -- Lines with no exchange are untouched. bill_cancel never deletes or changes lines, and
 -- exchange_record only inserts exchanges rows, so neither is affected.
 --
@@ -54,10 +57,11 @@ begin
   end if;
 
   if new.billid is distinct from old.billid or new.variantid is distinct from old.variantid
-     or new.mrp is distinct from old.mrp or new.quantity < v_exchanged then
+     or new.mrp is distinct from old.mrp or new.quantity < v_exchanged
+     or new.quantity > old.quantity then
     raise exception 'BILL_ITEM_EXCHANGED' using errcode = 'P0001',
       detail = format('bill item %s on bill %s has %s exchanged; its bill, variant and MRP stay, '
-                      'and its quantity cannot go below that', old.bill_item_id, old.billid,
+                      'and its quantity cannot go up or below that', old.bill_item_id, old.billid,
                       trim_scale(v_exchanged));
   end if;
   return new;

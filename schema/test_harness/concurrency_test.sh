@@ -672,5 +672,34 @@ echo "bill_edit vs payment: B_rc=$BE_B_RC waitedB=${BE_WAITED}s held=$BE_HELD cr
 [ "$BE_HELD" = "1000.00" ] && [ "$BE_CREDIT" = "0.00" ] && [ "$BE_STATUS" = "finalized" ] || { echo "FAIL: bill should hold 1000 with no credit given"; fail=1; }
 [ "$BE_WAITED" -ge 1 ] || { echo "FAIL: the edit did not wait for the payment's bill lock"; fail=1; }
 
+# ---- exchange_record vs bill_cancel on one paid bill (1000). A cancels it to store credit and holds
+# its transaction; B exchanges the line for 1000. B must wait for A's bill lock, then see the bill
+# cancelled and refuse: an exchange on top of the cancel's 1000 credit would pay the item twice. ----
+bs_fixture 5
+"${PSQL[@]}" > /dev/null <<SQL
+insert into public.customers (customerid, customer_ulid, first_name, store_credit) values (-9701, 'CONCEDITFIXTURE00000000001', 'Conc', 0);
+insert into public.salesmethods (salesmethodid, methodname) values (-9701, 'Conc cash');
+SQL
+EC_BILL="$("${PSQL[@]}" -c "select public.bill_save('$(bs_key 10)', 'finalize_create', '{\"bill\":{\"customerid\":-9701,\"notes\":\"$BS_NOTE\",\"paymentstatus\":\"finalized\",\"finalized\":true,\"net_amount\":1000,\"payment_amount\":1000,\"salesmethodid\":-9701},\"items\":[{\"quantity\":1,\"mrp\":1000,\"subtotal\":1000,\"gst_amount\":0,\"total\":1000,\"variantid\":\"$BS_V\"}]}') ->> 'billid'")"
+EC_BI="$("${PSQL[@]}" -c "select bill_item_id from public.bill_items where billid = $EC_BILL")"
+"${PSQL[@]}" -c "begin" -c "select public.bill_cancel('$(bs_key 11)', $EC_BILL, 'store_credit', '{\"expect\":{\"finalized\":true,\"paymentstatus\":\"finalized\"}}')" -c "select pg_sleep(1.5)" -c "commit" > /dev/null &
+PID_EC=$!
+sleep 0.5
+set +e
+START=$(date +%s)
+"${PSQL[@]}" -c "select public.exchange_record($EC_BILL, -9701, '[{\"bill_item_id\":$EC_BI,\"quantity\":1,\"credit_amount\":1000,\"reason\":\"conc\"}]')" > /dev/null 2> "$OUT/ec_b_err"
+EC_B_RC=$?
+EC_WAITED=$(( $(date +%s) - START ))
+set -e
+wait "$PID_EC"
+EC_CHECK="$("${PSQL[@]}" -c "select (select count(*) from public.exchanges where original_bill_item_id = $EC_BI) || ' ' || (select round(store_credit::numeric, 2) from public.customers where customerid = -9701) || ' ' || (select paymentstatus from public.bills where billid = $EC_BILL)")"
+read -r EC_EXCHANGES EC_CREDIT EC_STATUS <<< "$EC_CHECK"
+"${PSQL[@]}" -c "delete from public.exchanges where original_bill_item_id = $EC_BI" > /dev/null
+cleanup_bill_edit
+echo "exchange vs cancel: B_rc=$EC_B_RC waitedB=${EC_WAITED}s exchanges=$EC_EXCHANGES credit=$EC_CREDIT status=$EC_STATUS B_err=$(tr '\n' ' ' < "$OUT/ec_b_err")"
+[ "$EC_B_RC" != "0" ] && grep -q 'EXCHANGE_BILL_NOT_FINAL' "$OUT/ec_b_err" || { echo "FAIL: the exchange should be refused on the cancelled bill"; fail=1; }
+[ "$EC_EXCHANGES" = "0" ] && [ "$EC_CREDIT" = "1000.00" ] && [ "$EC_STATUS" = "cancelled" ] || { echo "FAIL: only the cancel's 1000 credit should be given"; fail=1; }
+[ "$EC_WAITED" -ge 1 ] || { echo "FAIL: the exchange did not wait for the cancel's bill lock"; fail=1; }
+
 [ "$fail" = 0 ] && echo "concurrency: all checks passed"
 exit "$fail"
