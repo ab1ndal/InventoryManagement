@@ -1,4 +1,4 @@
-import { buildFeed, feedColour, feedResponse, sampleItems } from "../feed";
+import { buildFeed, feedColour, feedResponse, productType, sampleItems } from "../feed";
 
 const IMG = "https://x.supabase.co/storage/v1/object/public/mockups/BC1";
 const product = {
@@ -55,6 +55,26 @@ test("size is stated only when the in-stock pieces share one, and gender and age
   expect(unknown).not.toContain("<g:gender>");
   expect(unknown).not.toContain("<g:age_group>");
   expect(unknown).not.toContain("item_group_id");
+});
+
+test("fabric, the shop's own path and a closer Google category come from the product and its category", async () => {
+  const saree = await buildFeed(rest([{ ...product, categoryid: "SA", fabric: "Silk", categories: { name: "Saree" } }]));
+  expect(saree).toContain("<g:material>Silk</g:material>");
+  expect(saree).toContain("<g:product_type>Women &gt; Saree &gt; Silk</g:product_type>");
+  expect(saree).toContain("<g:google_product_category>8248</g:google_product_category>");
+  const kurtaPajama = await buildFeed(rest([{ ...product, categoryid: "C-KP", fabric: "Cotton", categories: { name: "Kurta-Pajama (Child)" } }]));
+  expect(kurtaPajama).toContain("<g:product_type>Kids &gt; Kurta-Pajama (Child) &gt; Cotton</g:product_type>");
+  expect(kurtaPajama).toContain("<g:google_product_category>5388</g:google_product_category>");
+  const unknown = await buildFeed(rest([{ ...product, categoryid: "ACC", fabric: " ", categories: null }]));
+  expect(unknown).toContain("<g:google_product_category>1604</g:google_product_category>");
+  expect(unknown).not.toContain("<g:material>");
+  expect(unknown).not.toContain("<g:product_type>");
+});
+
+test("the shop's own path leaves out what is not known", () => {
+  expect(productType({ categoryName: "Shirt", fabric: "Linen" })).toBe("Shirt > Linen");
+  expect(productType({ categoryName: "Sherwani", gender: "male", ageGroup: "adult" })).toBe("Men > Sherwani");
+  expect(productType({})).toBe("");
 });
 
 test("sold-out and photo-less products are left out", async () => {

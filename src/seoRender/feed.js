@@ -10,9 +10,35 @@ export const CACHE_FEED = "public, max-age=0, s-maxage=3600, stale-while-revalid
 
 const PAGE = 1000;
 const FIELDS =
-  "productid,name:display_title,description,retailprice,categoryid,productimages(imageurl,displayorder),productsizecolors(stock,color,size)";
-// Google's category "Apparel & Accessories > Clothing".
+  "productid,name:display_title,description,retailprice,categoryid,fabric,categories(name),productimages(imageurl,displayorder),productsizecolors(stock,color,size)";
+// Google's category "Apparel & Accessories > Clothing", for anything without a closer match below.
 const GOOGLE_CATEGORY_CLOTHING = 1604;
+// Closer Google categories (ids from google.com/basepages/producttype/taxonomy-with-ids.en-US.txt).
+// Only clear matches are listed: a wrong category hurts matching more than the general one.
+const SARIS_AND_LEHENGAS = 8248; // Clothing > Traditional & Ceremonial Clothing > Saris & Lehengas
+const TRADITIONAL_CLOTHING = 5388; // Clothing > Traditional & Ceremonial Clothing
+const DRESSES = 2271; // Clothing > Dresses
+const SUITS = 1594; // Clothing > Suits
+const SHIRTS_AND_TOPS = 212; // Clothing > Shirts & Tops
+const PANTS = 204; // Clothing > Pants
+const GOOGLE_CATEGORY = {
+  SA: SARIS_AND_LEHENGAS,
+  LE: SARIS_AND_LEHENGAS,
+  LCH: SARIS_AND_LEHENGAS,
+  // Salwar suits, kurtis, kurta pajamas, sherwanis and Jodhpuri suits are Indian traditional dress.
+  ...Object.fromEntries(
+    ["ST", "RMS", "KUR", "SHR", "KP", "SK", "SW", "IW", "NHJ", "GD", "SJ-2P", "SJ-3P", "C-KP", "C-SW", "C-IW", "C-S3P", "C-S5P"].map(
+      (id) => [id, TRADITIONAL_CLOTHING],
+    ),
+  ),
+  GWN: DRESSES,
+  DRS: DRESSES,
+  // Western two-, three- and five-piece suits and blazers.
+  ...Object.fromEntries(["S2P", "S3P", "S5P", "BLZ"].map((id) => [id, SUITS])),
+  ...Object.fromEntries(["SHT", "T-SHT", "TOP", "SWT-SHT"].map((id) => [id, SHIRTS_AND_TOPS])),
+  ...Object.fromEntries(["FRMP", "TRS", "PNT", "JNS", "PL", "LG"].map((id) => [id, PANTS])),
+};
+const AUDIENCE_LABEL = { kids: "Kids", female: "Women", male: "Men" };
 // Merchant Center allows 10 extra photos per item.
 const MAX_EXTRA_IMAGES = 10;
 
@@ -40,6 +66,13 @@ export function feedColour(raw) {
 
 const tag = (name, value) => `<g:${name}>${esc(value)}</g:${name}>`;
 
+// The shop's own path, such as "Women > Saree > Silk": who it is for, the category and the fabric the
+// product page shows. Merchant Center uses it to match searches and to group products in reports.
+export function productType({ categoryName, fabric, gender, ageGroup }) {
+  const audience = ageGroup === "kids" ? AUDIENCE_LABEL.kids : AUDIENCE_LABEL[gender];
+  return [audience, categoryName, fabric].map((part) => String(part ?? "").trim()).filter(Boolean).join(" > ");
+}
+
 function feedItem(product) {
   const images = [...(product.productimages || [])]
     .sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0))
@@ -56,6 +89,8 @@ function feedItem(product) {
   const sizes = [...new Set(variants.filter((v) => Number(v.stock) > 0).map((v) => v.size).filter(Boolean))];
   const colour = colours.length === 1 ? feedColour(colours[0]) : null;
   const { gender, ageGroup } = categoryAudience(product.categoryid);
+  const fabric = String(product.fabric ?? "").trim();
+  const type = productType({ categoryName: product.categories?.name, fabric, gender, ageGroup });
   return [
     "<item>",
     tag("id", product.productid),
@@ -70,8 +105,11 @@ function feedItem(product) {
     tag("condition", "new"),
     // These are the shop's own pieces, with no manufacturer barcode to state.
     tag("identifier_exists", "no"),
-    tag("google_product_category", GOOGLE_CATEGORY_CLOTHING),
+    tag("google_product_category", GOOGLE_CATEGORY[product.categoryid] ?? GOOGLE_CATEGORY_CLOTHING),
+    ...(type ? [tag("product_type", type)] : []),
     ...(colour ? [tag("color", colour)] : []),
+    // The same fabric the product page's Details table shows.
+    ...(fabric ? [tag("material", fabric)] : []),
     ...(sizes.length === 1 ? [tag("size", formatSize(sizes[0]))] : []),
     ...(gender ? [tag("gender", gender)] : []),
     ...(ageGroup ? [tag("age_group", ageGroup)] : []),
