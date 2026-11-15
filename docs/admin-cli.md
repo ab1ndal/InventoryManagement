@@ -412,6 +412,15 @@ How amounts become a bill, as on the screen:
   fill in. Check the slip and shelf before running it.
 - Warned (non-blocking): a line discount over 30% (the screen asks to
   confirm), paying more than the total (recorded as is).
+- Warned (non-blocking) when the spec would **create** a customer
+  (`create`, or `create_if_missing` for an unknown phone), likely
+  duplicates: existing customers with the same first and last name
+  (ignoring case; no last name matches no last name), with their id and
+  phone, and existing customers whose phone is one digit off the slip's
+  `+91` phone (a misread digit). Two cheap reads: a name match, and one
+  `phone in (…)` over the 90 one-digit variants. If it is the same person,
+  bill `customer { id }` instead. `bill create` repeats these warnings in
+  its output.
 - No `bill_payments` row: like the screen, a fully paid bill records payment
   as `payment_amount` + `salesmethodid` on the bill.
 - Part-paid (`balance_due` > 0), as the screen's partial finalize: the bill

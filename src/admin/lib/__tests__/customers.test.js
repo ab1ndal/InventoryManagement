@@ -5,6 +5,8 @@ import {
   createCustomer,
   CustomerInputError,
   findCustomersByName,
+  phonesOneDigitOff,
+  findLikelyDuplicates,
 } from "../customers";
 import { fakeSupabase as fakeClient } from "../testing/fakeSupabase";
 
@@ -163,6 +165,53 @@ describe("findCustomersByName", () => {
 
   it("requires a name", async () => {
     await expect(findCustomersByName(fakeClient(), " (), ")).rejects.toThrow(CustomerInputError);
+  });
+});
+
+describe("phonesOneDigitOff", () => {
+  it("lists the 90 +91 phones that differ in exactly one digit", () => {
+    const near = phonesOneDigitOff("+919000000001");
+    expect(near).toHaveLength(90);
+    expect(new Set(near).size).toBe(90);
+    expect(near).toContain("+918000000001");
+    expect(near).toContain("+919000000009");
+    expect(near).not.toContain("+919000000001");
+    expect(near.every((p) => /^\+91\d{10}$/.test(p))).toBe(true);
+  });
+
+  it("gives none for a phone that is not +91 and 10 digits", () => {
+    expect(phonesOneDigitOff("+14155550100")).toEqual([]);
+    expect(phonesOneDigitOff(null)).toEqual([]);
+  });
+});
+
+describe("findLikelyDuplicates", () => {
+  it("looks up the same name ignoring case, and the phones one digit off", async () => {
+    const client = fakeClient({
+      "customers.select": (call) =>
+        call.filters[0][0] === "in" ? { data: [{ customerid: 2 }], error: null } : { data: [{ customerid: 1 }], error: null },
+    });
+    const out = await findLikelyDuplicates(client, { first_name: "Asha", last_name: "Rao_K", phone: "+919000000001" });
+    expect(out).toEqual({ same_name: [{ customerid: 1 }], near_phone: [{ customerid: 2 }] });
+    // LIKE wildcards in a name are escaped, so the match stays exact.
+    expect(client.calls[0].filters).toEqual([["ilike", "first_name", "Asha"], ["ilike", "last_name", "Rao\\_K"]]);
+    expect(client.calls[1].filters[0].slice(0, 2)).toEqual(["in", "phone"]);
+    expect(client.calls[1].filters[0][2]).toHaveLength(90);
+  });
+
+  it("matches no last name to no last name, and skips the phone query without a phone", async () => {
+    const client = fakeClient({ "customers.select": { data: [], error: null } });
+    await expect(findLikelyDuplicates(client, { first_name: "Walk", last_name: null, phone: null })).resolves.toEqual({
+      same_name: [],
+      near_phone: [],
+    });
+    expect(client.calls).toHaveLength(1);
+    expect(client.calls[0].filters).toEqual([["ilike", "first_name", "Walk"], ["or", "last_name.is.null,last_name.eq."]]);
+  });
+
+  it("passes on a failed query", async () => {
+    const client = fakeClient({ "customers.select": { data: null, error: new Error("db down") } });
+    await expect(findLikelyDuplicates(client, { first_name: "A", last_name: "B", phone: null })).rejects.toThrow("db down");
   });
 });
 

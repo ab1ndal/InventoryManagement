@@ -22,7 +22,7 @@ import {
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
 import { customerName, money } from "../../utility/activitySummary.js";
 import { todayIST } from "../../utility/dateFormat.js";
-import { findCustomerByPhone, createCustomer } from "./customers.js";
+import { findCustomerByPhone, createCustomer, findLikelyDuplicates } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
 import { logActivityWith } from "./activity.js";
@@ -291,6 +291,17 @@ async function planCustomer(client, input, creates) {
   return { customerid: null, first_name: row.first_name, last_name: row.last_name, phone: row.phone };
 }
 
+// A customer about to be created may already exist under the same name or with the slip's phone
+// misread by a digit. Warned, not refused: same names are common, and the operator decides.
+async function duplicateCustomerWarnings(client, row) {
+  const { same_name, near_phone } = await findLikelyDuplicates(client, row);
+  const who = (c) => `customer ${c.customerid} (${customerName(c)}, ${c.phone || "no phone"})`;
+  return [
+    ...same_name.map((c) => `Possible duplicate: ${who(c)} has the same name; if it is them, bill customer { id: ${c.customerid} } instead of creating a new customer`),
+    ...near_phone.map((c) => `Possible duplicate: ${who(c)} has a phone one digit off ${row.phone}; check the slip's phone`),
+  ];
+}
+
 // product + colour/size → the one matching variant; anything else is refused
 // with the options listed, so the slip line can be corrected.
 async function resolveProductRefs(client, items) {
@@ -367,6 +378,7 @@ export async function prepareBill(client, rawSpec) {
   const creates = { customer: null, manual_items: [] };
 
   const customer = await resolveCustomer(client, spec.customer, creates, warnings);
+  if (creates.customer) warnings.push(...(await duplicateCustomerWarnings(client, creates.customer)));
   const items0 = await resolveProductRefs(client, spec.items);
   await planManualItems(client, items0, creates);
 
@@ -659,7 +671,10 @@ export async function createBill(client, rawSpec, { dryRun = false, source = "vi
     // Re-resolve against the real rows (ids actually assigned) before writing.
     const prepared = resolved === rawSpec ? planned : await prepareBill(client, resolved);
     const save = prepared.status === BILL_STATUS.DRAFT ? insertDraft : insertBill;
-    return { ...(await save(client, prepared, source)), created };
+    const saved = await save(client, prepared, source);
+    // The re-resolved plan bills the new customer by id, so keep the first plan's warnings
+    // (possible duplicate customers) in the output too.
+    return { ...saved, warnings: [...new Set([...planned.warnings, ...saved.warnings])], created };
   } catch (e) {
     if (!created.customer && created.manual_items.length === 0) throw e;
     const what = [

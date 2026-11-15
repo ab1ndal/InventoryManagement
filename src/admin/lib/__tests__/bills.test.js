@@ -453,10 +453,12 @@ describe("readable bill spec", () => {
     items: [{ product: "BC-252051", qty: 1, amount: 1800 }],
     ...o,
   });
+  // A new customer's preview also looks for customers with the same name (ilike): none here.
+  const noNameMatch = (fake) => (call) => (call.filters.some((f) => f[0] === "ilike") ? { data: [], error: null } : fake(call));
   const rdb = (o = {}) =>
     db({
-      "customers.select": (call) =>
-        call.filters.some((f) => f[1] === "phone") ? { data: [test], error: null } : { data: test, error: null },
+      "customers.select": noNameMatch((call) =>
+        call.filters.some((f) => f[1] === "phone") ? { data: [test], error: null } : { data: test, error: null }),
       "productsizecolors.select": { data: [MUSTARD, MAROON, GOLDEN], error: null },
       "products.select": {
         data: [
@@ -520,6 +522,51 @@ describe("readable bill spec", () => {
     expect(p.creates.customer).toMatchObject({ first_name: "Test", last_name: "Customer", phone: "+919000000001", is_guest: false });
   });
 
+  it("warns of likely duplicates when it would create a customer: same name, or phone one digit off", async () => {
+    const sameName = { customerid: 41, first_name: "test", last_name: "CUSTOMER", phone: "+919811111111" };
+    const nearPhone = { customerid: 42, first_name: "Ravi", last_name: null, phone: "+919000000007" };
+    const client = fakeSupabase(rdb({
+      "customers.select": (call) => {
+        if (call.filters.some((f) => f[0] === "ilike")) return { data: [sameName], error: null };
+        if (call.filters.some((f) => f[0] === "in" && f[1] === "phone")) return { data: [nearPhone], error: null };
+        return { data: [], error: null };
+      },
+    }));
+    const p = await prepareBill(
+      client,
+      spec({ customer: { phone: "9000000001", create_if_missing: { first: "Test", last: "Customer" } } }),
+    );
+    expect(p.creates.customer).toMatchObject({ phone: "+919000000001" });
+    expect(p.warnings).toEqual([
+      "Possible duplicate: customer 41 (test CUSTOMER, +919811111111) has the same name; if it is them, bill customer { id: 41 } instead of creating a new customer",
+      "Possible duplicate: customer 42 (Ravi, +919000000007) has a phone one digit off +919000000001; check the slip's phone",
+    ]);
+    const byName = client.calls.find((c) => c.filters.some((f) => f[0] === "ilike"));
+    expect(byName.filters).toEqual([["ilike", "first_name", "Test"], ["ilike", "last_name", "Customer"]]);
+    const byPhone = client.calls.find((c) => c.table === "customers" && c.filters.some((f) => f[0] === "in"));
+    expect(byPhone.filters[0][2]).toHaveLength(90);
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+
+  it("looks for no duplicates when the customer already exists", async () => {
+    const client = fakeSupabase(rdb());
+    await prepareBill(client, spec({ customer: { phone: "9000000001", create_if_missing: { first: "Test", last: "Customer" } } }));
+    expect(client.calls.filter((c) => c.table === "customers")).toHaveLength(1);
+  });
+
+  it("keeps the duplicate warnings in bill create's output", async () => {
+    const client = fakeSupabase(rdb({
+      "customers.select": (call) => {
+        if (call.filters.some((f) => f[0] === "ilike")) return { data: [{ customerid: 41, first_name: "W", last_name: null, phone: null }], error: null };
+        return { data: { customerid: 500, first_name: "W" }, error: null };
+      },
+      "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
+      "rpc.bill_save": { data: { billid: 901, bill_number: "FY26-000337" }, error: null },
+    }));
+    const out = await createBill(client, spec({ customer: { create: { first: "W" } } }));
+    expect(out.warnings).toEqual([expect.stringMatching(/^Possible duplicate: customer 41 \(W, no phone\) has the same name/)]);
+  });
+
   it("warns when the phone belongs to someone with another name", async () => {
     const p = await prepareBill(fakeSupabase(rdb()), spec({ customer: { phone: "9000000001", create_if_missing: { first: "Asha" } } }));
     expect(p.bill.customerid).toBe(453);
@@ -556,10 +603,10 @@ describe("readable bill spec", () => {
     const client = fakeSupabase(
       rdb({
         ...noPhoneMatch,
-        "customers.select": (call) =>
+        "customers.select": noNameMatch((call) =>
           call.filters.some((f) => f[1] === "phone")
             ? { data: [], error: null }
-            : { data: { customerid: 500, first_name: "Test", last_name: "Customer", phone: "+919000000001" }, error: null },
+            : { data: { customerid: 500, first_name: "Test", last_name: "Customer", phone: "+919000000001" }, error: null }),
         "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
         "manual_items.select": (call) => ({
           data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150 }],
@@ -594,7 +641,7 @@ describe("readable bill spec", () => {
   it("says what was already created when the bill then fails", async () => {
     const client = fakeSupabase(
       rdb({
-        "customers.select": (call) => (call.filters.some((f) => f[1] === "phone") ? { data: [], error: null } : { data: { customerid: 500, first_name: "W" }, error: null }),
+        "customers.select": noNameMatch((call) => (call.filters.some((f) => f[1] === "phone") ? { data: [], error: null } : { data: { customerid: 500, first_name: "W" }, error: null })),
         "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
         "rpc.bill_save": { data: null, error: new Error("db down") },
       }),
