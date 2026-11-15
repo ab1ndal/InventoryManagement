@@ -1,4 +1,4 @@
-import { parseBillSpec, prepareBill, createBill, getBill, findBills, resolveSalespersons, checkBillAgainstSpec, BillInputError } from "../bills";
+import { parseBillSpec, prepareBill, createBill, getBill, findBills, resolveSalespersons, checkBillAgainstSpec, splitByMrpShare, BillInputError } from "../bills";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
 // jsdom (CRA's jest env) has no crypto.randomUUID, which createCustomer uses
@@ -595,7 +595,7 @@ describe("readable bill spec", () => {
 
   it("reports a bad inline manual item against its line", async () => {
     await expect(
-      prepareBill(fakeSupabase(rdb()), spec({ items: [{ manual_item: { create: { name: "Fall", category: "ACC", mrp: 150 } }, qty: 1 }] })),
+      prepareBill(fakeSupabase(rdb()), spec({ items: [{ manual_item: { create: { name: "Fall", category: "ACC", mrp: 150, cost: "ZZ" } }, qty: 1 }] })),
     ).rejects.toThrow(/items\[0\].manual_item.create: A valid cost is required/);
   });
 
@@ -1291,5 +1291,96 @@ describe("stock_adds (stock added with the bill)", () => {
     const out = await createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }), { dryRun: true });
     expect(out.stock_adds[0]).toMatchObject({ created: true });
     expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+});
+
+describe("sold_total (one amount for several lines)", () => {
+  describe("splitByMrpShare", () => {
+    it.each([
+      // Owner's example (2026-11-11): 792.22 / 1057.78 → 790 / 1060.
+      [1850, [1000, 1335], [790, 1060]],
+      // Slip 441: 1580 over MRP 1195 + 799.
+      [1580, [1195, 799], [950, 630]],
+      // A total off the ₹10 grid lands its odd rupees on the largest line.
+      [1855, [1000, 1335], [790, 1065]],
+      // Three lines; the largest line takes the remainder.
+      [4000, [2995, 1795, 895], [2110, 1260, 630]],
+      // Single line: the whole total.
+      [1234.5, [2000], [1234.5]],
+      // At or above the MRP total every line stays at MRP.
+      [3000, [1000, 2000], [1000, 2000]],
+    ])("splits %p over %p → %p", (total, grosses, want) => {
+      const out = splitByMrpShare(total, grosses);
+      expect(out).toEqual(want);
+      expect(out.reduce((s, a) => s + a, 0)).toBeCloseTo(Math.min(total, grosses.reduce((s, g) => s + g, 0)), 2);
+    });
+
+    it("keeps paisa shares when rounding would push the largest line over its MRP", () => {
+      // 14 + 1000 sold for 1013: the small line rounds down to 10, leaving 1003 on a ₹1000 line.
+      expect(splitByMrpShare(1013, [14, 1000])).toEqual([13.99, 999.01]);
+    });
+  });
+
+  it.each([
+    [{ ...slip387, sold_total: 0, items: [{ variantid: VID, qty: 1 }] }, /sold_total must be > 0/],
+    [{ ...slip387, sold_total: "x", items: [{ variantid: VID, qty: 1 }] }, /sold_total/],
+    [{ ...slip387, sold_total: 1800 }, /sold_total or line amounts, not both/],
+  ])("refuses a bad sold_total %#", (spec, msg) => {
+    expect(() => parseBillSpec(spec)).toThrow(msg);
+  });
+
+  it("prices each line at its MRP share and shows the split in the preview", async () => {
+    const VID2 = "11111111-2222-3333-4444-555555555555";
+    const client = fakeSupabase(db({
+      "productsizecolors.select": {
+        data: [
+          { variantid: VID, productid: "BC252051", size: "FREE-SIZE", color: "Mustard", stock: 1 },
+          { variantid: VID2, productid: "BC25132", size: "L|40", color: "White Grey", stock: 1 },
+        ],
+        error: null,
+      },
+      "products.select": {
+        data: [
+          { productid: "BC252051", name: "Georgette-Saree", categoryid: "SA", retailprice: 2395, unit_type: "piece" },
+          { productid: "BC25132", name: "Cotton Shirt", categoryid: "SH", retailprice: 799, unit_type: "piece" },
+        ],
+        error: null,
+      },
+    }));
+    const spec = {
+      ...slip387,
+      payment: { method: "Cash", amount: 2500 },
+      sold_total: 2500,
+      items: [{ variantid: VID, qty: 1 }, { variantid: VID2, qty: 1 }],
+    };
+    const p = await prepareBill(client, spec);
+    // 2500 × 2395/3194 = 1874.6 → 1870 (largest line takes the rest: 1870); 2500 × 799/3194 = 625.4 → 630.
+    expect(p.sold_split).toEqual([1870, 630]);
+    expect(p.totals.grand_total).toBe(2500);
+    expect(p.bill_items.map((l) => Math.round(l.total))).toEqual([1870, 630]);
+  });
+
+  it("slip finish checks each line against its share", () => {
+    const spec = {
+      customerid: 453,
+      date: "2026-10-22",
+      payment: { method: "Cash", amount: 1850 },
+      sold_total: 1850,
+      items: [{ variantid: "a", qty: 1 }, { variantid: "b", qty: 1 }],
+    };
+    const bill = (t1, t2) => ({
+      billid: 1, bill_number: "FY26-1", customerid: 453, orderdate: "2026-10-21T18:30:00+00:00",
+      paymentstatus: "finalized", totalamount: 1850, payment_amount: 1850, payment_method: "Cash",
+      customer: { customerid: 453, first_name: "Test", last_name: "Customer", phone: "+919000000001" }, salespersons: [],
+      items: [
+        { product_code: "BC1", variantid: "a", quantity: 1, mrp: 1000, total: t1, alteration_charge: 0 },
+        { product_code: "BC2", variantid: "b", quantity: 1, mrp: 1335, total: t2, alteration_charge: 0 },
+      ],
+    });
+    expect(checkBillAgainstSpec(spec, bill(790, 1060)).ok).toBe(true);
+    expect(checkBillAgainstSpec(spec, bill(1060, 790)).mismatches).toEqual([
+      "items[0] amount: spec 790, bill 1060",
+      "items[1] amount: spec 1060, bill 790",
+    ]);
   });
 });

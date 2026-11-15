@@ -171,6 +171,45 @@ node scripts/admin-cli.mjs product find --code BC-252051
 (`src/utility/zCode.js`: Z, then A=1 … I=9, Z=0), so it can be matched
 against the code written on a slip. Variants are in the app's size order.
 
+## product near
+
+When the code written on a slip disagrees with the slip's rate or colour, a
+digit was probably miswritten or misread. Lists the products one digit off the
+written code that match the slip, across all categories. Read-only. When the
+category is known, `product search --category … --mrp … --near <code>` comes
+first; this is the fallback when that finds nothing.
+
+```bash
+node scripts/admin-cli.mjs product near --code BC253248 --mrp 2195 --color fawn --in-stock
+```
+
+| Option | Notes |
+|---|---|
+| `--code` | the code as written (normalised like `product find`) |
+| `--mrp` | the slip's rate: keeps near codes at exactly this MRP |
+| `--color` | substring of a variant colour; keeps only matching variants |
+| `--in-stock` | keeps only variants with stock > 0 |
+
+Every digit of the code is tried with each other digit (`BC253248` → 54
+codes). Output:
+
+```json
+{
+  "written": { "productid": "BC253248", "retailprice": 2995, "variants": [ … ] },
+  "written_matches": { "mrp": false, "color": false },
+  "near": [
+    { "productid": "BC253249", "retailprice": 2195, "changed": "8→9 at digit 8", "lookalike": false, "variants": [ … ] }
+  ]
+}
+```
+
+`written` is the written code's product (`null` if none) and
+`written_matches` says whether it fits `--mrp` / `--color` (`null` for a
+filter not given). `near` holds up to 25 products in `product find`'s shape
+plus `changed` and `lookalike`. Look-alike digits on slips (3/5, 4/9, 1/7,
+1/2, 6/8) come first, then products with stock. Without `--color` or
+`--in-stock`, every existing near code is listed.
+
 ## product search
 
 Find inventory products when a slip has no usable code. Read-only. At least
@@ -189,11 +228,22 @@ node scripts/admin-cli.mjs product search --category SA --cost ZAAGB --mrp 2395 
 | `--mrp` | exact retail price |
 | `--color` | substring of a variant colour; keeps only matching variants |
 | `--in-stock` | keeps only variants with stock > 0 |
+| `--near` | the code written on the slip: each product gets `code_distance` (digits to change, add or drop to reach its code) and the closest codes come first |
 
 Output: up to 25 products in the same shape as `product find`. With
 `--color` / `--in-stock`, products left with no matching variant are dropped.
 A cost code alone is rarely unique (three sarees share `ZAAGB` at ₹2395), so
 combine it with category, MRP and colour.
+
+A slip whose code does not match its rate or description: search the slip's
+category and MRP (and cost code, if written) with `--near <written code>`.
+The miswritten code is usually at the top, one or two digits off. The ranking
+covers the first 200 products by code that match the filters, enough for any
+category + MRP listing.
+
+```bash
+node scripts/admin-cli.mjs product search --category RMS --mrp 2195 --cost ZAAGB --near BC253248
+```
 
 ## category list
 
@@ -246,7 +296,7 @@ node scripts/admin-cli.mjs manual-item create --name Fall --category ACC --mrp 1
 | `--name` | yes | |
 | `--category` | yes | must exist (`category list`) |
 | `--mrp` | yes | number ≥ 0 |
-| `--cost` | yes | purchase price as Z-code (`ZEZ` = 50) or a number; must be > 0 |
+| `--cost` | no | purchase price as Z-code (`ZEZ` = 50) or a number; must be > 0. Left out: half the MRP, rounded to the nearest 10 (owner rule for slips with no cost; MRP 1795 → 900) |
 | `--size`, `--color` | no | |
 | `--dry-run` | no | shows the row, including the id it would get |
 
@@ -270,7 +320,7 @@ The id is the next `BCX{YY}{NNN}` for the current year (from
 ```
 
 Errors (exit 2): `Name is required`, `Category is required`,
-`Invalid MRP "…"`, `A valid cost is required …`, `Unknown category "…"`.
+`Invalid MRP "…"`, `A valid cost is required …` (also when no cost is given and half the MRP rounds to 0), `Unknown category "…"`.
 Like the app, no activity-log entry is written for a new manual item.
 
 ## stock add
@@ -370,7 +420,7 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 | `"product": "BC-252051"` (+ `"color"`, `"size"`) | the product's variant; colour/size (case-insensitive) must narrow it to exactly one, else it is refused with the variants listed |
 | `"variantid": "…"` | a variant by id |
 | `"manual_item_id": "BCX26125"` or `"manual_item": { "id": "BCX26125" }` | an existing manual item |
-| `"manual_item": { "create": { "name", "category", "mrp", "cost"[, "size", "color"] } }` | a new manual item, same rules as `manual-item create` (`cost` as Z-code or number) |
+| `"manual_item": { "create": { "name", "category", "mrp"[, "cost", "size", "color"] } }` | a new manual item, same rules as `manual-item create` (`cost` as Z-code or number; left out = half the MRP rounded to 10) |
 
 | Field | Required | Notes |
 |---|---|---|
@@ -385,6 +435,7 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 | `stock_adds` | no | stock to add before the bill, for pieces on the shelf but not in the inventory: a list of `{ "code", "size", "color", "qty"[, "new_variant": true] }`, each exactly a [stock add](#stock-add) (see [Stock adds](#stock-adds)); default none |
 | `salespersons` | no | the bill's salespeople (names at the top right of the slip): a list of names (case-insensitive) and/or ids from `salesperson list`, e.g. `["Asha", 4]`. Refused: an unknown name or id, an inactive salesperson (the screen does not offer them), a name two active salespersons share (give the id). Saved as the screen's Salesperson(s) selector saves them: `bill_salespersons` rows, written by `bill_save`. Lines get no salesperson. Default none |
 | `items[].qty` | yes | > 0; decimals for meter items |
+| `sold_total` | no | one amount for all the lines (goods only, excluding alteration), for a slip with a single total or a bill-level "-20%": split over the lines by MRP share, each rounded to the nearest ₹10, the largest-MRP line taking the remainder so the lines add up exactly (1850 over MRP 1000 + 1335 → 790 + 1060). If that would push the largest line over its MRP, the shares are kept to the paisa. At or above the MRP total, every line stays at MRP. Not with `items[].amount`. `bill preview` shows the result as `sold_split` |
 | `items[].amount` | no | what the line sold for (goods only, excluding alteration); default MRP × qty |
 | `items[].alteration_charge` | no | added on top of `amount` (e.g. fall/pico charged with the item) |
 | `items[].stitch_type` | no | `unstitched` (default) or `stitched` |

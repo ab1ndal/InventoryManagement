@@ -55,10 +55,16 @@ export async function nextManualItemId(client, date = new Date()) {
   return `BCX${yy}${String(current + 1).padStart(3, "0")}`;
 }
 
+/** Cost for a manual item whose slip gives none: half the MRP, rounded to the nearest 10. */
+export function defaultManualItemCost(mrp) {
+  return Math.round(Number(mrp) / 2 / 10) * 10;
+}
+
 /**
  * Create a manual item. Category must exist; cost is a Z-code (as on price
  * tags, e.g. "ZAAGB") or a plain number, and must decode to > 0, as the form
- * requires. With dryRun, returns { dry_run, would_insert } and writes nothing.
+ * requires. No cost → defaultManualItemCost(mrp). With dryRun, returns
+ * { dry_run, would_insert } and writes nothing.
  */
 export async function createManualItem(
   client,
@@ -73,7 +79,10 @@ export async function createManualItem(
   if (blankToNull(input.mrp) === null || !Number.isFinite(mrp) || mrp < 0) {
     throw new ManualItemInputError(`Invalid MRP "${input.mrp ?? ""}"`);
   }
-  const purchasePrice = decodeZCodeToPrice(blankToNull(input.cost) ?? "");
+  // Slips rarely carry a cost for manual items; the owner's rule (2026-11-14) is half the MRP,
+  // rounded to the nearest 10.
+  const purchasePrice =
+    blankToNull(input.cost) === null ? defaultManualItemCost(mrp) : decodeZCodeToPrice(String(input.cost).trim());
   if (!(purchasePrice > 0)) {
     throw new ManualItemInputError(
       `A valid cost is required (Z-code like ZAAGB or a number), got "${input.cost ?? ""}"`,

@@ -64,6 +64,16 @@ describe("createManualItem", () => {
     expect(client.calls.some((c) => c.op === "insert")).toBe(false);
   });
 
+  it.each([
+    [undefined, "150", 80],
+    ["", "1795", 900],
+    ["  ", "125", 60],
+    [null, "2390", 1200],
+  ])("defaults a missing cost (%p) to half the MRP %s rounded to 10 → %d", async (cost, mrp, want) => {
+    const out = await createManualItem(fakeSupabase(ok), { ...input, cost, mrp }, { dryRun: true, now: oct2026 });
+    expect(out.would_insert.purchase_price).toBe(want);
+  });
+
   it("inserts and returns the saved row", async () => {
     const client = fakeSupabase({
       ...ok,
@@ -78,8 +88,9 @@ describe("createManualItem", () => {
     [{ ...input, categoryid: "" }, /category is required/i],
     [{ ...input, mrp: "abc" }, /invalid mrp/i],
     [{ ...input, mrp: undefined }, /invalid mrp/i],
-    [{ ...input, cost: "" }, /valid cost is required/i],
     [{ ...input, cost: "ZZ" }, /valid cost is required/i],
+    // No cost on an MRP so small that half of it rounds to 0.
+    [{ ...input, cost: "", mrp: "8" }, /valid cost is required/i],
   ])("rejects bad input %#", async (bad, msg) => {
     await expect(createManualItem(fakeSupabase(ok), bad, { now: oct2026 })).rejects.toThrow(msg);
   });

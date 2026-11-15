@@ -185,7 +185,7 @@ export function parseBillSpec(spec) {
   if (!isObj(spec)) fail("Bill spec must be a JSON object");
   checkKeys(
     spec,
-    ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "salespersons", "draft", "stock_adds", "items"],
+    ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "salespersons", "draft", "stock_adds", "sold_total", "items"],
     "spec",
   );
   const draft = spec.draft ?? false;
@@ -202,6 +202,11 @@ export function parseBillSpec(spec) {
   }
   const payment = draft ? parseDraftPayment(spec.payment) : parsePayment(spec.payment);
   if (!Array.isArray(spec.items) || spec.items.length === 0) fail("items: at least one item is required");
+  const soldTotal = spec.sold_total == null ? null : num(spec.sold_total, "sold_total");
+  if (soldTotal != null && soldTotal <= 0) fail("sold_total must be > 0");
+  if (soldTotal != null && spec.items.some((it) => isObj(it) && it.amount != null)) {
+    fail("give sold_total or line amounts, not both");
+  }
 
   const items = spec.items.map((it, i) => {
     const at = `items[${i}]`;
@@ -238,8 +243,33 @@ export function parseBillSpec(spec) {
     draft,
     salespersons: salespersons.map((s) => (typeof s === "string" ? s.trim() : s)),
     stock_adds: parseStockAdds(spec.stock_adds),
+    sold_total: soldTotal,
     items,
   };
+}
+
+const ROUND_TO = 10;
+
+/**
+ * Splits what a slip says was paid for several lines into per-line amounts by each line's share
+ * of the MRP (grosses = MRP × qty per line), rounded to the nearest ₹10 so each line reads as
+ * what that piece sold for (owner rule 2026-11-11: 792.22 / 1057.78 → 790 / 1060). The line with
+ * the largest MRP takes the remainder, so the amounts always add up to the total. If rounding
+ * would push that line past its MRP or below 0, the shares are kept to the paisa instead.
+ * A total at or above the MRP total leaves every line at its MRP.
+ */
+export function splitByMrpShare(total, grosses) {
+  const sum = grosses.reduce((s, g) => s + g, 0);
+  if (grosses.length === 1) return [round2(total)];
+  if (total >= sum) return grosses.map(round2);
+  const big = grosses.indexOf(Math.max(...grosses));
+  const fill = (amounts) => {
+    const others = amounts.reduce((s, a, i) => (i === big ? s : s + a), 0);
+    return amounts.map((a, i) => (i === big ? round2(total - others) : a));
+  };
+  const rounded = fill(grosses.map((g) => Math.min(g, Math.round((total * g) / sum / ROUND_TO) * ROUND_TO)));
+  if (rounded[big] >= 0 && rounded[big] <= grosses[big]) return rounded;
+  return fill(grosses.map((g) => round2((total * g) / sum)));
 }
 
 async function one(query) {
@@ -499,13 +529,12 @@ export async function prepareBill(client, rawSpec) {
 
   // Item objects in the exact shape the billing screen's pickers build
   // (InventoryPicker / ManualItemForm), so billUtils prices them identically.
-  const items = items0.map((it, i) => {
+  const bases = items0.map((it, i) => {
     const at = `items[${i}]`;
-    let base;
     if (it.variantid) {
       const v = variantById[it.variantid] ?? fail(`${at}: variant ${it.variantid} not found`);
       const p = productById[v.productid] ?? fail(`${at}: product ${v.productid} not found`);
-      base = {
+      return {
         source: "inventory",
         productid: p.productid,
         variantid: v.variantid,
@@ -518,23 +547,29 @@ export async function prepareBill(client, rawSpec) {
         unit_type: p.unit_type || "piece",
         // The billing screen does not set cost_price for inventory lines.
       };
-    } else {
-      const m = manualById[it.manual_item_id] ?? fail(`${at}: manual item ${it.manual_item_id} not found`);
-      base = {
-        source: "manual",
-        productid: m.manual_item_id,
-        product_name: m.name,
-        category: m.categoryid || null,
-        size: m.size || null,
-        color: m.color || null,
-        mrp: Number(m.mrp || 0),
-        cost_price: Number(m.purchase_price),
-        unit_type: m.categoryid?.startsWith("FAB-") ? "meter" : "piece",
-      };
     }
+    const m = manualById[it.manual_item_id] ?? fail(`${at}: manual item ${it.manual_item_id} not found`);
+    return {
+      source: "manual",
+      productid: m.manual_item_id,
+      product_name: m.name,
+      category: m.categoryid || null,
+      size: m.size || null,
+      color: m.color || null,
+      mrp: Number(m.mrp || 0),
+      cost_price: Number(m.purchase_price),
+      unit_type: m.categoryid?.startsWith("FAB-") ? "meter" : "piece",
+    };
+  });
+  const grosses = bases.map((base, i) => round2(base.mrp * items0[i].qty));
+  const soldSplit = spec.sold_total != null ? splitByMrpShare(spec.sold_total, grosses) : null;
+  const amounts = soldSplit ?? items0.map((it) => it.amount);
 
-    const gross = round2(base.mrp * it.qty);
-    const amount = it.amount ?? gross;
+  const items = items0.map((it, i) => {
+    const at = `items[${i}]`;
+    const base = bases[i];
+    const gross = grosses[i];
+    const amount = amounts[i] ?? gross;
     if (amount > gross) {
       fail(`${at}: amount ${amount} is above MRP ${base.mrp} × ${it.qty} = ${gross}; the bill cannot charge more than MRP`);
     }
@@ -593,7 +628,7 @@ export async function prepareBill(client, rawSpec) {
 
   const computed = computeBillTotals(items, [], [], 0, 0, DOC_TYPE);
   if (spec.draft) {
-    return prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, stockAdds, computed, warnings });
+    return prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, stockAdds, computed, warnings, soldSplit });
   }
 
   // A part-paid bill is priced at what the customer agreed to pay in all (the
@@ -658,6 +693,8 @@ export async function prepareBill(client, rawSpec) {
     bill_items: billItems,
     stock,
     stock_adds: stockAdds,
+    // What each line sold for, from sold_total split by MRP share.
+    ...(soldSplit ? { sold_split: soldSplit } : {}),
     totals: {
       mrp_total: totals.itemsSubtotal,
       line_discounts: totals.itemLevelDiscountTotal,
@@ -685,7 +722,7 @@ export async function prepareBill(client, rawSpec) {
 // discount and no payment check (finishing the draft does both), and the
 // payment fields as entered. The stock check before it is the same as for a
 // finalized bill, since a draft takes its stock when saved.
-function prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, stockAdds, computed, warnings }) {
+function prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, stockAdds, computed, warnings, soldSplit }) {
   const p = spec.payment;
   // The screen's "final amount": what the customer agreed to pay in all.
   const finalAmount = p.balance_due > 0 ? round2((p.amount ?? 0) + p.balance_due) : null;
@@ -717,6 +754,7 @@ function prepareDraft(spec, { customer, creates, method, location, salespersons,
     bill_items: buildBillItemsPayload(null, items, 0, computed.overallDiscount, DOC_TYPE),
     stock,
     stock_adds: stockAdds,
+    ...(soldSplit ? { sold_split: soldSplit } : {}),
     totals: {
       mrp_total: computed.itemsSubtotal,
       line_discounts: computed.itemLevelDiscountTotal,
@@ -1073,8 +1111,11 @@ export function checkBillAgainstSpec(rawSpec, bill) {
   // lower by the balance discount that trims them to the amount agreed, spread over the lines in
   // proportion, so each is compared after its share. A draft has no balance discount.
   const agreed = round2((spec.payment.amount ?? 0) + spec.payment.balance_due);
-  const wantTotal = (it, line) => (it.amount ?? round2(Number(line.mrp) * it.qty)) + it.alteration_charge;
-  const sumWant = paired.reduce((s, [it, line]) => s + wantTotal(it, line), 0);
+  const split = spec.sold_total == null
+    ? null
+    : splitByMrpShare(spec.sold_total, paired.map(([it, line]) => round2(Number(line.mrp) * it.qty)));
+  const wantTotal = (it, line, i) => (split?.[i] ?? it.amount ?? round2(Number(line.mrp) * it.qty)) + it.alteration_charge;
+  const sumWant = paired.reduce((s, [it, line], i) => s + wantTotal(it, line, i), 0);
   const gap = spec.draft ? 0 : Math.max(0, sumWant - agreed);
   for (const [i, [it, line]] of paired.entries()) {
     const at = `items[${i}]`;
@@ -1093,7 +1134,7 @@ export function checkBillAgainstSpec(rawSpec, bill) {
     if (Number(line.quantity) !== it.qty) differs(`${at} qty`, it.qty, Number(line.quantity));
     const alteration = Number(line.alteration_charge ?? 0);
     if (!near(alteration, it.alteration_charge, PAISA)) differs(`${at} alteration_charge`, it.alteration_charge, alteration);
-    const want = wantTotal(it, line);
+    const want = wantTotal(it, line, i);
     const share = sumWant > 0 ? gap * (want / sumWant) : 0;
     if (!near(Number(line.total), want - share, LINE_TOLERANCE)) {
       differs(`${at} amount`, want - it.alteration_charge, round2(Number(line.total) - alteration));
