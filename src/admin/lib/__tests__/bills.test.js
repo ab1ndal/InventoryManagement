@@ -1,4 +1,4 @@
-import { parseBillSpec, prepareBill, createBill, getBill, findBills, resolveSalespersons, BillInputError } from "../bills";
+import { parseBillSpec, prepareBill, createBill, getBill, findBills, resolveSalespersons, checkBillAgainstSpec, BillInputError } from "../bills";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
 // jsdom (CRA's jest env) has no crypto.randomUUID, which createCustomer uses
@@ -955,6 +955,108 @@ describe("draft bills (spec draft: true)", () => {
     expect((await getBill(fakeSupabase({ "bills.select": { data: draftRow, error: null } }), { billid: 902 })).is_draft).toBe(true);
     const finRow = { ...draftRow, paymentstatus: "finalized", finalized: true };
     expect((await getBill(fakeSupabase({ "bills.select": { data: finRow, error: null } }), { billid: 902 })).is_draft).toBe(false);
+  });
+});
+
+describe("checkBillAgainstSpec (slip finish)", () => {
+  // Slip 387 as getBill returns it once saved; orderdate comes back in UTC.
+  const saved = (o = {}) => ({
+    billid: 900,
+    bill_number: "FY26-000336",
+    customerid: 453,
+    orderdate: "2026-10-21T18:30:00+00:00",
+    paymentstatus: "finalized",
+    totalamount: 1800,
+    payment_amount: 1800,
+    payment_method: "Cash",
+    customer: { customerid: 453, first_name: "Test", last_name: "Customer", phone: "+919000000001" },
+    salespersons: [{ salesperson_id: 10, name: "Asha" }],
+    items: [{ product_code: "BC252051", variantid: VID, quantity: 1, mrp: 2395, total: 1800, alteration_charge: 0, color: "Mustard", size: "FREE-SIZE" }],
+    ...o,
+  });
+  const spec = {
+    customer: { phone: "9000000001" },
+    date: "2026-10-22",
+    payment: { method: "Cash", amount: 1800 },
+    salespersons: ["asha"],
+    items: [{ product: "BC-252051", color: "mustard", qty: 1, amount: 1800 }],
+  };
+
+  it("passes a bill saved as the spec says, with a compact view of it", () => {
+    expect(checkBillAgainstSpec(spec, saved())).toEqual({
+      ok: true,
+      mismatches: [],
+      saved: {
+        bill_number: "FY26-000336",
+        status: "finalized",
+        customer: { customerid: 453, name: "Test Customer", phone: "+919000000001" },
+        date: "2026-10-22",
+        lines: [{ code: "BC252051", color: "Mustard", size: "FREE-SIZE", qty: 1, amount: 1800 }],
+        total: 1800,
+        paid: 1800,
+        method: "Cash",
+        salespersons: ["Asha"],
+      },
+    });
+  });
+
+  it("allows the balance discount spread over the lines, but not amounts on the wrong line", () => {
+    // Lines 1000 + 960 on a 1950 payment: the ₹10 balance discount is shared in proportion.
+    const twoLines = { ...spec, payment: { method: "Cash", amount: 1950 }, items: [
+      { variantid: "a", qty: 1, amount: 1000 },
+      { variantid: "b", qty: 1, amount: 960 },
+    ] };
+    const items = (t1, t2) => [
+      { product_code: "BC1", variantid: "a", quantity: 1, mrp: 1200, total: t1, alteration_charge: 0 },
+      { product_code: "BC2", variantid: "b", quantity: 1, mrp: 1200, total: t2, alteration_charge: 0 },
+    ];
+    expect(checkBillAgainstSpec(twoLines, saved({ totalamount: 1950, payment_amount: 1950, items: items(994.9, 955.1) })).ok).toBe(true);
+    const swapped = checkBillAgainstSpec(twoLines, saved({ totalamount: 1950, payment_amount: 1950, items: items(955.1, 994.9) }));
+    expect(swapped.mismatches).toEqual([
+      "items[0] amount: spec 1000, bill 955.1",
+      "items[1] amount: spec 960, bill 994.9",
+    ]);
+  });
+
+  it("lists every field that differs", () => {
+    const wrong = saved({
+      orderdate: "2026-10-22T18:30:00+00:00",
+      totalamount: 1700,
+      payment_amount: 1700,
+      payment_method: "UPI",
+      customer: { customerid: 454, first_name: "Other", last_name: null, phone: "+919000000009" },
+      salespersons: [],
+      items: [{ product_code: "BC252051", variantid: "x", quantity: 2, mrp: 2395, total: 1700, alteration_charge: 0, color: "Maroon", size: "FREE-SIZE" }],
+    });
+    expect(checkBillAgainstSpec(spec, wrong).mismatches).toEqual([
+      'customer phone: spec "+919000000001", bill "+919000000009"',
+      'date: spec "2026-10-22", bill "2026-10-23"',
+      'items[0] color: spec "mustard", bill "Maroon"',
+      "items[0] qty: spec 1, bill 2",
+      "items[0] amount: spec 1800, bill 1700",
+      "total: spec 1800, bill 1700",
+      "paid: spec 1800, bill 1700",
+      'method: spec "Cash", bill "UPI"',
+      'salespersons: spec ["asha"], bill []',
+    ]);
+  });
+
+  it("checks status, line count and a customer by id", () => {
+    const out = checkBillAgainstSpec({ ...slip387, payment: { method: "Cash", amount: 1000, balance_due: 800 } }, saved({ customerid: 9, items: [] }));
+    expect(out.ok).toBe(false);
+    expect(out.mismatches).toEqual(expect.arrayContaining([
+      "customer: spec 453, bill 9",
+      'status: spec "partial", bill "finalized"',
+      "lines: spec 1, bill 0",
+      "paid: spec 1000, bill 1800",
+    ]));
+  });
+
+  it("does not hold a draft to the amount paid", () => {
+    const draft = { ...slip387, draft: true, payment: { method: "Cash", amount: 500 } };
+    const bill = saved({ paymentstatus: "draft", totalamount: 1800.08, payment_amount: 500, salespersons: [],
+      items: [{ product_code: "BC252051", variantid: VID, quantity: 1, mrp: 2395, total: 1800.08, alteration_charge: 0 }] });
+    expect(checkBillAgainstSpec(draft, bill)).toMatchObject({ ok: true, mismatches: [] });
   });
 });
 

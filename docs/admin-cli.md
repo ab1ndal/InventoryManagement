@@ -325,7 +325,8 @@ Save Draft writes it (see [Draft bills](#draft-bills)). `bill preview` shows
 all of it without writing. Not supported: discount codes, vouchers, store
 credit, exchanges, recording a later payment or finishing a draft (use the
 Bills screen), per-line salespersons, SMS. The bill's PDF is a separate step:
-[bill pdf](#bill-pdf).
+[bill pdf](#bill-pdf), or [slip finish](#slip-finish) does create, PDF and a
+check in one command.
 
 ### Bill spec
 
@@ -673,6 +674,62 @@ node scripts/admin-cli.mjs slip download --photo <photo id> --out audit/   # sav
 
 For an audit: `bill get` shows the bill with its `slip_photos`; `slip download`
 saves each photo so it can be read next to the bill.
+
+### slip finish
+
+One command for a slip whose spec has passed `bill preview`: `bill create`
+with the photo, then `bill pdf` with the **bill number** the save returned
+(never the bill id), then `bill get`, and a check of the saved bill against
+the spec. Each step is the CLI's own command, so it writes exactly what
+they write.
+
+```bash
+node scripts/admin-cli.mjs slip finish --spec 441.json --photo "BC Bills/441.jpeg"
+node scripts/admin-cli.mjs slip finish --spec 441.json --photo 441.jpeg --dry-run   # = bill create --dry-run
+```
+
+`--photo` is required (repeatable); `--app-url` is passed to `bill pdf`. A
+draft spec gets no PDF (`"pdf": "skipped: …"`). Output, compact:
+
+```json
+{
+  "billid": 488,
+  "bill_number": "FY26-000415",
+  "status": "finalized",
+  "pdf_url": "https://…/invoices/…pdf",
+  "slip_photos": ["<photo id>"],
+  "verify": {
+    "ok": true,
+    "mismatches": [],
+    "saved": {
+      "bill_number": "FY26-000415", "status": "finalized",
+      "customer": { "customerid": 453, "name": "Test Customer", "phone": "+919000000001" },
+      "date": "2026-10-22",
+      "lines": [{ "code": "BC252051", "color": "Mustard", "size": "FREE-SIZE", "qty": 1, "amount": 1800 }],
+      "total": 1800, "paid": 1800, "method": "Cash", "salespersons": ["Asha"]
+    }
+  },
+  "ok": true
+}
+```
+
+`verify` compares the saved bill with the spec: customer (id, phone, or the
+new customer's name), date (the shop's day), status (finalized / partial /
+draft), number of lines, each line's product code (and colour / size if
+the spec gives them), variant id or manual item, qty, alteration and amount
+(to the rupee, after the line's share of the balance discount), the total
+(`amount + balance_due`, not for a draft), the amount paid, the payment
+method and the salespersons. Each difference is one `mismatches` line, e.g.
+`items[0] amount: spec 1800, bill 1700`. Paying more than the line total
+(a preview warning) shows as a `total` mismatch.
+
+Exit code `1` with `"ok": false` when anything differs, or when a step after
+the save failed: the PDF (`pdf_error`, with `pdf_retry`, e.g.
+`bill pdf --number FY26-000415`), a photo (`slip_photo_errors`), a draft's
+salespersons or stock (`save_errors`), or `negative_stock`. None of these
+undo the bill; fix them and check with `bill get`. Warnings and applied
+`stock_adds` are listed too. A refused bill fails before anything is saved,
+as for `bill create`.
 
 ### Checked against the app
 

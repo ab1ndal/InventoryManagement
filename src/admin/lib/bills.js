@@ -22,7 +22,7 @@ import {
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
 import { customerName, money } from "../../utility/activitySummary.js";
 import { todayIST } from "../../utility/dateFormat.js";
-import { findCustomerByPhone, createCustomer, findLikelyDuplicates } from "./customers.js";
+import { findCustomerByPhone, createCustomer, findLikelyDuplicates, normalizePhone } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
 import { logActivityWith } from "./activity.js";
@@ -979,6 +979,114 @@ export async function getBill(client, { billid, billNumber }) {
     }),
     payments: payments ?? [],
     slip_photos: slipPhotos,
+  };
+}
+
+// Money that matches to the paisa, and a line's amount, checked to the rupee: lines land on or a
+// few paise above the slip's amount before the balance discount is spread over them.
+const PAISA = 0.01;
+const LINE_TOLERANCE = 1;
+
+/**
+ * Compares a saved bill (getBill) with the spec it was made from: customer, date, status, each
+ * line's item, qty, amount and alteration, the total, amount paid, payment method and
+ * salespersons. For `slip finish`, so a bill that is not what the slip says is caught at once.
+ * Returns { ok, mismatches, saved }: saved is a compact view of the bill as stored.
+ */
+export function checkBillAgainstSpec(rawSpec, bill) {
+  const spec = parseBillSpec(rawSpec);
+  const mismatches = [];
+  const differs = (what, want, got) => mismatches.push(`${what}: spec ${JSON.stringify(want)}, bill ${JSON.stringify(got)}`);
+  const eqi = (a, b) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+  const near = (a, b, tolerance) => Math.abs(Number(a) - Number(b)) <= tolerance + 1e-9;
+
+  const c = spec.customer;
+  const cust = bill.customer;
+  if (c.kind === "id" && bill.customerid !== c.customerid) differs("customer", c.customerid, bill.customerid);
+  if (c.kind === "phone" && cust?.phone !== normalizePhone(c.phone)) differs("customer phone", normalizePhone(c.phone), cust?.phone ?? null);
+  if (c.kind === "new") {
+    const want = customerName({ first_name: c.create.first, last_name: c.create.last });
+    if (!cust || !eqi(customerName(cust), want)) differs("customer", want, cust ? customerName(cust) : null);
+  }
+  if (c.kind === "none" && bill.customerid != null) differs("customer", null, bill.customerid);
+
+  const date = todayIST(new Date(bill.orderdate));
+  if (date !== spec.date) differs("date", spec.date, date);
+  const status = spec.draft ? BILL_STATUS.DRAFT : spec.payment.balance_due > 0 ? BILL_STATUS.PARTIAL : BILL_STATUS.FINALIZED;
+  if (bill.paymentstatus !== status) differs("status", status, bill.paymentstatus);
+
+  const lines = bill.items ?? [];
+  if (lines.length !== spec.items.length) differs("lines", spec.items.length, lines.length);
+  const paired = spec.items.map((it, i) => [it, lines[i]]).filter(([, line]) => line);
+  // Line totals the spec asks for (goods + alteration) against the bill's. A finalized bill's are
+  // lower by the balance discount that trims them to the amount agreed, spread over the lines in
+  // proportion, so each is compared after its share. A draft has no balance discount.
+  const agreed = round2((spec.payment.amount ?? 0) + spec.payment.balance_due);
+  const wantTotal = (it, line) => (it.amount ?? round2(Number(line.mrp) * it.qty)) + it.alteration_charge;
+  const sumWant = paired.reduce((s, [it, line]) => s + wantTotal(it, line), 0);
+  const gap = spec.draft ? 0 : Math.max(0, sumWant - agreed);
+  for (const [i, [it, line]] of paired.entries()) {
+    const at = `items[${i}]`;
+    const { ref } = it;
+    if (ref.kind === "product") {
+      if (line.product_code !== ref.code) differs(`${at} product`, ref.code, line.product_code);
+      if (ref.color != null && !eqi(line.color, ref.color)) differs(`${at} color`, ref.color, line.color ?? null);
+      if (ref.size != null && !eqi(line.size, ref.size)) differs(`${at} size`, ref.size, line.size ?? null);
+    } else if (ref.kind === "variant") {
+      if (line.variantid !== ref.variantid) differs(`${at} variantid`, ref.variantid, line.variantid);
+    } else if (ref.kind === "manual") {
+      if (line.product_code !== ref.id) differs(`${at} manual item`, ref.id, line.product_code);
+    } else if (!eqi(line.product_name, ref.create.name)) {
+      differs(`${at} manual item`, ref.create.name, line.product_name);
+    }
+    if (Number(line.quantity) !== it.qty) differs(`${at} qty`, it.qty, Number(line.quantity));
+    const alteration = Number(line.alteration_charge ?? 0);
+    if (!near(alteration, it.alteration_charge, PAISA)) differs(`${at} alteration_charge`, it.alteration_charge, alteration);
+    const want = wantTotal(it, line);
+    const share = sumWant > 0 ? gap * (want / sumWant) : 0;
+    if (!near(Number(line.total), want - share, LINE_TOLERANCE)) {
+      differs(`${at} amount`, want - it.alteration_charge, round2(Number(line.total) - alteration));
+    }
+  }
+
+  // A draft keeps its line totals as they stand; finishing it trims the total to what is paid.
+  if (!spec.draft && !near(bill.totalamount, agreed, PAISA)) differs("total", agreed, Number(bill.totalamount));
+  const paid = bill.payment_amount == null ? null : Number(bill.payment_amount);
+  const paidMatches = paid == null || spec.payment.amount == null ? paid === spec.payment.amount : near(paid, spec.payment.amount, PAISA);
+  if (!paidMatches) differs("paid", spec.payment.amount, paid);
+  if (!eqi(bill.payment_method, spec.payment.method)) differs("method", spec.payment.method || null, bill.payment_method ?? null);
+
+  const onBill = bill.salespersons ?? [];
+  const matches = (ref, s) => (typeof ref === "number" || /^\d+$/.test(ref) ? s.salesperson_id === Number(ref) : eqi(s.name, ref));
+  const sameSalespersons =
+    spec.salespersons.every((ref) => onBill.some((s) => matches(ref, s))) &&
+    onBill.every((s) => spec.salespersons.some((ref) => matches(ref, s)));
+  if (!sameSalespersons) differs("salespersons", spec.salespersons, onBill.map((s) => s.name));
+
+  return {
+    ok: mismatches.length === 0,
+    mismatches,
+    saved: {
+      bill_number: bill.bill_number,
+      status: bill.paymentstatus,
+      customer: cust ? { customerid: cust.customerid, name: customerName(cust), phone: cust.phone ?? null } : null,
+      date,
+      lines: lines.map((l) => {
+        const alteration = Number(l.alteration_charge ?? 0);
+        return {
+          code: l.product_code,
+          ...(l.color != null && { color: l.color }),
+          ...(l.size != null && { size: l.size }),
+          qty: Number(l.quantity),
+          amount: round2(Number(l.total) - alteration),
+          ...(alteration && { alteration_charge: alteration }),
+        };
+      }),
+      total: Number(bill.totalamount),
+      paid,
+      method: bill.payment_method ?? null,
+      salespersons: onBill.map((s) => s.name),
+    },
   };
 }
 
