@@ -91,6 +91,22 @@ test("a product with several colours states none, and an empty description gets 
   expect(xml).toContain("<g:description>Silk Saree, ₹2,195, from Bindal&#39;s Creation in Ghaziabad.</g:description>");
 });
 
+test("the main image is an in-stock colour's photo, sold-out colours' photos come after", async () => {
+  const productimages = [
+    { imageurl: `${IMG}/black.webp`, displayorder: 0, productcolor: "Black" },
+    { imageurl: `${IMG}/green.webp`, displayorder: 1, productcolor: "Peacock Green" },
+  ];
+  const productsizecolors = [
+    { stock: 0, color: "Black" },
+    { stock: 1, color: "Peacock Green" },
+  ];
+  const q = rest([{ ...product, productimages, productsizecolors }]);
+  const xml = await buildFeed(q);
+  expect(q.mock.calls[0][0]).toContain("productimages(imageurl,displayorder,productcolor)");
+  expect(xml).toMatch(/<g:image_link>[^<]*green_1200\.webp<\/g:image_link>/);
+  expect(xml).toMatch(/<g:additional_image_link>[^<]*black_1200\.webp<\/g:additional_image_link>/);
+});
+
 test("extra photos stop at Merchant Center's limit of 10", async () => {
   const productimages = Array.from({ length: 14 }, (_, i) => ({ imageurl: `${IMG}/${i}.webp`, displayorder: i }));
   const xml = await buildFeed(rest([{ ...product, productimages }]));

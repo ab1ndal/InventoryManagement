@@ -1,14 +1,16 @@
 import { imageUrl } from "./imageVariant";
 import { supabase } from "lib/supabaseClient";
+import { orderImagesByStock } from "./stock";
 
 // Product images are indexed in the public-readable `productimages` table:
 // one row per image with `imageurl` (a full public URL into the `mockups`
 // storage bucket), `displayorder` (sequence) and `productcolor`. Requests are
 // batched per microtask into a single `in(...)` query and the resolved URLs
-// are cached per product, ordered by `displayorder`. The `producturl` column
+// are cached per product, ordered by `displayorder` with photos of in-stock
+// colours first (see orderImagesByStock). The `producturl` column
 // on `products` holds dead Google Drive links and is NOT a usable image source.
 
-// productid -> Promise<string[]> of full image URLs, in displayorder.
+// productid -> Promise<string[]> of full image URLs, in-stock colours first.
 // Cached so a product rendered in multiple places is queried only once.
 const cache = new Map();
 
@@ -30,22 +32,38 @@ let flushScheduled = false;
 const BATCH_SIZE = 100;
 
 async function fetchChunk(ids) {
-  const grouped = new Map(ids.map((id) => [id, []]));
-  const { data, error } = await supabase
-    .from("productimages")
-    .select("productid,imageurl,displayorder,productcolor")
-    .in("productid", ids)
-    .order("productid", { ascending: true })
-    .order("displayorder", { ascending: true });
+  const rowsById = new Map(ids.map((id) => [id, []]));
+  const variantsById = new Map();
+  const [images, variants] = await Promise.all([
+    supabase
+      .from("productimages")
+      .select("productid,imageurl,displayorder,productcolor")
+      .in("productid", ids)
+      .order("productid", { ascending: true })
+      .order("displayorder", { ascending: true }),
+    supabase.from("productsizecolors").select("productid,color,stock").in("productid", ids),
+  ]);
 
-  if (!error && data) {
-    for (const row of data) {
-      const bucket = grouped.get(row.productid);
+  if (!images.error && images.data) {
+    for (const row of images.data) {
+      const bucket = rowsById.get(row.productid);
       if (bucket && row.imageurl) {
-        bucket.push(row.imageurl);
+        bucket.push(row);
         if (row.productcolor) colorByUrl.set(row.imageurl, row.productcolor);
       }
     }
+  }
+  // Without stock (query failed) the photos simply stay in displayorder.
+  if (!variants.error && variants.data) {
+    for (const row of variants.data) {
+      if (!variantsById.has(row.productid)) variantsById.set(row.productid, []);
+      variantsById.get(row.productid).push(row);
+    }
+  }
+
+  const grouped = new Map();
+  for (const [id, rows] of rowsById) {
+    grouped.set(id, orderImagesByStock(rows, variantsById.get(id)).map((row) => row.imageurl));
   }
   return grouped;
 }
@@ -84,7 +102,7 @@ function resolve(productid) {
 export { imageUrl } from "./imageVariant";
 
 /**
- * Resolve ALL image URLs for a product, in displayorder.
+ * Resolve ALL image URLs for a product, in-stock colours first.
  * @param {string} productid
  * @returns {Promise<string[]>}
  */

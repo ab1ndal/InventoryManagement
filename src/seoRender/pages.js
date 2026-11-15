@@ -34,16 +34,18 @@ import {
 } from "../storefront/pages/allProductsContent";
 import { DELIVERY_ESTIMATE, RETURNS_BADGE } from "../storefront/lib/deliveryEstimate";
 import { compareSizes, formatSize } from "../storefront/lib/sizes";
+import { orderImagesByStock } from "../storefront/lib/stock";
 import { FREE_SHIPPING_THRESHOLD } from "../storefront/lib/freeShipping";
 import { categoryAudience } from "./audience";
 import { SITE_NAME, SITE_URL, esc } from "./html";
 
 const LISTED_PRODUCTS = 48;
 const PRODUCT_ID_RE = /^[A-Za-z0-9-]{1,40}$/;
-const LIST_FIELDS = "productid,name:display_title,retailprice,productimages(imageurl,displayorder,productcolor)";
+const LIST_FIELDS =
+  "productid,name:display_title,retailprice,productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color)";
 // The same pool the product page's "More like this" ranks.
 const SIMILAR_CANDIDATES = 200;
-const SIMILAR_FIELDS = `${LIST_FIELDS},fabric,categoryid,productsizecolors(stock,color)`;
+const SIMILAR_FIELDS = `${LIST_FIELDS},fabric,categoryid`;
 
 // States only what /policies/returns says: 7 days from delivery, sent back at the customer's cost or
 // brought to the shop, item price refunded (store credit is the customer's option, not the rule).
@@ -124,8 +126,12 @@ const link = (to, label) => `<a href="${esc(to)}">${esc(label)}</a>`;
 const faqAnswerHtml = (f) => (f.link ? `${esc(f.a)} ${link(f.link.to, f.link.label)}.` : esc(f.a));
 const faqAnswerText = (f) => (f.link ? `${f.a} ${f.link.label}.` : f.a);
 
+// Same order as the app: displayorder, then photos of in-stock colours first.
 const sortedImages = (product) =>
-  [...(product.productimages || [])].sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0));
+  orderImagesByStock(
+    [...(product.productimages || [])].sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0)),
+    product.productsizecolors
+  );
 
 function firstImage(product, width) {
   const [first] = sortedImages(product);

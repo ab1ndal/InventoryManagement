@@ -3,6 +3,7 @@ import { imageUrl } from "../storefront/lib/imageVariant";
 import { stripMarkdown } from "../storefront/lib/productText";
 import { productMetaDescription } from "../storefront/lib/seoText";
 import { formatSize } from "../storefront/lib/sizes";
+import { orderImagesByStock } from "../storefront/lib/stock";
 import { categoryAudience } from "./audience";
 import { SITE_NAME, SITE_URL, esc } from "./html";
 
@@ -10,7 +11,7 @@ export const CACHE_FEED = "public, max-age=0, s-maxage=3600, stale-while-revalid
 
 const PAGE = 1000;
 const FIELDS =
-  "productid,name:display_title,description,retailprice,categoryid,fabric,categories(name),productimages(imageurl,displayorder),productsizecolors(stock,color,size)";
+  "productid,name:display_title,description,retailprice,categoryid,fabric,categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color,size)";
 // Google's category "Apparel & Accessories > Clothing", for anything without a closer match below.
 const GOOGLE_CATEGORY_CLOTHING = 1604;
 // Closer Google categories (ids from google.com/basepages/producttype/taxonomy-with-ids.en-US.txt).
@@ -74,10 +75,12 @@ export function productType({ categoryName, fabric, gender, ageGroup }) {
 }
 
 function feedItem(product) {
-  const images = [...(product.productimages || [])]
-    .sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0))
-    .map((img) => imageUrl(img.imageurl, { width: 1200 }));
   const variants = product.productsizecolors || [];
+  // In-stock colours' photos first, so the main image is one a shopper can buy.
+  const images = orderImagesByStock(
+    [...(product.productimages || [])].sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0)),
+    variants
+  ).map((img) => imageUrl(img.imageurl, { width: 1200 }));
   // Sold-out pieces are left out rather than listed as unavailable: most stock is one-off.
   if (!images.length || !variants.some((v) => Number(v.stock) > 0)) return null;
 
