@@ -4,8 +4,9 @@
 // (handleConfirmFinalize) for the common case: one customer, inventory and/or
 // manual items, per-line discount and alteration, paid by one method, either
 // in full or in part (handleConfirmPartialFinalize: first payment now, the
-// rest owed). Out of scope: drafts, discount codes, vouchers, store credit,
-// exchanges, salespersons, PDF/SMS.
+// rest owed), with the bill's salespersons as the screen's selector sets them.
+// Out of scope: drafts, discount codes, vouchers, store credit, exchanges,
+// per-line salespersons, PDF/SMS.
 // A bill spec is one readable JSON per bill (see docs/admin-cli.md): customer
 // by id, by phone (optionally created if missing) or as a new guest; lines by
 // product code + colour/size, variant id, manual item id, or a manual item
@@ -25,6 +26,7 @@ import { createManualItem } from "./manualItems.js";
 import { logActivityWith } from "./activity.js";
 import { listSlipPhotos } from "./billSlipPhotos.js";
 import { BILL_STATUS, billStatusFields } from "./billStatus.js";
+import { listSalespersons } from "./salespersons.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -126,8 +128,18 @@ function parseItemRef(it, at) {
 /** Validates the bill spec's shape (not its references). Returns a clean copy. */
 export function parseBillSpec(spec) {
   if (!isObj(spec)) fail("Bill spec must be a JSON object");
-  checkKeys(spec, ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "items"], "spec");
+  checkKeys(
+    spec,
+    ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "salespersons", "items"],
+    "spec",
+  );
   const customer = parseCustomer(spec);
+  const salespersons = spec.salespersons ?? [];
+  if (!Array.isArray(salespersons)) fail('salespersons must be a list of names or ids, e.g. ["Asha", 3]');
+  for (const [i, s] of salespersons.entries()) {
+    const ok = (typeof s === "string" && s.trim() !== "") || Number.isInteger(s);
+    if (!ok) fail(`salespersons[${i}]: expected a name or id, got ${JSON.stringify(s)}`);
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(spec.date ?? "") || Number.isNaN(Date.parse(spec.date))) {
     fail(`date: expected YYYY-MM-DD, got "${spec.date ?? ""}"`);
   }
@@ -176,6 +188,7 @@ export function parseBillSpec(spec) {
     payment: { method, amount: paid, balance_due: balanceDue },
     notes: spec.notes ? String(spec.notes) : null,
     skip_stock: Boolean(spec.skip_stock),
+    salespersons: salespersons.map((s) => (typeof s === "string" ? s.trim() : s)),
     items,
   };
 }
@@ -188,6 +201,29 @@ async function one(query) {
 
 const byName = (rows, col, name) =>
   rows.find((r) => String(r[col]).toLowerCase() === name.toLowerCase());
+
+// Spec names (case-insensitive) or ids → the bill's salespersons, in spec
+// order without repeats. Only active ones, as the screen's selector offers.
+export function resolveSalespersons(rows, refs) {
+  const active = rows.filter((r) => r.active !== false);
+  const options = () => active.map((r) => `${r.name} (${r.salesperson_id})`).join(", ") || "none";
+  const out = [];
+  for (const ref of refs) {
+    const isId = typeof ref === "number" || /^\d+$/.test(ref);
+    const named = isId
+      ? rows.filter((r) => r.salesperson_id === Number(ref))
+      : rows.filter((r) => String(r.name).trim().toLowerCase() === ref.toLowerCase());
+    // A name shared with a former salesperson means the active one.
+    const hits = named.length > 1 && named.some((r) => r.active !== false) ? named.filter((r) => r.active !== false) : named;
+    const label = isId ? `id ${ref}` : `"${ref}"`;
+    if (hits.length === 0) fail(`Unknown salesperson ${label} (one of: ${options()})`);
+    if (hits.length > 1) fail(`Salesperson ${label} matches ids ${hits.map((r) => r.salesperson_id).join(", ")}; give the id`);
+    const sp = hits[0];
+    if (sp.active === false) fail(`Salesperson ${sp.name} (${sp.salesperson_id}) is not active; the billing screen does not offer them`);
+    if (!out.some((o) => o.salesperson_id === sp.salesperson_id)) out.push({ salesperson_id: sp.salesperson_id, name: sp.name });
+  }
+  return out;
+}
 
 // Customer for the bill. A customer still to be created comes back with
 // customerid null and its insert row in creates.customer.
@@ -296,9 +332,10 @@ export async function prepareBill(client, rawSpec) {
   const variantIds = items0.filter((i) => i.variantid).map((i) => i.variantid);
   const manualIds = items0.filter((i) => i.manual_item_id && !i.newManual).map((i) => i.manual_item_id);
 
-  const [methods, locations, variants, manuals] = await Promise.all([
+  const [methods, locations, salespersonRows, variants, manuals] = await Promise.all([
     one(client.from("salesmethods").select("salesmethodid, methodname")),
     one(client.from("saleslocations").select("saleslocationid, locationname")),
+    spec.salespersons.length ? listSalespersons(client) : [],
     variantIds.length
       ? one(client.from("productsizecolors").select("variantid, productid, size, color, stock").in("variantid", variantIds))
       : [],
@@ -317,6 +354,7 @@ export async function prepareBill(client, rawSpec) {
   if (!location) {
     fail(`Unknown location "${spec.location}" (one of: ${(locations ?? []).map((l) => l.locationname).join(", ")})`);
   }
+  const salespersons = resolveSalespersons(salespersonRows, spec.salespersons);
 
   const variantById = Object.fromEntries((variants ?? []).map((v) => [v.variantid, v]));
   const manualById = Object.fromEntries(
@@ -476,6 +514,8 @@ export async function prepareBill(client, rawSpec) {
     creates,
     payment_method: method?.methodname ?? null,
     location: location.locationname,
+    // The bill's salespeople (bill_salespersons rows), as the screen's selector sets them.
+    salespersons,
     bill,
     bill_items: billItems,
     stock,
@@ -575,6 +615,8 @@ async function insertBill(client, prepared, source) {
       bill,
       items: prepared.bill_items,
       skip_stock: !stockReduced,
+      // bill_save writes these as bill_salespersons rows, as for the screen's selector.
+      ...(prepared.salespersons.length ? { salesperson_ids: prepared.salespersons.map((s) => s.salesperson_id) } : {}),
       ...(prepared.first_payment ? { first_payment: prepared.first_payment } : {}),
     },
   });
@@ -594,6 +636,7 @@ async function insertBill(client, prepared, source) {
     billid: saved.billid,
     bill_number: saved.bill_number,
     customer: prepared.customer,
+    salespersons: prepared.salespersons,
     totals: prepared.totals,
     stock: prepared.stock,
     negative_stock: saved.negative_stock ?? [],
@@ -601,7 +644,7 @@ async function insertBill(client, prepared, source) {
   };
 }
 
-/** A bill with its items, payments, customer, slip photos and each variant's current stock. */
+/** A bill with its items, payments, customer, salespersons, slip photos and each variant's current stock. */
 export async function getBill(client, { billid, billNumber }) {
   if (billid == null && !billNumber) throw new BillInputError("Give a bill id or bill number");
   let q = client.from("bills").select("*");
@@ -609,9 +652,10 @@ export async function getBill(client, { billid, billNumber }) {
   const bill = await one(q.maybeSingle());
   if (!bill) return null;
 
-  const [items, payments, customer, method, location, slipPhotos] = await Promise.all([
+  const [items, payments, salespersons, customer, method, location, slipPhotos] = await Promise.all([
     one(client.from("bill_items").select("*").eq("billid", bill.billid).order("bill_item_id")),
     one(client.from("bill_payments").select("*").eq("billid", bill.billid).order("payment_id")),
+    one(client.from("bill_salespersons").select("salesperson_id, salespersons(name)").eq("billid", bill.billid)),
     bill.customerid != null
       ? one(client.from("customers").select("customerid, first_name, last_name, phone").eq("customerid", bill.customerid).maybeSingle())
       : null,
@@ -634,6 +678,7 @@ export async function getBill(client, { billid, billNumber }) {
     payment_method: method?.methodname ?? null,
     location: location?.locationname ?? null,
     customer,
+    salespersons: (salespersons ?? []).map((s) => ({ salesperson_id: s.salesperson_id, name: s.salespersons?.name ?? null })),
     items: (items ?? []).map((i) => {
       const v = i.variantid ? variantById[i.variantid] : null;
       return v ? { ...i, size: v.size, color: v.color, current_stock: Number(v.stock) } : i;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Command-line access to admin features (customers, products, bills, slip photos), for
+ * Command-line access to admin features (customers, products, salespersons, bills, slip photos), for
  * entering and auditing data without the admin screens. Thin wrapper: all
  * rules live in the shared modules under src/admin/lib/.
  *
@@ -39,6 +39,7 @@ const { findManualItems, createManualItem, ManualItemInputError } = await import
   "../src/admin/lib/manualItems.js"
 );
 const { addStockByCode, VariantInputError } = await import("../src/admin/lib/variants.js");
+const { listSalespersons } = await import("../src/admin/lib/salespersons.js");
 const { prepareBill, createBill, getBill, findBills, BillInputError } = await import(
   "../src/admin/lib/bills.js"
 );
@@ -173,6 +174,13 @@ const COMMANDS = {
       usage: "category list",
       options: {},
       run: (client) => listCategories(client),
+    },
+  },
+  salesperson: {
+    list: {
+      usage: "salesperson list",
+      options: {},
+      run: (client) => listSalespersons(client),
     },
   },
   "manual-item": {

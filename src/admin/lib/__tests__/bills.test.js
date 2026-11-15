@@ -1,4 +1,4 @@
-import { parseBillSpec, prepareBill, createBill, getBill, findBills, BillInputError } from "../bills";
+import { parseBillSpec, prepareBill, createBill, getBill, findBills, resolveSalespersons, BillInputError } from "../bills";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
 // jsdom (CRA's jest env) has no crypto.randomUUID, which createCustomer uses
@@ -582,5 +582,110 @@ describe("readable bill spec", () => {
     await expect(createBill(client, spec({ customer: { create: { first: "W" } } }))).rejects.toThrow(
       /Failed to save bill: db down — NOTE: customer 500 were already created; re-run with customer \{ id \}/,
     );
+  });
+});
+
+describe("salespersons", () => {
+  // Fake staff names; the shop's real ones live only in the salespersons table.
+  const staff = [
+    { salesperson_id: 10, name: "Asha", active: true },
+    { salesperson_id: 20, name: "Bina", active: true },
+    { salesperson_id: 30, name: "Chandni", active: false },
+  ];
+  const withStaff = (overrides = {}) => db({ "salespersons.select": { data: staff, error: null }, ...overrides });
+
+  it.each([
+    [{ ...slip387, salespersons: "Asha" }, /salespersons must be a list/],
+    [{ ...slip387, salespersons: [""] }, /salespersons\[0\]: expected a name or id/],
+    [{ ...slip387, salespersons: [{ name: "Asha" }] }, /salespersons\[0\]: expected a name or id/],
+    [{ ...slip387, salespersons: [1.5] }, /salespersons\[0\]: expected a name or id/],
+  ])("rejects a malformed salespersons list %#", (spec, msg) => {
+    expect(() => parseBillSpec(spec)).toThrow(msg);
+  });
+
+  it("matches names case-insensitively and accepts ids, in spec order without repeats", () => {
+    expect(resolveSalespersons(staff, ["bina", "ASHA", 20, "10"])).toEqual([
+      { salesperson_id: 20, name: "Bina" },
+      { salesperson_id: 10, name: "Asha" },
+    ]);
+  });
+
+  it.each([
+    [["Dev"], /Unknown salesperson "Dev" \(one of: Asha \(10\), Bina \(20\)\)/],
+    [[99], /Unknown salesperson id 99/],
+    [["chandni"], /Chandni \(30\) is not active/],
+  ])("refuses an unknown or inactive salesperson %#", (refs, msg) => {
+    expect(() => resolveSalespersons(staff, refs)).toThrow(BillInputError);
+    expect(() => resolveSalespersons(staff, refs)).toThrow(msg);
+  });
+
+  it("refuses a name two active salespersons share, and prefers the active one over a former one", () => {
+    const twins = [...staff, { salesperson_id: 40, name: "asha", active: true }];
+    expect(() => resolveSalespersons(twins, ["Asha"])).toThrow(/matches ids 10, 40; give the id/);
+    const rehired = [...staff, { salesperson_id: 50, name: "Asha", active: false }];
+    expect(resolveSalespersons(rehired, ["Asha"])).toEqual([{ salesperson_id: 10, name: "Asha" }]);
+  });
+
+  it("preview shows the resolved salespersons and stays read-only", async () => {
+    const client = fakeSupabase(withStaff());
+    const p = await prepareBill(client, { ...slip387, salespersons: ["asha", "Bina"] });
+    expect(p.salespersons).toEqual([
+      { salesperson_id: 10, name: "Asha" },
+      { salesperson_id: 20, name: "Bina" },
+    ]);
+    // Bill-level only, as the screen's selector: lines keep no salesperson.
+    expect(p.bill_items.every((i) => i.salesperson_id === null)).toBe(true);
+    expect(p.bill).not.toHaveProperty("salesperson_ids");
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+
+  it("an unknown name fails the preview with BillInputError", async () => {
+    await expect(prepareBill(fakeSupabase(withStaff()), { ...slip387, salespersons: ["Dev"] })).rejects.toThrow(BillInputError);
+  });
+
+  it("without salespersons the table is not read and the preview lists none", async () => {
+    const client = fakeSupabase(withStaff());
+    const p = await prepareBill(client, slip387);
+    expect(p.salespersons).toEqual([]);
+    expect(client.calls.some((c) => c.table === "salespersons")).toBe(false);
+  });
+
+  it("sends salesperson_ids to bill_save, which writes bill_salespersons as for the screen", async () => {
+    const client = fakeSupabase(withStaff({
+      "rpc.bill_save": { data: { billid: 900, bill_number: "FY26-000336" }, error: null },
+      "activity_log.insert": { data: null, error: null },
+    }));
+    const out = await createBill(client, { ...slip387, salespersons: ["Bina", "asha"] });
+    const writes = client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
+    expect(writes).toEqual(["bill_save", "activity_log.insert"]);
+    const { p_payload } = client.calls.find((c) => c.fn === "bill_save").args;
+    expect(p_payload.salesperson_ids).toEqual([20, 10]);
+    expect(p_payload.items.every((i) => i.salesperson_id === null)).toBe(true);
+    expect(out.salespersons).toEqual([
+      { salesperson_id: 20, name: "Bina" },
+      { salesperson_id: 10, name: "Asha" },
+    ]);
+  });
+
+  it("sends no salesperson_ids when the spec has none, as before", async () => {
+    const client = fakeSupabase(withStaff({ "rpc.bill_save": { data: { billid: 900, bill_number: "FY26-000336" }, error: null } }));
+    await createBill(client, { ...slip387, salespersons: [] });
+    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload).not.toHaveProperty("salesperson_ids");
+  });
+
+  it("bill get lists the bill's salespersons by name", async () => {
+    const client = fakeSupabase({
+      "bills.select": { data: { billid: 900, bill_number: "FY26-000336" }, error: null },
+      "bill_salespersons.select": {
+        data: [{ salesperson_id: 10, salespersons: { name: "Asha" } }, { salesperson_id: 20, salespersons: { name: "Bina" } }],
+        error: null,
+      },
+    });
+    const b = await getBill(client, { billid: 900 });
+    expect(b.salespersons).toEqual([
+      { salesperson_id: 10, name: "Asha" },
+      { salesperson_id: 20, name: "Bina" },
+    ]);
+    expect(client.calls.find((c) => c.table === "bill_salespersons").filters).toEqual([["eq", "billid", 900]]);
   });
 });

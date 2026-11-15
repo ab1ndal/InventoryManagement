@@ -200,6 +200,20 @@ combine it with category, MRP and colour.
 All categories (`categoryid`, `name`), by name. Read-only. Use it to pick
 `--category` for `manual-item create`.
 
+## salesperson list
+
+All salespersons (`salesperson_id`, `name`, `active`), by name. Read-only.
+Use it to pick names for a bill spec's `salespersons` (the names written at
+the top right of a paper slip). Only active ones can go on a bill, as on the
+billing screen.
+
+```json
+[
+  { "salesperson_id": 1, "name": "Asha", "active": true },
+  { "salesperson_id": 4, "name": "Bina", "active": false }
+]
+```
+
 ## manual-item find
 
 Search manual (non-inventory) items. Read-only. At least one of `--code` /
@@ -308,7 +322,7 @@ become a new variant. Quote the size: `|` is a shell pipe.
 writing what the billing screen's Finalize (or partial finalize) button writes
 for a new bill. `bill preview` shows all of it without writing. Not supported:
 drafts, discount codes, vouchers, store credit, exchanges, recording a later
-payment (use the Bills screen), salespersons, SMS. The
+payment (use the Bills screen), per-line salespersons, SMS. The
 bill's PDF is a separate step: [bill pdf](#bill-pdf).
 
 ### Bill spec
@@ -323,6 +337,7 @@ references so it can be audited before it runs:
   "date": "2026-10-22",
   "payment": { "method": "Cash", "amount": 1950 },
   "notes": "Paper bill 387",
+  "salespersons": ["Asha", "bina"],
   "items": [
     { "product": "BC-252051", "color": "Mustard", "qty": 1, "amount": 1800 },
     { "manual_item": { "create": { "name": "Fall", "category": "ACC", "mrp": 150, "cost": "ZEZ" } }, "qty": 1 }
@@ -363,6 +378,7 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 | `location` | no | sales location name, default `Walk-In` |
 | `notes` | no | e.g. `"Paper bill 387; Cash 1000 + UPI 950"` |
 | `skip_stock` | no | `true` = don't touch stock (the screen's "backdated" checkbox); default reduces stock |
+| `salespersons` | no | the bill's salespeople (names at the top right of the slip): a list of names (case-insensitive) and/or ids from `salesperson list`, e.g. `["Asha", 4]`. Refused: an unknown name or id, an inactive salesperson (the screen does not offer them), a name two active salespersons share (give the id). Saved as the screen's Salesperson(s) selector saves them: `bill_salespersons` rows, written by `bill_save`. Lines get no salesperson. Default none |
 | `items[].qty` | yes | > 0; decimals for meter items |
 | `items[].amount` | no | what the line sold for (goods only, excluding alteration); default MRP × qty |
 | `items[].alteration_charge` | no | added on top of `amount` (e.g. fall/pico charged with the item) |
@@ -405,7 +421,8 @@ node scripts/admin-cli.mjs bill preview --spec bill.json
 Read-only. Output: `customer`, `creates` (the customer row and manual item
 rows that would be created first, with the ids the manual items will get;
 `customer` there means `bill.customerid` is filled in on create),
-`payment_method`, `location`, the exact `bill` row and `bill_items` rows that
+`payment_method`, `location`, `salespersons` (`salesperson_id`, `name`, `[]`
+if none), the exact `bill` row and `bill_items` rows that
 would be inserted (bill number and ids are assigned on create), `stock` (per variant: `stock_before`, `change`,
 `stock_after`), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
 `grand_total`, `paid`, and `balance_due` on a part-paid bill), `first_payment`
@@ -426,7 +443,7 @@ nothing saved. With `--dry-run` the output lists each photo's upload size.
 
 Writes, in order: the customer and manual items from `creates` (if any), then
 as the screen does, one `bill_save` call that saves the bill (the database
-assigns the next `FY26-000NNN`), its items, the stock change per inventory
+assigns the next `FY26-000NNN`), its items, its salespersons, the stock change per inventory
 variant (none with `skip_stock`) and, on a part-paid bill, the first payment,
 all in one transaction: if any part fails, nothing is saved and no bill is
 left to delete. Then an activity-log entry
@@ -444,7 +461,7 @@ left to delete. Then an activity-log entry
 }
 ```
 
-The output also has `created` (`customer`, `manual_items`). `negative_stock`
+The output also has `salespersons` and `created` (`customer`, `manual_items`). `negative_stock`
 lists any variant (`variantid`, `stock`) the save took below zero, which can
 only happen if stock was sold elsewhere after the preview; recount those. If the bill
 fails after a customer or manual item was created, the error ends with
@@ -487,9 +504,12 @@ node scripts/admin-cli.mjs bill get --id 352
 ```
 
 Read-only. The full `bills` row plus `payment_method`, `location`,
-`customer`, `items` (each inventory line with its variant's `size`, `color`
+`customer`, `salespersons` (the bill's `bill_salespersons`, each
+`salesperson_id` and `name`), `items` (each inventory line with its variant's `size`, `color`
 and `current_stock`), `payments` (`bill_payments` rows) and `slip_photos`.
-`null` if no such bill.
+`null` if no such bill. The row's own `salesperson_ids` column is filled by a
+trigger from per-line salespersons only, so it is usually `[]`; read
+`salespersons` instead.
 
 ### bill pdf
 
