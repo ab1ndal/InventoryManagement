@@ -70,6 +70,10 @@ All database access goes through the Supabase client directly in component effec
 
 No global store. Each page/component manages its own state with `useState`/`useEffect`. A common pattern for triggering re-fetches is a boolean `refreshFlag` that gets toggled after mutations.
 
+### Admin CLI
+
+`scripts/admin-cli.mjs` runs admin features from the terminal (customer/product lookups, stock adds, bills from paper slips) as the signed-in admin, through the same `src/admin/lib/` modules as the app. Run it with no arguments for the one-line usage of every command. `docs/admin-cli.md` is the full guide: read only the section you need. The paper-slip workflow is the `reading-bill-slips` skill. Only the owner can run `login`, in their own terminal (hidden password prompt).
+
 ### Printing
 
 `qz-tray` is used for label/invoice printing. It requires the QZ Tray desktop application to be running on the user's machine.
