@@ -20,7 +20,7 @@ import {
   round2,
 } from "../components/billing/billUtils.js";
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
-import { customerName, money } from "../../utility/activitySummary.js";
+import { customerName, money, variantLabel } from "../../utility/activitySummary.js";
 import { todayIST } from "../../utility/dateFormat.js";
 import { findCustomerByPhone, createCustomer, findLikelyDuplicates, normalizePhone } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
@@ -740,9 +740,10 @@ function prepareDraft(spec, { customer, creates, method, location, salespersons,
  * activity log is written after the save. negative_stock lists any variant the
  * save took below zero (only possible if stock moved since the preview).
  * A draft spec is saved as the screen saves a new draft instead (insertDraft).
- * The spec's stock_adds are applied first, with `stock add`'s writes, so the bill's stock check
- * sees them. They are separate writes, not part of the bill's transaction: if the bill then fails,
- * they are undone (undoStockAdds) and the error says how that went.
+ * The spec's stock_adds go into the same transaction as a finalized or part-paid bill
+ * (bill_save_with_stock_adds), so a failure leaves neither and there is nothing to undo. A draft
+ * has no bill_save op, so its stock adds are applied first with `stock add`'s writes and undone
+ * (undoStockAdds) if the draft then fails, with the error saying how that went.
  */
 export async function createBill(client, rawSpec, { dryRun = false, source = "via CLI" } = {}) {
   const planned = await prepareBill(client, rawSpec);
@@ -752,6 +753,14 @@ export async function createBill(client, rawSpec, { dryRun = false, source = "vi
   const stockAdded = [];
   try {
     const resolved = await createReferenced(client, rawSpec, planned, created, source);
+    if (planned.status !== BILL_STATUS.DRAFT) {
+      // Re-resolve against the rows createReferenced made (ids actually assigned) before writing.
+      const prepared = resolved !== rawSpec ? await prepareBill(client, resolved) : planned;
+      const saved = await insertBill(client, prepared, source);
+      // The re-resolved plan bills the new customer by id, so keep the first plan's warnings
+      // (possible duplicate customers) in the output too.
+      return { ...saved, warnings: [...new Set([...planned.warnings, ...saved.warnings])], created };
+    }
     for (const a of planned.stock_adds) {
       const r = await addStockByCode(client, {
         code: a.productid, size: a.size, color: a.color, quantity: a.qty, allowNewVariant: a.created,
@@ -765,8 +774,7 @@ export async function createBill(client, rawSpec, { dryRun = false, source = "vi
       delete billSpec.stock_adds;
       prepared = await prepareBill(client, billSpec);
     }
-    const save = prepared.status === BILL_STATUS.DRAFT ? insertDraft : insertBill;
-    const saved = await save(client, prepared, source);
+    const saved = await insertDraft(client, prepared, source);
     // The re-resolved plan bills the new customer by id, so keep the first plan's warnings
     // (possible duplicate customers) in the output too.
     return {
@@ -822,27 +830,69 @@ async function createReferenced(client, rawSpec, planned, created, source) {
   return out;
 }
 
+// A variant a stock add creates gets its real id here, made client-side as addVariantStock makes
+// one, so the bill lines can name it in the same call that creates it. Adds to the same new
+// variant share its id.
+function withNewVariantIds(prepared) {
+  const ids = new Map();
+  const real = (id) => {
+    if (!id?.startsWith(NEW_VARIANT)) return id;
+    if (!ids.has(id)) ids.set(id, crypto.randomUUID());
+    return ids.get(id);
+  };
+  return {
+    stockAdds: prepared.stock_adds.map((a) => ({ ...a, variantid: real(a.variantid) })),
+    items: prepared.bill_items.map((it) => (it.variantid ? { ...it, variantid: real(it.variantid) } : it)),
+  };
+}
+
+// The activity entries addVariantStock writes for the same change.
+const stockAddSummary = (a, source) =>
+  a.created
+    ? `Added variant ${variantLabel(a.size, a.color)} to product ${a.productid} — ${a.name} (stock ${a.qty}) (${source})`
+    : `Increased stock of ${variantLabel(a.size, a.color)}, product ${a.productid} — ${a.name}: ${a.stock_before} → ${a.stock} (+${a.qty}) (${source})`;
+
 async function insertBill(client, prepared, source) {
   // bill_save takes the "don't reduce stock" choice as skip_stock and records stock_reduced from
   // it, so the bill row goes without that column.
   const { stock_reduced: stockReduced, ...bill } = prepared.bill;
-  // A fresh key per create: this process saves once and does not retry.
-  const { data: saved, error: saveErr } = await client.rpc("bill_save", {
+  const { stockAdds, items } = withNewVariantIds(prepared);
+  const args = {
+    // A fresh key per create: this process saves once and does not retry.
     p_key: crypto.randomUUID(),
     p_op: prepared.bill.paymentstatus === BILL_STATUS.PARTIAL ? "partial_create" : "finalize_create",
     p_payload: {
       bill,
-      items: prepared.bill_items,
+      items,
       skip_stock: !stockReduced,
       // bill_save writes these as bill_salespersons rows, as for the screen's selector.
       ...(prepared.salespersons.length ? { salesperson_ids: prepared.salespersons.map((s) => s.salesperson_id) } : {}),
       ...(prepared.first_payment ? { first_payment: prepared.first_payment } : {}),
     },
-  });
+  };
+  // With stock adds, they and the bill are one transaction: the database adds the stock (or
+  // creates the variant), then runs bill_save, and any error rolls back both.
+  const { data: saved, error: saveErr } = stockAdds.length
+    ? await client.rpc("bill_save_with_stock_adds", {
+        ...args,
+        p_stock_adds: stockAdds.map((a) => ({
+          variantid: a.variantid, productid: a.productid, size: a.size, color: a.color, qty: a.qty, create: a.created,
+        })),
+      })
+    : await client.rpc("bill_save", args);
   if (saveErr) {
     throw new Error("Failed to save bill: " + saveErr.message + (saveErr.details ? ` (${saveErr.details})` : ""));
   }
   const partial = prepared.bill.paymentstatus === BILL_STATUS.PARTIAL;
+
+  for (const a of stockAdds) {
+    await logActivityWith(client, {
+      action: a.created ? "create" : "update",
+      entityType: a.created ? "variant" : "stock",
+      entityId: a.productid,
+      summary: stockAddSummary(a, source),
+    });
+  }
 
   await logActivityWith(client, {
     action: "create",
@@ -861,6 +911,7 @@ async function insertBill(client, prepared, source) {
     stock: prepared.stock,
     negative_stock: saved.negative_stock ?? [],
     warnings: prepared.warnings,
+    ...(stockAdds.length && { stock_adds: stockAdds }),
   };
 }
 

@@ -1,13 +1,14 @@
--- PROPOSAL, not applied (written 2026-11-14). Nothing calls this yet; the owner applies it.
+-- Written 2026-11-14; the owner applies it in the Supabase SQL editor before the CLI change that
+-- calls it (createBill in src/admin/lib/bills.js) is merged.
 --
 -- A bill spec's stock_adds (admin CLI, docs/admin-cli.md) add stock, or a new variant, for a piece
--- that is on the shelf but not in the inventory, and then save the bill. Until this is applied the
--- CLI does that as separate writes: stock_adjust or a productsizecolors insert (the `stock add`
--- writes), then bill_save, and when bill_save fails it undoes the adds from the client
--- (src/admin/lib/variants.js undoStockAdds). That leaves two gaps:
---   - the CLI dying, or losing its connection, between the adds and the undo leaves the stock added;
---   - a bill_save that committed but whose reply was lost looks failed, so the undo takes back
---     stock the bill has already taken.
+-- that is on the shelf but not in the inventory, and then save the bill. Before this the CLI did
+-- that as separate writes: stock_adjust or a productsizecolors insert (the `stock add` writes),
+-- then bill_save, and when bill_save failed it undid the adds from the client
+-- (src/admin/lib/variants.js undoStockAdds). That left two gaps:
+--   - the CLI dying, or losing its connection, between the adds and the undo left the stock added;
+--   - a bill_save that committed but whose reply was lost looked failed, so the undo took back
+--     stock the bill had already taken.
 -- This function closes both: the adds and the bill are one transaction, and a retried key does not
 -- add the stock a second time.
 --
@@ -19,7 +20,7 @@
 --     bill_save(p_key, p_op, p_payload), whose result it returns. Any error rolls back all of it.
 --     A key already in bill_save_log (a retry) skips the adds and bill_save replays its result.
 --
--- The CLI would call it for finalized and part-paid bills. A new draft has no bill_save op (it is
+-- The CLI calls it for finalized and part-paid bills. A new draft has no bill_save op (it is
 -- inserted as the screen's Save Draft does), so drafts keep the client-side undo.
 -- Activity-log entries stay with the client, as for every other bill write.
 

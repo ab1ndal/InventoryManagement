@@ -451,33 +451,34 @@ slip is still one command:
 }
 ```
 
-- Each entry is checked and written by the same code as `stock add`
-  (`addStockByCode`): same size/colour matching, same refusals (reported as
-  `stock_adds[0]: …`), same `stock_adjust` or new-variant insert and the same
-  activity-log entries. `new_variant` is `--new-variant`. Unknown fields are
-  refused.
+- Each entry is checked by the same code as `stock add` (`addStockByCode`):
+  same size/colour matching, same refusals (reported as `stock_adds[0]: …`)
+  and the same activity-log entries. `new_variant` is `--new-variant`.
+  Unknown fields are refused.
 - `bill preview` (and `--dry-run`) writes nothing: it lists the adds in
   `stock_adds` (`productid`, `size`, `color`, `variantid`, `created`, `qty`,
   `stock_before`, `stock`) and checks the bill as if they were applied, so
   `stock` shows the stock after the add. A variant an add would create has
   no id yet: the preview shows it as `new:<code>:<colour>/<size>`, in
   `stock_adds` and in `bill_items`.
-- `bill create` applies the adds first, in order, then saves the bill
-  against the real rows. Its output adds `stock_adds` (each add's result).
-- **Not one transaction.** The adds are separate writes before the bill.
-  If the bill then fails, they are undone, newest first: a variant an add
-  created is deleted again (the database refuses that while anything
-  references it, e.g. a bill line or a cart; then it is kept), and any other
-  add is taken back with `stock_adjust` (activity log `Decreased stock of …,
-  added for a bill that failed (via CLI)`). The error ends with what
-  happened, e.g. `— stock adds undone: BC25385 Pink / 3XL|46 +1 variant removed`,
-  or `— stock adds NOT all undone, fix them in the inventory editor: …`
-  naming each one to fix by hand. Two gaps remain until the database can do
-  the adds inside the bill's own transaction: the CLI dying between the adds
-  and the undo leaves the stock added, and a bill that saved but whose reply
-  was lost would be undone wrongly (check `bill find` before re-running).
-  The proposed database function is `schema/migration_bill_save_with_stock_adds.sql`
-  (not applied).
+- **Finalized and part-paid bills: one transaction.** `bill create` sends the
+  adds and the bill in one `bill_save_with_stock_adds` call
+  (`schema/migration_bill_save_with_stock_adds.sql`): the database adds the
+  stock (or creates the variant, under an id the CLI makes, which the bill
+  lines also use), then runs `bill_save`. If anything fails, nothing is
+  saved, neither the stock nor the bill, so there is nothing to undo. Its
+  output adds `stock_adds` (each add, with the real variant id).
+- **Drafts: separate writes.** A new draft has no `bill_save` op, so its adds
+  are applied first with `stock add`'s writes (`stock_adjust` or the
+  new-variant insert), then the draft is saved. If the draft then fails, the
+  adds are undone, newest first: a variant an add created is deleted again
+  (the database refuses that while anything references it, e.g. a bill line
+  or a cart; then it is kept), and any other add is taken back with
+  `stock_adjust` (activity log `Decreased stock of …, added for a bill that
+  failed (via CLI)`). The error ends with what happened, e.g.
+  `— stock adds undone: BC25385 Pink / 3XL|46 +1 variant removed`, or
+  `— stock adds NOT all undone, fix them in the inventory editor: …` naming
+  each one to fix by hand.
 
 ### Draft bills
 
@@ -540,7 +541,7 @@ rows that would be created first, with the ids the manual items will get;
 `payment_method`, `location`, `salespersons` (`salesperson_id`, `name`, `[]`
 if none), the exact `bill` row and `bill_items` rows that
 would be inserted (bill number and ids are assigned on create), `stock` (per variant: `stock_before`, `change`,
-`stock_after`), `stock_adds` (the [stock adds](#stock-adds) applied first, `[]` if none), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
+`stock_after`), `stock_adds` (the [stock adds](#stock-adds) applied with the bill, `[]` if none), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
 `grand_total`, `paid`, and `balance_due` on a part-paid bill), `first_payment`
 (the `bill_payments` row a part-paid bill gets, else `null`) and `warnings`.
 
@@ -558,8 +559,8 @@ checked before the bill is written, so a bad photo stops the command with
 nothing saved. With `--dry-run` the output lists each photo's upload size.
 
 Writes, in order: the customer and manual items from `creates` (if any), the
-spec's [stock adds](#stock-adds) (if any; undone if the bill fails), then
-as the screen does, one `bill_save` call that saves the bill (the database
+spec's [stock adds](#stock-adds) (if any, inside the same call, as
+`bill_save_with_stock_adds`), then as the screen does, one `bill_save` call that saves the bill (the database
 assigns the next `FY26-000NNN`), its items, its salespersons, the stock change per inventory
 variant (none with `skip_stock`) and, on a part-paid bill, the first payment,
 all in one transaction: if any part fails, nothing is saved and no bill is
