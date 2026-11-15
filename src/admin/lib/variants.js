@@ -3,7 +3,8 @@
 // colour the product already has gets more stock, a new one becomes a new variant. Same writes
 // as the inventory editor (src/admin/components/ProductTable.js): stock on an existing variant
 // only moves by stock_adjust, because billing and online orders change it concurrently.
-// The admin CLI's `stock add` uses the same writes, by product code.
+// The admin CLI's `stock add` uses the same writes, by product code, as do a bill spec's
+// stock_adds, which undoStockAdds takes back if the bill then fails.
 // Functions take the Supabase client; imports carry .js for Node ESM.
 import { v4 as uuidv4 } from "uuid";
 import { logActivityWith } from "./activity.js";
@@ -119,6 +120,64 @@ export async function addStockByCode(
     { dryRun, source: "via CLI" },
   );
   return { productid, name: product.name, size: target.size, color: target.color, ...result };
+}
+
+/**
+ * Takes back stock adds (addStockByCode results, each with the qty added) after the bill they were
+ * made for failed, newest first. A variant an add created is deleted again; the database refuses
+ * that while anything references it (a bill line, a cart, an order), and then, as for any other
+ * add, the stock is taken back with stock_adjust. Returns a one-line summary for the bill's error
+ * message instead of throwing, so the bill's own error still reaches the operator, with any add
+ * it could not undo named for fixing by hand.
+ */
+export async function undoStockAdds(client, added, { source = "via CLI" } = {}) {
+  const undone = [];
+  const failed = [];
+  for (const a of [...added].reverse()) {
+    const label = `${a.productid} ${variantLabel(a.size, a.color)} +${a.qty}`;
+    try {
+      undone.push(`${label} ${await undoStockAdd(client, a, source)}`);
+    } catch (e) {
+      failed.push(`${label} (${e.message})`);
+    }
+  }
+  if (failed.length === 0) return `stock adds undone: ${undone.join("; ")}`;
+  return `stock adds NOT all undone, fix them in the inventory editor: ${failed.join("; ")}` +
+    (undone.length ? `; undone: ${undone.join("; ")}` : "");
+}
+
+async function undoStockAdd(client, a, source) {
+  const label = variantLabel(a.size, a.color);
+  let kept = null;
+  if (a.created) {
+    const { data, error } = await client.from("productsizecolors").delete().eq("variantid", a.variantid).select("variantid");
+    if (!error && data?.length) {
+      await logActivityWith(client, {
+        action: "delete",
+        entityType: "variant",
+        entityId: a.productid,
+        summary: `Deleted variant ${label} from product ${a.productid} — ${a.name}, added for a bill that failed (${source})`,
+      });
+      return "variant removed";
+    }
+    // In use (or not deletable): keep the variant and take its stock back instead.
+    kept = error ? error.message : "nothing deleted";
+  }
+  const { data: after, error } = await client.rpc("stock_adjust", {
+    p_variant: a.variantid,
+    p_delta: -a.qty,
+    p_reason: "manual_edit",
+    p_ref: a.productid,
+  });
+  if (error) throw new Error(`could not take the stock back: ${error.message}`);
+  const now = Number(after);
+  await logActivityWith(client, {
+    action: "update",
+    entityType: "stock",
+    entityId: a.productid,
+    summary: `Decreased stock of ${label}, product ${a.productid} — ${a.name}: ${round3(now + a.qty)} → ${now} (-${a.qty}), added for a bill that failed (${source})`,
+  });
+  return kept ? `stock taken back, variant kept (${kept})` : "stock taken back";
 }
 
 // A new variant takes its size and colour from the inventory's lists, as the screen's dropdowns do.

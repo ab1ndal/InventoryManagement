@@ -957,3 +957,172 @@ describe("draft bills (spec draft: true)", () => {
     expect((await getBill(fakeSupabase({ "bills.select": { data: finRow, error: null } }), { billid: 902 })).is_draft).toBe(false);
   });
 });
+
+describe("stock_adds (stock add before the bill)", () => {
+  const SHIRT = { productid: "BC25385", name: "Cotton Self-Shirt", categoryid: "SHT", fabric: null, purchaseprice: 567, retailprice: 1495, unit_type: "piece" };
+  const writesOf = (client) => client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
+  const filterOf = (call, kind, col) => call.filters?.find((f) => f[0] === kind && f[1] === col)?.[2];
+  // The shelf as the database holds it: stock_adjust, insert and delete change it.
+  const shelf = ({ billSave, deleteError, undoError } = {}) => {
+    const variants = [{ variantid: "v-xl", productid: "BC25385", size: "XL|42", color: "Pink", stock: 0 }];
+    const client = fakeSupabase(db({
+      "products_admin.select": { data: [SHIRT], error: null },
+      "products.select": { data: [SHIRT], error: null },
+      "categories.select": { data: [{ categoryid: "SHT", name: "Shirt" }], error: null },
+      "sizes.select": { data: [{ code: "XL|42" }, { code: "3XL|46" }], error: null },
+      "colors.select": { data: [{ code: "Pink" }], error: null },
+      "productsizecolors.select": (call) => {
+        const ids = filterOf(call, "in", "variantid");
+        const products = filterOf(call, "in", "productid");
+        if (ids) return { data: variants.filter((v) => ids.includes(v.variantid)).map((v) => ({ ...v })), error: null };
+        if (products) return { data: variants.filter((v) => products.includes(v.productid)).map((v) => ({ ...v })), error: null };
+        const [p, s, c] = ["productid", "size", "color"].map((col) => filterOf(call, "eq", col));
+        const found = variants.find((v) => v.productid === p && v.size === s && v.color === c);
+        return { data: found ? { ...found } : null, error: null };
+      },
+      "productsizecolors.insert": (call) => {
+        variants.push({ ...call.row });
+        return { data: null, error: null };
+      },
+      "productsizecolors.delete": (call) => {
+        if (deleteError) return { data: null, error: deleteError };
+        const id = filterOf(call, "eq", "variantid");
+        variants.splice(variants.findIndex((v) => v.variantid === id), 1);
+        return { data: [{ variantid: id }], error: null };
+      },
+      "rpc.stock_adjust": (call) => {
+        if (undoError && call.args.p_delta < 0) return { data: null, error: undoError };
+        const v = variants.find((x) => x.variantid === call.args.p_variant);
+        v.stock += call.args.p_delta;
+        return { data: v.stock, error: null };
+      },
+      "rpc.bill_save": billSave ?? { data: { billid: 903, bill_number: "FY26-000339", negative_stock: [] }, error: null },
+      "activity_log.insert": { data: null, error: null },
+    }));
+    return { client, variants };
+  };
+  const shirtSpec = (o = {}) => ({
+    customerid: 453,
+    date: "2026-10-22",
+    payment: { method: "Cash", amount: 1495 },
+    items: [{ product: "BC25385", color: "Pink", size: "XL|42", qty: 1 }],
+    ...o,
+  });
+  const addXL = { code: "bc-25385", size: "xl|42", color: "pink", qty: 1 };
+  const add3XL = { code: "BC25385", size: "3XL|46", color: "Pink", qty: 1, new_variant: true };
+  const shirt3XL = [{ product: "BC25385", color: "Pink", size: "3XL|46", qty: 1 }];
+  const failingSave = { data: null, error: { message: "db down" } };
+
+  it.each([
+    [{ stock_adds: "BC25385" }, /stock_adds must be a list/],
+    [{ stock_adds: [{ ...addXL, colour: "Pink" }] }, /stock_adds\[0\]: unknown field\(s\) colour/],
+    [{ stock_adds: [{ ...addXL, size: " " }] }, /stock_adds\[0\].size is required/],
+    [{ stock_adds: [{ ...addXL, qty: 0 }] }, /stock_adds\[0\].qty must be > 0/],
+    [{ stock_adds: [{ ...addXL, new_variant: "yes" }] }, /stock_adds\[0\].new_variant must be true or false/],
+  ])("rejects a malformed stock_adds %#", (patch, msg) => {
+    expect(() => parseBillSpec(shirtSpec(patch))).toThrow(msg);
+  });
+
+  it("preview checks the bill as if the stock were added, and writes nothing", async () => {
+    const { client } = shelf();
+    await expect(prepareBill(client, shirtSpec())).rejects.toThrow(/Insufficient stock: BC25385 Pink\/XL\|42 has 0, needs 1/);
+    const p = await prepareBill(client, shirtSpec({ stock_adds: [addXL] }));
+    expect(p.stock_adds).toEqual([
+      { productid: "BC25385", name: "Cotton Self-Shirt", size: "XL|42", color: "Pink", variantid: "v-xl", created: false, qty: 1, stock_before: 0, stock: 1 },
+    ]);
+    expect(p.stock).toEqual([
+      { variantid: "v-xl", productid: "BC25385", size: "XL|42", color: "Pink", stock_before: 1, change: -1, stock_after: 0 },
+    ]);
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+
+  it("preview bills a variant a stock add will create, under a placeholder id", async () => {
+    const { client } = shelf();
+    const p = await prepareBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }));
+    expect(p.stock_adds[0]).toMatchObject({ variantid: "new:BC25385:Pink/3XL|46", created: true, stock_before: 0, stock: 1 });
+    expect(p.bill_items[0]).toMatchObject({ variantid: "new:BC25385:Pink/3XL|46", product_code: "BC25385", total: 1495 });
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+    // Never sent to the database as a variant id.
+    expect(client.calls.some((c) => (filterOf(c, "in", "variantid") ?? []).some((id) => id.startsWith("new:")))).toBe(false);
+  });
+
+  it("refuses a stock add as stock add does, against its entry", async () => {
+    const { client } = shelf();
+    const { new_variant, ...noFlag } = add3XL;
+    await expect(prepareBill(client, shirtSpec({ stock_adds: [noFlag], items: shirt3XL }))).rejects.toThrow(
+      /^stock_adds\[0\]: BC25385 has no Pink \/ 3XL\|46 variant/,
+    );
+  });
+
+  it("counts earlier adds to the same variant", async () => {
+    const { client } = shelf();
+    const p = await prepareBill(client, shirtSpec({ stock_adds: [add3XL, { ...add3XL, qty: 2 }], items: shirt3XL }));
+    expect(p.stock_adds.map((a) => [a.created, a.stock_before, a.stock])).toEqual([[true, 0, 1], [false, 1, 3]]);
+    expect(p.stock[0]).toMatchObject({ stock_before: 3, stock_after: 2 });
+  });
+
+  it("create adds the stock with stock add's writes, then saves the bill", async () => {
+    const { client, variants } = shelf();
+    const out = await createBill(client, shirtSpec({ stock_adds: [addXL] }));
+    expect(writesOf(client)).toEqual(["stock_adjust", "activity_log.insert", "bill_save", "activity_log.insert"]);
+    expect(client.calls.find((c) => c.fn === "stock_adjust").args).toEqual({ p_variant: "v-xl", p_delta: 1, p_reason: "manual_edit", p_ref: "BC25385" });
+    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload.items[0].variantid).toBe("v-xl");
+    expect(out.stock_adds).toEqual([expect.objectContaining({ variantid: "v-xl", created: false, stock_before: 0, stock: 1, qty: 1 })]);
+    expect(variants[0].stock).toBe(1);
+  });
+
+  it("create makes the new variant first and bills it by its real id", async () => {
+    const { client, variants } = shelf();
+    const out = await createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }));
+    expect(writesOf(client)).toEqual(["productsizecolors.insert", "activity_log.insert", "bill_save", "activity_log.insert"]);
+    const id = variants[1].variantid;
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload.items[0].variantid).toBe(id);
+    expect(out.stock_adds[0]).toMatchObject({ variantid: id, created: true });
+  });
+
+  it("takes the stock back when the bill then fails, and says so", async () => {
+    const { client, variants } = shelf({ billSave: failingSave });
+    await expect(createBill(client, shirtSpec({ stock_adds: [addXL] }))).rejects.toThrow(
+      "Failed to save bill: db down — stock adds undone: BC25385 Pink / XL|42 +1 stock taken back",
+    );
+    expect(writesOf(client)).toEqual(["stock_adjust", "activity_log.insert", "bill_save", "stock_adjust", "activity_log.insert"]);
+    expect(client.calls.filter((c) => c.fn === "stock_adjust").map((c) => c.args.p_delta)).toEqual([1, -1]);
+    expect(client.calls.at(-1).row.summary).toBe(
+      "Decreased stock of Pink / XL|42, product BC25385 — Cotton Self-Shirt: 1 → 0 (-1), added for a bill that failed (via CLI)",
+    );
+    expect(variants[0].stock).toBe(0);
+  });
+
+  it("deletes a variant it created when the bill then fails", async () => {
+    const { client, variants } = shelf({ billSave: failingSave });
+    await expect(createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
+      "Failed to save bill: db down — stock adds undone: BC25385 Pink / 3XL|46 +1 variant removed",
+    );
+    expect(writesOf(client).slice(-2)).toEqual(["productsizecolors.delete", "activity_log.insert"]);
+    expect(variants.map((v) => v.variantid)).toEqual(["v-xl"]);
+  });
+
+  it("keeps a created variant the database will not delete, and takes its stock back", async () => {
+    const { client, variants } = shelf({ billSave: failingSave, deleteError: { message: "violates foreign key constraint" } });
+    await expect(createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
+      /stock adds undone: BC25385 Pink \/ 3XL\|46 \+1 stock taken back, variant kept \(violates foreign key constraint\)/,
+    );
+    expect(variants[1]).toMatchObject({ size: "3XL|46", stock: 0 });
+  });
+
+  it("names an add it could not undo", async () => {
+    const { client } = shelf({ billSave: failingSave, undoError: { message: "permission denied" } });
+    await expect(createBill(client, shirtSpec({ stock_adds: [addXL] }))).rejects.toThrow(
+      "Failed to save bill: db down — stock adds NOT all undone, fix them in the inventory editor: " +
+        "BC25385 Pink / XL|42 +1 (could not take the stock back: permission denied)",
+    );
+  });
+
+  it("dry run writes nothing", async () => {
+    const { client } = shelf();
+    const out = await createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }), { dryRun: true });
+    expect(out.stock_adds[0]).toMatchObject({ created: true });
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+});
