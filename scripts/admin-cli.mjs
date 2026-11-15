@@ -269,6 +269,8 @@ const COMMANDS = {
         const photos = shrinkSlipPhotos(o.photo);
         const result = await createBill(client, readSpec(o), { dryRun: Boolean(o["dry-run"]) });
         if (o["dry-run"]) return { ...result, slip_photos: photos.map(describeShrunk) };
+        // A draft saved without its salespersons or stock change: exit 1 so a script notices.
+        if (result.save_errors) process.exitCode = 1;
         return { ...result, ...(await attachSlipPhotos(client, result.billid, photos)) };
       },
     },

@@ -689,3 +689,204 @@ describe("salespersons", () => {
     expect(client.calls.find((c) => c.table === "bill_salespersons").filters).toEqual([["eq", "billid", 900]]);
   });
 });
+
+describe("draft bills (spec draft: true)", () => {
+  // A slip marked "not confirmed yet": saved as the billing screen's Save Draft on a new bill.
+  const draft = { ...slip387, draft: true };
+  const saved = { billid: 902, bill_number: "FY26-000338" };
+  const staff = [{ salesperson_id: 10, name: "Asha", active: true }];
+  const draftDb = (overrides = {}) => db({
+    "salespersons.select": { data: staff, error: null },
+    "bills.insert": { data: saved, error: null },
+    "bill_items.insert": { data: null, error: null },
+    "bill_salespersons.insert": { data: null, error: null },
+    "rpc.stock_adjust": { data: 0, error: null },
+    "activity_log.insert": { data: null, error: null },
+    ...overrides,
+  });
+  const writesOf = (client) => client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
+
+  it("accepts draft true/false and refuses anything else", () => {
+    expect(parseBillSpec(draft).draft).toBe(true);
+    expect(parseBillSpec(slip387).draft).toBe(false);
+    expect(() => parseBillSpec({ ...slip387, draft: "yes" })).toThrow(/draft must be true or false/);
+  });
+
+  it("allows what Save Draft allows: no customer, no payment, an amount without a method", async () => {
+    const { customerid, payment, ...bare } = draft;
+    const s = parseBillSpec(bare);
+    expect(s.customer).toEqual({ kind: "none" });
+    expect(s.payment).toEqual({ method: "", amount: null, balance_due: 0 });
+    expect(parseBillSpec({ ...draft, payment: { amount: 500 } }).payment).toEqual({ method: "", amount: 500, balance_due: 0 });
+    // The same specs are refused for a finalized bill.
+    expect(() => parseBillSpec({ ...bare, draft: false })).toThrow(/customer is required/);
+    expect(() => parseBillSpec({ ...slip387, payment: { amount: 500 } })).toThrow(/payment.method is required/);
+
+    const p = await prepareBill(fakeSupabase(draftDb()), bare);
+    expect(p.customer).toBeNull();
+    expect(p.bill).toMatchObject({ customerid: null, payment_amount: null, salesmethodid: null, final_amount: null });
+  });
+
+  it.each([
+    [{ ...draft, payment: { method: "Cash", amount: -1 } }, /payment.amount must be >= 0/],
+    [{ ...draft, payment: { amount: 0, balance_due: -5 } }, /balance_due must be >= 0/],
+    [{ ...draft, payment: "cash" }, /payment must be an object/],
+    [{ ...draft, payment: { method: "Cash", amount: 1800, tip: 5 } }, /unknown field\(s\) tip/],
+  ])("still rejects a malformed draft payment %#", (spec, msg) => {
+    expect(() => parseBillSpec(spec)).toThrow(msg);
+  });
+
+  it("still refuses an unknown payment method on a draft", async () => {
+    await expect(prepareBill(fakeSupabase(draftDb()), { ...draft, payment: { method: "Barter" } })).rejects.toThrow(/Unknown payment method "Barter"/);
+  });
+
+  it("preview builds the row the screen inserts for a draft, without the payment check, and writes nothing", async () => {
+    const client = fakeSupabase(draftDb());
+    // 1600 paid is ₹200 off the total: refused for a finalized bill, saved as entered for a draft.
+    const p = await prepareBill(client, { ...draft, payment: { method: "Cash", amount: 1600 } });
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+    expect(p.status).toBe("draft");
+    expect(p.bill).toEqual({
+      customerid: 453,
+      stock_reduced: true,
+      notes: null,
+      document_type: "bos",
+      // Line totals as they stand: no balance discount until the draft is finished.
+      totalamount: 1800.08,
+      gst_total: 0,
+      discount_total: 594.92,
+      taxable_total: 1800.08,
+      paymentstatus: "draft",
+      finalized: false,
+      applied_codes: [],
+      payment_amount: 1600,
+      final_amount: null,
+      saleslocationid: 1,
+      salesmethodid: 1,
+      orderdate: "2026-10-22T00:00:00+05:30",
+    });
+    expect(p.totals).toEqual({ mrp_total: 2395, line_discounts: 594.92, balance_discount: 0, grand_total: 1800.08, paid: 1600 });
+    expect(p.bill_items).toEqual([expect.objectContaining({ billid: null, variantid: VID, quantity: 1, total: 1800.08 })]);
+    expect(p.first_payment).toBeNull();
+    expect(p.stock[0]).toMatchObject({ change: -1, stock_after: 0 });
+  });
+
+  it("a finalized bill's preview says finalized and differs from the draft only where the screen does", async () => {
+    const fin = await prepareBill(fakeSupabase(draftDb()), slip387);
+    const dr = await prepareBill(fakeSupabase(draftDb()), draft);
+    expect(fin.status).toBe("finalized");
+    expect(fin.bill).toMatchObject({ paymentstatus: "finalized", finalized: true, totalamount: 1800 });
+    expect(dr.bill).toMatchObject({ paymentstatus: "draft", finalized: false, totalamount: 1800.08 });
+    // The money columns bill_save sets are left to their defaults on a draft insert, as the screen does.
+    expect(dr.bill).not.toHaveProperty("store_credit_used");
+    expect(dr.bill).not.toHaveProperty("exchange_credit_used");
+  });
+
+  it("records balance_due as the screen's final amount", async () => {
+    const p = await prepareBill(fakeSupabase(draftDb()), { ...draft, payment: { method: "Cash", amount: 500, balance_due: 1300 } });
+    expect(p.bill).toMatchObject({ payment_amount: 500, final_amount: 1800 });
+    expect(p.totals.balance_due).toBe(1300);
+  });
+
+  it("refuses short stock, as Save Draft does, unless skip_stock", async () => {
+    const stock0 = draftDb({
+      "productsizecolors.select": { data: [{ variantid: VID, productid: "BC252051", size: "FREE-SIZE", color: "Mustard", stock: 0 }], error: null },
+    });
+    await expect(prepareBill(fakeSupabase(stock0), draft)).rejects.toThrow(/Insufficient stock/);
+    const p = await prepareBill(fakeSupabase(stock0), { ...draft, skip_stock: true });
+    expect(p.bill.stock_reduced).toBe(false);
+  });
+
+  it("saves bills row, items, salespersons, then stock and the log, as the screen's Save Draft", async () => {
+    const client = fakeSupabase(draftDb());
+    const out = await createBill(client, { ...draft, salespersons: ["asha"] });
+    expect(writesOf(client)).toEqual([
+      "bills.insert",
+      "bill_items.insert",
+      "bill_salespersons.insert",
+      "stock_adjust",
+      "activity_log.insert",
+    ]);
+    // Not bill_save: it has no op for a new draft.
+    expect(client.calls.some((c) => c.fn === "bill_save")).toBe(false);
+    const billRow = client.calls.find((c) => c.table === "bills" && c.op === "insert").row;
+    expect(billRow).toMatchObject({ paymentstatus: "draft", finalized: false, stock_reduced: true });
+    // The trigger numbers the bill; the CLI never sends one.
+    expect(billRow).not.toHaveProperty("bill_number");
+    expect(client.calls.find((c) => c.table === "bill_items").row).toEqual([
+      expect.objectContaining({ billid: 902, variantid: VID, quantity: 1 }),
+    ]);
+    expect(client.calls.find((c) => c.table === "bill_salespersons").row).toEqual([{ billid: 902, salesperson_id: 10 }]);
+    expect(client.calls.find((c) => c.fn === "stock_adjust").args).toEqual({
+      p_variant: VID, p_delta: -1, p_reason: "bill_draft_create", p_ref: "902",
+    });
+    expect(client.calls.find((c) => c.table === "activity_log").row.summary).toBe(
+      "Created draft bill #FY26-000338 for Test Customer — ₹1,800.08, 1 items (via CLI)",
+    );
+    expect(out).toMatchObject({ billid: 902, bill_number: "FY26-000338", status: "draft", negative_stock: [] });
+    expect(out).not.toHaveProperty("save_errors");
+  });
+
+  it("with skip_stock moves no stock and records stock_reduced false", async () => {
+    const client = fakeSupabase(draftDb());
+    await createBill(client, { ...draft, skip_stock: true });
+    expect(writesOf(client)).toEqual(["bills.insert", "bill_items.insert", "activity_log.insert"]);
+    expect(client.calls.find((c) => c.table === "bills").row.stock_reduced).toBe(false);
+  });
+
+  it("logs a draft with no customer as walk-in", async () => {
+    const { customerid, ...walkIn } = draft;
+    const client = fakeSupabase(draftDb());
+    const out = await createBill(client, walkIn);
+    expect(out.customer).toBeNull();
+    expect(client.calls.find((c) => c.table === "activity_log").row.summary).toMatch(/for walk-in —/);
+  });
+
+  it("removes the bills row again when its items fail, as the screen does", async () => {
+    const client = fakeSupabase(draftDb({ "bill_items.insert": { data: null, error: { message: "items boom" } } }));
+    await expect(createBill(client, draft)).rejects.toThrow("Failed to save bill items: items boom");
+    expect(writesOf(client)).toEqual(["bills.insert", "bill_items.insert", "bills.delete"]);
+    expect(client.calls.find((c) => c.op === "delete").filters).toEqual([["eq", "billid", 902]]);
+  });
+
+  it("says so when the cleanup delete fails too", async () => {
+    const client = fakeSupabase(draftDb({
+      "bill_items.insert": { data: null, error: { message: "items boom" } },
+      "bills.delete": { data: null, error: { message: "delete boom" } },
+    }));
+    await expect(createBill(client, draft)).rejects.toThrow(/draft FY26-000338 \(billid 902\) could not be removed: delete boom/);
+  });
+
+  it("keeps the draft and lists a salespersons or stock failure in save_errors", async () => {
+    const client = fakeSupabase(draftDb({
+      "bill_salespersons.insert": { data: null, error: { message: "sp boom" } },
+      "rpc.stock_adjust": { data: null, error: { message: "stock boom" } },
+    }));
+    const out = await createBill(client, { ...draft, salespersons: ["Asha"] });
+    expect(out.billid).toBe(902);
+    expect(out.save_errors).toEqual([
+      expect.stringMatching(/Salespersons not saved \(sp boom\)/),
+      expect.stringMatching(/Stock not reduced for BC252051 Mustard\/FREE-SIZE \(stock boom\)/),
+    ]);
+  });
+
+  it("reports a variant the stock change took below zero", async () => {
+    const client = fakeSupabase(draftDb({ "rpc.stock_adjust": { data: -1, error: null } }));
+    const out = await createBill(client, draft);
+    expect(out.negative_stock).toEqual([{ variantid: VID, stock: -1 }]);
+  });
+
+  it("dry run writes nothing", async () => {
+    const client = fakeSupabase(draftDb());
+    const out = await createBill(client, draft, { dryRun: true });
+    expect(out).toMatchObject({ dry_run: true, status: "draft" });
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+
+  it("bill get marks a draft", async () => {
+    const draftRow = { billid: 902, bill_number: "FY26-000338", paymentstatus: "draft", finalized: false };
+    expect((await getBill(fakeSupabase({ "bills.select": { data: draftRow, error: null } }), { billid: 902 })).is_draft).toBe(true);
+    const finRow = { ...draftRow, paymentstatus: "finalized", finalized: true };
+    expect((await getBill(fakeSupabase({ "bills.select": { data: finRow, error: null } }), { billid: 902 })).is_draft).toBe(false);
+  });
+});

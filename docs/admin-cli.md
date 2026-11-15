@@ -320,10 +320,12 @@ become a new variant. Quote the size: `|` is a shell pipe.
 
 `bill create` makes a **finalized Bill of Supply**, fully paid or part paid,
 writing what the billing screen's Finalize (or partial finalize) button writes
-for a new bill. `bill preview` shows all of it without writing. Not supported:
-drafts, discount codes, vouchers, store credit, exchanges, recording a later
-payment (use the Bills screen), per-line salespersons, SMS. The
-bill's PDF is a separate step: [bill pdf](#bill-pdf).
+for a new bill, or, with `"draft": true`, a **draft bill** as the screen's
+Save Draft writes it (see [Draft bills](#draft-bills)). `bill preview` shows
+all of it without writing. Not supported: discount codes, vouchers, store
+credit, exchanges, recording a later payment or finishing a draft (use the
+Bills screen), per-line salespersons, SMS. The bill's PDF is a separate step:
+[bill pdf](#bill-pdf).
 
 ### Bill spec
 
@@ -378,6 +380,7 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 | `location` | no | sales location name, default `Walk-In` |
 | `notes` | no | e.g. `"Paper bill 387; Cash 1000 + UPI 950"` |
 | `skip_stock` | no | `true` = don't touch stock (the screen's "backdated" checkbox); default reduces stock |
+| `draft` | no | `true` = save as a draft bill, for a slip marked "not confirmed yet" ([Draft bills](#draft-bills)); default `false` |
 | `salespersons` | no | the bill's salespeople (names at the top right of the slip): a list of names (case-insensitive) and/or ids from `salesperson list`, e.g. `["Asha", 4]`. Refused: an unknown name or id, an inactive salesperson (the screen does not offer them), a name two active salespersons share (give the id). Saved as the screen's Salesperson(s) selector saves them: `bill_salespersons` rows, written by `bill_save`. Lines get no salesperson. Default none |
 | `items[].qty` | yes | > 0; decimals for meter items |
 | `items[].amount` | no | what the line sold for (goods only, excluding alteration); default MRP × qty |
@@ -412,13 +415,62 @@ How amounts become a bill, as on the screen:
 - Inventory lines get `cost_price: null` and manual lines the item's cost, as
   on the screen. Manual-item stock is not changed (the app never does).
 
+### Draft bills
+
+A slip marked "not confirmed yet" is saved as a draft: add `"draft": true`.
+It is written exactly as the billing screen's **Save Draft** on a new bill
+(`BillingForm.handleSaveDraft`):
+
+```json
+{
+  "draft": true,
+  "customer": { "phone": "9000000001" },
+  "date": "2026-10-22",
+  "payment": { "method": "Cash", "amount": 500 },
+  "notes": "Paper bill 420, not confirmed yet",
+  "salespersons": ["Asha"],
+  "items": [{ "product": "BC-252051", "color": "Mustard", "qty": 1, "amount": 1800 }]
+}
+```
+
+- `paymentstatus: "draft"`, `finalized: false`. The bill gets its
+  `FY26-000NNN` number when saved, like any bill, so `slip add`, `--photo`
+  and `bill get --number` work on it.
+- Stock is taken now, as on the screen (stock reason `bill_draft_create`),
+  and the same "not enough stock" refusal applies; `skip_stock` works as
+  for a finalized bill.
+- What the screen does not check on a draft, the CLI does not either:
+  `customer` may be left out (a walk-in draft), `payment` may be left out,
+  and `payment.method` / `payment.amount` are stored as given
+  (`salesmethodid`, `payment_amount`; `balance_due` becomes the screen's
+  `final_amount`, `amount + balance_due`). No ₹100 payment check, no
+  balance discount: the total is the line total as it stands
+  (e.g. 1800.08, not 1800). Those happen when the draft is finished.
+- Still refused: everything about the lines (unknown product, discount over
+  50%, amount above MRP, not enough stock), an unknown payment method or
+  location, unknown salespersons.
+- No `bill_payments` row; no PDF (`bill pdf` refuses a draft, and the Bills
+  screen offers no PDF until it is finalized). Finish it (Finalize or Partial
+  Payment) on the Billing screen.
+
+Writes, in the screen's order: the `bills` row, its `bill_items` (if they
+fail, the bill row is deleted again, as the screen does), its
+`bill_salespersons`, then one `stock_adjust` per variant, then an
+activity-log entry `Created draft bill #… for … — ₹…, N items (via CLI)`.
+These are separate writes, not one transaction, because the database's
+`bill_save` has no draft op and the screen saves a new draft this way. A
+salespersons or stock write that fails keeps the draft: it is listed in
+`save_errors` and the exit code is `1`; fix it on the Billing screen.
+Output is as for a finalized bill with `"status": "draft"`.
+
 ### bill preview
 
 ```bash
 node scripts/admin-cli.mjs bill preview --spec bill.json
 ```
 
-Read-only. Output: `customer`, `creates` (the customer row and manual item
+Read-only. Output: `status` (`finalized`, `partial` or `draft`: what the bill
+would be saved as), `customer` (`null` for a walk-in draft), `creates` (the customer row and manual item
 rows that would be created first, with the ids the manual items will get;
 `customer` there means `bill.customerid` is filled in on create),
 `payment_method`, `location`, `salespersons` (`salesperson_id`, `name`, `[]`
@@ -453,6 +505,7 @@ left to delete. Then an activity-log entry
 {
   "billid": 353,
   "bill_number": "FY26-000336",
+  "status": "finalized",
   "customer": { "customerid": 453, "first_name": "Test", "last_name": "Customer", "phone": "+919000000001" },
   "totals": { "mrp_total": 2395, "line_discounts": 594.92, "balance_discount": 0.08, "grand_total": 1800, "paid": 1800 },
   "stock": [ { "variantid": "29c3…", "productid": "BC252051", "size": "FREE-SIZE", "color": "Mustard", "stock_before": 1, "change": -1, "stock_after": 0 } ],
@@ -503,7 +556,8 @@ node scripts/admin-cli.mjs bill get --number FY26-000335
 node scripts/admin-cli.mjs bill get --id 352
 ```
 
-Read-only. The full `bills` row plus `payment_method`, `location`,
+Read-only. The full `bills` row plus `is_draft` (`true` for a draft: not a
+sale yet, no PDF, finished on the Billing screen), `payment_method`, `location`,
 `customer`, `salespersons` (the bill's `bill_salespersons`, each
 `salesperson_id` and `name`), `items` (each inventory line with its variant's `size`, `color`
 and `current_stock`), `payments` (`bill_payments` rows) and `slip_photos`.
@@ -531,7 +585,7 @@ bucket) and `previous_pdf_url`. Success is checked in the database:
 `pdf_url` must have changed. If the app refreshes the login while it runs,
 the new session is saved back to the CLI's session file.
 
-Errors: `No bill numbered …`, `Bill … is not finalized` (exit 2); the app
+Errors: `No bill numbered …`, `Bill … is not finalized` (a draft), `Bill … is cancelled` (exit 2); the app
 not accepting the session, the app's "PDF generation failed" message, or
 `pdf_url` unchanged (exit 1).
 
