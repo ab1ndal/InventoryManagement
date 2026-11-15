@@ -1,4 +1,4 @@
-import { parseBillSpec, prepareBill, createBill, getBill, findBills, resolveSalespersons, BillInputError } from "../bills";
+import { parseBillSpec, prepareBill, createBill, getBill, findBills, resolveSalespersons, checkBillAgainstSpec, BillInputError } from "../bills";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
 // jsdom (CRA's jest env) has no crypto.randomUUID, which createCustomer uses
@@ -121,6 +121,16 @@ describe("prepareBill — slip 387", () => {
     await expect(prepareBill(fakeSupabase(stock0), slip387)).rejects.toThrow(/Insufficient stock: BC252051 Mustard\/FREE-SIZE has 0, needs 1/);
     const p = await prepareBill(fakeSupabase(stock0), { ...slip387, skip_stock: true });
     expect(p.stock[0]).toMatchObject({ change: 0, stock_after: 0 });
+  });
+
+  it("says which stock add command would cover a shortfall", async () => {
+    const short = db({
+      "productsizecolors.select": { data: [{ variantid: VID, productid: "BC252051", size: "XL|42", color: "Mustard", stock: 1 }], error: null },
+    });
+    await expect(prepareBill(fakeSupabase(short), { ...slip387, items: [{ variantid: VID, qty: 3, amount: 5400 }] })).rejects.toThrow(
+      "Insufficient stock: BC252051 Mustard/XL|42 has 1, needs 3. If the pieces are on the shelf, add them: " +
+        "stock add --code BC252051 --size 'XL|42' --color 'Mustard' --qty 2",
+    );
   });
 
   it("records whether the bill took stock, so cancelling it gives back only what left the shelf", async () => {
@@ -443,10 +453,12 @@ describe("readable bill spec", () => {
     items: [{ product: "BC-252051", qty: 1, amount: 1800 }],
     ...o,
   });
+  // A new customer's preview also looks for customers with the same name (ilike): none here.
+  const noNameMatch = (fake) => (call) => (call.filters.some((f) => f[0] === "ilike") ? { data: [], error: null } : fake(call));
   const rdb = (o = {}) =>
     db({
-      "customers.select": (call) =>
-        call.filters.some((f) => f[1] === "phone") ? { data: [test], error: null } : { data: test, error: null },
+      "customers.select": noNameMatch((call) =>
+        call.filters.some((f) => f[1] === "phone") ? { data: [test], error: null } : { data: test, error: null }),
       "productsizecolors.select": { data: [MUSTARD, MAROON, GOLDEN], error: null },
       "products.select": {
         data: [
@@ -485,6 +497,16 @@ describe("readable bill spec", () => {
     await expect(prepareBill(fakeSupabase(rdb()), spec({ items: [item] }))).rejects.toThrow(msg);
   });
 
+  it.each([
+    // The product's only size fills in a size the line leaves out.
+    [{ product: "BC25051", color: "Pink", qty: 1 }, "stock add --code BC25051 --size 'FREE-SIZE' --color 'Pink' --qty 1 --new-variant"],
+    [{ product: "BC25051", color: "Pink", size: "XL|42", qty: 2 }, "stock add --code BC25051 --size 'XL|42' --color 'Pink' --qty 2 --new-variant"],
+    // More than one colour: left for the operator to fill in.
+    [{ product: "BC25051", size: "M", qty: 1 }, "stock add --code BC25051 --size 'M' --color '<color>' --qty 1 --new-variant"],
+  ])("says which stock add command would create a missing variant %#", async (item, command) => {
+    await expect(prepareBill(fakeSupabase(rdb()), spec({ items: [item] }))).rejects.toThrow(`If the piece is on the shelf, add it: ${command}`);
+  });
+
   it("refuses an unknown phone unless asked to create the customer", async () => {
     await expect(prepareBill(fakeSupabase(rdb(noPhoneMatch)), spec())).rejects.toThrow(
       /No customer with phone 9000000001; add customer.create_if_missing/,
@@ -498,6 +520,51 @@ describe("readable bill spec", () => {
     );
     expect(p.bill.customerid).toBeNull();
     expect(p.creates.customer).toMatchObject({ first_name: "Test", last_name: "Customer", phone: "+919000000001", is_guest: false });
+  });
+
+  it("warns of likely duplicates when it would create a customer: same name, or phone one digit off", async () => {
+    const sameName = { customerid: 41, first_name: "test", last_name: "CUSTOMER", phone: "+919811111111" };
+    const nearPhone = { customerid: 42, first_name: "Ravi", last_name: null, phone: "+919000000007" };
+    const client = fakeSupabase(rdb({
+      "customers.select": (call) => {
+        if (call.filters.some((f) => f[0] === "ilike")) return { data: [sameName], error: null };
+        if (call.filters.some((f) => f[0] === "in" && f[1] === "phone")) return { data: [nearPhone], error: null };
+        return { data: [], error: null };
+      },
+    }));
+    const p = await prepareBill(
+      client,
+      spec({ customer: { phone: "9000000001", create_if_missing: { first: "Test", last: "Customer" } } }),
+    );
+    expect(p.creates.customer).toMatchObject({ phone: "+919000000001" });
+    expect(p.warnings).toEqual([
+      "Possible duplicate: customer 41 (test CUSTOMER, +919811111111) has the same name; if it is them, bill customer { id: 41 } instead of creating a new customer",
+      "Possible duplicate: customer 42 (Ravi, +919000000007) has a phone one digit off +919000000001; check the slip's phone",
+    ]);
+    const byName = client.calls.find((c) => c.filters.some((f) => f[0] === "ilike"));
+    expect(byName.filters).toEqual([["ilike", "first_name", "Test"], ["ilike", "last_name", "Customer"]]);
+    const byPhone = client.calls.find((c) => c.table === "customers" && c.filters.some((f) => f[0] === "in"));
+    expect(byPhone.filters[0][2]).toHaveLength(90);
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+
+  it("looks for no duplicates when the customer already exists", async () => {
+    const client = fakeSupabase(rdb());
+    await prepareBill(client, spec({ customer: { phone: "9000000001", create_if_missing: { first: "Test", last: "Customer" } } }));
+    expect(client.calls.filter((c) => c.table === "customers")).toHaveLength(1);
+  });
+
+  it("keeps the duplicate warnings in bill create's output", async () => {
+    const client = fakeSupabase(rdb({
+      "customers.select": (call) => {
+        if (call.filters.some((f) => f[0] === "ilike")) return { data: [{ customerid: 41, first_name: "W", last_name: null, phone: null }], error: null };
+        return { data: { customerid: 500, first_name: "W" }, error: null };
+      },
+      "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
+      "rpc.bill_save": { data: { billid: 901, bill_number: "FY26-000337" }, error: null },
+    }));
+    const out = await createBill(client, spec({ customer: { create: { first: "W" } } }));
+    expect(out.warnings).toEqual([expect.stringMatching(/^Possible duplicate: customer 41 \(W, no phone\) has the same name/)]);
   });
 
   it("warns when the phone belongs to someone with another name", async () => {
@@ -536,10 +603,10 @@ describe("readable bill spec", () => {
     const client = fakeSupabase(
       rdb({
         ...noPhoneMatch,
-        "customers.select": (call) =>
+        "customers.select": noNameMatch((call) =>
           call.filters.some((f) => f[1] === "phone")
             ? { data: [], error: null }
-            : { data: { customerid: 500, first_name: "Test", last_name: "Customer", phone: "+919000000001" }, error: null },
+            : { data: { customerid: 500, first_name: "Test", last_name: "Customer", phone: "+919000000001" }, error: null }),
         "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
         "manual_items.select": (call) => ({
           data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150 }],
@@ -574,7 +641,7 @@ describe("readable bill spec", () => {
   it("says what was already created when the bill then fails", async () => {
     const client = fakeSupabase(
       rdb({
-        "customers.select": (call) => (call.filters.some((f) => f[1] === "phone") ? { data: [], error: null } : { data: { customerid: 500, first_name: "W" }, error: null }),
+        "customers.select": noNameMatch((call) => (call.filters.some((f) => f[1] === "phone") ? { data: [], error: null } : { data: { customerid: 500, first_name: "W" }, error: null })),
         "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
         "rpc.bill_save": { data: null, error: new Error("db down") },
       }),
@@ -888,5 +955,276 @@ describe("draft bills (spec draft: true)", () => {
     expect((await getBill(fakeSupabase({ "bills.select": { data: draftRow, error: null } }), { billid: 902 })).is_draft).toBe(true);
     const finRow = { ...draftRow, paymentstatus: "finalized", finalized: true };
     expect((await getBill(fakeSupabase({ "bills.select": { data: finRow, error: null } }), { billid: 902 })).is_draft).toBe(false);
+  });
+});
+
+describe("checkBillAgainstSpec (slip finish)", () => {
+  // Slip 387 as getBill returns it once saved; orderdate comes back in UTC.
+  const saved = (o = {}) => ({
+    billid: 900,
+    bill_number: "FY26-000336",
+    customerid: 453,
+    orderdate: "2026-10-21T18:30:00+00:00",
+    paymentstatus: "finalized",
+    totalamount: 1800,
+    payment_amount: 1800,
+    payment_method: "Cash",
+    customer: { customerid: 453, first_name: "Test", last_name: "Customer", phone: "+919000000001" },
+    salespersons: [{ salesperson_id: 10, name: "Asha" }],
+    items: [{ product_code: "BC252051", variantid: VID, quantity: 1, mrp: 2395, total: 1800, alteration_charge: 0, color: "Mustard", size: "FREE-SIZE" }],
+    ...o,
+  });
+  const spec = {
+    customer: { phone: "9000000001" },
+    date: "2026-10-22",
+    payment: { method: "Cash", amount: 1800 },
+    salespersons: ["asha"],
+    items: [{ product: "BC-252051", color: "mustard", qty: 1, amount: 1800 }],
+  };
+
+  it("passes a bill saved as the spec says, with a compact view of it", () => {
+    expect(checkBillAgainstSpec(spec, saved())).toEqual({
+      ok: true,
+      mismatches: [],
+      saved: {
+        bill_number: "FY26-000336",
+        status: "finalized",
+        customer: { customerid: 453, name: "Test Customer", phone: "+919000000001" },
+        date: "2026-10-22",
+        lines: [{ code: "BC252051", color: "Mustard", size: "FREE-SIZE", qty: 1, amount: 1800 }],
+        total: 1800,
+        paid: 1800,
+        method: "Cash",
+        salespersons: ["Asha"],
+      },
+    });
+  });
+
+  it("allows the balance discount spread over the lines, but not amounts on the wrong line", () => {
+    // Lines 1000 + 960 on a 1950 payment: the ₹10 balance discount is shared in proportion.
+    const twoLines = { ...spec, payment: { method: "Cash", amount: 1950 }, items: [
+      { variantid: "a", qty: 1, amount: 1000 },
+      { variantid: "b", qty: 1, amount: 960 },
+    ] };
+    const items = (t1, t2) => [
+      { product_code: "BC1", variantid: "a", quantity: 1, mrp: 1200, total: t1, alteration_charge: 0 },
+      { product_code: "BC2", variantid: "b", quantity: 1, mrp: 1200, total: t2, alteration_charge: 0 },
+    ];
+    expect(checkBillAgainstSpec(twoLines, saved({ totalamount: 1950, payment_amount: 1950, items: items(994.9, 955.1) })).ok).toBe(true);
+    const swapped = checkBillAgainstSpec(twoLines, saved({ totalamount: 1950, payment_amount: 1950, items: items(955.1, 994.9) }));
+    expect(swapped.mismatches).toEqual([
+      "items[0] amount: spec 1000, bill 955.1",
+      "items[1] amount: spec 960, bill 994.9",
+    ]);
+  });
+
+  it("lists every field that differs", () => {
+    const wrong = saved({
+      orderdate: "2026-10-22T18:30:00+00:00",
+      totalamount: 1700,
+      payment_amount: 1700,
+      payment_method: "UPI",
+      customer: { customerid: 454, first_name: "Other", last_name: null, phone: "+919000000009" },
+      salespersons: [],
+      items: [{ product_code: "BC252051", variantid: "x", quantity: 2, mrp: 2395, total: 1700, alteration_charge: 0, color: "Maroon", size: "FREE-SIZE" }],
+    });
+    expect(checkBillAgainstSpec(spec, wrong).mismatches).toEqual([
+      'customer phone: spec "+919000000001", bill "+919000000009"',
+      'date: spec "2026-10-22", bill "2026-10-23"',
+      'items[0] color: spec "mustard", bill "Maroon"',
+      "items[0] qty: spec 1, bill 2",
+      "items[0] amount: spec 1800, bill 1700",
+      "total: spec 1800, bill 1700",
+      "paid: spec 1800, bill 1700",
+      'method: spec "Cash", bill "UPI"',
+      'salespersons: spec ["asha"], bill []',
+    ]);
+  });
+
+  it("checks status, line count and a customer by id", () => {
+    const out = checkBillAgainstSpec({ ...slip387, payment: { method: "Cash", amount: 1000, balance_due: 800 } }, saved({ customerid: 9, items: [] }));
+    expect(out.ok).toBe(false);
+    expect(out.mismatches).toEqual(expect.arrayContaining([
+      "customer: spec 453, bill 9",
+      'status: spec "partial", bill "finalized"',
+      "lines: spec 1, bill 0",
+      "paid: spec 1000, bill 1800",
+    ]));
+  });
+
+  it("does not hold a draft to the amount paid", () => {
+    const draft = { ...slip387, draft: true, payment: { method: "Cash", amount: 500 } };
+    const bill = saved({ paymentstatus: "draft", totalamount: 1800.08, payment_amount: 500, salespersons: [],
+      items: [{ product_code: "BC252051", variantid: VID, quantity: 1, mrp: 2395, total: 1800.08, alteration_charge: 0 }] });
+    expect(checkBillAgainstSpec(draft, bill)).toMatchObject({ ok: true, mismatches: [] });
+  });
+});
+
+describe("stock_adds (stock add before the bill)", () => {
+  const SHIRT = { productid: "BC25385", name: "Cotton Self-Shirt", categoryid: "SHT", fabric: null, purchaseprice: 567, retailprice: 1495, unit_type: "piece" };
+  const writesOf = (client) => client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
+  const filterOf = (call, kind, col) => call.filters?.find((f) => f[0] === kind && f[1] === col)?.[2];
+  // The shelf as the database holds it: stock_adjust, insert and delete change it.
+  const shelf = ({ billSave, deleteError, undoError } = {}) => {
+    const variants = [{ variantid: "v-xl", productid: "BC25385", size: "XL|42", color: "Pink", stock: 0 }];
+    const client = fakeSupabase(db({
+      "products_admin.select": { data: [SHIRT], error: null },
+      "products.select": { data: [SHIRT], error: null },
+      "categories.select": { data: [{ categoryid: "SHT", name: "Shirt" }], error: null },
+      "sizes.select": { data: [{ code: "XL|42" }, { code: "3XL|46" }], error: null },
+      "colors.select": { data: [{ code: "Pink" }], error: null },
+      "productsizecolors.select": (call) => {
+        const ids = filterOf(call, "in", "variantid");
+        const products = filterOf(call, "in", "productid");
+        if (ids) return { data: variants.filter((v) => ids.includes(v.variantid)).map((v) => ({ ...v })), error: null };
+        if (products) return { data: variants.filter((v) => products.includes(v.productid)).map((v) => ({ ...v })), error: null };
+        const [p, s, c] = ["productid", "size", "color"].map((col) => filterOf(call, "eq", col));
+        const found = variants.find((v) => v.productid === p && v.size === s && v.color === c);
+        return { data: found ? { ...found } : null, error: null };
+      },
+      "productsizecolors.insert": (call) => {
+        variants.push({ ...call.row });
+        return { data: null, error: null };
+      },
+      "productsizecolors.delete": (call) => {
+        if (deleteError) return { data: null, error: deleteError };
+        const id = filterOf(call, "eq", "variantid");
+        variants.splice(variants.findIndex((v) => v.variantid === id), 1);
+        return { data: [{ variantid: id }], error: null };
+      },
+      "rpc.stock_adjust": (call) => {
+        if (undoError && call.args.p_delta < 0) return { data: null, error: undoError };
+        const v = variants.find((x) => x.variantid === call.args.p_variant);
+        v.stock += call.args.p_delta;
+        return { data: v.stock, error: null };
+      },
+      "rpc.bill_save": billSave ?? { data: { billid: 903, bill_number: "FY26-000339", negative_stock: [] }, error: null },
+      "activity_log.insert": { data: null, error: null },
+    }));
+    return { client, variants };
+  };
+  const shirtSpec = (o = {}) => ({
+    customerid: 453,
+    date: "2026-10-22",
+    payment: { method: "Cash", amount: 1495 },
+    items: [{ product: "BC25385", color: "Pink", size: "XL|42", qty: 1 }],
+    ...o,
+  });
+  const addXL = { code: "bc-25385", size: "xl|42", color: "pink", qty: 1 };
+  const add3XL = { code: "BC25385", size: "3XL|46", color: "Pink", qty: 1, new_variant: true };
+  const shirt3XL = [{ product: "BC25385", color: "Pink", size: "3XL|46", qty: 1 }];
+  const failingSave = { data: null, error: { message: "db down" } };
+
+  it.each([
+    [{ stock_adds: "BC25385" }, /stock_adds must be a list/],
+    [{ stock_adds: [{ ...addXL, colour: "Pink" }] }, /stock_adds\[0\]: unknown field\(s\) colour/],
+    [{ stock_adds: [{ ...addXL, size: " " }] }, /stock_adds\[0\].size is required/],
+    [{ stock_adds: [{ ...addXL, qty: 0 }] }, /stock_adds\[0\].qty must be > 0/],
+    [{ stock_adds: [{ ...addXL, new_variant: "yes" }] }, /stock_adds\[0\].new_variant must be true or false/],
+  ])("rejects a malformed stock_adds %#", (patch, msg) => {
+    expect(() => parseBillSpec(shirtSpec(patch))).toThrow(msg);
+  });
+
+  it("preview checks the bill as if the stock were added, and writes nothing", async () => {
+    const { client } = shelf();
+    await expect(prepareBill(client, shirtSpec())).rejects.toThrow(/Insufficient stock: BC25385 Pink\/XL\|42 has 0, needs 1/);
+    const p = await prepareBill(client, shirtSpec({ stock_adds: [addXL] }));
+    expect(p.stock_adds).toEqual([
+      { productid: "BC25385", name: "Cotton Self-Shirt", size: "XL|42", color: "Pink", variantid: "v-xl", created: false, qty: 1, stock_before: 0, stock: 1 },
+    ]);
+    expect(p.stock).toEqual([
+      { variantid: "v-xl", productid: "BC25385", size: "XL|42", color: "Pink", stock_before: 1, change: -1, stock_after: 0 },
+    ]);
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+  });
+
+  it("preview bills a variant a stock add will create, under a placeholder id", async () => {
+    const { client } = shelf();
+    const p = await prepareBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }));
+    expect(p.stock_adds[0]).toMatchObject({ variantid: "new:BC25385:Pink/3XL|46", created: true, stock_before: 0, stock: 1 });
+    expect(p.bill_items[0]).toMatchObject({ variantid: "new:BC25385:Pink/3XL|46", product_code: "BC25385", total: 1495 });
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
+    // Never sent to the database as a variant id.
+    expect(client.calls.some((c) => (filterOf(c, "in", "variantid") ?? []).some((id) => id.startsWith("new:")))).toBe(false);
+  });
+
+  it("refuses a stock add as stock add does, against its entry", async () => {
+    const { client } = shelf();
+    const { new_variant, ...noFlag } = add3XL;
+    await expect(prepareBill(client, shirtSpec({ stock_adds: [noFlag], items: shirt3XL }))).rejects.toThrow(
+      /^stock_adds\[0\]: BC25385 has no Pink \/ 3XL\|46 variant/,
+    );
+  });
+
+  it("counts earlier adds to the same variant", async () => {
+    const { client } = shelf();
+    const p = await prepareBill(client, shirtSpec({ stock_adds: [add3XL, { ...add3XL, qty: 2 }], items: shirt3XL }));
+    expect(p.stock_adds.map((a) => [a.created, a.stock_before, a.stock])).toEqual([[true, 0, 1], [false, 1, 3]]);
+    expect(p.stock[0]).toMatchObject({ stock_before: 3, stock_after: 2 });
+  });
+
+  it("create adds the stock with stock add's writes, then saves the bill", async () => {
+    const { client, variants } = shelf();
+    const out = await createBill(client, shirtSpec({ stock_adds: [addXL] }));
+    expect(writesOf(client)).toEqual(["stock_adjust", "activity_log.insert", "bill_save", "activity_log.insert"]);
+    expect(client.calls.find((c) => c.fn === "stock_adjust").args).toEqual({ p_variant: "v-xl", p_delta: 1, p_reason: "manual_edit", p_ref: "BC25385" });
+    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload.items[0].variantid).toBe("v-xl");
+    expect(out.stock_adds).toEqual([expect.objectContaining({ variantid: "v-xl", created: false, stock_before: 0, stock: 1, qty: 1 })]);
+    expect(variants[0].stock).toBe(1);
+  });
+
+  it("create makes the new variant first and bills it by its real id", async () => {
+    const { client, variants } = shelf();
+    const out = await createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }));
+    expect(writesOf(client)).toEqual(["productsizecolors.insert", "activity_log.insert", "bill_save", "activity_log.insert"]);
+    const id = variants[1].variantid;
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload.items[0].variantid).toBe(id);
+    expect(out.stock_adds[0]).toMatchObject({ variantid: id, created: true });
+  });
+
+  it("takes the stock back when the bill then fails, and says so", async () => {
+    const { client, variants } = shelf({ billSave: failingSave });
+    await expect(createBill(client, shirtSpec({ stock_adds: [addXL] }))).rejects.toThrow(
+      "Failed to save bill: db down — stock adds undone: BC25385 Pink / XL|42 +1 stock taken back",
+    );
+    expect(writesOf(client)).toEqual(["stock_adjust", "activity_log.insert", "bill_save", "stock_adjust", "activity_log.insert"]);
+    expect(client.calls.filter((c) => c.fn === "stock_adjust").map((c) => c.args.p_delta)).toEqual([1, -1]);
+    expect(client.calls.at(-1).row.summary).toBe(
+      "Decreased stock of Pink / XL|42, product BC25385 — Cotton Self-Shirt: 1 → 0 (-1), added for a bill that failed (via CLI)",
+    );
+    expect(variants[0].stock).toBe(0);
+  });
+
+  it("deletes a variant it created when the bill then fails", async () => {
+    const { client, variants } = shelf({ billSave: failingSave });
+    await expect(createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
+      "Failed to save bill: db down — stock adds undone: BC25385 Pink / 3XL|46 +1 variant removed",
+    );
+    expect(writesOf(client).slice(-2)).toEqual(["productsizecolors.delete", "activity_log.insert"]);
+    expect(variants.map((v) => v.variantid)).toEqual(["v-xl"]);
+  });
+
+  it("keeps a created variant the database will not delete, and takes its stock back", async () => {
+    const { client, variants } = shelf({ billSave: failingSave, deleteError: { message: "violates foreign key constraint" } });
+    await expect(createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
+      /stock adds undone: BC25385 Pink \/ 3XL\|46 \+1 stock taken back, variant kept \(violates foreign key constraint\)/,
+    );
+    expect(variants[1]).toMatchObject({ size: "3XL|46", stock: 0 });
+  });
+
+  it("names an add it could not undo", async () => {
+    const { client } = shelf({ billSave: failingSave, undoError: { message: "permission denied" } });
+    await expect(createBill(client, shirtSpec({ stock_adds: [addXL] }))).rejects.toThrow(
+      "Failed to save bill: db down — stock adds NOT all undone, fix them in the inventory editor: " +
+        "BC25385 Pink / XL|42 +1 (could not take the stock back: permission denied)",
+    );
+  });
+
+  it("dry run writes nothing", async () => {
+    const { client } = shelf();
+    const out = await createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }), { dryRun: true });
+    expect(out.stock_adds[0]).toMatchObject({ created: true });
+    expect(client.calls.every((c) => c.op === "select")).toBe(true);
   });
 });

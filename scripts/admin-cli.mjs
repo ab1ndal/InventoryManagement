@@ -21,6 +21,7 @@ import { parseArgs } from "node:util";
 import { authedClient, login, logout, promptHidden, sessionPath, writeSession, AuthError } from "./admin-cli/session.mjs";
 import { shrinkSlipPhoto, SlipFileError } from "./admin-cli/slipPhoto.mjs";
 import { regenerateBillPdf, BillPdfError, DEFAULT_APP_URL } from "./admin-cli/billPdf.mjs";
+import { finishSlip } from "./admin-cli/slipFinish.mjs";
 
 // src/ is untyped ESM shared with CRA; marking it "type": "module" would force
 // extensionful imports on the whole app. Node warns when loading it, so drop
@@ -40,7 +41,7 @@ const { findManualItems, createManualItem, ManualItemInputError } = await import
 );
 const { addStockByCode, VariantInputError } = await import("../src/admin/lib/variants.js");
 const { listSalespersons } = await import("../src/admin/lib/salespersons.js");
-const { prepareBill, createBill, getBill, findBills, BillInputError } = await import(
+const { prepareBill, createBill, getBill, findBills, checkBillAgainstSpec, BillInputError } = await import(
   "../src/admin/lib/bills.js"
 );
 const { listSlipPhotos, addSlipPhoto, downloadSlipPhoto, SlipPhotoInputError, MAX_SLIP_BYTES } = await import(
@@ -335,6 +336,31 @@ const COMMANDS = {
       usage: "slip list (--number <FY26-000NNN> | --id <billid>)",
       options: { number: { type: "string" }, id: { type: "string" } },
       run: async (client, o) => listSlipPhotos(client, await billIdFrom(client, o)),
+    },
+    finish: {
+      usage:
+        "slip finish (--spec <file.json> | --json '<spec>') --photo <slip photo>... [--app-url <admin app origin>] [--dry-run]   (bill create + bill pdf + bill get + check)",
+      options: {
+        spec: { type: "string" },
+        json: { type: "string" },
+        photo: { type: "string", multiple: true },
+        "app-url": { type: "string" },
+        "dry-run": { type: "boolean" },
+      },
+      run: async (client, o) => {
+        if (!o.photo?.length) throw new UsageError("--photo is required (the slip the bill is entered from)");
+        const result = await finishSlip({
+          spec: readSpec(o),
+          dryRun: Boolean(o["dry-run"]),
+          create: () => COMMANDS.bill.create.run(client, o),
+          // By the bill NUMBER the save returned, never its id.
+          pdf: (number) => COMMANDS.bill.pdf.run(client, { number, "app-url": o["app-url"] }),
+          get: (number) => COMMANDS.bill.get.run(client, { number }),
+          check: checkBillAgainstSpec,
+        });
+        if (result.ok === false) process.exitCode = 1;
+        return result;
+      },
     },
     download: {
       usage: "slip download --photo <photo id> [--out <folder>]   (saves <photo id>.jpg)",

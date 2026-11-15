@@ -325,7 +325,8 @@ Save Draft writes it (see [Draft bills](#draft-bills)). `bill preview` shows
 all of it without writing. Not supported: discount codes, vouchers, store
 credit, exchanges, recording a later payment or finishing a draft (use the
 Bills screen), per-line salespersons, SMS. The bill's PDF is a separate step:
-[bill pdf](#bill-pdf).
+[bill pdf](#bill-pdf), or [slip finish](#slip-finish) does create, PDF and a
+check in one command.
 
 ### Bill spec
 
@@ -381,6 +382,7 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 | `notes` | no | e.g. `"Paper bill 387; Cash 1000 + UPI 950"` |
 | `skip_stock` | no | `true` = don't touch stock (the screen's "backdated" checkbox); default reduces stock |
 | `draft` | no | `true` = save as a draft bill, for a slip marked "not confirmed yet" ([Draft bills](#draft-bills)); default `false` |
+| `stock_adds` | no | stock to add before the bill, for pieces on the shelf but not in the inventory: a list of `{ "code", "size", "color", "qty"[, "new_variant": true] }`, each exactly a [stock add](#stock-add) (see [Stock adds](#stock-adds)); default none |
 | `salespersons` | no | the bill's salespeople (names at the top right of the slip): a list of names (case-insensitive) and/or ids from `salesperson list`, e.g. `["Asha", 4]`. Refused: an unknown name or id, an inactive salesperson (the screen does not offer them), a name two active salespersons share (give the id). Saved as the screen's Salesperson(s) selector saves them: `bill_salespersons` rows, written by `bill_save`. Lines get no salesperson. Default none |
 | `items[].qty` | yes | > 0; decimals for meter items |
 | `items[].amount` | no | what the line sold for (goods only, excluding alteration); default MRP × qty |
@@ -402,8 +404,26 @@ How amounts become a bill, as on the screen:
   payment (`amount + balance_due`) off from the line total by more than ₹100, not enough
   stock (unless `skip_stock`), unknown customer, variant, manual item, method
   or location.
+- A line refused for a missing variant (`… has no variant Pink; …`) or for
+  not enough stock ends with the `stock add` command that would let it
+  through, for when the piece is on the shelf but not in the inventory:
+  `If the pieces are on the shelf, add them: stock add --code BC252051 --size 'XL|42' --color 'Mustard' --qty 2`
+  (the shortfall), or the same with `--new-variant` and the line's quantity
+  for a missing variant. A size or colour the line leaves out is filled in
+  when the product has only one, else left as `'<size>'` / `'<color>'` to
+  fill in. Check the slip and shelf before running it, or put the same add
+  in the spec's [`stock_adds`](#stock-adds).
 - Warned (non-blocking): a line discount over 30% (the screen asks to
   confirm), paying more than the total (recorded as is).
+- Warned (non-blocking) when the spec would **create** a customer
+  (`create`, or `create_if_missing` for an unknown phone), likely
+  duplicates: existing customers with the same first and last name
+  (ignoring case; no last name matches no last name), with their id and
+  phone, and existing customers whose phone is one digit off the slip's
+  `+91` phone (a misread digit). Two cheap reads: a name match, and one
+  `phone in (…)` over the 90 one-digit variants. If it is the same person,
+  bill `customer { id }` instead. `bill create` repeats these warnings in
+  its output.
 - No `bill_payments` row: like the screen, a fully paid bill records payment
   as `payment_amount` + `salesmethodid` on the bill.
 - Part-paid (`balance_due` > 0), as the screen's partial finalize: the bill
@@ -414,6 +434,50 @@ How amounts become a bill, as on the screen:
   `bill_partial_finalize`. The rest is recorded later on the Bills screen.
 - Inventory lines get `cost_price: null` and manual lines the item's cost, as
   on the screen. Manual-item stock is not changed (the app never does).
+
+### Stock adds
+
+A slip whose piece is on the shelf but not in the inventory needs a
+`stock add` before its bill. `stock_adds` puts that in the spec, so the
+slip is still one command:
+
+```json
+{
+  "customer": { "id": 453 },
+  "date": "2026-10-22",
+  "payment": { "method": "Cash", "amount": 1495 },
+  "stock_adds": [{ "code": "BC25385", "size": "3XL|46", "color": "Pink", "qty": 1, "new_variant": true }],
+  "items": [{ "product": "BC25385", "size": "3XL|46", "color": "Pink", "qty": 1 }]
+}
+```
+
+- Each entry is checked and written by the same code as `stock add`
+  (`addStockByCode`): same size/colour matching, same refusals (reported as
+  `stock_adds[0]: …`), same `stock_adjust` or new-variant insert and the same
+  activity-log entries. `new_variant` is `--new-variant`. Unknown fields are
+  refused.
+- `bill preview` (and `--dry-run`) writes nothing: it lists the adds in
+  `stock_adds` (`productid`, `size`, `color`, `variantid`, `created`, `qty`,
+  `stock_before`, `stock`) and checks the bill as if they were applied, so
+  `stock` shows the stock after the add. A variant an add would create has
+  no id yet: the preview shows it as `new:<code>:<colour>/<size>`, in
+  `stock_adds` and in `bill_items`.
+- `bill create` applies the adds first, in order, then saves the bill
+  against the real rows. Its output adds `stock_adds` (each add's result).
+- **Not one transaction.** The adds are separate writes before the bill.
+  If the bill then fails, they are undone, newest first: a variant an add
+  created is deleted again (the database refuses that while anything
+  references it, e.g. a bill line or a cart; then it is kept), and any other
+  add is taken back with `stock_adjust` (activity log `Decreased stock of …,
+  added for a bill that failed (via CLI)`). The error ends with what
+  happened, e.g. `— stock adds undone: BC25385 Pink / 3XL|46 +1 variant removed`,
+  or `— stock adds NOT all undone, fix them in the inventory editor: …`
+  naming each one to fix by hand. Two gaps remain until the database can do
+  the adds inside the bill's own transaction: the CLI dying between the adds
+  and the undo leaves the stock added, and a bill that saved but whose reply
+  was lost would be undone wrongly (check `bill find` before re-running).
+  The proposed database function is `schema/migration_bill_save_with_stock_adds.sql`
+  (not applied).
 
 ### Draft bills
 
@@ -476,7 +540,7 @@ rows that would be created first, with the ids the manual items will get;
 `payment_method`, `location`, `salespersons` (`salesperson_id`, `name`, `[]`
 if none), the exact `bill` row and `bill_items` rows that
 would be inserted (bill number and ids are assigned on create), `stock` (per variant: `stock_before`, `change`,
-`stock_after`), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
+`stock_after`), `stock_adds` (the [stock adds](#stock-adds) applied first, `[]` if none), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
 `grand_total`, `paid`, and `balance_due` on a part-paid bill), `first_payment`
 (the `bill_payments` row a part-paid bill gets, else `null`) and `warnings`.
 
@@ -493,7 +557,8 @@ was entered from; see [Slip photos](#slip-photos). Photos are shrunk and
 checked before the bill is written, so a bad photo stops the command with
 nothing saved. With `--dry-run` the output lists each photo's upload size.
 
-Writes, in order: the customer and manual items from `creates` (if any), then
+Writes, in order: the customer and manual items from `creates` (if any), the
+spec's [stock adds](#stock-adds) (if any; undone if the bill fails), then
 as the screen does, one `bill_save` call that saves the bill (the database
 assigns the next `FY26-000NNN`), its items, its salespersons, the stock change per inventory
 variant (none with `skip_stock`) and, on a part-paid bill, the first payment,
@@ -609,6 +674,62 @@ node scripts/admin-cli.mjs slip download --photo <photo id> --out audit/   # sav
 
 For an audit: `bill get` shows the bill with its `slip_photos`; `slip download`
 saves each photo so it can be read next to the bill.
+
+### slip finish
+
+One command for a slip whose spec has passed `bill preview`: `bill create`
+with the photo, then `bill pdf` with the **bill number** the save returned
+(never the bill id), then `bill get`, and a check of the saved bill against
+the spec. Each step is the CLI's own command, so it writes exactly what
+they write.
+
+```bash
+node scripts/admin-cli.mjs slip finish --spec 441.json --photo "BC Bills/441.jpeg"
+node scripts/admin-cli.mjs slip finish --spec 441.json --photo 441.jpeg --dry-run   # = bill create --dry-run
+```
+
+`--photo` is required (repeatable); `--app-url` is passed to `bill pdf`. A
+draft spec gets no PDF (`"pdf": "skipped: …"`). Output, compact:
+
+```json
+{
+  "billid": 488,
+  "bill_number": "FY26-000415",
+  "status": "finalized",
+  "pdf_url": "https://…/invoices/…pdf",
+  "slip_photos": ["<photo id>"],
+  "verify": {
+    "ok": true,
+    "mismatches": [],
+    "saved": {
+      "bill_number": "FY26-000415", "status": "finalized",
+      "customer": { "customerid": 453, "name": "Test Customer", "phone": "+919000000001" },
+      "date": "2026-10-22",
+      "lines": [{ "code": "BC252051", "color": "Mustard", "size": "FREE-SIZE", "qty": 1, "amount": 1800 }],
+      "total": 1800, "paid": 1800, "method": "Cash", "salespersons": ["Asha"]
+    }
+  },
+  "ok": true
+}
+```
+
+`verify` compares the saved bill with the spec: customer (id, phone, or the
+new customer's name), date (the shop's day), status (finalized / partial /
+draft), number of lines, each line's product code (and colour / size if
+the spec gives them), variant id or manual item, qty, alteration and amount
+(to the rupee, after the line's share of the balance discount), the total
+(`amount + balance_due`, not for a draft), the amount paid, the payment
+method and the salespersons. Each difference is one `mismatches` line, e.g.
+`items[0] amount: spec 1800, bill 1700`. Paying more than the line total
+(a preview warning) shows as a `total` mismatch.
+
+Exit code `1` with `"ok": false` when anything differs, or when a step after
+the save failed: the PDF (`pdf_error`, with `pdf_retry`, e.g.
+`bill pdf --number FY26-000415`), a photo (`slip_photo_errors`), a draft's
+salespersons or stock (`save_errors`), or `negative_stock`. None of these
+undo the bill; fix them and check with `bill get`. Warnings and applied
+`stock_adds` are listed too. A refused bill fails before anything is saved,
+as for `bill create`.
 
 ### Checked against the app
 

@@ -22,13 +22,14 @@ import {
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
 import { customerName, money } from "../../utility/activitySummary.js";
 import { todayIST } from "../../utility/dateFormat.js";
-import { findCustomerByPhone, createCustomer } from "./customers.js";
+import { findCustomerByPhone, createCustomer, findLikelyDuplicates, normalizePhone } from "./customers.js";
 import { normalizeProductCode } from "./products.js";
 import { createManualItem } from "./manualItems.js";
 import { logActivityWith } from "./activity.js";
 import { listSlipPhotos } from "./billSlipPhotos.js";
 import { BILL_STATUS, billStatusFields, isDraft } from "./billStatus.js";
 import { listSalespersons } from "./salespersons.js";
+import { addStockByCode, undoStockAdds } from "./variants.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -158,12 +159,33 @@ function parseDraftPayment(p) {
   return { method: String(p.method ?? "").trim(), amount, balance_due: balanceDue };
 }
 
+const STOCK_ADD_FIELDS = ["code", "size", "color", "qty", "new_variant"];
+
+// Stock to add before the bill, as `stock add` would (a piece on the shelf but not in the inventory).
+function parseStockAdds(list) {
+  if (list == null) return [];
+  if (!Array.isArray(list)) fail("stock_adds must be a list of { code, size, color, qty[, new_variant] }");
+  return list.map((a, i) => {
+    const at = `stock_adds[${i}]`;
+    if (!isObj(a)) fail(`${at} must be an object`);
+    checkKeys(a, STOCK_ADD_FIELDS, at);
+    for (const k of ["code", "size", "color"]) {
+      if (a[k] == null || String(a[k]).trim() === "") fail(`${at}.${k} is required`);
+    }
+    const qty = num(a.qty, `${at}.qty`);
+    if (qty <= 0) fail(`${at}.qty must be > 0`);
+    const newVariant = a.new_variant ?? false;
+    if (typeof newVariant !== "boolean") fail(`${at}.new_variant must be true or false`);
+    return { code: String(a.code), size: String(a.size).trim(), color: String(a.color).trim(), qty, new_variant: newVariant };
+  });
+}
+
 /** Validates the bill spec's shape (not its references). Returns a clean copy. */
 export function parseBillSpec(spec) {
   if (!isObj(spec)) fail("Bill spec must be a JSON object");
   checkKeys(
     spec,
-    ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "salespersons", "draft", "items"],
+    ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "salespersons", "draft", "stock_adds", "items"],
     "spec",
   );
   const draft = spec.draft ?? false;
@@ -215,6 +237,7 @@ export function parseBillSpec(spec) {
     skip_stock: Boolean(spec.skip_stock),
     draft,
     salespersons: salespersons.map((s) => (typeof s === "string" ? s.trim() : s)),
+    stock_adds: parseStockAdds(spec.stock_adds),
     items,
   };
 }
@@ -227,6 +250,12 @@ async function one(query) {
 
 const byName = (rows, col, name) =>
   rows.find((r) => String(r[col]).toLowerCase() === name.toLowerCase());
+
+// The `stock add` command that would let a refused line through, for when the piece is on the
+// shelf but not in the inventory. Size and colour in single quotes: a size like XL|42 has a pipe.
+const shellArg = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
+const stockAddCommand = ({ code, size, color, qty, newVariant = false }) =>
+  `stock add --code ${code} --size ${shellArg(size)} --color ${shellArg(color)} --qty ${qty}${newVariant ? " --new-variant" : ""}`;
 
 // Spec names (case-insensitive) or ids → the bill's salespersons, in spec
 // order without repeats. Only active ones, as the screen's selector offers.
@@ -285,13 +314,76 @@ async function planCustomer(client, input, creates) {
   return { customerid: null, first_name: row.first_name, last_name: row.last_name, phone: row.phone };
 }
 
+// A customer about to be created may already exist under the same name or with the slip's phone
+// misread by a digit. Warned, not refused: same names are common, and the operator decides.
+async function duplicateCustomerWarnings(client, row) {
+  const { same_name, near_phone } = await findLikelyDuplicates(client, row);
+  const who = (c) => `customer ${c.customerid} (${customerName(c)}, ${c.phone || "no phone"})`;
+  return [
+    ...same_name.map((c) => `Possible duplicate: ${who(c)} has the same name; if it is them, bill customer { id: ${c.customerid} } instead of creating a new customer`),
+    ...near_phone.map((c) => `Possible duplicate: ${who(c)} has a phone one digit off ${row.phone}; check the slip's phone`),
+  ];
+}
+
+// A variant a stock add will create has no id until it is created; the plan names it by this key.
+const NEW_VARIANT = "new:";
+const newVariantKey = (a) => `${NEW_VARIANT}${a.productid}:${a.color}/${a.size}`;
+
+// The spec's stock adds, checked and looked up exactly as `stock add --dry-run` does (same
+// function), each with the stock it leaves, counting an earlier add to the same variant.
+async function planStockAdds(client, adds) {
+  const planned = [];
+  for (const [i, a] of adds.entries()) {
+    let r;
+    try {
+      r = await addStockByCode(
+        client,
+        { code: a.code, size: a.size, color: a.color, quantity: a.qty, allowNewVariant: a.new_variant },
+        { dryRun: true },
+      );
+    } catch (e) {
+      if (e.name === "VariantInputError") fail(`stock_adds[${i}]: ${e.message}`);
+      throw e;
+    }
+    const earlier = planned.findLast((p) => p.productid === r.productid && p.size === r.size && p.color === r.color);
+    const before = earlier ? earlier.stock : r.stock_before;
+    planned.push({
+      productid: r.productid,
+      name: r.name,
+      size: r.size,
+      color: r.color,
+      variantid: earlier?.variantid ?? r.variantid ?? newVariantKey(r),
+      created: earlier ? false : r.created,
+      qty: a.qty,
+      stock_before: before,
+      stock: Math.round((before + a.qty) * 1000) / 1000,
+    });
+  }
+  return planned;
+}
+
+// Variant rows as they will be once the planned stock adds are applied: the stock they leave,
+// and the variants they create.
+function withStockAdds(rows, adds) {
+  const out = (rows ?? []).map((v) => ({ ...v }));
+  for (const a of adds) {
+    const v = out.find((r) => r.variantid === a.variantid);
+    if (v) v.stock = a.stock;
+    else out.push({ variantid: a.variantid, productid: a.productid, size: a.size, color: a.color, stock: a.stock });
+  }
+  return out;
+}
+
 // product + colour/size → the one matching variant; anything else is refused
 // with the options listed, so the slip line can be corrected.
-async function resolveProductRefs(client, items) {
+async function resolveProductRefs(client, items, stockAdds) {
   const codes = [...new Set(items.filter((i) => i.ref.kind === "product").map((i) => i.ref.code))];
-  const variants = codes.length
-    ? await one(client.from("productsizecolors").select("variantid, productid, size, color, stock").in("productid", codes))
-    : [];
+  const variants = withStockAdds(
+    codes.length
+      ? await one(client.from("productsizecolors").select("variantid, productid, size, color, stock").in("productid", codes))
+      : [],
+    stockAdds,
+  );
   const eqi = (a, b) => String(a ?? "").toLowerCase() === String(b ?? "").toLowerCase();
   return items.map((it, i) => {
     const at = `items[${i}]`;
@@ -304,10 +396,18 @@ async function resolveProductRefs(client, items) {
     const hits = all.filter((v) => (ref.color == null || eqi(v.color, ref.color)) && (ref.size == null || eqi(v.size, ref.size)));
     if (hits.length === 1) return { ...it, variantid: hits[0].variantid };
     const options = all.map((v) => `${v.color}/${v.size} (stock ${Number(v.stock)})`).join(", ");
+    if (hits.length > 1) fail(`${at}: ${ref.code} has ${hits.length} matching variants, add color/size; variants: ${options}`);
+    // A size or colour the line leaves out is the product's only one, if it has just one.
+    const only = (col) => {
+      const values = [...new Set(all.map((v) => v[col]))];
+      return values.length === 1 ? values[0] : `<${col}>`;
+    };
+    const fix = stockAddCommand({
+      code: ref.code, size: ref.size ?? only("size"), color: ref.color ?? only("color"), qty: it.qty, newVariant: true,
+    });
     fail(
-      hits.length === 0
-        ? `${at}: ${ref.code} has no variant ${[ref.color, ref.size].filter(Boolean).join("/")}; variants: ${options}`
-        : `${at}: ${ref.code} has ${hits.length} matching variants, add color/size; variants: ${options}`,
+      `${at}: ${ref.code} has no variant ${[ref.color, ref.size].filter(Boolean).join("/")}; variants: ${options}. ` +
+        `If the piece is on the shelf, add it: ${fix}`,
     );
     return null;
   });
@@ -353,10 +453,13 @@ export async function prepareBill(client, rawSpec) {
   const creates = { customer: null, manual_items: [] };
 
   const customer = await resolveCustomer(client, spec.customer, creates, warnings);
-  const items0 = await resolveProductRefs(client, spec.items);
+  if (creates.customer) warnings.push(...(await duplicateCustomerWarnings(client, creates.customer)));
+  // The bill is checked as if the stock adds were already applied (createBill applies them first).
+  const stockAdds = await planStockAdds(client, spec.stock_adds);
+  const items0 = await resolveProductRefs(client, spec.items, stockAdds);
   await planManualItems(client, items0, creates);
 
-  const variantIds = items0.filter((i) => i.variantid).map((i) => i.variantid);
+  const variantIds = items0.filter((i) => i.variantid && !i.variantid.startsWith(NEW_VARIANT)).map((i) => i.variantid);
   const manualIds = items0.filter((i) => i.manual_item_id && !i.newManual).map((i) => i.manual_item_id);
 
   const [methods, locations, salespersonRows, variants, manuals] = await Promise.all([
@@ -383,11 +486,12 @@ export async function prepareBill(client, rawSpec) {
   }
   const salespersons = resolveSalespersons(salespersonRows, spec.salespersons);
 
-  const variantById = Object.fromEntries((variants ?? []).map((v) => [v.variantid, v]));
+  const plannedVariants = withStockAdds(variants, stockAdds);
+  const variantById = Object.fromEntries(plannedVariants.map((v) => [v.variantid, v]));
   const manualById = Object.fromEntries(
     [...(manuals ?? []), ...creates.manual_items].map((m) => [m.manual_item_id, m]),
   );
-  const productIds = [...new Set((variants ?? []).map((v) => v.productid))];
+  const productIds = [...new Set(plannedVariants.map((v) => v.productid))];
   const products = productIds.length
     ? await one(client.from("products").select("productid, name, categoryid, retailprice, unit_type").in("productid", productIds))
     : [];
@@ -480,14 +584,16 @@ export async function prepareBill(client, rawSpec) {
     if (short.length) {
       fail(
         "Insufficient stock: " +
-          short.map((s) => `${s.productid} ${s.color}/${s.size} has ${s.stock_before}, needs ${s.stock_before - s.stock_after}`).join("; "),
+          short.map((s) => `${s.productid} ${s.color}/${s.size} has ${s.stock_before}, needs ${s.stock_before - s.stock_after}`).join("; ") +
+          ". If the pieces are on the shelf, add them: " +
+          short.map((s) => stockAddCommand({ code: s.productid, size: s.size, color: s.color, qty: Math.round(-s.stock_after * 1000) / 1000 })).join("; "),
       );
     }
   }
 
   const computed = computeBillTotals(items, [], [], 0, 0, DOC_TYPE);
   if (spec.draft) {
-    return prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, computed, warnings });
+    return prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, stockAdds, computed, warnings });
   }
 
   // A part-paid bill is priced at what the customer agreed to pay in all (the
@@ -551,6 +657,7 @@ export async function prepareBill(client, rawSpec) {
     bill,
     bill_items: billItems,
     stock,
+    stock_adds: stockAdds,
     totals: {
       mrp_total: totals.itemsSubtotal,
       line_discounts: totals.itemLevelDiscountTotal,
@@ -578,7 +685,7 @@ export async function prepareBill(client, rawSpec) {
 // discount and no payment check (finishing the draft does both), and the
 // payment fields as entered. The stock check before it is the same as for a
 // finalized bill, since a draft takes its stock when saved.
-function prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, computed, warnings }) {
+function prepareDraft(spec, { customer, creates, method, location, salespersons, items, stock, stockAdds, computed, warnings }) {
   const p = spec.payment;
   // The screen's "final amount": what the customer agreed to pay in all.
   const finalAmount = p.balance_due > 0 ? round2((p.amount ?? 0) + p.balance_due) : null;
@@ -609,6 +716,7 @@ function prepareDraft(spec, { customer, creates, method, location, salespersons,
     },
     bill_items: buildBillItemsPayload(null, items, 0, computed.overallDiscount, DOC_TYPE),
     stock,
+    stock_adds: stockAdds,
     totals: {
       mrp_total: computed.itemsSubtotal,
       line_discounts: computed.itemLevelDiscountTotal,
@@ -632,27 +740,55 @@ function prepareDraft(spec, { customer, creates, method, location, salespersons,
  * activity log is written after the save. negative_stock lists any variant the
  * save took below zero (only possible if stock moved since the preview).
  * A draft spec is saved as the screen saves a new draft instead (insertDraft).
+ * The spec's stock_adds are applied first, with `stock add`'s writes, so the bill's stock check
+ * sees them. They are separate writes, not part of the bill's transaction: if the bill then fails,
+ * they are undone (undoStockAdds) and the error says how that went.
  */
 export async function createBill(client, rawSpec, { dryRun = false, source = "via CLI" } = {}) {
   const planned = await prepareBill(client, rawSpec);
   if (dryRun) return { dry_run: true, ...planned };
 
   const created = { customer: null, manual_items: [] };
+  const stockAdded = [];
   try {
     const resolved = await createReferenced(client, rawSpec, planned, created, source);
-    // Re-resolve against the real rows (ids actually assigned) before writing.
-    const prepared = resolved === rawSpec ? planned : await prepareBill(client, resolved);
+    for (const a of planned.stock_adds) {
+      const r = await addStockByCode(client, {
+        code: a.productid, size: a.size, color: a.color, quantity: a.qty, allowNewVariant: a.created,
+      });
+      stockAdded.push({ ...r, qty: a.qty });
+    }
+    let prepared = planned;
+    if (resolved !== rawSpec || stockAdded.length) {
+      // Re-resolve against the real rows (ids actually assigned, stock added) before writing.
+      const billSpec = { ...resolved };
+      delete billSpec.stock_adds;
+      prepared = await prepareBill(client, billSpec);
+    }
     const save = prepared.status === BILL_STATUS.DRAFT ? insertDraft : insertBill;
-    return { ...(await save(client, prepared, source)), created };
+    const saved = await save(client, prepared, source);
+    // The re-resolved plan bills the new customer by id, so keep the first plan's warnings
+    // (possible duplicate customers) in the output too.
+    return {
+      ...saved,
+      warnings: [...new Set([...planned.warnings, ...saved.warnings])],
+      ...(stockAdded.length && { stock_adds: stockAdded }),
+      created,
+    };
   } catch (e) {
-    if (!created.customer && created.manual_items.length === 0) throw e;
-    const what = [
-      created.customer && `customer ${created.customer.customerid}`,
-      created.manual_items.length && `manual items ${created.manual_items.map((m) => m.manual_item_id).join(", ")}`,
-    ].filter(Boolean).join(" and ");
-    // Keep the type so input errors still exit 2; say what already exists so a
-    // re-run uses it instead of creating duplicates.
-    e.message = `${e.message} — NOTE: ${what} were already created; re-run with customer { id } / manual_item { id }`;
+    const notes = [];
+    if (stockAdded.length) notes.push(await undoStockAdds(client, stockAdded));
+    if (created.customer || created.manual_items.length) {
+      const what = [
+        created.customer && `customer ${created.customer.customerid}`,
+        created.manual_items.length && `manual items ${created.manual_items.map((m) => m.manual_item_id).join(", ")}`,
+      ].filter(Boolean).join(" and ");
+      // Say what already exists so a re-run uses it instead of creating duplicates.
+      notes.push(`NOTE: ${what} were already created; re-run with customer { id } / manual_item { id }`);
+    }
+    if (!notes.length) throw e;
+    // Keep the type so input errors still exit 2.
+    e.message = `${e.message} — ${notes.join(" — ")}`;
     throw e;
   }
 }
@@ -843,6 +979,114 @@ export async function getBill(client, { billid, billNumber }) {
     }),
     payments: payments ?? [],
     slip_photos: slipPhotos,
+  };
+}
+
+// Money that matches to the paisa, and a line's amount, checked to the rupee: lines land on or a
+// few paise above the slip's amount before the balance discount is spread over them.
+const PAISA = 0.01;
+const LINE_TOLERANCE = 1;
+
+/**
+ * Compares a saved bill (getBill) with the spec it was made from: customer, date, status, each
+ * line's item, qty, amount and alteration, the total, amount paid, payment method and
+ * salespersons. For `slip finish`, so a bill that is not what the slip says is caught at once.
+ * Returns { ok, mismatches, saved }: saved is a compact view of the bill as stored.
+ */
+export function checkBillAgainstSpec(rawSpec, bill) {
+  const spec = parseBillSpec(rawSpec);
+  const mismatches = [];
+  const differs = (what, want, got) => mismatches.push(`${what}: spec ${JSON.stringify(want)}, bill ${JSON.stringify(got)}`);
+  const eqi = (a, b) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+  const near = (a, b, tolerance) => Math.abs(Number(a) - Number(b)) <= tolerance + 1e-9;
+
+  const c = spec.customer;
+  const cust = bill.customer;
+  if (c.kind === "id" && bill.customerid !== c.customerid) differs("customer", c.customerid, bill.customerid);
+  if (c.kind === "phone" && cust?.phone !== normalizePhone(c.phone)) differs("customer phone", normalizePhone(c.phone), cust?.phone ?? null);
+  if (c.kind === "new") {
+    const want = customerName({ first_name: c.create.first, last_name: c.create.last });
+    if (!cust || !eqi(customerName(cust), want)) differs("customer", want, cust ? customerName(cust) : null);
+  }
+  if (c.kind === "none" && bill.customerid != null) differs("customer", null, bill.customerid);
+
+  const date = todayIST(new Date(bill.orderdate));
+  if (date !== spec.date) differs("date", spec.date, date);
+  const status = spec.draft ? BILL_STATUS.DRAFT : spec.payment.balance_due > 0 ? BILL_STATUS.PARTIAL : BILL_STATUS.FINALIZED;
+  if (bill.paymentstatus !== status) differs("status", status, bill.paymentstatus);
+
+  const lines = bill.items ?? [];
+  if (lines.length !== spec.items.length) differs("lines", spec.items.length, lines.length);
+  const paired = spec.items.map((it, i) => [it, lines[i]]).filter(([, line]) => line);
+  // Line totals the spec asks for (goods + alteration) against the bill's. A finalized bill's are
+  // lower by the balance discount that trims them to the amount agreed, spread over the lines in
+  // proportion, so each is compared after its share. A draft has no balance discount.
+  const agreed = round2((spec.payment.amount ?? 0) + spec.payment.balance_due);
+  const wantTotal = (it, line) => (it.amount ?? round2(Number(line.mrp) * it.qty)) + it.alteration_charge;
+  const sumWant = paired.reduce((s, [it, line]) => s + wantTotal(it, line), 0);
+  const gap = spec.draft ? 0 : Math.max(0, sumWant - agreed);
+  for (const [i, [it, line]] of paired.entries()) {
+    const at = `items[${i}]`;
+    const { ref } = it;
+    if (ref.kind === "product") {
+      if (line.product_code !== ref.code) differs(`${at} product`, ref.code, line.product_code);
+      if (ref.color != null && !eqi(line.color, ref.color)) differs(`${at} color`, ref.color, line.color ?? null);
+      if (ref.size != null && !eqi(line.size, ref.size)) differs(`${at} size`, ref.size, line.size ?? null);
+    } else if (ref.kind === "variant") {
+      if (line.variantid !== ref.variantid) differs(`${at} variantid`, ref.variantid, line.variantid);
+    } else if (ref.kind === "manual") {
+      if (line.product_code !== ref.id) differs(`${at} manual item`, ref.id, line.product_code);
+    } else if (!eqi(line.product_name, ref.create.name)) {
+      differs(`${at} manual item`, ref.create.name, line.product_name);
+    }
+    if (Number(line.quantity) !== it.qty) differs(`${at} qty`, it.qty, Number(line.quantity));
+    const alteration = Number(line.alteration_charge ?? 0);
+    if (!near(alteration, it.alteration_charge, PAISA)) differs(`${at} alteration_charge`, it.alteration_charge, alteration);
+    const want = wantTotal(it, line);
+    const share = sumWant > 0 ? gap * (want / sumWant) : 0;
+    if (!near(Number(line.total), want - share, LINE_TOLERANCE)) {
+      differs(`${at} amount`, want - it.alteration_charge, round2(Number(line.total) - alteration));
+    }
+  }
+
+  // A draft keeps its line totals as they stand; finishing it trims the total to what is paid.
+  if (!spec.draft && !near(bill.totalamount, agreed, PAISA)) differs("total", agreed, Number(bill.totalamount));
+  const paid = bill.payment_amount == null ? null : Number(bill.payment_amount);
+  const paidMatches = paid == null || spec.payment.amount == null ? paid === spec.payment.amount : near(paid, spec.payment.amount, PAISA);
+  if (!paidMatches) differs("paid", spec.payment.amount, paid);
+  if (!eqi(bill.payment_method, spec.payment.method)) differs("method", spec.payment.method || null, bill.payment_method ?? null);
+
+  const onBill = bill.salespersons ?? [];
+  const matches = (ref, s) => (typeof ref === "number" || /^\d+$/.test(ref) ? s.salesperson_id === Number(ref) : eqi(s.name, ref));
+  const sameSalespersons =
+    spec.salespersons.every((ref) => onBill.some((s) => matches(ref, s))) &&
+    onBill.every((s) => spec.salespersons.some((ref) => matches(ref, s)));
+  if (!sameSalespersons) differs("salespersons", spec.salespersons, onBill.map((s) => s.name));
+
+  return {
+    ok: mismatches.length === 0,
+    mismatches,
+    saved: {
+      bill_number: bill.bill_number,
+      status: bill.paymentstatus,
+      customer: cust ? { customerid: cust.customerid, name: customerName(cust), phone: cust.phone ?? null } : null,
+      date,
+      lines: lines.map((l) => {
+        const alteration = Number(l.alteration_charge ?? 0);
+        return {
+          code: l.product_code,
+          ...(l.color != null && { color: l.color }),
+          ...(l.size != null && { size: l.size }),
+          qty: Number(l.quantity),
+          amount: round2(Number(l.total) - alteration),
+          ...(alteration && { alteration_charge: alteration }),
+        };
+      }),
+      total: Number(bill.totalamount),
+      paid,
+      method: bill.payment_method ?? null,
+      salespersons: onBill.map((s) => s.name),
+    },
   };
 }
 

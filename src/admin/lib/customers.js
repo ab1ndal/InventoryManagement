@@ -101,6 +101,40 @@ export async function findCustomersByName(client, name) {
   return data ?? [];
 }
 
+/** The 90 phones one digit off a +91 mobile, as stored (+91 and 10 digits); [] for any other phone. */
+export function phonesOneDigitOff(phone) {
+  const national = /^\+91(\d{10})$/.exec(phone ?? "")?.[1];
+  if (!national) return [];
+  const out = [];
+  for (let i = 0; i < national.length; i++) {
+    for (const d of "0123456789") {
+      if (d !== national[i]) out.push(`+91${national.slice(0, i)}${d}${national.slice(i + 1)}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Existing customers a new customer row (buildCustomerPayload) may duplicate: the same first and
+ * last name, ignoring case (no last name matches no last name), and customers whose phone is one
+ * digit off its +91 phone (a misread digit on a slip). Read-only; two queries.
+ */
+export async function findLikelyDuplicates(client, { first_name, last_name, phone }) {
+  const columns = "customerid, first_name, last_name, phone";
+  // ilike with LIKE's wildcards escaped is a case-insensitive equals.
+  const exactly = (s) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
+  let byName = client.from("customers").select(columns).ilike("first_name", exactly(first_name));
+  byName = last_name ? byName.ilike("last_name", exactly(last_name)) : byName.or("last_name.is.null,last_name.eq.");
+  const near = phonesOneDigitOff(phone);
+  const [names, phones] = await Promise.all([
+    byName.order("customerid").limit(20),
+    near.length ? client.from("customers").select(columns).in("phone", near).order("customerid") : { data: [], error: null },
+  ]);
+  if (names.error) throw names.error;
+  if (phones.error) throw phones.error;
+  return { same_name: names.data ?? [], near_phone: phones.data ?? [] };
+}
+
 // The suffix says where the change came from (the screen's entry has none).
 const logCustomerCreated = (client, saved, source) =>
   logActivityWith(client, {
