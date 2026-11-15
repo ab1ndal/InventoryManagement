@@ -300,6 +300,29 @@ describe("describePage", () => {
     expect(page.bodyHtml).toContain('href="/product/BC1"');
   });
 
+  test("photos of a sold-out colour come after in-stock colours on product and listing pages", async () => {
+    const black = IMG.replace("a.webp", "black.webp");
+    const green = IMG.replace("a.webp", "green.webp");
+    const stocked = {
+      ...product,
+      productimages: [
+        { imageurl: black, displayorder: 0, productcolor: "Black" },
+        { imageurl: green, displayorder: 1, productcolor: "Peacock Green" },
+      ],
+      productsizecolors: [
+        { stock: 0, color: "Black" },
+        { stock: 1, color: "Peacock Green" },
+      ],
+    };
+    const html = renderHtml(shell, await describePage("product/BC1", rest([stocked])));
+    expect(html).toContain('href="https://www.bindalscreations.com/images/BC1/green_1200.webp" fetchpriority="high"');
+    const q = rest([stocked]);
+    const list = await describePage("collections/sarees", q);
+    expect(q.mock.calls[0][0]).toContain("productsizecolors(stock,color)");
+    expect(list.bodyHtml).toContain("/images/BC1/green_150.webp");
+    expect(list.bodyHtml).not.toContain("/images/BC1/black_150.webp");
+  });
+
   test("a size collection lists its products, with size codes safely encoded", async () => {
     const q = rest();
     const page = await describePage("collections/plus-size", q);

@@ -12,16 +12,22 @@ jest.mock("lib/supabaseClient", () => ({
 }));
 
 
-// Build a chainable mock for the batched query:
-//   supabase.from(...).select(...).in(...).order(...).order(...)
-// that resolves to { data, error }. Returns the spies so callers can assert.
-function mockTable({ data = null, error = null } = {}) {
+// Build chainable mocks for the two batched queries:
+//   supabase.from("productimages").select(...).in(...).order(...).order(...)
+//   supabase.from("productsizecolors").select(...).in(...)
+// each resolving to { data, error }. Returns the image-query spies so callers
+// can assert. `variants` defaults to none, which leaves displayorder alone.
+function mockTable({ data = null, error = null, variants = [], variantsError = null } = {}) {
   const orderInner = jest.fn(async () => ({ data, error }));
   const orderOuter = jest.fn(() => ({ order: orderInner }));
   const inFn = jest.fn(() => ({ order: orderOuter }));
   const select = jest.fn(() => ({ in: inFn }));
-  supabase.from.mockReturnValue({ select });
-  return { select, in: inFn, orderOuter, orderInner };
+  const variantIn = jest.fn(async () => ({ data: variants, error: variantsError }));
+  const variantSelect = jest.fn(() => ({ in: variantIn }));
+  supabase.from.mockImplementation((table) =>
+    table === "productimages" ? { select } : { select: variantSelect }
+  );
+  return { select, in: inFn, orderOuter, orderInner, variantSelect, variantIn };
 }
 
 beforeEach(() => {
@@ -113,10 +119,44 @@ describe("getProductImagePaths", () => {
       getProductImagePaths("PIMG_A"),
       getProductImagePaths("PIMG_B"),
     ]);
-    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledTimes(2);
     expect(inFn).toHaveBeenCalledWith("productid", ["PIMG_A", "PIMG_B"]);
     expect(a).toEqual(["https://x/a.png"]);
     expect(b).toEqual(["https://x/b.png"]);
+  });
+
+  it("puts photos of in-stock colours before sold-out ones, from one stock query per batch", async () => {
+    const { variantSelect, variantIn } = mockTable({
+      data: [
+        { productid: "PIMG_STOCK", imageurl: "https://x/black.webp", displayorder: 0, productcolor: "Black" },
+        { productid: "PIMG_STOCK", imageurl: "https://x/green.webp", displayorder: 1, productcolor: "Peacock Green" },
+      ],
+      variants: [
+        { productid: "PIMG_STOCK", color: "Black", stock: 0 },
+        { productid: "PIMG_STOCK", color: "Peacock Green", stock: 1 },
+      ],
+    });
+    expect(await getProductImagePaths("PIMG_STOCK")).toEqual([
+      "https://x/green.webp",
+      "https://x/black.webp",
+    ]);
+    expect(supabase.from).toHaveBeenCalledWith("productsizecolors");
+    expect(variantSelect).toHaveBeenCalledWith("productid,color,stock");
+    expect(variantIn).toHaveBeenCalledWith("productid", ["PIMG_STOCK"]);
+  });
+
+  it("keeps displayorder when the stock query fails", async () => {
+    mockTable({
+      data: [
+        { productid: "PIMG_NOSTOCK", imageurl: "https://x/black.webp", displayorder: 0, productcolor: "Black" },
+        { productid: "PIMG_NOSTOCK", imageurl: "https://x/green.webp", displayorder: 1, productcolor: "Green" },
+      ],
+      variantsError: { message: "boom" },
+    });
+    expect(await getProductImagePaths("PIMG_NOSTOCK")).toEqual([
+      "https://x/black.webp",
+      "https://x/green.webp",
+    ]);
   });
 
   it("filters out rows with a null imageurl", async () => {
@@ -142,7 +182,7 @@ describe("getProductImagePaths", () => {
     });
     await getProductImagePaths("PIMG_CACHE");
     await getProductImagePaths("PIMG_CACHE");
-    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledTimes(2);
   });
 });
 
