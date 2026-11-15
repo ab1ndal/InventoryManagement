@@ -123,6 +123,16 @@ describe("prepareBill — slip 387", () => {
     expect(p.stock[0]).toMatchObject({ change: 0, stock_after: 0 });
   });
 
+  it("says which stock add command would cover a shortfall", async () => {
+    const short = db({
+      "productsizecolors.select": { data: [{ variantid: VID, productid: "BC252051", size: "XL|42", color: "Mustard", stock: 1 }], error: null },
+    });
+    await expect(prepareBill(fakeSupabase(short), { ...slip387, items: [{ variantid: VID, qty: 3, amount: 5400 }] })).rejects.toThrow(
+      "Insufficient stock: BC252051 Mustard/XL|42 has 1, needs 3. If the pieces are on the shelf, add them: " +
+        "stock add --code BC252051 --size 'XL|42' --color 'Mustard' --qty 2",
+    );
+  });
+
   it("records whether the bill took stock, so cancelling it gives back only what left the shelf", async () => {
     expect((await prepareBill(fakeSupabase(db()), slip387)).bill.stock_reduced).toBe(true);
     expect((await prepareBill(fakeSupabase(db()), { ...slip387, skip_stock: true })).bill.stock_reduced).toBe(false);
@@ -483,6 +493,16 @@ describe("readable bill spec", () => {
     [{ product: "BC252051", colour: "Mustard", qty: 1 }, /unknown field\(s\) colour/],
   ])("refuses an unclear or misspelt line %#", async (item, msg) => {
     await expect(prepareBill(fakeSupabase(rdb()), spec({ items: [item] }))).rejects.toThrow(msg);
+  });
+
+  it.each([
+    // The product's only size fills in a size the line leaves out.
+    [{ product: "BC25051", color: "Pink", qty: 1 }, "stock add --code BC25051 --size 'FREE-SIZE' --color 'Pink' --qty 1 --new-variant"],
+    [{ product: "BC25051", color: "Pink", size: "XL|42", qty: 2 }, "stock add --code BC25051 --size 'XL|42' --color 'Pink' --qty 2 --new-variant"],
+    // More than one colour: left for the operator to fill in.
+    [{ product: "BC25051", size: "M", qty: 1 }, "stock add --code BC25051 --size 'M' --color '<color>' --qty 1 --new-variant"],
+  ])("says which stock add command would create a missing variant %#", async (item, command) => {
+    await expect(prepareBill(fakeSupabase(rdb()), spec({ items: [item] }))).rejects.toThrow(`If the piece is on the shelf, add it: ${command}`);
   });
 
   it("refuses an unknown phone unless asked to create the customer", async () => {

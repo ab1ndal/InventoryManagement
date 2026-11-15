@@ -402,6 +402,14 @@ How amounts become a bill, as on the screen:
   payment (`amount + balance_due`) off from the line total by more than ₹100, not enough
   stock (unless `skip_stock`), unknown customer, variant, manual item, method
   or location.
+- A line refused for a missing variant (`… has no variant Pink; …`) or for
+  not enough stock ends with the `stock add` command that would let it
+  through, for when the piece is on the shelf but not in the inventory:
+  `If the pieces are on the shelf, add them: stock add --code BC252051 --size 'XL|42' --color 'Mustard' --qty 2`
+  (the shortfall), or the same with `--new-variant` and the line's quantity
+  for a missing variant. A size or colour the line leaves out is filled in
+  when the product has only one, else left as `'<size>'` / `'<color>'` to
+  fill in. Check the slip and shelf before running it.
 - Warned (non-blocking): a line discount over 30% (the screen asks to
   confirm), paying more than the total (recorded as is).
 - No `bill_payments` row: like the screen, a fully paid bill records payment

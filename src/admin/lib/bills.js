@@ -228,6 +228,12 @@ async function one(query) {
 const byName = (rows, col, name) =>
   rows.find((r) => String(r[col]).toLowerCase() === name.toLowerCase());
 
+// The `stock add` command that would let a refused line through, for when the piece is on the
+// shelf but not in the inventory. Size and colour in single quotes: a size like XL|42 has a pipe.
+const shellArg = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
+const stockAddCommand = ({ code, size, color, qty, newVariant = false }) =>
+  `stock add --code ${code} --size ${shellArg(size)} --color ${shellArg(color)} --qty ${qty}${newVariant ? " --new-variant" : ""}`;
+
 // Spec names (case-insensitive) or ids → the bill's salespersons, in spec
 // order without repeats. Only active ones, as the screen's selector offers.
 export function resolveSalespersons(rows, refs) {
@@ -304,10 +310,18 @@ async function resolveProductRefs(client, items) {
     const hits = all.filter((v) => (ref.color == null || eqi(v.color, ref.color)) && (ref.size == null || eqi(v.size, ref.size)));
     if (hits.length === 1) return { ...it, variantid: hits[0].variantid };
     const options = all.map((v) => `${v.color}/${v.size} (stock ${Number(v.stock)})`).join(", ");
+    if (hits.length > 1) fail(`${at}: ${ref.code} has ${hits.length} matching variants, add color/size; variants: ${options}`);
+    // A size or colour the line leaves out is the product's only one, if it has just one.
+    const only = (col) => {
+      const values = [...new Set(all.map((v) => v[col]))];
+      return values.length === 1 ? values[0] : `<${col}>`;
+    };
+    const fix = stockAddCommand({
+      code: ref.code, size: ref.size ?? only("size"), color: ref.color ?? only("color"), qty: it.qty, newVariant: true,
+    });
     fail(
-      hits.length === 0
-        ? `${at}: ${ref.code} has no variant ${[ref.color, ref.size].filter(Boolean).join("/")}; variants: ${options}`
-        : `${at}: ${ref.code} has ${hits.length} matching variants, add color/size; variants: ${options}`,
+      `${at}: ${ref.code} has no variant ${[ref.color, ref.size].filter(Boolean).join("/")}; variants: ${options}. ` +
+        `If the piece is on the shelf, add it: ${fix}`,
     );
     return null;
   });
@@ -480,7 +494,9 @@ export async function prepareBill(client, rawSpec) {
     if (short.length) {
       fail(
         "Insufficient stock: " +
-          short.map((s) => `${s.productid} ${s.color}/${s.size} has ${s.stock_before}, needs ${s.stock_before - s.stock_after}`).join("; "),
+          short.map((s) => `${s.productid} ${s.color}/${s.size} has ${s.stock_before}, needs ${s.stock_before - s.stock_after}`).join("; ") +
+          ". If the pieces are on the shelf, add them: " +
+          short.map((s) => stockAddCommand({ code: s.productid, size: s.size, color: s.color, qty: Math.round(-s.stock_after * 1000) / 1000 })).join("; "),
       );
     }
   }
