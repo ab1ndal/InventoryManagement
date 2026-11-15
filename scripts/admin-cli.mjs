@@ -33,7 +33,7 @@ process.on("warning", (w) => {
 const { findCustomerByPhone, findCustomersByName, createCustomer, CustomerInputError } = await import(
   "../src/admin/lib/customers.js"
 );
-const { findProducts, searchProducts, listCategories, ProductInputError } = await import(
+const { findProducts, nearProducts, searchProducts, listCategories, ProductInputError } = await import(
   "../src/admin/lib/products.js"
 );
 const { findManualItems, createManualItem, ManualItemInputError } = await import(
@@ -148,6 +148,19 @@ const COMMANDS = {
         return findProducts(client, o.code);
       },
     },
+    near: {
+      usage: "product near --code <written code> [--mrp <slip rate>] [--color <text>] [--in-stock]",
+      options: {
+        code: { type: "string" },
+        mrp: { type: "string" },
+        color: { type: "string" },
+        "in-stock": { type: "boolean" },
+      },
+      run: (client, o) => {
+        if (!o.code) throw new UsageError("--code is required");
+        return nearProducts(client, { code: o.code, mrp: o.mrp, color: o.color, inStock: Boolean(o["in-stock"]) });
+      },
+    },
     search: {
       usage:
         "product search [--name <text>] [--category <id>] [--cost <Z-code|amount>] [--mrp <amount>] [--color <text>] [--in-stock]",
@@ -197,7 +210,7 @@ const COMMANDS = {
     },
     create: {
       usage:
-        "manual-item create --name <text> --category <id> --mrp <amount> --cost <Z-code|amount> [--size <text>] [--color <text>] [--dry-run]",
+        "manual-item create --name <text> --category <id> --mrp <amount> [--cost <Z-code|amount>] [--size <text>] [--color <text>] [--dry-run]",
       options: {
         name: { type: "string" },
         category: { type: "string" },
