@@ -99,9 +99,13 @@ const SEARCH_RESULTS = 25;
  * substring, category id, cost (Z-code like "ZBEAF" or a number), MRP, and
  * variant colour substring / in-stock. Returns up to 25 products in
  * findProducts' shape; with colour/in-stock, only matching variants are kept
- * and products left with none are dropped.
+ * and products left with none are dropped. With `near` (the code written on a
+ * slip), each product gets `code_distance` (digits to change, add or drop to
+ * reach its code) and the closest codes come first: the owner's way of finding
+ * a miswritten code is a category + MRP listing scanned for a code a few
+ * digits off.
  */
-export async function searchProducts(client, { name, categoryid, cost, mrp, color, inStock = false } = {}) {
+export async function searchProducts(client, { name, categoryid, cost, mrp, color, inStock = false, near } = {}) {
   const has = (v) => v != null && String(v).trim() !== "";
   if (![name, categoryid, cost, mrp].some(has)) {
     throw new ProductInputError("Give at least one of name, category, cost or MRP");
@@ -124,7 +128,13 @@ export async function searchProducts(client, { name, categoryid, cost, mrp, colo
 
   const colorNeedle = has(color) ? String(color).trim().toLowerCase() : null;
   const filtering = colorNeedle !== null || inStock;
-  return (await withVariants(client, data ?? []))
+  const written = has(near) ? normalizeProductCode(near) : null;
+  const rows = written
+    ? (data ?? [])
+        .map((p) => ({ ...p, code_distance: editDistance(written, p.productid) }))
+        .sort((a, b) => a.code_distance - b.code_distance || a.productid.localeCompare(b.productid))
+    : data ?? [];
+  return (await withVariants(client, rows))
     .map((p) =>
       filtering
         ? {
@@ -139,6 +149,19 @@ export async function searchProducts(client, { name, categoryid, cost, mrp, colo
     )
     .filter((p) => !filtering || p.variants.length > 0)
     .slice(0, SEARCH_RESULTS);
+}
+
+// Characters to change, add or drop to turn one code into the other (Levenshtein).
+export function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
 }
 
 // Digit pairs that handwriting on slips mixes up most (slip misreads so far).

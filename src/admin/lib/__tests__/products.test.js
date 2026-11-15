@@ -1,4 +1,4 @@
-import { normalizeProductCode, findProducts, listCategories, searchProducts, nearProducts, ProductInputError } from "../products";
+import { normalizeProductCode, findProducts, listCategories, searchProducts, nearProducts, editDistance, ProductInputError } from "../products";
 import { fakeSupabase } from "../testing/fakeSupabase";
 
 const saree = {
@@ -108,6 +108,35 @@ describe("searchProducts", () => {
     expect(out[0]).toMatchObject({ productid: "BC2", variants: [{ variantid: "b" }] });
   });
 
+  it("with near, puts the codes closest to the written one first", async () => {
+    const c = fakeSupabase({
+      "products_admin.select": {
+        data: [
+          { ...saree, productid: "BC251111" },
+          { ...saree, productid: "BC253249" },
+          { ...saree, productid: "BC25324" },
+          { ...saree, productid: "BC253148" },
+        ],
+        error: null,
+      },
+      "productsizecolors.select": { data: [], error: null },
+      "categories.select": { data: [], error: null },
+    });
+    const out = await searchProducts(c, { categoryid: "SA", mrp: "2195", near: "bc-253248" });
+    expect(out.map((p) => [p.productid, p.code_distance])).toEqual([
+      ["BC253148", 1],
+      ["BC25324", 1],
+      ["BC253249", 1],
+      ["BC251111", 4],
+    ]);
+  });
+
+  it("without near, keeps product order and adds no distance", async () => {
+    const out = await searchProducts(client(), { categoryid: "SA" });
+    expect(out.map((p) => p.productid)).toEqual(["BC1", "BC2"]);
+    expect(out[0]).not.toHaveProperty("code_distance");
+  });
+
   it.each([
     [{}, /at least one of name, category, cost or MRP/],
     [{ color: "red" }, /at least one of/],
@@ -193,5 +222,17 @@ describe("nearProducts", () => {
     [{ code: "BC25134", mrp: "abc" }, /Invalid MRP/],
   ])("rejects bad input %#", async (input, msg) => {
     await expect(nearProducts(client([], []), input)).rejects.toThrow(msg);
+  });
+});
+
+describe("editDistance", () => {
+  it.each([
+    ["BC253248", "BC253248", 0],
+    ["BC253248", "BC253249", 1],
+    ["BC251868", "BC257868", 1],
+    ["BC25134", "BC251134", 1],
+    ["BC253248", "BC235248", 2],
+  ])("%s → %s is %d", (a, b, d) => {
+    expect(editDistance(a, b)).toBe(d);
   });
 });

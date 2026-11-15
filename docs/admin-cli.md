@@ -175,7 +175,9 @@ against the code written on a slip. Variants are in the app's size order.
 
 When the code written on a slip disagrees with the slip's rate or colour, a
 digit was probably miswritten or misread. Lists the products one digit off the
-written code that match the slip. Read-only.
+written code that match the slip, across all categories. Read-only. When the
+category is known, `product search --category … --mrp … --near <code>` comes
+first; this is the fallback when that finds nothing.
 
 ```bash
 node scripts/admin-cli.mjs product near --code BC253248 --mrp 2195 --color fawn --in-stock
@@ -226,11 +228,22 @@ node scripts/admin-cli.mjs product search --category SA --cost ZAAGB --mrp 2395 
 | `--mrp` | exact retail price |
 | `--color` | substring of a variant colour; keeps only matching variants |
 | `--in-stock` | keeps only variants with stock > 0 |
+| `--near` | the code written on the slip: each product gets `code_distance` (digits to change, add or drop to reach its code) and the closest codes come first |
 
 Output: up to 25 products in the same shape as `product find`. With
 `--color` / `--in-stock`, products left with no matching variant are dropped.
 A cost code alone is rarely unique (three sarees share `ZAAGB` at ₹2395), so
 combine it with category, MRP and colour.
+
+A slip whose code does not match its rate or description: search the slip's
+category and MRP (and cost code, if written) with `--near <written code>`.
+The miswritten code is usually at the top, one or two digits off. The ranking
+covers the first 200 products by code that match the filters, enough for any
+category + MRP listing.
+
+```bash
+node scripts/admin-cli.mjs product search --category RMS --mrp 2195 --cost ZAAGB --near BC253248
+```
 
 ## category list
 

@@ -163,7 +163,7 @@ const COMMANDS = {
     },
     search: {
       usage:
-        "product search [--name <text>] [--category <id>] [--cost <Z-code|amount>] [--mrp <amount>] [--color <text>] [--in-stock]",
+        "product search [--name <text>] [--category <id>] [--cost <Z-code|amount>] [--mrp <amount>] [--color <text>] [--in-stock] [--near <written code>]",
       options: {
         name: { type: "string" },
         category: { type: "string" },
@@ -171,6 +171,7 @@ const COMMANDS = {
         mrp: { type: "string" },
         color: { type: "string" },
         "in-stock": { type: "boolean" },
+        near: { type: "string" },
       },
       run: (client, o) =>
         searchProducts(client, {
@@ -180,6 +181,7 @@ const COMMANDS = {
           mrp: o.mrp,
           color: o.color,
           inStock: Boolean(o["in-stock"]),
+          near: o.near,
         }),
     },
   },
