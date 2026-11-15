@@ -1060,12 +1060,12 @@ describe("checkBillAgainstSpec (slip finish)", () => {
   });
 });
 
-describe("stock_adds (stock add before the bill)", () => {
+describe("stock_adds (stock added with the bill)", () => {
   const SHIRT = { productid: "BC25385", name: "Cotton Self-Shirt", categoryid: "SHT", fabric: null, purchaseprice: 567, retailprice: 1495, unit_type: "piece" };
   const writesOf = (client) => client.calls.filter((c) => c.op !== "select").map((c) => c.fn ?? `${c.table}.${c.op}`);
   const filterOf = (call, kind, col) => call.filters?.find((f) => f[0] === kind && f[1] === col)?.[2];
   // The shelf as the database holds it: stock_adjust, insert and delete change it.
-  const shelf = ({ billSave, deleteError, undoError } = {}) => {
+  const shelf = ({ billSave, atomicSave, draftInsert, deleteError, undoError } = {}) => {
     const variants = [{ variantid: "v-xl", productid: "BC25385", size: "XL|42", color: "Pink", stock: 0 }];
     const client = fakeSupabase(db({
       "products_admin.select": { data: [SHIRT], error: null },
@@ -1099,6 +1099,17 @@ describe("stock_adds (stock add before the bill)", () => {
         return { data: v.stock, error: null };
       },
       "rpc.bill_save": billSave ?? { data: { billid: 903, bill_number: "FY26-000339", negative_stock: [] }, error: null },
+      // One transaction, as the database runs it: on an error nothing it would have added stays.
+      "rpc.bill_save_with_stock_adds": (call) => {
+        if (atomicSave) return atomicSave;
+        for (const a of call.args.p_stock_adds) {
+          if (a.create) variants.push({ variantid: a.variantid, productid: a.productid, size: a.size, color: a.color, stock: a.qty });
+          else variants.find((v) => v.variantid === a.variantid).stock += a.qty;
+        }
+        return { data: { billid: 903, bill_number: "FY26-000339", negative_stock: [] }, error: null };
+      },
+      "bills.insert": draftInsert ?? { data: { billid: 904, bill_number: "FY26-000340" }, error: null },
+      "bill_items.insert": { data: null, error: null },
       "activity_log.insert": { data: null, error: null },
     }));
     return { client, variants };
@@ -1163,32 +1174,86 @@ describe("stock_adds (stock add before the bill)", () => {
     expect(p.stock[0]).toMatchObject({ stock_before: 3, stock_after: 2 });
   });
 
-  it("create adds the stock with stock add's writes, then saves the bill", async () => {
+  it("create sends the stock adds and the bill in one call, then logs both", async () => {
     const { client, variants } = shelf();
     const out = await createBill(client, shirtSpec({ stock_adds: [addXL] }));
-    expect(writesOf(client)).toEqual(["stock_adjust", "activity_log.insert", "bill_save", "activity_log.insert"]);
-    expect(client.calls.find((c) => c.fn === "stock_adjust").args).toEqual({ p_variant: "v-xl", p_delta: 1, p_reason: "manual_edit", p_ref: "BC25385" });
-    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload.items[0].variantid).toBe("v-xl");
+    expect(writesOf(client)).toEqual(["bill_save_with_stock_adds", "activity_log.insert", "activity_log.insert"]);
+    const { args } = client.calls.find((c) => c.fn === "bill_save_with_stock_adds");
+    expect(args.p_stock_adds).toEqual([{ variantid: "v-xl", productid: "BC25385", size: "XL|42", color: "Pink", qty: 1, create: false }]);
+    expect(args.p_op).toBe("finalize_create");
+    expect(args.p_payload.items[0].variantid).toBe("v-xl");
+    expect(client.calls.filter((c) => c.table === "activity_log").map((c) => c.row.summary)[0]).toBe(
+      "Increased stock of Pink / XL|42, product BC25385 — Cotton Self-Shirt: 0 → 1 (+1) (via CLI)",
+    );
     expect(out.stock_adds).toEqual([expect.objectContaining({ variantid: "v-xl", created: false, stock_before: 0, stock: 1, qty: 1 })]);
+    expect(out.bill_number).toBe("FY26-000339");
     expect(variants[0].stock).toBe(1);
   });
 
-  it("create makes the new variant first and bills it by its real id", async () => {
+  it("create names a new variant by a real id, in the add and in the bill line", async () => {
     const { client, variants } = shelf();
     const out = await createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }));
-    expect(writesOf(client)).toEqual(["productsizecolors.insert", "activity_log.insert", "bill_save", "activity_log.insert"]);
-    const id = variants[1].variantid;
+    const { args } = client.calls.find((c) => c.fn === "bill_save_with_stock_adds");
+    const id = args.p_stock_adds[0].variantid;
     expect(id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(client.calls.find((c) => c.fn === "bill_save").args.p_payload.items[0].variantid).toBe(id);
+    expect(args.p_stock_adds[0]).toMatchObject({ productid: "BC25385", size: "3XL|46", color: "Pink", qty: 1, create: true });
+    expect(args.p_payload.items[0].variantid).toBe(id);
+    expect(variants[1]).toMatchObject({ variantid: id, stock: 1 });
     expect(out.stock_adds[0]).toMatchObject({ variantid: id, created: true });
+    expect(client.calls.find((c) => c.table === "activity_log").row.summary).toBe(
+      "Added variant Pink / 3XL|46 to product BC25385 — Cotton Self-Shirt (stock 1) (via CLI)",
+    );
   });
 
-  it("takes the stock back when the bill then fails, and says so", async () => {
-    const { client, variants } = shelf({ billSave: failingSave });
-    await expect(createBill(client, shirtSpec({ stock_adds: [addXL] }))).rejects.toThrow(
+  it("two adds to the same new variant share its id: the first creates it, the second adds to it", async () => {
+    const { client } = shelf();
+    await createBill(client, shirtSpec({ stock_adds: [add3XL, { ...add3XL, qty: 2 }], items: shirt3XL }));
+    const adds = client.calls.find((c) => c.fn === "bill_save_with_stock_adds").args.p_stock_adds;
+    expect(adds.map((a) => [a.create, a.qty])).toEqual([[true, 1], [false, 2]]);
+    expect(adds[1].variantid).toBe(adds[0].variantid);
+  });
+
+  it("a part-paid bill with stock adds goes through the same one call", async () => {
+    const { client } = shelf();
+    await createBill(client, shirtSpec({ stock_adds: [addXL], payment: { method: "Cash", amount: 500, balance_due: 995 } }));
+    expect(client.calls.find((c) => c.fn === "bill_save_with_stock_adds").args.p_op).toBe("partial_create");
+  });
+
+  it("a bill without stock adds still uses bill_save", async () => {
+    const { client, variants } = shelf();
+    variants[0].stock = 1;
+    await createBill(client, shirtSpec());
+    expect(writesOf(client)).toEqual(["bill_save", "activity_log.insert"]);
+  });
+
+  it("a failed save leaves no stock added and nothing to undo", async () => {
+    const { client, variants } = shelf({ atomicSave: failingSave });
+    await expect(createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(/^Failed to save bill: db down$/);
+    expect(writesOf(client)).toEqual(["bill_save_with_stock_adds"]);
+    expect(variants.map((v) => v.variantid)).toEqual(["v-xl"]);
+  });
+
+  // A draft has no bill_save op: its adds are separate writes, undone if the draft fails.
+  const draftSpec = (o) => shirtSpec({ draft: true, ...o });
+  const failingDraft = { data: null, error: { message: "db down" } };
+
+  it("a draft adds the stock with stock add's writes, then saves the draft", async () => {
+    const { client, variants } = shelf();
+    await createBill(client, draftSpec({ stock_adds: [addXL] }));
+    expect(writesOf(client)).toEqual([
+      "stock_adjust", "activity_log.insert", "bills.insert", "bill_items.insert", "stock_adjust", "activity_log.insert",
+    ]);
+    expect(client.calls.find((c) => c.fn === "stock_adjust").args).toEqual({ p_variant: "v-xl", p_delta: 1, p_reason: "manual_edit", p_ref: "BC25385" });
+    // Added for the slip, then taken by the draft.
+    expect(variants[0].stock).toBe(0);
+  });
+
+  it("takes the stock back when the draft then fails, and says so", async () => {
+    const { client, variants } = shelf({ draftInsert: failingDraft });
+    await expect(createBill(client, draftSpec({ stock_adds: [addXL] }))).rejects.toThrow(
       "Failed to save bill: db down — stock adds undone: BC25385 Pink / XL|42 +1 stock taken back",
     );
-    expect(writesOf(client)).toEqual(["stock_adjust", "activity_log.insert", "bill_save", "stock_adjust", "activity_log.insert"]);
+    expect(writesOf(client)).toEqual(["stock_adjust", "activity_log.insert", "bills.insert", "stock_adjust", "activity_log.insert"]);
     expect(client.calls.filter((c) => c.fn === "stock_adjust").map((c) => c.args.p_delta)).toEqual([1, -1]);
     expect(client.calls.at(-1).row.summary).toBe(
       "Decreased stock of Pink / XL|42, product BC25385 — Cotton Self-Shirt: 1 → 0 (-1), added for a bill that failed (via CLI)",
@@ -1196,9 +1261,9 @@ describe("stock_adds (stock add before the bill)", () => {
     expect(variants[0].stock).toBe(0);
   });
 
-  it("deletes a variant it created when the bill then fails", async () => {
-    const { client, variants } = shelf({ billSave: failingSave });
-    await expect(createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
+  it("deletes a variant it created when the draft then fails", async () => {
+    const { client, variants } = shelf({ draftInsert: failingDraft });
+    await expect(createBill(client, draftSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
       "Failed to save bill: db down — stock adds undone: BC25385 Pink / 3XL|46 +1 variant removed",
     );
     expect(writesOf(client).slice(-2)).toEqual(["productsizecolors.delete", "activity_log.insert"]);
@@ -1206,16 +1271,16 @@ describe("stock_adds (stock add before the bill)", () => {
   });
 
   it("keeps a created variant the database will not delete, and takes its stock back", async () => {
-    const { client, variants } = shelf({ billSave: failingSave, deleteError: { message: "violates foreign key constraint" } });
-    await expect(createBill(client, shirtSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
+    const { client, variants } = shelf({ draftInsert: failingDraft, deleteError: { message: "violates foreign key constraint" } });
+    await expect(createBill(client, draftSpec({ stock_adds: [add3XL], items: shirt3XL }))).rejects.toThrow(
       /stock adds undone: BC25385 Pink \/ 3XL\|46 \+1 stock taken back, variant kept \(violates foreign key constraint\)/,
     );
     expect(variants[1]).toMatchObject({ size: "3XL|46", stock: 0 });
   });
 
   it("names an add it could not undo", async () => {
-    const { client } = shelf({ billSave: failingSave, undoError: { message: "permission denied" } });
-    await expect(createBill(client, shirtSpec({ stock_adds: [addXL] }))).rejects.toThrow(
+    const { client } = shelf({ draftInsert: failingDraft, undoError: { message: "permission denied" } });
+    await expect(createBill(client, draftSpec({ stock_adds: [addXL] }))).rejects.toThrow(
       "Failed to save bill: db down — stock adds NOT all undone, fix them in the inventory editor: " +
         "BC25385 Pink / XL|42 +1 (could not take the stock back: permission denied)",
     );
