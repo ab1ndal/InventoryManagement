@@ -1,7 +1,7 @@
 // Pure helpers for exchange credit computation and returnable-qty logic.
 // Consumed by ExchangePage, BillingForm, Summary, and unit tests.
 
-import { round2 } from "./billUtils";
+import { round2 } from "./billUtils.js";
 
 export const EXCHANGE_WINDOW_DAYS = 7;
 
