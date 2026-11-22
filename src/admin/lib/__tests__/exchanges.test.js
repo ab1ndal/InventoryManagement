@@ -123,7 +123,7 @@ describe("prepareBill with an exchange", () => {
         p_returndate: "2026-11-14T12:00:00",
         p_items: [{
           bill_item_id: 5001, quantity: 1, credit_amount: 1500, reason: "size",
-          product_name: "Cotton-Kurti", product_code: "BC26001", variantid: SRC_VID, manual_item_id: null,
+          product_name: "Cotton-Kurti", product_code: "BC26001", variantid: SRC_VID,
         }],
       },
       outside_window: null,
@@ -262,18 +262,22 @@ describe("prepareBill with an exchange", () => {
     ]);
   });
 
-  it("leaves a returned manual item's stock alone, as the Exchange page does (sales never take it)", async () => {
+  it("puts a returned manual item back in stock; exchange_record finds it from the line", async () => {
     const manualLine = { ...sourceLine, variantid: null, product_code: "BCX26001", product_name: "Suit" };
     const p = await prepareBill(
       fakeSupabase(db({
         "bill_items.select": { data: [manualLine], error: null },
-        "manual_items.select": { data: [{ manual_item_id: "BCX26001", size: "38", color: "Black" }], error: null },
+        "manual_items.select": { data: [{ manual_item_id: "BCX26001", size: "38", color: "Black", stock: 0 }], error: null },
       })),
       { ...exchangeSlip, exchange: { bill: "FY26-000123", items: [{ product: "BCX26001", qty: 1 }] } },
     );
-    expect(p.exchange.returned[0]).toMatchObject({ code: "BCX26001", size: "38", color: "Black", stock: null });
-    expect(p.exchange.record.p_items[0]).toMatchObject({ variantid: null, manual_item_id: null });
-    expect(p.warnings).toEqual([expect.stringMatching(/manual item; its stock is not changed \(a sale never takes manual-item stock/)]);
+    expect(p.exchange.returned[0]).toMatchObject({
+      code: "BCX26001", size: "38", color: "Black",
+      stock: { manual_item_id: "BCX26001", stock_before: 0, stock_after: 1 },
+    });
+    expect(p.exchange.record.p_items[0]).toMatchObject({ variantid: null, product_code: "BCX26001" });
+    expect(p.exchange.record.p_items[0]).not.toHaveProperty("manual_item_id");
+    expect(p.warnings).toEqual([]);
   });
 });
 

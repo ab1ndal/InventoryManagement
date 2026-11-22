@@ -24,9 +24,8 @@ const withZCode = (row) => ({
 
 /**
  * Manual items matching all given filters, newest first (max 20):
- * code = exact id (case-insensitive), name = substring, inStock = stock > 0.
- * Note the app never decrements manual-item stock on sale, so stock > 0 does
- * not prove the piece is unsold.
+ * code = exact id (case-insensitive), name = substring, inStock = stock > 0
+ * (a sale takes manual-item stock, so in stock = not sold yet).
  */
 export async function findManualItems(client, { code, name, inStock = false } = {}) {
   if (!blankToNull(code) && !blankToNull(name)) {
@@ -63,8 +62,10 @@ export function defaultManualItemCost(mrp) {
 /**
  * Create a manual item. Category must exist; cost is a Z-code (as on price
  * tags, e.g. "ZAAGB") or a plain number, and must decode to > 0, as the form
- * requires. No cost → defaultManualItemCost(mrp). With dryRun, returns
- * { dry_run, would_insert } and writes nothing.
+ * requires. No cost → defaultManualItemCost(mrp). stock, when given, is what
+ * exists (a bill line's quantity: 3.5 for 3.5 m of fabric); left out, the
+ * column default 1. With dryRun, returns { dry_run, would_insert } and writes
+ * nothing.
  */
 export async function createManualItem(
   client,
@@ -89,6 +90,11 @@ export async function createManualItem(
     );
   }
 
+  const stock = input.stock == null ? null : Number(input.stock);
+  if (stock !== null && !(Number.isFinite(stock) && stock > 0)) {
+    throw new ManualItemInputError(`Invalid stock "${input.stock}"`);
+  }
+
   const { data: category, error: catErr } = await client
     .from("categories")
     .select("categoryid")
@@ -107,6 +113,7 @@ export async function createManualItem(
     color: blankToNull(input.color),
     purchase_price: purchasePrice,
     mrp,
+    ...(stock !== null ? { stock } : {}),
   };
   if (dryRun) return { dry_run: true, would_insert: row };
 

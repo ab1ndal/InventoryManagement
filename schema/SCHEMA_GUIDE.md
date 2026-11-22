@@ -40,7 +40,7 @@
 | `salespersons` | `salespersons.sql` | Staff who make sales. Has name, hire date, active flag. |
 | `saleslocations` | `saleslocations.sql` | Lookup: physical or virtual sale venue (e.g., "Store", "Exhibition"). |
 | `salesmethods` | `salesmethods.sql` | Lookup: how the sale happened (e.g., "Walk-in", "Instagram"). |
-| `manual_items` | `manual_items.sql` | Ad-hoc items not in product inventory (e.g., stitching supplies). Have their own ID prefix, category, size, color, MRP. Used as `bill_items` without a `variantid`. |
+| `manual_items` | `manual_items.sql` | Ad-hoc items not in product inventory (e.g., stitching supplies). Have their own ID prefix, category, size, color, MRP. Used as `bill_items` without a `variantid` (linked by `product_code`). `stock` is numeric (metres for fabric) and moves with sales, cancels, edits and exchanges (`migration_manual_item_stock.sql`). |
 
 ### Customers & Loyalty
 

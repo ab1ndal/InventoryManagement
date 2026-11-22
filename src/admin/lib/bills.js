@@ -52,6 +52,9 @@ const PAYMENT_TOLERANCE = 100;
 const DOC_TYPE = "bos";
 const DEFAULT_LOCATION = "Walk-In";
 
+// Stock is numeric(10,3), so metre sums are kept to 3 places (0.1 + 0.2 is 0.3).
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
 const fail = (msg) => {
   throw new BillInputError(msg);
 };
@@ -463,7 +466,7 @@ async function planManualItems(client, items, creates) {
     try {
       ({ would_insert: row } = await createManualItem(
         client,
-        { name: c.name, categoryid: c.category, mrp: c.mrp, cost: c.cost, size: c.size, color: c.color },
+        { name: c.name, categoryid: c.category, mrp: c.mrp, cost: c.cost, size: c.size, color: c.color, stock: it.qty },
         { dryRun: true },
       ));
     } catch (e) {
@@ -514,7 +517,7 @@ export async function prepareBill(client, rawSpec) {
       ? one(client.from("productsizecolors").select("variantid, productid, size, color, stock").in("variantid", variantIds))
       : [],
     manualIds.length
-      ? one(client.from("manual_items").select("manual_item_id, name, categoryid, size, color, purchase_price, mrp").in("manual_item_id", manualIds))
+      ? one(client.from("manual_items").select("manual_item_id, name, categoryid, size, color, purchase_price, mrp, stock").in("manual_item_id", manualIds))
       : [],
   ]);
 
@@ -616,8 +619,10 @@ export async function prepareBill(client, rawSpec) {
   // Stock: the same check the screen runs before finalizing, summed per variant. Pieces the
   // exchange returns are back on the shelf first (exchange_record runs before the bill).
   const backByVariant = {};
+  const backByManual = {};
   for (const r of exchange?.returned ?? []) {
-    if (r.stock) backByVariant[r.stock.variantid] = (backByVariant[r.stock.variantid] ?? 0) + r.qty;
+    if (r.stock?.variantid) backByVariant[r.stock.variantid] = (backByVariant[r.stock.variantid] ?? 0) + r.qty;
+    if (r.stock?.manual_item_id) backByManual[r.stock.manual_item_id] = (backByManual[r.stock.manual_item_id] ?? 0) + r.qty;
   }
   const qtyByVariant = {};
   for (const it of items) if (it.variantid) qtyByVariant[it.variantid] = (qtyByVariant[it.variantid] ?? 0) + it.quantity;
@@ -634,14 +639,40 @@ export async function prepareBill(client, rawSpec) {
       stock_after: spec.skip_stock ? before : before - qty,
     };
   });
+  // Manual items take their stock too (schema/migration_manual_item_stock.sql), exactly: fabric is
+  // sold by the metre. One the spec creates starts at its line's quantity.
+  const qtyByManual = {};
+  for (const it of items) {
+    if (!it.variantid) qtyByManual[it.productid] = round3((qtyByManual[it.productid] ?? 0) + it.quantity);
+  }
+  const manualStock = Object.entries(qtyByManual).map(([manual_item_id, qty]) => {
+    const m = manualById[manual_item_id];
+    const before = round3(Number(m.stock) + (backByManual[manual_item_id] ?? 0));
+    return {
+      manual_item_id,
+      name: m.name,
+      stock_before: before,
+      change: spec.skip_stock ? 0 : -qty,
+      stock_after: spec.skip_stock ? before : round3(before - qty),
+    };
+  });
+  stock.push(...manualStock);
   if (!spec.skip_stock) {
-    const short = stock.filter((s) => s.stock_after < 0);
+    const short = stock.filter((s) => s.variantid && s.stock_after < 0);
     if (short.length) {
       fail(
         "Insufficient stock: " +
           short.map((s) => `${s.productid} ${s.color}/${s.size} has ${s.stock_before}, needs ${s.stock_before - s.stock_after}`).join("; ") +
           ". If the pieces are on the shelf, add them: " +
           short.map((s) => stockAddCommand({ code: s.productid, size: s.size, color: s.color, qty: Math.round(-s.stock_after * 1000) / 1000 })).join("; "),
+      );
+    }
+    const manualShort = manualStock.filter((s) => s.stock_after < 0);
+    if (manualShort.length) {
+      fail(
+        "Insufficient stock: " +
+          manualShort.map((s) => `manual item ${s.manual_item_id} (${s.name}) has ${s.stock_before}, needs ${round3(s.stock_before - s.stock_after)}`).join("; ") +
+          ". It is already sold; for a different piece, use manual_item { create } instead",
       );
     }
   }
@@ -943,8 +974,10 @@ async function createReferenced(client, rawSpec, planned, created, source) {
     const ref = spec.items[i].ref;
     if (ref.kind !== "manual_new") continue;
     const c = ref.create;
+    // Made for this line, so its stock is what the line sells, as the screen's Manual Item form.
     const saved = await createManualItem(client, {
       name: c.name, categoryid: c.category, mrp: c.mrp, cost: c.cost, size: c.size, color: c.color,
+      stock: spec.items[i].qty,
     });
     created.manual_items.push(saved);
     const { manual_item, ...rest } = it;
@@ -1093,14 +1126,27 @@ async function insertDraft(client, prepared, source) {
     // Each change is atomic and independent, so they run together, as on the screen.
     await Promise.all(
       prepared.stock.map(async (s) => {
-        const { data: after, error } = await client.rpc("stock_adjust", {
-          p_variant: s.variantid,
-          p_delta: s.change,
-          p_reason: "bill_draft_create",
-          p_ref: String(bill.billid),
-        });
-        if (error) save_errors.push(`Stock not reduced for ${s.productid} ${s.color}/${s.size} (${error.message}); recheck it`);
-        else if (Number(after) < 0) negative_stock.push({ variantid: s.variantid, stock: Number(after) });
+        // A manual item moves through its own RPC, as on the screen (BillingForm.adjustManualStock).
+        const { data: after, error } = s.manual_item_id
+          ? await client.rpc("manual_item_stock_adjust", {
+              p_manual_item_id: s.manual_item_id,
+              p_delta: s.change,
+              p_reason: "bill_draft_create",
+              p_ref: String(bill.billid),
+            })
+          : await client.rpc("stock_adjust", {
+              p_variant: s.variantid,
+              p_delta: s.change,
+              p_reason: "bill_draft_create",
+              p_ref: String(bill.billid),
+            });
+        const what = s.manual_item_id ? `manual item ${s.manual_item_id}` : `${s.productid} ${s.color}/${s.size}`;
+        if (error) save_errors.push(`Stock not reduced for ${what} (${error.message}); recheck it`);
+        else if (Number(after) < 0) {
+          negative_stock.push(s.manual_item_id
+            ? { manual_item_id: s.manual_item_id, stock: Number(after) }
+            : { variantid: s.variantid, stock: Number(after) });
+        }
       }),
     );
   }

@@ -324,8 +324,9 @@ export default function ExchangePage() {
           // which deletes + reinserts bill_items and nulls original_bill_item_id.
           product_name: ri.product_name || null,
           product_code: ri.product_code || null,
+          // A returned manual item is restocked from the line's own product_code
+          // (exchange_record), so no manual_item_id is sent.
           variantid: ri.variantid || null,
-          manual_item_id: ri.manual_item_id || null,
         })),
       });
       if (exErr) throw new Error(EXCHANGE_ERRORS[exErr.message] || `Exchange record failed: ${exErr.message}`);

@@ -37,7 +37,7 @@ const db = (overrides = {}) => ({
     error: null,
   },
   "manual_items.select": {
-    data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150 }],
+    data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150, stock: 1 }],
     error: null,
   },
   ...overrides,
@@ -146,7 +146,38 @@ describe("prepareBill — slip 387", () => {
     });
     expect(p.bill_items[0]).toMatchObject({ product_code: "BCX26129", variantid: null, mrp: 150, cost_price: 50, category: "ACC", total: 150 });
     expect(p.bill.salesmethodid).toBe(2);
-    expect(p.stock).toEqual([]);
+    // A sale takes manual-item stock too (schema/migration_manual_item_stock.sql).
+    expect(p.stock).toEqual([{ manual_item_id: "BCX26129", name: "Fall", stock_before: 1, change: -1, stock_after: 0 }]);
+  });
+
+  it("takes a fabric manual item's stock by the exact metres", async () => {
+    const fabric = db({
+      "manual_items.select": {
+        data: [{ manual_item_id: "BCX26129", name: "Cotton", categoryid: "FAB-COT", size: null, color: null, purchase_price: 50, mrp: 100, stock: 5 }],
+        error: null,
+      },
+    });
+    const p = await prepareBill(fakeSupabase(fabric), {
+      ...slip387,
+      payment: { method: "UPI", amount: 350 },
+      items: [{ manual_item_id: "BCX26129", qty: 3.5 }],
+    });
+    expect(p.stock).toEqual([{ manual_item_id: "BCX26129", name: "Cotton", stock_before: 5, change: -3.5, stock_after: 1.5 }]);
+  });
+
+  it("refuses an existing manual item already sold, unless skip_stock", async () => {
+    const sold = db({
+      "manual_items.select": {
+        data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150, stock: 0 }],
+        error: null,
+      },
+    });
+    const spec = { ...slip387, payment: { method: "UPI", amount: 150 }, items: [{ manual_item_id: "BCX26129", qty: 1 }] };
+    await expect(prepareBill(fakeSupabase(sold), spec)).rejects.toThrow(
+      "Insufficient stock: manual item BCX26129 (Fall) has 0, needs 1. It is already sold; for a different piece, use manual_item { create } instead",
+    );
+    const p = await prepareBill(fakeSupabase(sold), { ...spec, skip_stock: true });
+    expect(p.stock).toEqual([{ manual_item_id: "BCX26129", name: "Fall", stock_before: 0, change: 0, stock_after: 0 }]);
   });
 
   it("charges alteration on top of the goods amount", async () => {
@@ -593,6 +624,18 @@ describe("readable bill spec", () => {
     ]);
   });
 
+  it("creates a new manual item with its line's quantity as stock, so the sale leaves 0", async () => {
+    const p = await prepareBill(
+      fakeSupabase(rdb()),
+      spec({
+        payment: { method: "Cash", amount: 250 },
+        items: [{ manual_item: { create: { name: "Cotton", category: "ACC", mrp: 100, cost: "ZEZ" } }, qty: 2.5 }],
+      }),
+    );
+    expect(p.creates.manual_items[0]).toMatchObject({ manual_item_id: "BCX26129", stock: 2.5 });
+    expect(p.stock).toEqual([{ manual_item_id: "BCX26129", name: "Cotton", stock_before: 2.5, change: -2.5, stock_after: 0 }]);
+  });
+
   it("reports a bad inline manual item against its line", async () => {
     await expect(
       prepareBill(fakeSupabase(rdb()), spec({ items: [{ manual_item: { create: { name: "Fall", category: "ACC", mrp: 150, cost: "ZZ" } }, qty: 1 }] })),
@@ -609,7 +652,7 @@ describe("readable bill spec", () => {
             : { data: { customerid: 500, first_name: "Test", last_name: "Customer", phone: "+919000000001" }, error: null }),
         "customers.insert": (call) => ({ data: { customerid: 500, ...call.row }, error: null }),
         "manual_items.select": (call) => ({
-          data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150 }],
+          data: [{ manual_item_id: "BCX26129", name: "Fall", categoryid: "ACC", size: null, color: null, purchase_price: 50, mrp: 150, stock: 1 }],
           error: null,
         }),
         "manual_items.insert": (call) => ({ data: { ...call.row, stock: 1 }, error: null }),
@@ -632,6 +675,7 @@ describe("readable bill spec", () => {
     expect(writes).toEqual([
       "customers.insert", "activity_log.insert", "manual_items.insert", "bill_save", "activity_log.insert",
     ]);
+    expect(client.calls.find((c) => c.table === "manual_items" && c.op === "insert").row).toMatchObject({ stock: 1 });
     const { p_payload: payload } = client.calls.find((c) => c.fn === "bill_save").args;
     expect(payload.bill.customerid).toBe(500);
     expect(payload.items.map((r) => r.product_code)).toEqual(["BC252051", "BCX26129"]);
@@ -941,6 +985,29 @@ describe("draft bills (spec draft: true)", () => {
     const client = fakeSupabase(draftDb({ "rpc.stock_adjust": { data: -1, error: null } }));
     const out = await createBill(client, draft);
     expect(out.negative_stock).toEqual([{ variantid: VID, stock: -1 }]);
+  });
+
+  it("takes a manual line's stock through manual_item_stock_adjust, as the screen's Save Draft", async () => {
+    const client = fakeSupabase(draftDb({ "rpc.manual_item_stock_adjust": { data: 0, error: null } }));
+    const out = await createBill(client, {
+      ...draft,
+      payment: { method: "Cash", amount: 1950 },
+      items: [...draft.items, { manual_item_id: "BCX26129", qty: 1 }],
+    });
+    expect(client.calls.find((c) => c.fn === "manual_item_stock_adjust").args).toEqual({
+      p_manual_item_id: "BCX26129", p_delta: -1, p_reason: "bill_draft_create", p_ref: "902",
+    });
+    expect(client.calls.find((c) => c.fn === "stock_adjust").args.p_variant).toBe(VID);
+    expect(out.negative_stock).toEqual([]);
+    expect(out).not.toHaveProperty("save_errors");
+  });
+
+  it("lists a manual-item stock failure or a manual item below zero", async () => {
+    const spec = { ...draft, payment: { method: "Cash", amount: 1950 }, items: [...draft.items, { manual_item_id: "BCX26129", qty: 1 }] };
+    const failed = await createBill(fakeSupabase(draftDb({ "rpc.manual_item_stock_adjust": { data: null, error: { message: "mi boom" } } })), spec);
+    expect(failed.save_errors).toEqual([expect.stringMatching(/Stock not reduced for manual item BCX26129 \(mi boom\)/)]);
+    const below = await createBill(fakeSupabase(draftDb({ "rpc.manual_item_stock_adjust": { data: -1, error: null } })), spec);
+    expect(below.negative_stock).toEqual([{ manual_item_id: "BCX26129", stock: -1 }]);
   });
 
   it("dry run writes nothing", async () => {

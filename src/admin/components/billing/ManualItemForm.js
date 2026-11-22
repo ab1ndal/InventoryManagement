@@ -121,6 +121,9 @@ export default function ManualItemForm({ onAdd, initialVal, salespersons = [] })
           color: color || null,
           purchase_price: purchasePrice,
           mrp: Number(mrp) || 0,
+          // Made for this line: what it sells (3.5 m of fabric, 2 pieces) is what exists, so the
+          // sale brings it to 0 (schema/migration_manual_item_stock.sql).
+          stock: Number(qty) || 1,
         });
         if (error) throw new Error(error.message);
         toast({ title: `Manual item added — ${manualItemId}` });
