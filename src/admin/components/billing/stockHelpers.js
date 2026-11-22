@@ -33,6 +33,27 @@ export function computeStockDelta(existingBillItems, newInventoryItems) {
   return deltaMap;
 }
 
+// Stock is numeric(10,3): sums of fractional metres are kept to that, so 0.1 + 0.2 is 0.3.
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
+/**
+ * What a new draft takes from each manual item (BCX…): [manual_item_id, -quantity] per item, lines
+ * summed, exact (fabric is sold by the metre). Manual lines have no variantid; their productid is
+ * the manual_items id, which bill_items stores as product_code. bill_save and bill_edit move this
+ * stock themselves; only a new draft, inserted directly, needs it (manual_item_stock_adjust).
+ *
+ * @param {Array<{variantid?: string, source?: string, productid?: string, quantity: number}>} items
+ * @returns {Array<[string, number]>}
+ */
+export function manualStockTake(items) {
+  const byId = new Map();
+  for (const it of items) {
+    if (it.variantid || it.source !== "manual" || !it.productid) continue;
+    byId.set(it.productid, round3((byId.get(it.productid) || 0) - Number(it.quantity)));
+  }
+  return [...byId.entries()].filter(([, delta]) => delta !== 0);
+}
+
 /**
  * Build the bill_items insert payload from BillingForm items.
  *

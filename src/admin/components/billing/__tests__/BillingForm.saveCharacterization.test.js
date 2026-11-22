@@ -192,32 +192,58 @@ jest.mock("../../../../components/ui/select", () => {
   };
 });
 
-// Stand-in for the inventory picker: one click adds 2 units of variant v1 @ ₹150.
+// Stand-in for the inventory picker: one click adds 2 units of variant v1 @ ₹150. The second
+// button stands in for the Manual Item form: 3.5 m of fabric item BCX26900 @ ₹100/m.
 jest.mock("../AddItemDialog", () => (props) =>
   props.editItem ? null : (
-    <button
-      type="button"
-      onClick={() =>
-        props.onAdd({
-          _id: "row1",
-          source: "inventory",
-          variantid: "v1",
-          productid: "BC25001",
-          product_name: "Kurti",
-          quantity: 2,
-          unit_type: "piece",
-          mrp: 150,
-          alteration_charge: mockDb.alterationCharge,
-          quickDiscountPct: 0,
-          gstRate: 5,
-          stitchType: "unstitched",
-          size: "M",
-          color: "Red",
-        })
-      }
-    >
-      Stub add item
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          props.onAdd({
+            _id: "row1",
+            source: "inventory",
+            variantid: "v1",
+            productid: "BC25001",
+            product_name: "Kurti",
+            quantity: 2,
+            unit_type: "piece",
+            mrp: 150,
+            alteration_charge: mockDb.alterationCharge,
+            quickDiscountPct: 0,
+            gstRate: 5,
+            stitchType: "unstitched",
+            size: "M",
+            color: "Red",
+          })
+        }
+      >
+        Stub add item
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          props.onAdd({
+            _id: "row2",
+            source: "manual",
+            productid: "BCX26900",
+            product_name: "Cotton fabric",
+            manual_code: "BCX26900",
+            category: "FAB-COT",
+            quantity: 3.5,
+            unit_type: "meter",
+            mrp: 100,
+            alteration_charge: 0,
+            quickDiscountPct: 0,
+            gstRate: 5,
+            stitchType: "unstitched",
+            cost_price: 50,
+          })
+        }
+      >
+        Stub add manual item
+      </button>
+    </>
   ),
 );
 
@@ -343,6 +369,33 @@ describe("path A, new draft (pins current behaviour)", () => {
     tickDontReduceStock();
     await saveDraft(onSubmit);
     expect(normalised()).toMatchSnapshot();
+  });
+
+  // schema/migration_manual_item_stock.sql: the draft takes the manual item's exact metres too.
+  test("a manual line takes its stock through manual_item_stock_adjust", async () => {
+    const onSubmit = jest.fn();
+    await openNew({ onSubmit });
+    click("Stub add manual item");
+    await screen.findAllByText("Cotton fabric");
+    await saveDraft(onSubmit);
+    const rpcs = mockDb.writes.filter((w) => w.kind === "rpc");
+    expect(rpcs).toEqual([
+      { kind: "rpc", fn: "stock_adjust", args: { p_variant: "v1", p_delta: -2, p_reason: "bill_draft_create", p_ref: "42" } },
+      {
+        kind: "rpc", fn: "manual_item_stock_adjust",
+        args: { p_manual_item_id: "BCX26900", p_delta: -3.5, p_reason: "bill_draft_create", p_ref: "42" },
+      },
+    ]);
+  });
+
+  test("Don't reduce stock moves no manual-item stock either", async () => {
+    const onSubmit = jest.fn();
+    await openNew({ onSubmit });
+    click("Stub add manual item");
+    await screen.findAllByText("Cotton fabric");
+    tickDontReduceStock();
+    await saveDraft(onSubmit);
+    expect(mockDb.writes.filter((w) => w.kind === "rpc")).toEqual([]);
   });
 
   test("pins current behaviour: backdated draft on a tax invoice with a code discount", async () => {

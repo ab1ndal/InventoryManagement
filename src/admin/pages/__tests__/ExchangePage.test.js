@@ -198,7 +198,7 @@ test("confirm calls exchange_record once and links the returned ids", async () =
     p_customerid: 7,
     p_items: [{
       bill_item_id: 9001, quantity: 1, credit_amount: 1000, reason: "size",
-      product_name: "Silk Kurta", product_code: "BC25001", variantid: "v-1", manual_item_id: null,
+      product_name: "Silk Kurta", product_code: "BC25001", variantid: "v-1",
     }],
   });
   expect(supabase.from).not.toHaveBeenCalledWith("manual_items");

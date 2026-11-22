@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { computeBillTotals, computeBalanceAdjustedTotals, priceItem, computeAlterationDeposit } from "./billUtils";
-import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct, exchangedLineProblems, linesWithSavedIds } from "./stockHelpers";
+import { buildBillItemsPayload, computeStockDelta, describeStockShortfalls, backCalcDiscountPct, exchangedLineProblems, linesWithSavedIds, manualStockTake } from "./stockHelpers";
 import { isWebsiteMethod, paymentStatusAfterEdit, editExcess, excessCountsExchangeTwice } from "./paymentHelpers";
 import { computeCreditsApplied, computeExchangeBalance } from "./exchangeHelpers";
 import { BILL_STATUS, billStatusFields } from "../../lib/billStatus";
@@ -119,13 +119,14 @@ const REFINALIZE_ERRORS = {
 export const paymentDateFields = (date) =>
   date === todayIST() ? {} : { recorded_at: `${date}T12:00:00` };
 
-// Each change is atomic and independent, so they run together. Returns the variants that failed.
-async function applyStockChanges(changes, reason, ref) {
+// Each change is atomic and independent, so they run together. Returns the variants (or manual
+// items, with adjustManualStock) that failed.
+async function applyStockChanges(changes, reason, ref, adjust = adjustStock) {
   const results = await Promise.all(
-    changes.map(async ([variantId, delta]) => {
-      const { error } = await adjustStock(variantId, delta, reason, ref);
-      if (error) console.error("Stock update failed for", variantId, error);
-      return error ? variantId : null;
+    changes.map(async ([id, delta]) => {
+      const { error } = await adjust(id, delta, reason, ref);
+      if (error) console.error("Stock update failed for", id, error);
+      return error ? id : null;
     }),
   );
   return results.filter(Boolean);
@@ -169,6 +170,15 @@ function pendingExchangeCredit(exchanges) {
 const adjustStock = (variantId, delta, reason, ref) =>
   supabase.rpc("stock_adjust", {
     p_variant: variantId,
+    p_delta: delta,
+    p_reason: reason,
+    p_ref: String(ref),
+  });
+// The same for a manual item (BCX…): a new draft is inserted directly, so its manual lines take
+// their stock here, as its variants do (schema/migration_manual_item_stock.sql).
+const adjustManualStock = (manualItemId, delta, reason, ref) =>
+  supabase.rpc("manual_item_stock_adjust", {
+    p_manual_item_id: manualItemId,
     p_delta: delta,
     p_reason: reason,
     p_ref: String(ref),
@@ -1273,6 +1283,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
             "bill_draft_create",
             bill.billid,
           )),
+          ...(await applyStockChanges(manualStockTake(items), "bill_draft_create", bill.billid, adjustManualStock)),
         );
       }
 
@@ -1280,7 +1291,7 @@ export default function BillingForm({ billId, open, onOpenChange, onSubmit, exch
       toast.success(`Draft saved — Bill #${bill.bill_number || "(no number)"}`);
       if (newDraftStockFailures.length > 0) {
         toast.error("Stock sync warning", {
-          description: `Stock could not be updated for ${newDraftStockFailures.length} variant(s). Please recheck inventory.`,
+          description: `Stock could not be updated for ${newDraftStockFailures.length} item(s). Please recheck inventory.`,
         });
       }
       logActivity({ action: "create", entityType: "bill", entityId: bill.bill_number || bill.billid, summary: `Created draft bill #${bill.bill_number || "(no number)"} for ${customerName || "walk-in"} — ${money(computed.grandTotal)}, ${items.length} items` });
