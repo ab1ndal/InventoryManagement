@@ -84,9 +84,11 @@ Its quantity is taken exactly (3.5 m lowers stock by 3.5; nothing is rounded).
 - **Backfill** (separate migration, run right after the main one): for every manual item,
   `stock = greatest(0, 1 - (sold - returned))`, where sold = quantity on lines of bills that are
   not cancelled and whose `stock_reduced is distinct from false` (drafts included: they took
-  stock), and returned = exchanged quantity from those lines. Live preview (read-only,
-  2026-11-22): 191 items, **177 change 1 → 0**, 14 stay 1, none other. It is derived from bills
-  only, so it gives the same answer if re-run and whether run before or after the main migration.
+  stock), and returned = exchanged quantity from those lines. Live preview (read-only, same
+  statement as a select, end of 2026-11-22 session): 197 items all at 1, **183 change 1 → 0**,
+  14 stay 1, none other (191 / 177 earlier the same day: slips are being entered). It is derived
+  from bills only, so before the merge it gives the same answer re-run or run before the main
+  migration. Not to be re-run after the merge (an item made for 0.5 m would go back to 0.5).
 - **Admin UI**: no screen shows manual-item stock, before or after. The CLI's `manual-item find`
   shows the real figure (`--in-stock` now means unsold); its docs warning goes. The CLI's bill
   preview lists manual items in `stock` (`{ manual_item_id, stock_before, change, stock_after }`)
@@ -113,19 +115,36 @@ The code is **not** safe to merge before step 1: the new-draft path calls
 fabric item created with stock 3.5 fails on an `int4` column. Before the migration, nothing
 changes for anyone (main as today). Between the two migrations (minutes): sales take stock from
 items still reading 1; the backfill then recomputes from the bills, so the order does not matter.
+Between the migrations and the merge (keep it short): finalized and part-paid bills, edits,
+cancels and exchanges already move manual stock (all server side); only a **new draft** saved
+from the old screen or CLI does not take its manual items' stock, and a new manual item starts at
+1 instead of its quantity (fabric over 1 m goes below 0). Check any manual draft saved in that
+window. Do not re-run the backfill after the merge.
 
 ## 4. Plan
 
 - [x] Research (above).
-- [ ] `schema/migration_manual_item_stock.sql`: column to numeric; `_manual_stock_apply`
+- [x] `schema/migration_manual_item_stock.sql`: column to numeric; `_manual_stock_apply`
       (internal), `manual_item_stock_adjust` (staff RPC); `bill_save`, `_bill_lines_save`,
       `bill_cancel`, `exchange_record` bodies copied from live with the manual-item steps added.
-- [ ] `schema/migration_manual_item_stock_backfill.sql`.
-- [ ] `schema/test_manual_item_stock.sql`: fails before, passes after.
-- [ ] App: Manual Item form creates with stock = qty; new draft adjusts manual stock;
+- [x] `schema/migration_manual_item_stock_backfill.sql` (no begin/commit: one statement, so the
+      test can run it inside its own rolled-back transaction).
+- [x] `schema/test_manual_item_stock.sql` (43 checks; before the migration it fails on the first
+      checks and stops at the draft fixture) and `schema/test_manual_item_stock_backfill.sql`
+      (12 checks; 5 pass / 7 fail with an empty backfill).
+- [x] App: Manual Item form creates with stock = qty; new draft adjusts manual stock;
       Exchange page stops sending `manual_item_id`. CLI: same for drafts and creates, preview
       stock rows and refusal, exchange preview stock, docs.
-- [ ] Tests: full app suite, `node --test scripts/admin-cli/*.test.mjs`, SQL suites.
+- [x] Tests (2026-11-22): full app suite 192 suites / 2046 tests pass (worktree has no `.env`, so
+      run with dummy `REACT_APP_SUPABASE_URL` / `_ANON_KEY`); `node --test` 11/11; the new JS
+      tests fail (10) against the old code. SQL on the local DB after the migration:
+      test_bill_draft_finish 172/0, test_bill_exchange_lines 48/0,
+      test_exchange_record_return_date 12/0, test_bill_excess_credit 54/0,
+      test_bill_double_cash 35/0, test_bill_add_payment 47/0, test_bill_cancel 56/0,
+      test_bill_save 123/0, test_voucher_states 92/0, test_bill_status_states 99/0.
+      test_online_returns, test_online_orders_refunds and test_online_orders_holds stop at the
+      same error with and without the migration (stale fixtures, not this change).
+- [ ] Owner: run both migrations, then merge (§3). Read-only checks are in each file's header.
 
 ## 5. Owner decisions
 
