@@ -7,12 +7,13 @@
 --   - exchanges.quantity becomes numeric(10,3), as bill_items.quantity. No view, index, trigger
 --     or policy reads the column; every function that does (bill_cancel, _bill_items_exchange_lock,
 --     _online_return_free_units) already works in numeric. 11 rows on 2026-11-22.
---   - exchange_record reads the quantity as numeric. A whole number is checked exactly as before
---     (any line). A fraction is accepted only when it is all that is left to return on the line
---     (the line's quantity less earlier exchanges); any other fraction (1.5 of 3.5 m, 0.5 of a
---     piece) is refused with EXCHANGE_WHOLE_LINE (P0001, detail {bill_item_id, quantity, left}).
---     A fraction with more than 3 decimals can never equal a numeric(10,3) line, so it is refused
---     too and nothing is rounded on insert.
+--   - exchange_record reads the quantity as numeric. A metre line (bill_items.unit_type =
+--     'meter') is returned only whole: the quantity must be all that is left on it (the line's
+--     quantity less earlier exchanges), fractional or not, so 1 m of 3.5 m and 1 m of 2 m are
+--     refused. Any other line takes whole numbers only, partial returns allowed, exactly as before.
+--     Refusals: EXCHANGE_WHOLE_LINE (P0001, detail {bill_item_id, quantity, left}). A fraction with
+--     more than 3 decimals can never equal a numeric(10,3) line, so nothing is rounded on insert.
+--     Live 2026-11-22: no exchange on a metre line yet, so no earlier part return conflicts.
 --   - Credit caps unchanged (they were already numeric): a whole-line return's cap is the line's
 --     total, exactly.
 -- Nothing else changes: body copied from live (schema/migration_manual_item_stock.sql's
@@ -106,9 +107,10 @@ begin
     if v_used + v_qty > bi.quantity then
       raise exception 'item % already returned (% of %)', bi.bill_item_id, trim_scale(v_used), trim_scale(bi.quantity);
     end if;
-    -- Fabric by the metre goes back whole (owner, 2026-11-22): a fraction only as all that is
-    -- left on the line. Whole numbers are checked as before.
-    if v_qty <> trunc(v_qty) and v_qty <> bi.quantity - v_used then
+    -- Fabric by the metre goes back whole (owner, 2026-11-22): a metre line only as all that is
+    -- left on it, whole number or not. Any other line in whole numbers, as before.
+    if (bi.unit_type = 'meter' and v_qty <> bi.quantity - v_used)
+       or (bi.unit_type is distinct from 'meter' and v_qty <> trunc(v_qty)) then
       raise exception 'EXCHANGE_WHOLE_LINE' using errcode = 'P0001',
         detail = jsonb_build_object('bill_item_id', bi.bill_item_id, 'quantity', v_qty,
                                     'left', trim_scale(bi.quantity - v_used))::text;

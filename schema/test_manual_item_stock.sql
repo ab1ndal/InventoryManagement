@@ -342,14 +342,15 @@ begin
                          'manual_item_id', 'MIST001')))) = 'ok');
   perform pg_temp.ok('7 the line''s own item is restocked (1 -> 2), not the one named',
     pg_temp.stock('MIST008') = 2 and pg_temp.stock('MIST001') = 0);
-  -- Part of a metre cannot be returned: exchanges.quantity is whole numbers.
+  -- Part of a metre line cannot be returned; the whole line can
+  -- (schema/migration_exchange_fractional_qty.sql).
   perform pg_temp.ok('7 a 1.5 m return is refused',
     pg_temp.as_admin(format('select public.exchange_record(%s, -9721, %L)', bf, jsonb_build_array(
       jsonb_build_object('bill_item_id', pg_temp.line_id(bf, 'MISTF04'), 'quantity', 1.5, 'credit_amount', 100)))) <> 'ok');
-  perform pg_temp.ok('7 a whole 1 m return is accepted',
+  perform pg_temp.ok('7 the whole 3.5 m return is accepted',
     pg_temp.as_admin(format('select public.exchange_record(%s, -9721, %L)', bf, jsonb_build_array(
-      jsonb_build_object('bill_item_id', pg_temp.line_id(bf, 'MISTF04'), 'quantity', 1, 'credit_amount', 100)))) = 'ok');
-  perform pg_temp.ok('7 fabric 6.5 + 1 = 7.5 m', pg_temp.stock('MISTF04') = 7.5);
+      jsonb_build_object('bill_item_id', pg_temp.line_id(bf, 'MISTF04'), 'quantity', 3.5, 'credit_amount', 350)))) = 'ok');
+  perform pg_temp.ok('7 fabric 6.5 + 3.5 = 10 m', pg_temp.stock('MISTF04') = 10);
 
   -- Cancel: 3 sold, 2 exchanged, so 1 more comes back.
   r := pg_temp.cancel(15, b);
@@ -357,7 +358,7 @@ begin
   perform pg_temp.ok('7 cancel result lists the manual item',
     r -> 'stock' @> jsonb_build_array(jsonb_build_object('manual_item_id', 'MIST008', 'qty', 1.000)));
   r := pg_temp.cancel(16, bf);
-  perform pg_temp.ok('7 fabric cancel gives back 2.5 m (7.5 -> 10)', pg_temp.stock('MISTF04') = 10);
+  perform pg_temp.ok('7 fabric cancel gives nothing more back (all 3.5 m exchanged; stays 10)', pg_temp.stock('MISTF04') = 10);
 end $$;
 
 -- ---------- 8. Cancel of a plain sale, a draft, and a legacy bill ----------

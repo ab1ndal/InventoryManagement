@@ -1,6 +1,6 @@
--- Tests for schema/migration_exchange_fractional_qty.sql: a line sold in a fractional quantity
--- (fabric by the metre, e.g. 3.5 m) can be returned whole through exchange_record, a part of it
--- (1.5 of 3.5 m) is refused, and whole-number returns work exactly as before.
+-- Tests for schema/migration_exchange_fractional_qty.sql: a metre line (fabric, e.g. 3.5 m or
+-- 2 m) can be returned through exchange_record only whole, any part of it (1.5 or 1 of 3.5 m,
+-- 1 of 2 m) is refused, and other lines take whole numbers, in part, exactly as before.
 -- The whole file is one transaction that always rolls back, and its final select returns only
 -- pass and fail counts. A failed check also raises a WARNING naming it.
 -- Run locally (the chain in tasks/manual-item-stock-plan.md section 6, then
@@ -126,7 +126,8 @@ begin
   insert into public.manual_items (manual_item_id, name, categoryid, stock) values
     ('FRQF01', 'Fabric whole', 'FRQ', 3.5), ('FRQF02', 'Fabric part', 'FRQ', 3.5),
     ('FRQF03', 'Fabric metre then rest', 'FRQ', 3.5), ('FRQF04', 'Fabric cancel', 'FRQ', 2.25),
-    ('FRQF05', 'Fabric in a pair', 'FRQ', 1.5), ('FRQ001', 'Piece', 'FRQ', 3);
+    ('FRQF05', 'Fabric in a pair', 'FRQ', 1.5), ('FRQF06', 'Fabric whole metres', 'FRQ', 2),
+    ('FRQ001', 'Piece', 'FRQ', 3), ('FRQ002', 'Piece line in a fraction', 'FRQ', 2.5);
 end $$;
 grant select, insert, update, delete on public.bills, public.bill_payments, public.bill_items,
   public.exchanges, public.manual_items to authenticated;
@@ -172,17 +173,21 @@ begin
   perform pg_temp.ok('3 zero is refused', pg_temp.ret(b, 'FRQF02', 0, 0) like 'item %: quantity must be positive');
 end $$;
 
--- ---------- 4. Whole metres of a fractional line, then the rest whole ----------
+-- ---------- 4. Whole metres are part of a metre line too ----------
 do $$
 declare
   b int := pg_temp.sell(3, jsonb_build_array(pg_temp.line('FRQF03', 3.5, 'meter')));
+  bw int := pg_temp.sell(10, jsonb_build_array(pg_temp.line('FRQF06', 2, 'meter')));
 begin
-  perform pg_temp.ok('4 1 whole metre of 3.5 m is accepted, as before', pg_temp.ret(b, 'FRQF03', 1, 100) = 'ok');
-  perform pg_temp.ok('4 then 1.5 of the 2.5 m left is refused', pg_temp.ret(b, 'FRQF03', 1.5, 150) = 'EXCHANGE_WHOLE_LINE');
-  perform pg_temp.ok('4 credit for the rest above the line total is refused', pg_temp.ret(b, 'FRQF03', 2.5, 250.01) = 'EXCHANGE_OVER_LINE');
-  perform pg_temp.ok('4 the 2.5 m left is accepted', pg_temp.ret(b, 'FRQF03', 2.5, 250) = 'ok');
-  perform pg_temp.ok('4 returned 3.5 m and ₹350 in all, stock back to 3.5',
-    pg_temp.returned(b, 'FRQF03') = 3.5 and pg_temp.credited(b, 'FRQF03') = 350 and pg_temp.stock('FRQF03') = 3.5);
+  perform pg_temp.ok('4 1 whole metre of 3.5 m is refused', pg_temp.ret(b, 'FRQF03', 1, 100) = 'EXCHANGE_WHOLE_LINE');
+  perform pg_temp.ok('4 3 whole metres of 3.5 m are refused', pg_temp.ret(b, 'FRQF03', 3, 300) = 'EXCHANGE_WHOLE_LINE');
+  perform pg_temp.ok('4 nothing recorded, no stock moved',
+    pg_temp.returned(b, 'FRQF03') = 0 and pg_temp.stock('FRQF03') = 0);
+  perform pg_temp.ok('4 1 m of a 2 m line is refused', pg_temp.ret(bw, 'FRQF06', 1, 100) = 'EXCHANGE_WHOLE_LINE');
+  perform pg_temp.ok('4 credit above the 2 m line total is refused', pg_temp.ret(bw, 'FRQF06', 2, 200.01) = 'EXCHANGE_OVER_LINE');
+  perform pg_temp.ok('4 the whole 2 m is accepted', pg_temp.ret(bw, 'FRQF06', 2, 200) = 'ok');
+  perform pg_temp.ok('4 returned 2 m and ₹200, stock back to 2',
+    pg_temp.returned(bw, 'FRQF06') = 2 and pg_temp.credited(bw, 'FRQF06') = 200 and pg_temp.stock('FRQF06') = 2);
 end $$;
 
 -- ---------- 5. Piece lines: whole numbers exactly as before ----------
@@ -199,6 +204,15 @@ begin
   perform pg_temp.ok('5 piece stock 0 -> 3', pg_temp.stock('FRQ001') = 3);
   perform pg_temp.ok('5 variant: 1 of 2 accepted and restocked', pg_temp.ret(bv, 'FRQP1', 1, 100) = 'ok' and pg_temp.vstock() = v + 1);
   perform pg_temp.ok('5 variant: 0.5 refused', pg_temp.ret(bv, 'FRQP1', 0.5, 50) = 'EXCHANGE_WHOLE_LINE');
+end $$;
+
+-- A line that is not a metre line takes whole numbers only, even its whole fractional quantity.
+do $$
+declare
+  b int := pg_temp.sell(11, jsonb_build_array(pg_temp.line('FRQ002', 2.5)));
+begin
+  perform pg_temp.ok('5 a piece line of 2.5: all 2.5 refused', pg_temp.ret(b, 'FRQ002', 2.5, 250) = 'EXCHANGE_WHOLE_LINE');
+  perform pg_temp.ok('5 a piece line of 2.5: 2 accepted, as before', pg_temp.ret(b, 'FRQ002', 2, 200) = 'ok');
 end $$;
 
 -- ---------- 6. A fractional variant line returned whole; a refusal undoes the whole call ----------
