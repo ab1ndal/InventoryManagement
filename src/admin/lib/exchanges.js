@@ -11,6 +11,7 @@ import {
   isExchangeEligible,
   returnableLeft,
   isAllowedReturnQty,
+  isWholeOnlyLine,
   EXCHANGE_WINDOW_DAYS,
 } from "../components/billing/exchangeHelpers.js";
 import { round2 } from "../components/billing/billUtils.js";
@@ -82,7 +83,7 @@ export function parseExchange(ex) {
     if ((it.product != null) === (it.bill_item_id != null)) fail(`${at}: give exactly one of product or bill_item_id`);
     if ((it.color != null || it.size != null) && it.product == null) fail(`${at}: color/size only go with product`);
     if (it.bill_item_id != null && !Number.isInteger(it.bill_item_id)) fail(`${at}.bill_item_id must be a whole number`);
-    // A fraction is only taken as a fabric line's whole length (checked against the line in planReturn).
+    // A fraction is only taken as a metre line's whole length (checked against the line in planReturn).
     if (typeof it.qty !== "number" || !Number.isFinite(it.qty) || it.qty <= 0) fail(`${at}.qty must be a number > 0, got ${JSON.stringify(it.qty)}`);
     return {
       ref: it.product != null
@@ -151,7 +152,7 @@ async function planReturn(client, ex, { customerid, date }) {
     one(
       client
         .from("bill_items")
-        .select("bill_item_id, product_name, product_code, quantity, total, alteration_charge, variantid")
+        .select("bill_item_id, product_name, product_code, quantity, total, alteration_charge, variantid, unit_type")
         .eq("billid", bill.billid)
         .order("bill_item_id"),
     ),
@@ -239,12 +240,13 @@ async function planReturn(client, ex, { customerid, date }) {
           (unspent.length ? `. If this slip spends that credit, use "exchange": {"exchange_ids": ${JSON.stringify(unspent)}}` : ""),
       );
     }
-    // exchange_record refuses part of a length (EXCHANGE_WHOLE_LINE).
-    if (!isAllowedReturnQty(it.qty, left)) {
+    // exchange_record refuses part of a metre line, or a fraction of anything else (EXCHANGE_WHOLE_LINE).
+    const wholeOnly = isWholeOnlyLine(line);
+    if (!isAllowedReturnQty(it.qty, left, wholeOnly)) {
       fail(
-        Number.isInteger(left)
-          ? `${at}: ${lineLabel(line)}: qty must be a whole number, got ${it.qty}`
-          : `${at}: ${lineLabel(line)}: ${RECORD_ERRORS.EXCHANGE_WHOLE_LINE} Give qty ${left} (all that is left)`,
+        wholeOnly
+          ? `${at}: ${lineLabel(line)} is fabric sold by the metre: ${RECORD_ERRORS.EXCHANGE_WHOLE_LINE} Give qty ${left} (all that is left)`
+          : `${at}: ${lineLabel(line)}: qty must be a whole number, got ${it.qty}`,
       );
     }
     const credit = calcItemCredit(line, it.qty);
