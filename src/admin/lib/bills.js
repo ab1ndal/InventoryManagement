@@ -6,8 +6,10 @@
 // in full or in part (handleConfirmPartialFinalize: first payment now, the
 // rest owed), with the bill's salespersons as the screen's selector sets them.
 // A spec with "draft": true is saved as the screen's Save Draft on a new bill
-// (handleSaveDraft) instead.
-// Out of scope: discount codes, vouchers, store credit, exchanges, per-line
+// (handleSaveDraft) instead. A spec's "exchange" pays for the bill with goods
+// returned from an earlier bill, as the Exchange page and the screen record it
+// (exchanges.js).
+// Out of scope: discount codes, vouchers, store credit, per-line
 // salespersons, finishing a draft, PDF/SMS.
 // A bill spec is one readable JSON per bill (see docs/admin-cli.md): customer
 // by id, by phone (optionally created if missing) or as a new guest; lines by
@@ -19,6 +21,7 @@ import {
   computeBalanceAdjustedTotals,
   round2,
 } from "../components/billing/billUtils.js";
+import { computeCreditsApplied, computeExchangeBalance } from "../components/billing/exchangeHelpers.js";
 import { buildBillItemsPayload } from "../components/billing/stockHelpers.js";
 import { customerName, money, variantLabel } from "../../utility/activitySummary.js";
 import { todayIST } from "../../utility/dateFormat.js";
@@ -30,6 +33,7 @@ import { listSlipPhotos } from "./billSlipPhotos.js";
 import { BILL_STATUS, billStatusFields, isDraft } from "./billStatus.js";
 import { listSalespersons } from "./salespersons.js";
 import { addStockByCode, undoStockAdds } from "./variants.js";
+import { parseExchange, planExchange, recordExchange } from "./exchanges.js";
 
 export class BillInputError extends Error {
   constructor(message) {
@@ -130,7 +134,10 @@ function parseItemRef(it, at) {
   return { kind: "manual_new", create: m.create };
 }
 
-function parsePayment(p) {
+// With an exchange, the credit may cover the whole bill: payment may then be left out, or 0 with
+// no method. prepareBill refuses nothing paid if something is left to pay.
+function parsePayment(p, { exchange = false } = {}) {
+  if (exchange && p == null) return { method: "", amount: 0, balance_due: 0 };
   if (!isObj(p)) fail("payment is required: { method, amount }");
   checkKeys(p, ["method", "amount", "balance_due"], "payment");
   const paid = num(p.amount, "payment.amount");
@@ -138,7 +145,7 @@ function parsePayment(p) {
   if (balanceDue < 0) fail("payment.balance_due must be >= 0");
   // Nothing paid yet is allowed only on a part-paid bill, which then has no
   // payment method until its first payment (the screen's partial finalize).
-  if (paid < 0 || (paid === 0 && balanceDue === 0)) fail("payment.amount must be > 0");
+  if (paid < 0 || (paid === 0 && balanceDue === 0 && !exchange)) fail("payment.amount must be > 0");
   const method = String(p.method ?? "").trim();
   if (paid > 0 && !method) fail("payment.method is required (e.g. Cash, UPI)");
   if (paid === 0 && method) fail("give no payment.method when nothing is paid yet");
@@ -185,7 +192,7 @@ export function parseBillSpec(spec) {
   if (!isObj(spec)) fail("Bill spec must be a JSON object");
   checkKeys(
     spec,
-    ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "salespersons", "draft", "stock_adds", "sold_total", "items"],
+    ["customer", "customerid", "date", "location", "payment", "notes", "skip_stock", "salespersons", "draft", "stock_adds", "sold_total", "exchange", "items"],
     "spec",
   );
   const draft = spec.draft ?? false;
@@ -200,7 +207,9 @@ export function parseBillSpec(spec) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(spec.date ?? "") || Number.isNaN(Date.parse(spec.date))) {
     fail(`date: expected YYYY-MM-DD, got "${spec.date ?? ""}"`);
   }
-  const payment = draft ? parseDraftPayment(spec.payment) : parsePayment(spec.payment);
+  const exchange = spec.exchange == null ? null : parseExchange(spec.exchange);
+  if (exchange && draft) fail("exchange is not supported on a draft bill");
+  const payment = draft ? parseDraftPayment(spec.payment) : parsePayment(spec.payment, { exchange: Boolean(exchange) });
   if (!Array.isArray(spec.items) || spec.items.length === 0) fail("items: at least one item is required");
   const soldTotal = spec.sold_total == null ? null : num(spec.sold_total, "sold_total");
   if (soldTotal != null && soldTotal <= 0) fail("sold_total must be > 0");
@@ -244,6 +253,7 @@ export function parseBillSpec(spec) {
     salespersons: salespersons.map((s) => (typeof s === "string" ? s.trim() : s)),
     stock_adds: parseStockAdds(spec.stock_adds),
     sold_total: soldTotal,
+    exchange,
     items,
   };
 }
@@ -484,6 +494,10 @@ export async function prepareBill(client, rawSpec) {
 
   const customer = await resolveCustomer(client, spec.customer, creates, warnings);
   if (creates.customer) warnings.push(...(await duplicateCustomerWarnings(client, creates.customer)));
+  const exchange = spec.exchange
+    ? await planExchange(client, spec.exchange, { customerid: customer?.customerid ?? null, date: spec.date })
+    : null;
+  if (exchange) warnings.push(...exchange.warnings);
   // The bill is checked as if the stock adds were already applied (createBill applies them first).
   const stockAdds = await planStockAdds(client, spec.stock_adds);
   const items0 = await resolveProductRefs(client, spec.items, stockAdds);
@@ -599,19 +613,25 @@ export async function prepareBill(client, rawSpec) {
     };
   });
 
-  // Stock: the same check the screen runs before finalizing, summed per variant.
+  // Stock: the same check the screen runs before finalizing, summed per variant. Pieces the
+  // exchange returns are back on the shelf first (exchange_record runs before the bill).
+  const backByVariant = {};
+  for (const r of exchange?.returned ?? []) {
+    if (r.stock) backByVariant[r.stock.variantid] = (backByVariant[r.stock.variantid] ?? 0) + r.qty;
+  }
   const qtyByVariant = {};
   for (const it of items) if (it.variantid) qtyByVariant[it.variantid] = (qtyByVariant[it.variantid] ?? 0) + it.quantity;
   const stock = Object.entries(qtyByVariant).map(([variantid, qty]) => {
     const v = variantById[variantid];
+    const before = Number(v.stock) + (backByVariant[variantid] ?? 0);
     return {
       variantid,
       productid: v.productid,
       size: v.size,
       color: v.color,
-      stock_before: Number(v.stock),
+      stock_before: before,
       change: spec.skip_stock ? 0 : -qty,
-      stock_after: spec.skip_stock ? Number(v.stock) : Number(v.stock) - qty,
+      stock_after: spec.skip_stock ? before : before - qty,
     };
   });
   if (!spec.skip_stock) {
@@ -635,27 +655,57 @@ export async function prepareBill(client, rawSpec) {
   // screen's "final amount"); the first payment is only part of it.
   const partial = spec.payment.balance_due > 0;
   const agreed = round2(spec.payment.amount + spec.payment.balance_due);
+  // Exchange credit comes off the total before the payment is checked against it, as the screen
+  // does (computeCreditsApplied; no store credit).
+  const exchangeCredit = exchange?.credit ?? 0;
+  const { effectiveTotal: effectiveGrandTotal } = computeCreditsApplied(computed.grandTotal, 0, exchangeCredit);
   const totals = computeBalanceAdjustedTotals(computed, {
     finalAmount: partial ? agreed : undefined,
     paymentAmount: spec.payment.amount,
-    effectiveGrandTotal: computed.grandTotal,
+    effectiveGrandTotal,
     items,
     selectedCodes: [],
     allDiscounts: [],
     voucherPreTax: 0,
     docType: DOC_TYPE,
   });
+  // The screen asks for payment whenever something is left to pay.
+  if (exchange && effectiveGrandTotal > 0 && agreed === 0) {
+    fail(`payment is required: ₹${round2(effectiveGrandTotal)} is left to pay after the exchange credit of ₹${exchangeCredit}`);
+  }
   // Against the line total before the balance discount: the screen's final
   // amount would otherwise discount away any shortfall.
-  const diff = round2(agreed - computed.grandTotal);
+  const diff = round2(agreed - effectiveGrandTotal);
+  const dueText = exchange
+    ? `what is left to pay after the exchange credit (bill total ${computed.grandTotal} − credit ${exchangeCredit} = ${round2(effectiveGrandTotal)})`
+    : `the bill total ${computed.grandTotal}`;
   if (Math.abs(diff) > PAYMENT_TOLERANCE) {
     fail(
       `Payment ${agreed}${partial ? ` (${spec.payment.amount} paid + ${spec.payment.balance_due} due)` : ""} ` +
-        `differs from the bill total ${computed.grandTotal} by ${Math.abs(diff)} (over ₹${PAYMENT_TOLERANCE}); ` +
+        `differs from ${dueText} by ${Math.abs(diff)} (over ₹${PAYMENT_TOLERANCE}); ` +
         `check line amounts, or give payment.balance_due for a part payment`,
     );
   }
-  if (diff > 0) warnings.push(`Customer paid ₹${diff} more than the bill total ${computed.grandTotal} (the screen records it as is)`);
+  if (diff > 0) warnings.push(`Customer paid ₹${diff} more than ${dueText} (the screen records it as is)`);
+
+  const { exchangeCreditUsed, effectiveTotal } = computeCreditsApplied(totals.grandTotal, 0, exchangeCredit);
+  const exchangeBalance = computeExchangeBalance(totals.grandTotal, 0, exchangeCredit);
+  const balanceTo = spec.exchange?.balance ?? null;
+  if (exchange) {
+    if (exchangeBalance > 0) {
+      if (partial) fail(`The exchange credit ₹${exchangeCredit} covers the whole bill, so there is no balance_due`);
+      if (!balanceTo) {
+        fail(
+          `The exchange credit ₹${exchangeCredit} is ₹${exchangeBalance} more than the bill total ${totals.grandTotal}: ` +
+            `give exchange.balance "store_credit" or "cash_refund", as the screen asks`,
+        );
+      }
+      if (balanceTo === "store_credit" && !customer?.customerid) fail("exchange.balance store_credit needs a customer");
+    } else if (balanceTo) {
+      fail(`exchange.balance is only for credit left over, and the bill total ${totals.grandTotal} uses all ₹${exchangeCredit} of it`);
+    }
+  }
+  const cashRefund = !partial && balanceTo === "cash_refund" ? exchangeBalance : 0;
 
   const bill = {
     customerid: customer.customerid,
@@ -665,16 +715,16 @@ export async function prepareBill(client, rawSpec) {
     gst_total: totals.gstTotal,
     discount_total: totals.itemLevelDiscountTotal + totals.overallDiscount + totals.balanceDiscount,
     taxable_total: totals.taxableTotal,
-    ...(partial ? { net_amount: totals.grandTotal, final_amount: agreed } : {}),
+    ...(partial ? { net_amount: effectiveTotal, final_amount: agreed } : {}),
     ...billStatusFields(partial ? BILL_STATUS.PARTIAL : BILL_STATUS.FINALIZED),
     // Bill cancel restores stock only when this is true; the column defaults to true.
     stock_reduced: !spec.skip_stock,
     applied_codes: [],
     payment_amount: spec.payment.amount,
     store_credit_used: 0,
-    exchange_credit_used: 0,
-    exchange_source_bill: null,
-    exchange_cash_refund: 0,
+    exchange_credit_used: exchangeCreditUsed,
+    exchange_source_bill: exchange?.source_bill ?? null,
+    exchange_cash_refund: cashRefund,
     saleslocationid: location.saleslocationid,
     salesmethodid: method?.salesmethodid ?? null,
     orderdate: spec.date + "T00:00:00+05:30",
@@ -695,11 +745,30 @@ export async function prepareBill(client, rawSpec) {
     stock_adds: stockAdds,
     // What each line sold for, from sold_total split by MRP share.
     ...(soldSplit ? { sold_split: soldSplit } : {}),
+    // The goods returned (or credit recorded earlier) that pay for part of the bill.
+    ...(exchange
+      ? {
+          exchange: {
+            kind: exchange.kind,
+            source_bill: exchange.source_bill,
+            returned: exchange.returned,
+            exchange_ids: exchange.exchange_ids,
+            credit: exchangeCredit,
+            credit_used: exchangeCreditUsed,
+            balance: exchangeBalance,
+            balance_to: exchangeBalance > 0 ? balanceTo : null,
+            // exchange_record's arguments (goods returned now), written before the bill.
+            record: exchange.record,
+            outside_window: exchange.outside_window,
+          },
+        }
+      : {}),
     totals: {
       mrp_total: totals.itemsSubtotal,
       line_discounts: totals.itemLevelDiscountTotal,
       balance_discount: totals.balanceDiscount,
       grand_total: totals.grandTotal,
+      ...(exchange ? { exchange_credit: exchangeCreditUsed, net_due: round2(effectiveTotal) } : {}),
       paid: spec.payment.amount,
       ...(partial ? { balance_due: spec.payment.balance_due } : {}),
     },
@@ -782,6 +851,10 @@ function prepareDraft(spec, { customer, creates, method, location, salespersons,
  * (bill_save_with_stock_adds), so a failure leaves neither and there is nothing to undo. A draft
  * has no bill_save op, so its stock adds are applied first with `stock add`'s writes and undone
  * (undoStockAdds) if the draft then fails, with the error saying how that went.
+ * An exchange returning goods is recorded first with exchange_record, as the Exchange page does
+ * before the bill screen opens; bill_save then spends its credit. Those are two transactions, as
+ * in the app: if the bill then fails, the exchange stays recorded (stock back, credit unspent) and
+ * the error gives the exchange ids to re-run with.
  */
 export async function createBill(client, rawSpec, { dryRun = false, source = "via CLI" } = {}) {
   const planned = await prepareBill(client, rawSpec);
@@ -794,7 +867,19 @@ export async function createBill(client, rawSpec, { dryRun = false, source = "vi
     if (planned.status !== BILL_STATUS.DRAFT) {
       // Re-resolve against the rows createReferenced made (ids actually assigned) before writing.
       const prepared = resolved !== rawSpec ? await prepareBill(client, resolved) : planned;
-      const saved = await insertBill(client, prepared, source);
+      const ex = prepared.exchange;
+      const exchangeIds = ex?.record ? await recordExchange(client, ex, { source }) : ex?.exchange_ids ?? [];
+      let saved;
+      try {
+        saved = await insertBill(client, prepared, source, exchangeIds);
+      } catch (e) {
+        if (ex?.record) {
+          e.message +=
+            ` — the exchange WAS recorded (exchange ids ${exchangeIds.join(", ")}, credit ₹${ex.credit}, returned stock is back) and its credit is not spent:` +
+            ` re-run with "exchange": {"exchange_ids": ${JSON.stringify(exchangeIds)}${ex.balance_to ? `, "balance": "${ex.balance_to}"` : ""}}`;
+        }
+        throw e;
+      }
       // The re-resolved plan bills the new customer by id, so keep the first plan's warnings
       // (possible duplicate customers) in the output too.
       return { ...saved, warnings: [...new Set([...planned.warnings, ...saved.warnings])], created };
@@ -890,7 +975,7 @@ const stockAddSummary = (a, source) =>
     ? `Added variant ${variantLabel(a.size, a.color)} to product ${a.productid} — ${a.name} (stock ${a.qty}) (${source})`
     : `Increased stock of ${variantLabel(a.size, a.color)}, product ${a.productid} — ${a.name}: ${a.stock_before} → ${a.stock} (+${a.qty}) (${source})`;
 
-async function insertBill(client, prepared, source) {
+async function insertBill(client, prepared, source, exchangeIds = []) {
   // bill_save takes the "don't reduce stock" choice as skip_stock and records stock_reduced from
   // it, so the bill row goes without that column.
   const { stock_reduced: stockReduced, ...bill } = prepared.bill;
@@ -906,6 +991,12 @@ async function insertBill(client, prepared, source) {
       // bill_save writes these as bill_salespersons rows, as for the screen's selector.
       ...(prepared.salespersons.length ? { salesperson_ids: prepared.salespersons.map((s) => s.salesperson_id) } : {}),
       ...(prepared.first_payment ? { first_payment: prepared.first_payment } : {}),
+      // The exchange credit the bill spends, linked by bill_save, and any left over put on store
+      // credit (finalize only), as the screen sends them.
+      ...(exchangeIds.length ? { exchange_ids: exchangeIds } : {}),
+      ...(prepared.exchange?.balance_to === "store_credit"
+        ? { exchange_balance_to_credit: prepared.exchange.balance }
+        : {}),
     },
   };
   // With stock adds, they and the bill are one transaction: the database adds the stock (or
@@ -950,6 +1041,17 @@ async function insertBill(client, prepared, source) {
     negative_stock: saved.negative_stock ?? [],
     warnings: prepared.warnings,
     ...(stockAdds.length && { stock_adds: stockAdds }),
+    ...(prepared.exchange && {
+      exchange: {
+        source_bill: prepared.exchange.source_bill,
+        exchange_ids: exchangeIds,
+        credit: prepared.exchange.credit,
+        credit_used: prepared.exchange.credit_used,
+        balance: prepared.exchange.balance,
+        balance_to: prepared.exchange.balance_to,
+        returned: prepared.exchange.returned,
+      },
+    }),
   };
 }
 
@@ -1110,7 +1212,9 @@ export function checkBillAgainstSpec(rawSpec, bill) {
   // Line totals the spec asks for (goods + alteration) against the bill's. A finalized bill's are
   // lower by the balance discount that trims them to the amount agreed, spread over the lines in
   // proportion, so each is compared after its share. A draft has no balance discount.
-  const agreed = round2((spec.payment.amount ?? 0) + spec.payment.balance_due);
+  // Exchange credit pays for part of the bill, on top of what the customer pays.
+  const exchangeCredit = Number(bill.exchange_credit_used ?? 0);
+  const agreed = round2((spec.payment.amount ?? 0) + spec.payment.balance_due + exchangeCredit);
   const split = spec.sold_total == null
     ? null
     : splitByMrpShare(spec.sold_total, paired.map(([it, line]) => round2(Number(line.mrp) * it.qty)));
@@ -1147,6 +1251,11 @@ export function checkBillAgainstSpec(rawSpec, bill) {
   const paidMatches = paid == null || spec.payment.amount == null ? paid === spec.payment.amount : near(paid, spec.payment.amount, PAISA);
   if (!paidMatches) differs("paid", spec.payment.amount, paid);
   if (!eqi(bill.payment_method, spec.payment.method)) differs("method", spec.payment.method || null, bill.payment_method ?? null);
+  if (spec.exchange && !(exchangeCredit > 0)) differs("exchange credit", "> 0", exchangeCredit);
+  if (!spec.exchange && exchangeCredit > 0) differs("exchange credit", 0, exchangeCredit);
+  if (spec.exchange?.kind === "return" && bill.exchange_source_bill !== spec.exchange.bill) {
+    differs("exchange bill", spec.exchange.bill, bill.exchange_source_bill ?? null);
+  }
 
   const onBill = bill.salespersons ?? [];
   const matches = (ref, s) => (typeof ref === "number" || /^\d+$/.test(ref) ? s.salesperson_id === Number(ref) : eqi(s.name, ref));
@@ -1175,6 +1284,7 @@ export function checkBillAgainstSpec(rawSpec, bill) {
         };
       }),
       total: Number(bill.totalamount),
+      ...(exchangeCredit > 0 && { exchange_credit: exchangeCredit, exchange_bill: bill.exchange_source_bill ?? null }),
       paid,
       method: bill.payment_method ?? null,
       salespersons: onBill.map((s) => s.name),

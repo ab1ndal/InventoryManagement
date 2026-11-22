@@ -371,10 +371,12 @@ become a new variant. Quote the size: `|` is a shell pipe.
 `bill create` makes a **finalized Bill of Supply**, fully paid or part paid,
 writing what the billing screen's Finalize (or partial finalize) button writes
 for a new bill, or, with `"draft": true`, a **draft bill** as the screen's
-Save Draft writes it (see [Draft bills](#draft-bills)). `bill preview` shows
-all of it without writing. Not supported: discount codes, vouchers, store
-credit, exchanges, recording a later payment or finishing a draft (use the
-Bills screen), per-line salespersons, SMS. The bill's PDF is a separate step:
+Save Draft writes it (see [Draft bills](#draft-bills)), and an exchange
+(goods returned from an earlier bill paying for part of the new one, see
+[Exchanges](#exchanges)). `bill preview` shows all of it without writing.
+Not supported: discount codes, vouchers, store credit, recording a later
+payment or finishing a draft (use the Bills screen), per-line salespersons,
+SMS. The bill's PDF is a separate step:
 [bill pdf](#bill-pdf), or [slip finish](#slip-finish) does create, PDF and a
 check in one command.
 
@@ -426,12 +428,13 @@ Customer fields for `create` / `create_if_missing`: `first` (required),
 |---|---|---|
 | `date` | yes | `YYYY-MM-DD`, stored as the bill date; the FY of the bill number follows it |
 | `payment.method` | yes, unless nothing is paid | a sales method name (Cash, UPI, Card, Paytm, GPay, Mixed); not Website. Split payments: one combined amount, method `Mixed`, the split in `notes` |
-| `payment.amount` | yes | what the customer paid (the slip's net amount, or the first payment of a part-paid bill) |
+| `payment.amount` | yes, unless an exchange covers the bill | what the customer paid (the slip's net amount, or the first payment of a part-paid bill). With an [exchange](#exchanges), what was paid on top of the credit |
 | `payment.balance_due` | no | what the customer still owes (slip "bal 3950"); > 0 makes a part-paid bill priced at `amount + balance_due`. Nothing paid yet: `"amount": 0` and no `method`; the bill then has no payment method and no `bill_payments` row, as on the screen |
 | `location` | no | sales location name, default `Walk-In` |
 | `notes` | no | e.g. `"Paper bill 387; Cash 1000 + UPI 950"` |
 | `skip_stock` | no | `true` = don't touch stock (the screen's "backdated" checkbox); default reduces stock |
 | `draft` | no | `true` = save as a draft bill, for a slip marked "not confirmed yet" ([Draft bills](#draft-bills)); default `false` |
+| `exchange` | no | goods returned from an earlier bill whose credit pays for part of this one, or credit recorded earlier: see [Exchanges](#exchanges) |
 | `stock_adds` | no | stock to add before the bill, for pieces on the shelf but not in the inventory: a list of `{ "code", "size", "color", "qty"[, "new_variant": true] }`, each exactly a [stock add](#stock-add) (see [Stock adds](#stock-adds)); default none |
 | `salespersons` | no | the bill's salespeople (names at the top right of the slip): a list of names (case-insensitive) and/or ids from `salesperson list`, e.g. `["Asha", 4]`. Refused: an unknown name or id, an inactive salesperson (the screen does not offer them), a name two active salespersons share (give the id). Saved as the screen's Salesperson(s) selector saves them: `bill_salespersons` rows, written by `bill_save`. Lines get no salesperson. Default none |
 | `items[].qty` | yes | > 0; decimals for meter items |
@@ -579,6 +582,107 @@ salespersons or stock write that fails keeps the draft: it is listed in
 `save_errors` and the exit code is `1`; fix it on the Billing screen.
 Output is as for a finalized bill with `"status": "draft"`.
 
+### Exchanges
+
+A slip where the customer brings back something bought on an earlier bill
+and buys something else on the same visit: the returned goods' credit pays
+for part of the new bill and the slip shows the difference paid. Add an
+`exchange` block:
+
+```json
+{
+  "customerid": 453,
+  "date": "2026-11-14",
+  "payment": { "method": "Mixed", "amount": 2250 },
+  "notes": "Paper bill 999; GPay 1250 + Cash 1000",
+  "exchange": {
+    "bill": "FY26-000123",
+    "items": [{ "product": "BC26001", "size": "M|38", "color": "Black", "qty": 1, "reason": "size" }]
+  },
+  "items": [
+    { "manual_item": { "create": { "name": "3Pc Suit", "category": "S3P", "mrp": 7995, "cost": "ZCHEZ", "size": "38", "color": "Black" } }, "qty": 1, "amount": 5000 }
+  ]
+}
+```
+
+It is recorded exactly as the app records an exchange: first the Exchange
+page's step (`exchange_record`: the returned pieces go back in stock and the
+credit is saved for the customer), then the bill screen's Finalize
+(`bill_save` with the credit applied and the exchange linked to the new
+bill). The credit is never typed in: it is what the returned lines sold for,
+worked out as the Exchange page does (`calcItemCredit`: the line's total for
+the units returned).
+
+| Field | Required | Notes |
+|---|---|---|
+| `exchange.bill` | yes | the bill the goods were bought on (`FY26-000NNN`); must be fully paid and the same customer's |
+| `exchange.items[]` | yes | each returned line: `product` (+ `size`, `color`, matched case-insensitively) or `bill_item_id` (from `bill get`), and `qty` (whole number). `reason` is optional |
+| `exchange.balance` | only when the credit is more than the new bill | `"store_credit"` (the leftover goes on the customer's store credit) or `"cash_refund"` (paid back in cash), the screen's two choices. Refused when nothing is left over |
+| `exchange.exchange_ids` | instead of `bill` + `items` | credit already recorded and not spent yet (on the Exchange page, or by a `bill create` whose bill then failed): e.g. `[77]`. Nothing is returned or restocked again |
+
+How it becomes a bill, as on the screen:
+
+- The new bill's lines and total are what was sold (here 5000). The credit
+  comes off that total: `exchange_credit_used`, and `payment.amount` is what
+  is left (5000 − 2750 = 2250). The ₹100 payment check and the balance
+  discount work on what is left after the credit. `payment` may be left out
+  when the credit covers the whole bill.
+- `bill.exchange_source_bill` is the source bill's number;
+  `exchange_cash_refund` is the leftover for `"cash_refund"`; for
+  `"store_credit"` the leftover is sent as `exchange_balance_to_credit`.
+- Part payment works as without an exchange: `amount + balance_due` is
+  what is left after the credit.
+- A new line of the same variant as a returned piece counts the returned
+  piece as back on the shelf (the return is recorded first).
+
+Refused in the preview, before anything is written (each the same rule the
+database applies, so credit is never given twice):
+
+- the source bill does not exist, is not fully paid (part-paid, draft,
+  cancelled), is an online order not delivered yet, or is another
+  customer's;
+- a returned line not on the source bill (the error lists its lines), a
+  product on two lines with no size/colour to tell them apart (give
+  `bill_item_id`), the same line twice, a line with an alteration charge;
+- more than is left to return on a line: the error says how much was
+  returned before and, for each earlier exchange, whether its credit was
+  spent (on which bill) or not. Unspent credit for that return is used with
+  `"exchange_ids"`, not by returning the piece again;
+- more credit than the source bill holds (what was paid for it, less
+  credit already given from it);
+- `exchange_ids` that do not exist, were already spent, or are another
+  customer's;
+- credit above the new bill without `balance`; nothing paid while something
+  is left to pay; `exchange` on a draft.
+
+Warned (non-blocking): the exchange is more than 7 days after the source
+bill (or its delivery) — the Exchange page asks to allow it, and
+`bill create` writes the same activity entry it does; a source bill saved
+with "don't reduce stock" (the return still puts the piece back, as in the
+app); a returned manual item, whose stock is not changed: a sale never
+takes manual-item stock (every manual item keeps stock 1, sold or not), so
+there is nothing to put back, and the Exchange page does the same.
+
+Not done: the return receipt PDF (the Exchange page prints one; the bill's
+PDF shows the credit), a return with no new purchase (use the Exchange
+page).
+
+**Return date.** The exchange's `returndate` is the slip date (at midday),
+passed to `exchange_record` as `p_returndate`. That needs
+`schema/migration_exchange_record_return_date.sql` on the database; until
+the owner runs it, `bill create` refuses an exchange with `the owner must
+run schema/migration_exchange_record_return_date.sql first` before the
+exchange or the bill is written (a customer or manual item the spec creates
+is made first; the error's `NOTE` says so). `bill preview` works either way. The Exchange page has no date
+field, so its exchanges are still dated when they are entered.
+
+**Two writes, as in the app.** `bill create` runs `exchange_record`, logs
+`Exchange recorded on bill #FY26-000123 — 1 item, ₹2750.00 credit (via CLI)`,
+then saves the bill with `bill_save`. If `exchange_record` refuses, nothing
+is saved. If the bill then fails, the exchange stays recorded (stock back,
+credit unspent) and the error ends with the exact block to re-run with:
+`re-run with "exchange": {"exchange_ids": [77]}`.
+
 ### bill preview
 
 ```bash
@@ -595,6 +699,14 @@ would be inserted (bill number and ids are assigned on create), `stock` (per var
 `stock_after`), `stock_adds` (the [stock adds](#stock-adds) applied with the bill, `[]` if none), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
 `grand_total`, `paid`, and `balance_due` on a part-paid bill), `first_payment`
 (the `bill_payments` row a part-paid bill gets, else `null`) and `warnings`.
+With an [exchange](#exchanges), also `exchange`: `kind` (`return` or
+`recorded`), `source_bill`, `returned` (per line: `bill_item_id`, `code`,
+`name`, `size`, `color`, `qty`, `credit`, and `stock` `{ variantid,
+stock_before, stock_after }` for the piece going back, `null` for a manual
+item; for `exchange_ids`, each exchange), `exchange_ids`, `credit`,
+`credit_used`, `balance` (credit left over), `balance_to`, `record` (the
+exact `exchange_record` arguments) and `outside_window`; `totals` adds
+`exchange_credit` and `net_due` (what is left to pay after it).
 
 ### bill create
 
@@ -610,6 +722,7 @@ checked before the bill is written, so a bad photo stops the command with
 nothing saved. With `--dry-run` the output lists each photo's upload size.
 
 Writes, in order: the customer and manual items from `creates` (if any), the
+[exchange](#exchanges)'s `exchange_record` (if it returns goods), the
 spec's [stock adds](#stock-adds) (if any, inside the same call, as
 `bill_save_with_stock_adds`), then as the screen does, one `bill_save` call that saves the bill (the database
 assigns the next `FY26-000NNN`), its items, its salespersons, the stock change per inventory
@@ -631,7 +744,9 @@ left to delete. Then an activity-log entry
 }
 ```
 
-The output also has `salespersons` and `created` (`customer`, `manual_items`). `negative_stock`
+The output also has `salespersons` and `created` (`customer`, `manual_items`), and with an
+[exchange](#exchanges) `exchange` (`source_bill`, `exchange_ids`, `credit`, `credit_used`,
+`balance`, `balance_to`, `returned`). `negative_stock`
 lists any variant (`variantid`, `stock`) the save took below zero, which can
 only happen if stock was sold elsewhere after the preview; recount those. If the bill
 fails after a customer or manual item was created, the error ends with
@@ -770,7 +885,8 @@ new customer's name), date (the shop's day), status (finalized / partial /
 draft), number of lines, each line's product code (and colour / size if
 the spec gives them), variant id or manual item, qty, alteration and amount
 (to the rupee, after the line's share of the balance discount), the total
-(`amount + balance_due`, not for a draft), the amount paid, the payment
+(`amount + balance_due` plus the bill's exchange credit, not for a draft),
+the exchange (credit on the bill, and the source bill number), the amount paid, the payment
 method and the salespersons. Each difference is one `mismatches` line, e.g.
 `items[0] amount: spec 1800, bill 1700`. Paying more than the line total
 (a preview warning) shows as a `total` mismatch.

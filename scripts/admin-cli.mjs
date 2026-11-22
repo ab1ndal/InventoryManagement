@@ -44,6 +44,7 @@ const { listSalespersons } = await import("../src/admin/lib/salespersons.js");
 const { prepareBill, createBill, getBill, findBills, checkBillAgainstSpec, BillInputError } = await import(
   "../src/admin/lib/bills.js"
 );
+const { ExchangeInputError } = await import("../src/admin/lib/exchanges.js");
 const { listSlipPhotos, addSlipPhoto, downloadSlipPhoto, SlipPhotoInputError, MAX_SLIP_BYTES } = await import(
   "../src/admin/lib/billSlipPhotos.js"
 );
@@ -483,6 +484,7 @@ main(process.argv.slice(2)).catch((err) => {
     err instanceof ProductInputError ||
     err instanceof VariantInputError ||
     err instanceof BillInputError ||
+    err instanceof ExchangeInputError ||
     err instanceof SlipPhotoInputError ||
     err instanceof BillPdfError ||
     err instanceof SlipFileError;
