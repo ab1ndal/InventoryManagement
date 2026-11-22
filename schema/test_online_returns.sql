@@ -1292,9 +1292,9 @@ begin
     assert sqlerrm like '%no items%', 'empty: ' || sqlerrm;
   end;
   assert pg_temp.stock(v) = 6, 'nothing else restocked';
-  assert not has_function_privilege('anon', 'public.exchange_record(int,int,jsonb)', 'execute'), 'anon';
-  assert has_function_privilege('authenticated', 'public.exchange_record(int,int,jsonb)', 'execute'), 'authenticated';
-  assert has_function_privilege('service_role', 'public.exchange_record(int,int,jsonb)', 'execute'), 'service_role';
+  assert not has_function_privilege('anon', 'public.exchange_record(int,int,jsonb,timestamp)', 'execute'), 'anon';
+  assert has_function_privilege('authenticated', 'public.exchange_record(int,int,jsonb,timestamp)', 'execute'), 'authenticated';
+  assert has_function_privilege('service_role', 'public.exchange_record(int,int,jsonb,timestamp)', 'execute'), 'service_role';
 end $$;
 rollback;
 

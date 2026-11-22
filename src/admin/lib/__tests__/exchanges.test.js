@@ -72,7 +72,8 @@ describe("parseExchange", () => {
     [{ bill: "FY26-000123" }, /at least one returned item/],
     [{ bill: "FY26-000123", items: [{ product: "BC1", qty: 1 }], exchange_ids: [1] }, /not both/],
     [{ items: [{ product: "BC1", qty: 1 }] }, /exchange.bill is required/],
-    [{ bill: "FY26-000123", items: [{ product: "BC1", qty: 1.5 }] }, /qty must be a whole number > 0/],
+    [{ bill: "FY26-000123", items: [{ product: "BC1", qty: "1" }] }, /qty must be a number > 0/],
+    [{ bill: "FY26-000123", items: [{ product: "BC1", qty: 0 }] }, /qty must be a number > 0/],
     [{ bill: "FY26-000123", items: [{ product: "BC1", bill_item_id: 3, qty: 1 }] }, /exactly one of product or bill_item_id/],
     [{ bill: "FY26-000123", items: [{ bill_item_id: 3, size: "M", qty: 1 }] }, /color\/size only go with product/],
     [{ bill: "FY26-000123", items: [{ product: "BC1", qty: 1, colour: "Red" }] }, /unknown field\(s\) colour/],
@@ -278,6 +279,58 @@ describe("prepareBill with an exchange", () => {
     expect(p.exchange.record.p_items[0]).toMatchObject({ variantid: null, product_code: "BCX26001" });
     expect(p.exchange.record.p_items[0]).not.toHaveProperty("manual_item_id");
     expect(p.warnings).toEqual([]);
+  });
+
+  // Fabric by the metre goes back whole (schema/migration_exchange_fractional_qty.sql).
+  const fabricLine = { ...sourceLine, variantid: null, product_code: "BCX26002", product_name: "Fabric", quantity: 3.5, unit_type: "meter" };
+  const fabricDb = (overrides = {}, line = fabricLine) =>
+    fakeSupabase(db({
+      "bill_items.select": { data: [line], error: null },
+      "manual_items.select": { data: [{ manual_item_id: "BCX26002", size: null, color: "Blue", stock: 0 }], error: null },
+      ...overrides,
+    }));
+  const fabricSlip = (qty) => ({ ...exchangeSlip, exchange: { bill: "FY26-000123", items: [{ product: "BCX26002", qty }] } });
+
+  it("returns a 3.5 m fabric line whole, for the line's total", async () => {
+    const p = await prepareBill(fabricDb(), fabricSlip(3.5));
+    expect(p.exchange.returned[0]).toMatchObject({
+      qty: 3.5, credit: 1500, stock: { manual_item_id: "BCX26002", stock_before: 0, stock_after: 3.5 },
+    });
+    expect(p.exchange.record.p_items[0]).toMatchObject({ quantity: 3.5, credit_amount: 1500 });
+  });
+
+  it.each([1.5, 1, 3])("refuses part of a fabric length (%s of 3.5 m), saying what can be returned", async (qty) => {
+    await expect(prepareBill(fabricDb(), fabricSlip(qty))).rejects.toThrow(
+      /BCX26002 Blue \(bill_item_id 5001\) is fabric sold by the metre: Fabric goes back whole.*Give qty 3\.5 \(all that is left\)/,
+    );
+  });
+
+  it("returns a 2 m fabric line only whole", async () => {
+    const twoMetres = { ...fabricLine, quantity: 2 };
+    await expect(prepareBill(fabricDb({}, twoMetres), fabricSlip(1))).rejects.toThrow(/Give qty 2 \(all that is left\)/);
+    const p = await prepareBill(fabricDb({}, twoMetres), fabricSlip(2));
+    expect(p.exchange.returned[0]).toMatchObject({ qty: 2, credit: 1500 });
+  });
+
+  it("keeps a fractional line that is not sold by the metre to whole numbers", async () => {
+    const pieceLine = { ...fabricLine, unit_type: "piece", quantity: 2.5 };
+    await expect(prepareBill(fabricDb({}, pieceLine), fabricSlip(2.5))).rejects.toThrow(/qty must be a whole number, got 2\.5/);
+  });
+
+  it("returns the rest of a fabric line whole after a metre went back earlier (before the whole-only rule)", async () => {
+    const earlier = { exchangeid: 61, original_bill_item_id: 5001, quantity: 1, credit_amount: 428.57, new_billid: 701, new_bill: { bill_number: "FY26-000124" } };
+    const p = await prepareBill(fabricDb({ "exchanges.select": { data: [earlier], error: null } }), {
+      ...fabricSlip(2.5), payment: { method: "Cash", amount: 728.57 },
+    });
+    expect(p.exchange.returned[0]).toMatchObject({ qty: 2.5, credit: 1071.43 });
+    await expect(prepareBill(fabricDb({ "exchanges.select": { data: [earlier], error: null } }), fabricSlip(1.5)))
+      .rejects.toThrow(/Give qty 2\.5/);
+  });
+
+  it("keeps piece lines to whole numbers", async () => {
+    await expect(prepareBill(fakeSupabase(db()), {
+      ...exchangeSlip, exchange: { bill: "FY26-000123", items: [{ product: "BC26001", qty: 0.5 }] },
+    })).rejects.toThrow(/BC26001 .*\(bill_item_id 5001\): qty must be a whole number, got 0\.5/);
   });
 });
 

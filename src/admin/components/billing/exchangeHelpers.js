@@ -56,6 +56,28 @@ export function calcItemCredit(bi, returnQty) {
   return Math.max(0, Math.min(round2(total * (returnQty / fullQty)), round2(upToNow)));
 }
 
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
+/** What is left to return on a line: its quantity less bi.returnedQty, to 3 decimals as stored. */
+export function returnableLeft(bi) {
+  return Math.max(0, round3(Number(bi?.quantity || 0) - Number(bi?.returnedQty || 0)));
+}
+
+/** Fabric sold by the metre goes back whole or not at all (owner, 2026-11-22). */
+export function isWholeOnlyLine(bi) {
+  return bi?.unit_type === "meter";
+}
+
+/**
+ * A return quantity exchange_record accepts (schema/migration_exchange_fractional_qty.sql): on a
+ * metre line only all that is left (3.5 of 3.5 m; not 1.5 or 1 of it), on any other line a whole
+ * number up to what is left.
+ */
+export function isAllowedReturnQty(qty, left, wholeOnly) {
+  if (!(qty > 0 && qty <= left)) return false;
+  return wholeOnly ? qty === left : Number.isInteger(qty);
+}
+
 /** Sum already-returned qty per bill_item_id from existing exchanges rows. */
 export function buildReturnedQtyMap(existingExchanges) {
   const map = {};

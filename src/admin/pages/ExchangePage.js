@@ -24,6 +24,8 @@ import {
   calcItemCredit,
   isExchangeEligible,
   isWithinExchangeWindow,
+  returnableLeft,
+  isWholeOnlyLine,
   daysSinceBill,
   EXCHANGE_WINDOW_DAYS,
 } from "../components/billing/exchangeHelpers";
@@ -34,6 +36,7 @@ const EXCHANGE_ERRORS = {
   EXCHANGE_BILL_NOT_FINAL: "Only a fully paid bill can be exchanged. This bill is not paid in full, or was changed or cancelled. Search for it again.",
   EXCHANGE_OVER_LINE: "The credit is more than this item was sold for. Search for the bill again and retry.",
   EXCHANGE_OVER_HELD: "This bill has already given back what the customer paid for it, as an earlier exchange, refund or store credit. No more credit can come from it.",
+  EXCHANGE_WHOLE_LINE: "Fabric goes back whole: return the full length on the bill, or nothing. Search for the bill again and retry.",
 };
 
 export default function ExchangePage() {
@@ -212,7 +215,7 @@ export default function ExchangePage() {
     try {
       const { data: items, error: e1 } = await supabase
         .from("bill_items")
-        .select("bill_item_id, billid, product_name, product_code, category, quantity, mrp, discount_total, alteration_charge, stitch_type, total, variantid")
+        .select("bill_item_id, billid, product_name, product_code, category, quantity, mrp, discount_total, alteration_charge, stitch_type, total, variantid, unit_type")
         .eq("billid", bill.billid);
       if (e1) throw e1;
 
@@ -264,9 +267,7 @@ export default function ExchangePage() {
       const augmented = allItems.map(item => {
         const eligible = isExchangeEligible(item);
         const returnedQty = returnedQtyMap[item.bill_item_id] || 0;
-        const maxReturnQty = eligible
-          ? Math.max(0, Number(item.quantity || 0) - returnedQty)
-          : 0;
+        const maxReturnQty = eligible ? returnableLeft({ quantity: item.quantity, returnedQty }) : 0;
         const isExchanged = eligible && returnedQty > 0 && maxReturnQty === 0;
         const creditGiven = creditGivenMap[item.bill_item_id] || 0;
         return { ...item, isEligible: eligible, maxReturnQty, isExchanged, returnedQty, creditGiven };
@@ -286,8 +287,10 @@ export default function ExchangePage() {
     }
   }
 
+  // Pieces go back in whole numbers; a metre line goes back whole only, through its checkbox
+  // (exchange_record refuses anything else, EXCHANGE_WHOLE_LINE).
   function handleQtyChange(bill_item_id, v, max) {
-    const n = Math.max(0, Math.min(Number(v) || 0, Number(max) || 0));
+    const n = Math.max(0, Math.min(Math.trunc(Number(v) || 0), Math.floor(Number(max) || 0)));
     setReturnQtyMap(prev => ({ ...prev, [bill_item_id]: n }));
   }
 
@@ -504,7 +507,21 @@ export default function ExchangePage() {
                     </div>
                     <div className="col-span-1 text-right tabular-nums">{bi.quantity}</div>
                     <div className="col-span-2 text-right">
-                      {bi.isEligible && !bi.isExchanged ? (
+                      {bi.isEligible && !bi.isExchanged && isWholeOnlyLine(bi) ? (
+                        <label className="inline-flex items-center gap-1.5 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={Number(returnQtyMap[bi.bill_item_id] || 0) === bi.maxReturnQty}
+                            onChange={(e) =>
+                              setReturnQtyMap((prev) => ({
+                                ...prev,
+                                [bi.bill_item_id]: e.target.checked ? bi.maxReturnQty : 0,
+                              }))
+                            }
+                          />
+                          Return all {bi.maxReturnQty}
+                        </label>
+                      ) : bi.isEligible && !bi.isExchanged ? (
                         <Input
                           type="number"
                           min={0}
