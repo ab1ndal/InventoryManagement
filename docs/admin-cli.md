@@ -279,9 +279,9 @@ node scripts/admin-cli.mjs manual-item find --name dupatta --in-stock
 | `--name` | substring of the name |
 | `--in-stock` | only `stock > 0` |
 
-Returns up to 20 rows, newest first, each with `cost_zcode`. Caution: the app
-never reduces manual-item stock when one is sold, so `stock: 1` does not prove
-the piece is unsold.
+Returns up to 20 rows, newest first, each with `cost_zcode`. A sale takes
+manual-item stock (`schema/migration_manual_item_stock.sql`), so `stock` 0 means
+sold and `--in-stock` lists unsold items. Fabric stock is in metres (e.g. 1.5).
 
 ## manual-item create
 
@@ -467,6 +467,11 @@ How amounts become a bill, as on the screen:
   when the product has only one, else left as `'<size>'` / `'<color>'` to
   fill in. Check the slip and shelf before running it, or put the same add
   in the spec's [`stock_adds`](#stock-adds).
+- An existing manual item (`manual_item_id` / `manual_item { id }`) with too
+  little stock is refused too: `Insufficient stock: manual item BCX26125 (…)
+  has 0, needs 1. It is already sold; for a different piece, use
+  manual_item { create } instead`. A manual item the spec creates starts with
+  its line's quantity as stock (3.5 for 3.5 m of fabric), so its sale leaves 0.
 - Warned (non-blocking): a line discount over 30% (the screen asks to
   confirm), paying more than the total (recorded as is).
 - Warned (non-blocking) when the spec would **create** a customer
@@ -487,7 +492,8 @@ How amounts become a bill, as on the screen:
   (no `recorded_at` when the bill is dated today). Stock moves with reason
   `bill_partial_finalize`. The rest is recorded later on the Bills screen.
 - Inventory lines get `cost_price: null` and manual lines the item's cost, as
-  on the screen. Manual-item stock is not changed (the app never does).
+  on the screen. A manual line takes its item's stock by its exact quantity
+  (fabric by the metre), as a variant's is taken.
 
 ### Stock adds
 
@@ -574,7 +580,8 @@ It is written exactly as the billing screen's **Save Draft** on a new bill
 
 Writes, in the screen's order: the `bills` row, its `bill_items` (if they
 fail, the bill row is deleted again, as the screen does), its
-`bill_salespersons`, then one `stock_adjust` per variant, then an
+`bill_salespersons`, then one `stock_adjust` per variant and one
+`manual_item_stock_adjust` per manual item, then an
 activity-log entry `Created draft bill #… for … — ₹…, N items (via CLI)`.
 These are separate writes, not one transaction, because the database's
 `bill_save` has no draft op and the screen saves a new draft this way. A
@@ -659,9 +666,9 @@ Warned (non-blocking): the exchange is more than 7 days after the source
 bill (or its delivery) — the Exchange page asks to allow it, and
 `bill create` writes the same activity entry it does; a source bill saved
 with "don't reduce stock" (the return still puts the piece back, as in the
-app); a returned manual item, whose stock is not changed: a sale never
-takes manual-item stock (every manual item keeps stock 1, sold or not), so
-there is nothing to put back, and the Exchange page does the same.
+app). A returned manual item goes back in stock like a variant:
+`exchange_record` finds it from the returned line. Returns are whole
+numbers, so part of a metre of fabric cannot be returned.
 
 Not done: the return receipt PDF (the Exchange page prints one; the bill's
 PDF shows the credit), a return with no new purchase (use the Exchange
@@ -695,15 +702,15 @@ rows that would be created first, with the ids the manual items will get;
 `customer` there means `bill.customerid` is filled in on create),
 `payment_method`, `location`, `salespersons` (`salesperson_id`, `name`, `[]`
 if none), the exact `bill` row and `bill_items` rows that
-would be inserted (bill number and ids are assigned on create), `stock` (per variant: `stock_before`, `change`,
-`stock_after`), `stock_adds` (the [stock adds](#stock-adds) applied with the bill, `[]` if none), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
+would be inserted (bill number and ids are assigned on create), `stock` (per variant: `variantid`, `productid`, `size`, `color`,
+`stock_before`, `change`, `stock_after`; per manual item: `manual_item_id`, `name`, `stock_before`, `change`, `stock_after`), `stock_adds` (the [stock adds](#stock-adds) applied with the bill, `[]` if none), `totals` (`mrp_total`, `line_discounts`, `balance_discount`,
 `grand_total`, `paid`, and `balance_due` on a part-paid bill), `first_payment`
 (the `bill_payments` row a part-paid bill gets, else `null`) and `warnings`.
 With an [exchange](#exchanges), also `exchange`: `kind` (`return` or
 `recorded`), `source_bill`, `returned` (per line: `bill_item_id`, `code`,
 `name`, `size`, `color`, `qty`, `credit`, and `stock` `{ variantid,
-stock_before, stock_after }` for the piece going back, `null` for a manual
-item; for `exchange_ids`, each exchange), `exchange_ids`, `credit`,
+stock_before, stock_after }` (or `{ manual_item_id, … }` for a manual item)
+for the piece going back; for `exchange_ids`, each exchange), `exchange_ids`, `credit`,
 `credit_used`, `balance` (credit left over), `balance_to`, `record` (the
 exact `exchange_record` arguments) and `outside_window`; `totals` adds
 `exchange_credit` and `net_due` (what is left to pay after it).
@@ -726,7 +733,7 @@ Writes, in order: the customer and manual items from `creates` (if any), the
 spec's [stock adds](#stock-adds) (if any, inside the same call, as
 `bill_save_with_stock_adds`), then as the screen does, one `bill_save` call that saves the bill (the database
 assigns the next `FY26-000NNN`), its items, its salespersons, the stock change per inventory
-variant (none with `skip_stock`) and, on a part-paid bill, the first payment,
+variant and manual item (none with `skip_stock`) and, on a part-paid bill, the first payment,
 all in one transaction: if any part fails, nothing is saved and no bill is
 left to delete. Then an activity-log entry
 `Finalized bill #… for … — ₹…, N items (via CLI)`.
@@ -747,7 +754,7 @@ left to delete. Then an activity-log entry
 The output also has `salespersons` and `created` (`customer`, `manual_items`), and with an
 [exchange](#exchanges) `exchange` (`source_bill`, `exchange_ids`, `credit`, `credit_used`,
 `balance`, `balance_to`, `returned`). `negative_stock`
-lists any variant (`variantid`, `stock`) the save took below zero, which can
+lists any variant (`variantid`, `stock`) or manual item (`manual_item_id`, `stock`) the save took below zero, which can
 only happen if stock was sold elsewhere after the preview; recount those. If the bill
 fails after a customer or manual item was created, the error ends with
 `NOTE: … were already created` — re-run with `customer { id }` /

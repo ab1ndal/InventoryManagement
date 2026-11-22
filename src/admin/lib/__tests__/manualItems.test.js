@@ -81,6 +81,13 @@ describe("createManualItem", () => {
     });
     const saved = await createManualItem(client, { ...input, cost: "50" }, { now: oct2026 });
     expect(saved).toMatchObject({ manual_item_id: "BCX26129", purchase_price: 50, stock: 1, cost_zcode: "ZEZ" });
+    // No stock given: the column default (1) applies.
+    expect(client.calls.find((c) => c.op === "insert").row).not.toHaveProperty("stock");
+  });
+
+  it("sets the stock given (a bill line's quantity, fractional for fabric)", async () => {
+    const out = await createManualItem(fakeSupabase(ok), { ...input, stock: 3.5 }, { dryRun: true, now: oct2026 });
+    expect(out.would_insert.stock).toBe(3.5);
   });
 
   it.each([
@@ -91,6 +98,8 @@ describe("createManualItem", () => {
     [{ ...input, cost: "ZZ" }, /valid cost is required/i],
     // No cost on an MRP so small that half of it rounds to 0.
     [{ ...input, cost: "", mrp: "8" }, /valid cost is required/i],
+    [{ ...input, stock: 0 }, /invalid stock "0"/i],
+    [{ ...input, stock: "x" }, /invalid stock "x"/i],
   ])("rejects bad input %#", async (bad, msg) => {
     await expect(createManualItem(fakeSupabase(ok), bad, { now: oct2026 })).rejects.toThrow(msg);
   });

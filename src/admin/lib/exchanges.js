@@ -158,7 +158,7 @@ async function planReturn(client, ex, { customerid, date }) {
       ? one(client.from("productsizecolors").select("variantid, size, color, stock").in("variantid", variantIds))
       : [],
     manualCodes.length
-      ? one(client.from("manual_items").select("manual_item_id, size, color").in("manual_item_id", manualCodes))
+      ? one(client.from("manual_items").select("manual_item_id, size, color, stock").in("manual_item_id", manualCodes))
       : [],
     lineIds.length
       ? one(
@@ -178,7 +178,10 @@ async function planReturn(client, ex, { customerid, date }) {
       ...l,
       size: sc?.size ?? null,
       color: sc?.color ?? null,
-      stock: l.variantid ? Number(variantById[l.variantid]?.stock ?? 0) : null,
+      // A manual item's stock (BCX…); null for a line with no variant that is not one.
+      stock: l.variantid
+        ? Number(variantById[l.variantid]?.stock ?? 0)
+        : manualById[l.product_code] ? Number(manualById[l.product_code].stock) : null,
       earlier: ex,
       returnedQty: ex.reduce((n, x) => n + Number(x.quantity || 0), 0),
       creditGiven: round2(ex.reduce((n, x) => n + Number(x.credit_amount || 0), 0)),
@@ -228,9 +231,6 @@ async function planReturn(client, ex, { customerid, date }) {
       );
     }
     const credit = calcItemCredit(line, it.qty);
-    if (!line.variantid) {
-      warnings.push(`${at}: ${lineLabel(line)} is a manual item; its stock is not changed (a sale never takes manual-item stock, so there is nothing to put back; the Exchange page does the same)`);
-    }
     return {
       bill_item_id: line.bill_item_id,
       code: line.product_code,
@@ -240,9 +240,12 @@ async function planReturn(client, ex, { customerid, date }) {
       qty: it.qty,
       credit,
       reason: it.reason,
+      // exchange_record puts the pieces back: on the variant, or on the manual item the line names.
       stock: line.variantid
         ? { variantid: line.variantid, stock_before: line.stock, stock_after: line.stock + it.qty }
-        : null,
+        : line.stock != null
+          ? { manual_item_id: line.product_code, stock_before: line.stock, stock_after: line.stock + it.qty }
+          : null,
       line,
     };
   });
@@ -279,11 +282,9 @@ async function planReturn(client, ex, { customerid, date }) {
         reason: r.reason,
         product_name: r.line.product_name || null,
         product_code: r.line.product_code || null,
+        // No manual_item_id, as from ExchangePage: exchange_record restocks a manual item from
+        // the line's own product_code.
         variantid: r.line.variantid || null,
-        // Always null, as from ExchangePage (bill_items rows carry no manual_item_id). It must stay
-        // null: a sale never takes manual-item stock (every manual item keeps stock 1, sold or
-        // not), so adding the return back would count the piece twice.
-        manual_item_id: null,
       })),
     },
     outside_window: outsideWindow ? ageText : null,
