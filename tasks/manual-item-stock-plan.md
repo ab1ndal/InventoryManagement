@@ -151,8 +151,8 @@ window. Do not re-run the backfill after the merge.
 - (Decided 2026-11-22, owner) Fabric sold by the metre is **not** rounded: stock is in metres
   and a sale lowers it by the exact quantity (3.5 m → 3.5). Every give-back (cancel, edit,
   exchange) returns the exact amount. Piece items stay whole numbers.
-- (Open) Returning a fractional metre (e.g. 0.5 m) through an exchange: not supported now
-  (default). Say if it is needed.
+- (Decided 2026-11-22, owner) Fabric is returned whole or not at all: see
+  tasks/fabric-return-plan.md (`schema/migration_exchange_fractional_qty.sql`).
 - (Open) Default chosen: a new manual item is created with stock = its line's quantity.
 - (Open) Default chosen: the 14 unsold items keep stock 1; sold ones go to 0 (never below).
 

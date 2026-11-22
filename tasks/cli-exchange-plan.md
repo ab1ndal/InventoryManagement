@@ -73,7 +73,8 @@ to what is left per line (earlier returns counted).
   late got today's return date. Fixed by a migration, not yet applied (section 5).
 - `exchange_record` restocks even when the source bill was saved with "don't reduce stock"
   (`stock_reduced = false`); the preview warns then.
-- `exchanges.quantity` is an integer: meter quantities cannot be returned in part.
+- `exchanges.quantity` is an integer: meter quantities cannot be returned in part. (2026-11-22:
+  a fractional line can now be returned whole, tasks/fabric-return-plan.md.)
 - `exchangeHelpers.js` imported `./billUtils` without `.js`, so Node ESM (the CLI) could not load
   it; changed to `./billUtils.js` as `stockHelpers.js` already does.
 - The CLI bills module said "Out of scope: … exchanges"; `bill_save` already accepts every field
