@@ -623,7 +623,7 @@ the units returned).
 | Field | Required | Notes |
 |---|---|---|
 | `exchange.bill` | yes | the bill the goods were bought on (`FY26-000NNN`); must be fully paid and the same customer's |
-| `exchange.items[]` | yes | each returned line: `product` (+ `size`, `color`, matched case-insensitively) or `bill_item_id` (from `bill get`), and `qty` (whole number). `reason` is optional |
+| `exchange.items[]` | yes | each returned line: `product` (+ `size`, `color`, matched case-insensitively) or `bill_item_id` (from `bill get`), and `qty`: a whole number, or for fabric sold in a fractional length (3.5 m) the whole length left on the line (`3.5`). `reason` is optional |
 | `exchange.balance` | only when the credit is more than the new bill | `"store_credit"` (the leftover goes on the customer's store credit) or `"cash_refund"` (paid back in cash), the screen's two choices. Refused when nothing is left over |
 | `exchange.exchange_ids` | instead of `bill` + `items` | credit already recorded and not spent yet (on the Exchange page, or by a `bill create` whose bill then failed): e.g. `[77]`. Nothing is returned or restocked again |
 
@@ -655,6 +655,9 @@ database applies, so credit is never given twice):
   returned before and, for each earlier exchange, whether its credit was
   spent (on which bill) or not. Unspent credit for that return is used with
   `"exchange_ids"`, not by returning the piece again;
+- a fraction that is not all that is left on the line (1.5 of a 3.5 m
+  line, or 0.5 of a piece): fabric goes back whole, and the error gives the
+  length to use;
 - more credit than the source bill holds (what was paid for it, less
   credit already given from it);
 - `exchange_ids` that do not exist, were already spent, or are another
@@ -667,8 +670,13 @@ bill (or its delivery) — the Exchange page asks to allow it, and
 `bill create` writes the same activity entry it does; a source bill saved
 with "don't reduce stock" (the return still puts the piece back, as in the
 app). A returned manual item goes back in stock like a variant:
-`exchange_record` finds it from the returned line. Returns are whole
-numbers, so part of a metre of fabric cannot be returned.
+`exchange_record` finds it from the returned line. Fabric sold in a
+fractional length goes back whole (owner, 2026-11-22): `"qty": 3.5` for a
+3.5 m line, for the line's whole total as credit. That needs
+`schema/migration_exchange_fractional_qty.sql` on the database; until the
+owner runs it, the preview passes but `bill create` stops at
+`exchange_record` (`invalid input syntax for type integer`) before the
+exchange or the bill is written. Whole-number returns work either way.
 
 Not done: the return receipt PDF (the Exchange page prints one; the bill's
 PDF shows the credit), a return with no new purchase (use the Exchange

@@ -6,7 +6,13 @@
 // (schema/migration_exchange_record_caps.sql, schema/migration_bill_save_drafts.sql); planExchange
 // runs the same checks read-only first, so a refusal shows in the preview before anything is written.
 // Functions take the Supabase client; imports carry .js for Node ESM.
-import { calcItemCredit, isExchangeEligible, EXCHANGE_WINDOW_DAYS } from "../components/billing/exchangeHelpers.js";
+import {
+  calcItemCredit,
+  isExchangeEligible,
+  returnableLeft,
+  isAllowedReturnQty,
+  EXCHANGE_WINDOW_DAYS,
+} from "../components/billing/exchangeHelpers.js";
 import { round2 } from "../components/billing/billUtils.js";
 import { money, variantLabel } from "../../utility/activitySummary.js";
 import { todayIST } from "../../utility/dateFormat.js";
@@ -40,6 +46,7 @@ const RECORD_ERRORS = {
   EXCHANGE_OVER_LINE: "The credit is more than this item was sold for.",
   EXCHANGE_OVER_HELD: "This bill has already given back what the customer paid for it, as an earlier exchange, refund or store credit. No more credit can come from it.",
   EXCHANGE_BAD_DATE: "The return date is before the sale or after today.",
+  EXCHANGE_WHOLE_LINE: "Fabric goes back whole: return the full length left on the line, or nothing.",
 };
 // PostgREST's "no function with these arguments": the database predates p_returndate.
 const FUNCTION_NOT_FOUND = "PGRST202";
@@ -75,8 +82,8 @@ export function parseExchange(ex) {
     if ((it.product != null) === (it.bill_item_id != null)) fail(`${at}: give exactly one of product or bill_item_id`);
     if ((it.color != null || it.size != null) && it.product == null) fail(`${at}: color/size only go with product`);
     if (it.bill_item_id != null && !Number.isInteger(it.bill_item_id)) fail(`${at}.bill_item_id must be a whole number`);
-    // exchanges.quantity is an integer.
-    if (!Number.isInteger(it.qty) || it.qty <= 0) fail(`${at}.qty must be a whole number > 0, got ${JSON.stringify(it.qty)}`);
+    // A fraction is only taken as a fabric line's whole length (checked against the line in planReturn).
+    if (typeof it.qty !== "number" || !Number.isFinite(it.qty) || it.qty <= 0) fail(`${at}.qty must be a number > 0, got ${JSON.stringify(it.qty)}`);
     return {
       ref: it.product != null
         ? {
@@ -99,6 +106,8 @@ async function one(query) {
   return data;
 }
 
+// Quantities are numeric(10,3): fabric by the metre.
+const round3 = (n) => Math.round(n * 1000) / 1000;
 const eqi = (a, b) => String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
 const lineLabel = (l) => `${l.product_code || l.product_name}${l.size || l.color ? ` ${variantLabel(l.size, l.color)}` : ""} (bill_item_id ${l.bill_item_id})`;
 const daysBetween = (from, to) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
@@ -183,7 +192,7 @@ async function planReturn(client, ex, { customerid, date }) {
         ? Number(variantById[l.variantid]?.stock ?? 0)
         : manualById[l.product_code] ? Number(manualById[l.product_code].stock) : null,
       earlier: ex,
-      returnedQty: ex.reduce((n, x) => n + Number(x.quantity || 0), 0),
+      returnedQty: round3(ex.reduce((n, x) => n + Number(x.quantity || 0), 0)),
       creditGiven: round2(ex.reduce((n, x) => n + Number(x.credit_amount || 0), 0)),
     };
   });
@@ -221,13 +230,21 @@ async function planReturn(client, ex, { customerid, date }) {
     if (seen.has(line.bill_item_id)) fail(`${at}: ${lineLabel(line)} is listed twice; give one entry with the total qty`);
     seen.add(line.bill_item_id);
     if (!isExchangeEligible(line)) fail(`${at}: ${lineLabel(line)} had an alteration charge, so it cannot be exchanged (the service was rendered)`);
-    const left = Number(line.quantity) - line.returnedQty;
+    const left = returnableLeft(line);
     if (it.qty > left) {
       const unspent = line.earlier.filter((x) => x.new_billid == null).map((x) => x.exchangeid);
       fail(
         `${at}: ${lineLabel(line)} was bought ${Number(line.quantity)}, ${line.returnedQty} already returned, so at most ${left} can be returned now` +
           (line.earlier.length ? ` (${line.earlier.map(earlierExchange).join("; ")})` : "") +
           (unspent.length ? `. If this slip spends that credit, use "exchange": {"exchange_ids": ${JSON.stringify(unspent)}}` : ""),
+      );
+    }
+    // exchange_record refuses part of a length (EXCHANGE_WHOLE_LINE).
+    if (!isAllowedReturnQty(it.qty, left)) {
+      fail(
+        Number.isInteger(left)
+          ? `${at}: ${lineLabel(line)}: qty must be a whole number, got ${it.qty}`
+          : `${at}: ${lineLabel(line)}: ${RECORD_ERRORS.EXCHANGE_WHOLE_LINE} Give qty ${left} (all that is left)`,
       );
     }
     const credit = calcItemCredit(line, it.qty);
@@ -242,9 +259,9 @@ async function planReturn(client, ex, { customerid, date }) {
       reason: it.reason,
       // exchange_record puts the pieces back: on the variant, or on the manual item the line names.
       stock: line.variantid
-        ? { variantid: line.variantid, stock_before: line.stock, stock_after: line.stock + it.qty }
+        ? { variantid: line.variantid, stock_before: line.stock, stock_after: round3(line.stock + it.qty) }
         : line.stock != null
-          ? { manual_item_id: line.product_code, stock_before: line.stock, stock_after: line.stock + it.qty }
+          ? { manual_item_id: line.product_code, stock_before: line.stock, stock_after: round3(line.stock + it.qty) }
           : null,
       line,
     };
