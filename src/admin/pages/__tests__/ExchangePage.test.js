@@ -206,12 +206,12 @@ test("confirm calls exchange_record once and links the returned ids", async () =
 });
 
 // Fabric sold by the metre goes back whole or not at all (schema/migration_exchange_fractional_qty.sql).
-function fabricLine() {
+function fabricLine(quantity = 3.5) {
   mockTables.bill_items = {
     data: [{
       bill_item_id: 9002, billid: 501, product_name: "Cotton fabric", product_code: "BCX0101",
-      category: "Fabric", quantity: 3.5, mrp: 200, discount_total: 0, alteration_charge: 0,
-      stitch_type: "unstitched", total: 700, variantid: null,
+      category: "Fabric", quantity, mrp: 200, discount_total: 0, alteration_charge: 0,
+      stitch_type: "unstitched", total: 200 * quantity, variantid: null, unit_type: "meter",
     }],
     error: null,
   };
@@ -241,7 +241,19 @@ test("a 3.5 m fabric line offers only the whole length, and confirm sends 3.5 fo
   ]);
 });
 
-test("a fabric line with 1 m returned earlier offers the 2.5 m left, for the rest of the credit", async () => {
+test("a 2 m fabric line also goes back only whole", async () => {
+  fabricLine(2);
+  await loadBill();
+  await screen.findByText(/Return items from Bill #FY26-000501/);
+  expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Return all 2" }));
+  fireEvent.click(screen.getByRole("button", { name: "Review & Confirm" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Exchange" }));
+  await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+  expect(supabase.rpc.mock.calls[0][1].p_items[0]).toMatchObject({ quantity: 2, credit_amount: 400 });
+});
+
+test("a fabric line with 1 m returned earlier (before the whole-only rule) offers the 2.5 m left", async () => {
   fabricLine();
   mockTables.exchanges = { data: [{ original_bill_item_id: 9002, quantity: 1, credit_amount: 200 }], error: null, count: 0 };
   await confirmWith("Return all 2.5");

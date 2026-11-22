@@ -9,6 +9,7 @@ import {
   daysSinceBill,
   returnableLeft,
   isAllowedReturnQty,
+  isWholeOnlyLine,
   EXCHANGE_WINDOW_DAYS,
 } from "../exchangeHelpers";
 
@@ -21,18 +22,28 @@ describe("returnableLeft / isAllowedReturnQty", () => {
     expect(returnableLeft({ quantity: 1, returnedQty: 2 })).toBe(0);
   });
 
-  it("a fraction only as all that is left", () => {
-    expect(isAllowedReturnQty(3.5, 3.5)).toBe(true);
-    expect(isAllowedReturnQty(1.5, 3.5)).toBe(false);
-    expect(isAllowedReturnQty(2.5, 2.5)).toBe(true);
-    expect(isAllowedReturnQty(0.5, 1)).toBe(false);
+  it("only metre lines are whole-only", () => {
+    expect(isWholeOnlyLine({ unit_type: "meter" })).toBe(true);
+    expect(isWholeOnlyLine({ unit_type: "piece" })).toBe(false);
+    expect(isWholeOnlyLine({})).toBe(false);
   });
 
-  it("whole numbers up to what is left, as before", () => {
-    expect(isAllowedReturnQty(1, 3.5)).toBe(true);
-    expect(isAllowedReturnQty(3, 3)).toBe(true);
-    expect(isAllowedReturnQty(4, 3.5)).toBe(false);
-    expect(isAllowedReturnQty(0, 3)).toBe(false);
+  it("a metre line only as all that is left, whole number or not", () => {
+    expect(isAllowedReturnQty(3.5, 3.5, true)).toBe(true);
+    expect(isAllowedReturnQty(1.5, 3.5, true)).toBe(false);
+    expect(isAllowedReturnQty(1, 3.5, true)).toBe(false);
+    expect(isAllowedReturnQty(1, 2, true)).toBe(false);
+    expect(isAllowedReturnQty(2, 2, true)).toBe(true);
+    expect(isAllowedReturnQty(4, 3.5, true)).toBe(false);
+  });
+
+  it("other lines: whole numbers up to what is left, as before", () => {
+    expect(isAllowedReturnQty(1, 3, false)).toBe(true);
+    expect(isAllowedReturnQty(3, 3, false)).toBe(true);
+    expect(isAllowedReturnQty(0.5, 1, false)).toBe(false);
+    expect(isAllowedReturnQty(2.5, 2.5, false)).toBe(false);
+    expect(isAllowedReturnQty(4, 3, false)).toBe(false);
+    expect(isAllowedReturnQty(0, 3, false)).toBe(false);
   });
 
   it("whole-length credit is the line total", () => {

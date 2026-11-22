@@ -25,6 +25,7 @@ import {
   isExchangeEligible,
   isWithinExchangeWindow,
   returnableLeft,
+  isWholeOnlyLine,
   daysSinceBill,
   EXCHANGE_WINDOW_DAYS,
 } from "../components/billing/exchangeHelpers";
@@ -214,7 +215,7 @@ export default function ExchangePage() {
     try {
       const { data: items, error: e1 } = await supabase
         .from("bill_items")
-        .select("bill_item_id, billid, product_name, product_code, category, quantity, mrp, discount_total, alteration_charge, stitch_type, total, variantid")
+        .select("bill_item_id, billid, product_name, product_code, category, quantity, mrp, discount_total, alteration_charge, stitch_type, total, variantid, unit_type")
         .eq("billid", bill.billid);
       if (e1) throw e1;
 
@@ -286,8 +287,8 @@ export default function ExchangePage() {
     }
   }
 
-  // Pieces (and whole metres) go back in whole numbers; a fractional length goes back whole only,
-  // through its checkbox (exchange_record refuses anything else, EXCHANGE_WHOLE_LINE).
+  // Pieces go back in whole numbers; a metre line goes back whole only, through its checkbox
+  // (exchange_record refuses anything else, EXCHANGE_WHOLE_LINE).
   function handleQtyChange(bill_item_id, v, max) {
     const n = Math.max(0, Math.min(Math.trunc(Number(v) || 0), Math.floor(Number(max) || 0)));
     setReturnQtyMap(prev => ({ ...prev, [bill_item_id]: n }));
@@ -506,7 +507,7 @@ export default function ExchangePage() {
                     </div>
                     <div className="col-span-1 text-right tabular-nums">{bi.quantity}</div>
                     <div className="col-span-2 text-right">
-                      {bi.isEligible && !bi.isExchanged && !Number.isInteger(bi.maxReturnQty) ? (
+                      {bi.isEligible && !bi.isExchanged && isWholeOnlyLine(bi) ? (
                         <label className="inline-flex items-center gap-1.5 text-sm">
                           <input
                             type="checkbox"
