@@ -204,3 +204,78 @@ test("confirm calls exchange_record once and links the returned ids", async () =
   expect(supabase.from).not.toHaveBeenCalledWith("manual_items");
   expect(mockNavigate.mock.calls[0][1].state.exchangeCredit.exchangeIds).toEqual([77]);
 });
+
+// Fabric sold by the metre goes back whole or not at all (schema/migration_exchange_fractional_qty.sql).
+function fabricLine() {
+  mockTables.bill_items = {
+    data: [{
+      bill_item_id: 9002, billid: 501, product_name: "Cotton fabric", product_code: "BCX0101",
+      category: "Fabric", quantity: 3.5, mrp: 200, discount_total: 0, alteration_charge: 0,
+      stitch_type: "unstitched", total: 700, variantid: null,
+    }],
+    error: null,
+  };
+  mockTables.manual_items = { data: [{ manual_item_id: "BCX0101", size: null, color: "Blue" }], error: null };
+}
+
+async function confirmWith(label) {
+  await loadBill();
+  await screen.findByText(/Return items from Bill #FY26-000501/);
+  fireEvent.click(screen.getByRole("checkbox", { name: label }));
+  fireEvent.click(screen.getByRole("button", { name: "Review & Confirm" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Exchange" }));
+}
+
+test("a 3.5 m fabric line offers only the whole length, and confirm sends 3.5 for the line total", async () => {
+  fabricLine();
+  await loadBill();
+  await screen.findByText(/Return items from Bill #FY26-000501/);
+  expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Return all 3.5" }));
+  fireEvent.click(screen.getByRole("button", { name: "Review & Confirm" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm Exchange" }));
+
+  await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+  expect(supabase.rpc.mock.calls[0][1].p_items).toEqual([
+    expect.objectContaining({ bill_item_id: 9002, quantity: 3.5, credit_amount: 700 }),
+  ]);
+});
+
+test("a fabric line with 1 m returned earlier offers the 2.5 m left, for the rest of the credit", async () => {
+  fabricLine();
+  mockTables.exchanges = { data: [{ original_bill_item_id: 9002, quantity: 1, credit_amount: 200 }], error: null, count: 0 };
+  await confirmWith("Return all 2.5");
+  await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+  expect(supabase.rpc.mock.calls[0][1].p_items[0]).toMatchObject({ quantity: 2.5, credit_amount: 500 });
+});
+
+test("unticking the whole length returns nothing", async () => {
+  fabricLine();
+  await loadBill();
+  await screen.findByText(/Return items from Bill #FY26-000501/);
+  const box = screen.getByRole("checkbox", { name: "Return all 3.5" });
+  fireEvent.click(box);
+  expect(box).toBeChecked();
+  fireEvent.click(box);
+  expect(box).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Review & Confirm" })).toBeDisabled();
+});
+
+test("a piece line takes whole numbers only", async () => {
+  mockTables.bill_items.data[0] = { ...mockTables.bill_items.data[0], quantity: 3, total: 3000 };
+  await loadBill();
+  await screen.findByText(/Return items from Bill #FY26-000501/);
+  const qty = screen.getByRole("spinbutton");
+  fireEvent.change(qty, { target: { value: "1.5" } });
+  expect(qty).toHaveValue(1);
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+});
+
+test("a part-length refusal is shown in words", async () => {
+  fabricLine();
+  supabase.rpc.mockResolvedValue({ data: null, error: { message: "EXCHANGE_WHOLE_LINE" } });
+  await confirmWith("Return all 3.5");
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Exchange failed", {
+    description: expect.stringMatching(/^Fabric goes back whole/),
+  }));
+});

@@ -7,8 +7,39 @@ import {
   isExchangeEligible,
   isWithinExchangeWindow,
   daysSinceBill,
+  returnableLeft,
+  isAllowedReturnQty,
   EXCHANGE_WINDOW_DAYS,
 } from "../exchangeHelpers";
+
+// Fabric by the metre goes back whole (schema/migration_exchange_fractional_qty.sql).
+describe("returnableLeft / isAllowedReturnQty", () => {
+  it("left = quantity less earlier returns, to 3 decimals", () => {
+    expect(returnableLeft({ quantity: 3.5 })).toBe(3.5);
+    expect(returnableLeft({ quantity: 3.5, returnedQty: 1 })).toBe(2.5);
+    expect(returnableLeft({ quantity: 2.333, returnedQty: 1 })).toBe(1.333);
+    expect(returnableLeft({ quantity: 1, returnedQty: 2 })).toBe(0);
+  });
+
+  it("a fraction only as all that is left", () => {
+    expect(isAllowedReturnQty(3.5, 3.5)).toBe(true);
+    expect(isAllowedReturnQty(1.5, 3.5)).toBe(false);
+    expect(isAllowedReturnQty(2.5, 2.5)).toBe(true);
+    expect(isAllowedReturnQty(0.5, 1)).toBe(false);
+  });
+
+  it("whole numbers up to what is left, as before", () => {
+    expect(isAllowedReturnQty(1, 3.5)).toBe(true);
+    expect(isAllowedReturnQty(3, 3)).toBe(true);
+    expect(isAllowedReturnQty(4, 3.5)).toBe(false);
+    expect(isAllowedReturnQty(0, 3)).toBe(false);
+  });
+
+  it("whole-length credit is the line total", () => {
+    expect(calcItemCredit({ quantity: 3.5, total: 700 }, 3.5)).toBe(700);
+    expect(calcItemCredit({ quantity: 3.5, total: 700, returnedQty: 1, creditGiven: 200 }, 2.5)).toBe(500);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // calcItemCredit — uses bi.total * (returnQty / quantity) (GST-inclusive)

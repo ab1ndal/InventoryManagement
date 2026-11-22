@@ -56,6 +56,22 @@ export function calcItemCredit(bi, returnQty) {
   return Math.max(0, Math.min(round2(total * (returnQty / fullQty)), round2(upToNow)));
 }
 
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
+/** What is left to return on a line: its quantity less bi.returnedQty, to 3 decimals as stored. */
+export function returnableLeft(bi) {
+  return Math.max(0, round3(Number(bi?.quantity || 0) - Number(bi?.returnedQty || 0)));
+}
+
+/**
+ * A return quantity exchange_record accepts (schema/migration_exchange_fractional_qty.sql): a whole
+ * number up to what is left, or a fraction only as all that is left — fabric sold by the metre
+ * goes back whole (owner, 2026-11-22), so 3.5 of 3.5 m is taken and 1.5 of it is not.
+ */
+export function isAllowedReturnQty(qty, left) {
+  return qty > 0 && qty <= left && (Number.isInteger(qty) || qty === left);
+}
+
 /** Sum already-returned qty per bill_item_id from existing exchanges rows. */
 export function buildReturnedQtyMap(existingExchanges) {
   const map = {};
