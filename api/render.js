@@ -8,8 +8,9 @@ import { restClient } from "../src/seoRender/rest";
 const shell = readFileSync(join(process.cwd(), "build/shell.html"), "utf8");
 
 export default async function handler(req, res) {
-  // The rewrite adds ssr_path; every other parameter came with the visitor's own request.
-  const { ssr_path: ssrPath, ...query } = req.query;
+  // The rewrite adds ssr_path, and Vercel also passes its `:path` segment as `path`; every other
+  // parameter came with the visitor's own request. Left in, `path` would leak into redirects.
+  const { ssr_path: ssrPath, path: _routeSegment, ...query } = req.query;
   const { status, cacheControl, html, location } = await renderResponse({
     path: String(ssrPath ?? ""),
     query,
