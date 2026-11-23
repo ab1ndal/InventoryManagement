@@ -13,6 +13,7 @@ import {
 } from "../storefront/lib/siteConfig";
 import { PRODUCT_PHOTO_WIDTH, imageUrl } from "../storefront/lib/imageVariant";
 import { stripMarkdown } from "../storefront/lib/productText";
+import { parseProductParam, productPath } from "../storefront/lib/productPath";
 import {
   HOME_DESCRIPTION,
   HOME_TITLE,
@@ -40,9 +41,8 @@ import { categoryAudience } from "./audience";
 import { SITE_NAME, SITE_URL, esc } from "./html";
 
 const LISTED_PRODUCTS = 48;
-const PRODUCT_ID_RE = /^[A-Za-z0-9-]{1,40}$/;
 const LIST_FIELDS =
-  "productid,name:display_title,retailprice,productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color)";
+  "public_id,productid,name:display_title,retailprice,productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color)";
 // The same pool the product page's "More like this" ranks.
 const SIMILAR_CANDIDATES = 200;
 const SIMILAR_FIELDS = `${LIST_FIELDS},fabric,categoryid`;
@@ -146,7 +146,7 @@ function productList(products) {
     const src = firstImage(p, 150);
     const alt = productImageAlt(p.name, sortedImages(p)[0]?.productcolor);
     const img = src ? `<img src="${esc(src)}" alt="${esc(alt)}" width="150" loading="lazy"/>` : "";
-    return `<li><a href="/product/${esc(p.productid)}">${img}${esc(p.name)}</a> ${esc(rupees(p.retailprice))}</li>`;
+    return `<li><a href="${esc(productPath(p))}">${img}${esc(p.name)}</a> ${esc(rupees(p.retailprice))}</li>`;
   });
   return `<ul>${cards.join("")}</ul>`;
 }
@@ -157,7 +157,7 @@ const itemList = (products) => ({
   itemListElement: products.map((p, i) => ({
     "@type": "ListItem",
     position: i + 1,
-    url: `${SITE_URL}/product/${p.productid}`,
+    url: `${SITE_URL}${productPath(p)}`,
     name: p.name,
   })),
 });
@@ -298,6 +298,15 @@ const NOT_FOUND = {
   bodyHtml: frame(`<h1>Page not found</h1><p>${link("/shop", "Shop all products")}</p>`),
 };
 
+// Product addresses that used the product code: gone for good, so search engines drop them sooner
+// than they would a 404.
+const GONE = {
+  status: 410,
+  title: "Page no longer available",
+  noindex: true,
+  bodyHtml: frame(`<h1>Page no longer available</h1><p>${link("/shop", "Shop all products")}</p>`),
+};
+
 // The first hero slide is the largest thing on the home page, and the app only asks for it after its
 // code has run. The breakpoint is the one HeroSlider's <picture> uses, so each device fetches one file.
 function heroPreloads() {
@@ -369,13 +378,13 @@ async function allProductsPage(rest) {
   const products = [];
   for (let offset = 0; ; offset += ALL_PRODUCTS_PAGE) {
     const rows = await rest(
-      `products?select=productid,name:display_title&order=productid.desc&limit=${ALL_PRODUCTS_PAGE}&offset=${offset}`
+      `products?select=public_id,name:display_title&order=productid.desc&limit=${ALL_PRODUCTS_PAGE}&offset=${offset}`
     );
     products.push(...rows);
     if (rows.length < ALL_PRODUCTS_PAGE) break;
   }
   const links = products
-    .map((p) => `<li><a href="/product/${esc(encodeURIComponent(p.productid))}">${esc(p.name)}</a></li>`)
+    .map((p) => `<li><a href="${esc(productPath(p))}">${esc(p.name)}</a></li>`)
     .join("");
   return {
     status: 200,
@@ -415,16 +424,21 @@ async function collectionPage(slug, rest) {
   };
 }
 
-async function productPage(id, rest) {
-  if (!PRODUCT_ID_RE.test(id)) return NOT_FOUND;
+// `search` is the request's query string ("" or "?…"), kept when the address moves.
+async function productPage(param, search, rest) {
+  const parsed = parseProductParam(param);
+  if (parsed.kind === "legacy") return GONE;
+  if (parsed.kind !== "id") return NOT_FOUND;
   const rows = await rest(
-    `products?productid=eq.${id}&select=productid,name:display_title,description,retailprice,fabric,categoryid,` +
-      `categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color,size)`
+    `products?public_id=eq.${parsed.publicId}&select=public_id,productid,name:display_title,description,retailprice,` +
+      `fabric,categoryid,categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color,size)`
   );
   const product = rows[0];
   if (!product) return NOT_FOUND;
 
-  const path = `/product/${product.productid}`;
+  const path = productPath(product);
+  // Compared before lower-casing, so an upper-case address also moves to the one canonical form.
+  if (param !== path.slice("/product/".length)) return { status: 301, location: `${path}${search}` };
   const text = stripMarkdown(product.description);
   const category = product.categories?.name;
   const price = Number(product.retailprice);
@@ -506,7 +520,7 @@ async function productPage(id, rest) {
           gender || ageGroup
             ? { "@type": "PeopleAudience", suggestedGender: gender, suggestedAgeGroup: ageGroup }
             : undefined,
-        sku: product.productid,
+        sku: product.public_id,
         category: category || undefined,
         material: product.fabric || undefined,
         brand: { "@type": "Brand", name: SITE_NAME },
@@ -527,7 +541,7 @@ async function productPage(id, rest) {
 
 // `rest(query)` runs a PostgREST query as the anonymous storefront, so RLS decides what is public.
 // It throws on failure: an outage must not look like a missing page, which would drop it from Google.
-export async function describePage(rawPath, rest) {
+export async function describePage(rawPath, rest, search = "") {
   const path = `/${rawPath}`.replace(/\/{2,}/g, "/").replace(/(.)\/$/, "$1");
   if (path === "/") return homePage(rest);
   if (path === "/shop") return shopPage(rest);
@@ -536,6 +550,6 @@ export async function describePage(rawPath, rest) {
   const collection = path.match(/^\/collections\/([^/]+)$/);
   if (collection) return collectionPage(collection[1], rest);
   const product = path.match(/^\/product\/([^/]+)$/);
-  if (product) return productPage(product[1], rest);
+  if (product) return productPage(product[1], search, rest);
   return NOT_FOUND;
 }

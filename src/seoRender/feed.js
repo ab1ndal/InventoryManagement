@@ -1,5 +1,6 @@
 // Google Merchant Center product feed: the same products, prices and stock the storefront shows.
 import { imageUrl } from "../storefront/lib/imageVariant";
+import { productPath } from "../storefront/lib/productPath";
 import { stripMarkdown } from "../storefront/lib/productText";
 import { productMetaDescription } from "../storefront/lib/seoText";
 import { formatSize } from "../storefront/lib/sizes";
@@ -11,7 +12,7 @@ export const CACHE_FEED = "public, max-age=0, s-maxage=3600, stale-while-revalid
 
 const PAGE = 1000;
 const FIELDS =
-  "productid,name:display_title,description,retailprice,categoryid,fabric,categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color,size)";
+  "public_id,productid,name:display_title,description,retailprice,categoryid,fabric,categories(name),productimages(imageurl,displayorder,productcolor),productsizecolors(stock,color,size)";
 // Google's category "Apparel & Accessories > Clothing", for anything without a closer match below.
 const GOOGLE_CATEGORY_CLOTHING = 1604;
 // Closer Google categories (ids from google.com/basepages/producttype/taxonomy-with-ids.en-US.txt).
@@ -99,7 +100,7 @@ function feedItem(product) {
     tag("id", product.productid),
     tag("title", product.name),
     tag("description", text || productMetaDescription({ name: product.name, text, price })),
-    tag("link", `${SITE_URL}/product/${encodeURIComponent(product.productid)}`),
+    tag("link", `${SITE_URL}${productPath(product)}`),
     tag("image_link", images[0]),
     ...images.slice(1, MAX_EXTRA_IMAGES + 1).map((url) => tag("additional_image_link", url)),
     tag("availability", "in_stock"),
