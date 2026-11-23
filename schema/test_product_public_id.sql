@@ -73,3 +73,23 @@ begin
   assert (select display_title from public.products where productid = 'TT1') is not null;
 end $$;
 rollback;
+
+-- All 31 characters are used (a modulo of 30 once left out '9').
+begin;
+do $$
+declare v text := '';
+begin
+  for i in 1 .. 400 loop v := v || public.gen_product_public_id(); end loop;
+  assert v like '%9%', 'never drew 9';
+  assert v like '%a%', 'never drew a';
+end $$;
+rollback;
+
+-- Only roles that insert products may call the generator.
+begin;
+do $$
+begin
+  assert not has_function_privilege('anon', 'public.gen_product_public_id()', 'execute');
+  assert has_function_privilege('authenticated', 'public.gen_product_public_id()', 'execute');
+end $$;
+rollback;

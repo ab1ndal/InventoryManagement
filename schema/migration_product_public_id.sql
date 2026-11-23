@@ -7,7 +7,11 @@
 --
 -- Randomness comes from gen_random_uuid(), which is core Postgres, so the function does not depend
 -- on where pgcrypto is installed. Bytes 6 and 8 carry the UUID version and variant bits and are
--- skipped. Bytes of 240 or more are dropped so each character is equally likely (240 = 8 x 30).
+-- skipped. Bytes of 248 or more are dropped so each of the 31 characters is equally likely
+-- (248 = 8 x 31).
+--
+-- SECURITY DEFINER so the duplicate check sees every product, not only the rows the inserting
+-- role may read; only roles that insert products may call it.
 
 begin;
 
@@ -15,6 +19,7 @@ create or replace function public.gen_product_public_id()
 returns text
 language plpgsql
 volatile
+security definer
 set search_path = public
 as $$
 declare
@@ -32,8 +37,8 @@ begin
       for i in 0 .. 15 loop
         continue when i in (6, 8);
         v_byte := get_byte(v_bytes, i);
-        continue when v_byte >= 240;
-        v_id := v_id || substr(c_alphabet, v_byte % 30 + 1, 1);
+        continue when v_byte >= 248;
+        v_id := v_id || substr(c_alphabet, v_byte % 31 + 1, 1);
         exit when length(v_id) = c_length;
       end loop;
     end loop;
@@ -43,6 +48,9 @@ begin
   return v_id;
 end;
 $$;
+
+revoke execute on function public.gen_product_public_id() from public, anon;
+grant execute on function public.gen_product_public_id() to authenticated, service_role;
 
 alter table public.products add column if not exists public_id text;
 
