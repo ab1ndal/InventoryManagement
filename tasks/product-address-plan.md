@@ -1,7 +1,7 @@
 # Name-based product addresses
 
-Status: plan, 2026-11-22, hardened against live DB reads the same day. Waiting on owner approval.
-Nothing built.
+Status: Phase 1 LIVE 2026-11-23 (migration run, PRs #227 and #228). Phase 2 open: product pages still
+show "Product code" (`ProductSpecs.jsx`), and search still finds products by code.
 
 ## Goal
 
