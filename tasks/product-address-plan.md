@@ -38,7 +38,7 @@ code internally). Anti-goal: any new address that can be turned back into a BC c
 ## How the address works
 
 - `products.public_id text`: 5 characters from `abcdefghjkmnpqrstuvwxyz23456789` (no 0 o 1 l i),
-  drawn with `gen_random_bytes`, never derived from the BC code, never changed. 30^5 = 24.3 million
+  drawn from `gen_random_uuid()` bytes, never derived from the BC code, never changed. 31^5 = 28.6 million
   values. Set by a column DEFAULT `gen_product_public_id()` that loops until the value is unused, so
   every insert path (admin app, mockup-generator with the service key, CLI) gets one with no code change.
   Unique index; NOT NULL after backfill. Admin cannot edit it (no form field; grant select only).
