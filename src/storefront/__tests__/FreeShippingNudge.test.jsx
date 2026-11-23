@@ -28,9 +28,9 @@ const CART = [
 ];
 
 const SUGGESTIONS = [
-  { productid: "BC25001", name: "Silk Saree", retailprice: 3500 },
-  { productid: "BC25002", name: "Cotton Kurta", retailprice: 1600 },
-  { productid: "BC25003", name: "Linen Dupatta", retailprice: 1800 },
+  { productid: "BC25001", public_id: "aaaaa", name: "Silk Saree", retailprice: 3500 },
+  { productid: "BC25002", public_id: "bbbbb", name: "Cotton Kurta", retailprice: 1600 },
+  { productid: "BC25003", public_id: "ccccc", name: "Linen Dupatta", retailprice: 1800 },
 ];
 
 function renderNudge(props) {
@@ -87,6 +87,7 @@ it("suggests in-stock products that close the gap, excluding cart items", async 
   expect(await screen.findByText("Cotton Kurta")).toBeInTheDocument();
   expect(screen.getByText("Linen Dupatta")).toBeInTheDocument();
   expect(screen.queryByText("Silk Saree")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /cotton kurta/i })).toHaveAttribute("href", "/product/cotton-kurta-bbbbb");
   // Filtered server-side: price covers the gap, in stock, capped at 4.
   expect(calls).toContainEqual(["gte", "retailprice", 1500]);
   expect(calls).toContainEqual(["gt", "productsizecolors.stock", 0]);

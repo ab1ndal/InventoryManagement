@@ -3,7 +3,7 @@ import React, {
 } from "react";
 import { supabase } from "lib/supabaseClient";
 import {
-  fetchServerWishlist, addServerItems, removeServerItem, isMissingTableError,
+  fetchServerWishlist, addServerItems, removeServerItem, isMissingTableError, fetchPublicIds,
 } from "../lib/wishlistApi";
 
 const STORAGE_KEY = "bc_wishlist";
@@ -15,7 +15,7 @@ const OWNER_KEY = "bc_wishlist_owner";
 
 export const WishlistContext = createContext(null);
 
-const toSnapshot = ({ productid, name, retailprice }) => ({ productid, name, retailprice });
+const toSnapshot = ({ productid, public_id, name, retailprice }) => ({ productid, public_id, name, retailprice });
 
 export function WishlistProvider({ children }) {
   const [items, setItems] = useState(() => {
@@ -36,6 +36,31 @@ export function WishlistProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
+
+  // Snapshots saved before product addresses existed lack public_id, which
+  // every product link needs. Fill it in once on load; a product the
+  // storefront no longer shows is dropped, as the server list already does.
+  useEffect(() => {
+    const missing = itemsRef.current.filter((i) => !i.public_id).map((i) => i.productid);
+    if (!missing.length) return;
+    let active = true;
+    fetchPublicIds(missing)
+      .then((publicIds) => {
+        if (!active) return;
+        const queried = new Set(missing);
+        setItems((prev) =>
+          prev.flatMap((i) => {
+            if (i.public_id || !queried.has(i.productid)) return [i];
+            const public_id = publicIds.get(i.productid);
+            return public_id ? [{ ...i, public_id }] : [];
+          })
+        );
+      })
+      .catch((error) => console.error("Wishlist public id backfill failed", { missing, error }));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Returns true when the error was the missing table (already handled).
   const handleMissingTable = useCallback((error) => {

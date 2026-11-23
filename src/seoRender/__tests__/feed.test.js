@@ -2,6 +2,7 @@ import { buildFeed, feedColour, feedResponse, productType, sampleItems } from ".
 
 const IMG = "https://x.supabase.co/storage/v1/object/public/mockups/BC1";
 const product = {
+  public_id: "k7x2m",
   productid: "BC1",
   name: "Silk Saree",
   description: "**Yellow** silk saree with a red border",
@@ -19,13 +20,21 @@ test("an in-stock product has the fields Merchant Center needs", async () => {
   expect(xml).toContain("<g:id>BC1</g:id>");
   expect(xml).toContain("<g:title>Silk Saree</g:title>");
   expect(xml).toContain("<g:description>Yellow silk saree with a red border</g:description>");
-  expect(xml).toContain("<g:link>https://www.bindalscreations.com/product/BC1</g:link>");
+  expect(xml).toContain("<g:link>https://www.bindalscreations.com/product/silk-saree-k7x2m</g:link>");
   expect(xml).toMatch(/<g:image_link>[^<]*a_1200\.webp<\/g:image_link>/);
   expect(xml).toMatch(/<g:additional_image_link>[^<]*b_1200\.webp<\/g:additional_image_link>/);
   expect(xml).toContain("<g:availability>in_stock</g:availability>");
   expect(xml).toContain("<g:price>2195.00 INR</g:price>");
   expect(xml).toContain("<g:identifier_exists>no</g:identifier_exists>");
   expect(xml).toContain("<g:color>Yellow</g:color>");
+});
+
+test("the link is the product's address while the id stays the product code", async () => {
+  const q = rest([product]);
+  const xml = await buildFeed(q);
+  expect(q.mock.calls[0][0]).toContain("select=public_id,productid,");
+  expect(xml).toContain("<g:id>BC1</g:id>");
+  expect(xml).not.toContain("/product/BC1");
 });
 
 test("colours use Google's separator, and a value that is not a colour states none", async () => {

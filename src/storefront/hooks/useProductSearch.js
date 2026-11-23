@@ -57,7 +57,7 @@ export function useProductSearch(query, limit = SEARCH_PAGE_SIZE) {
       let query = supabase
         .from("products")
         .select(
-          `productid, name:display_title, retailprice, categoryid, categories(name), productsizecolors(stock)${colourEmbeds.join("")}`,
+          `productid, public_id, name:display_title, retailprice, categoryid, categories(name), productsizecolors(stock)${colourEmbeds.join("")}`,
           { count: "exact" }
         );
       colourFilters.forEach((f) => {

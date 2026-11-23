@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
+import { productPath } from "../lib/productPath";
 
 const mockImagePaths = jest.fn();
 jest.mock("../lib/productImage", () => ({
@@ -16,6 +17,7 @@ jest.mock("../context/WishlistContext", () => ({
 
 const base = {
   productid: "BC25001",
+  public_id: "k7x2m",
   name: "Silk-Saree",
   retailprice: 2499,
   fabric: "Silk",
@@ -49,8 +51,9 @@ describe("ProductCard", () => {
     expect(screen.getByText("Silk Saree")).toHaveClass("sr-only");
     expect(screen.getByRole("link", { name: /silk saree/i })).toHaveAttribute(
       "href",
-      "/product/BC25001"
+      productPath(base)
     );
+    expect(productPath(base)).toBe("/product/silk-saree-k7x2m");
   });
 
   it("carries the de-hyphenated name in image alt text, not as sr-only text", async () => {

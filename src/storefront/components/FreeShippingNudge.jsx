@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import { getProductImageUrl } from "../lib/productImage";
 import { SUGGEST_GAP_LIMIT, freeShippingProgress } from "../lib/freeShipping";
+import { productPath } from "../lib/productPath";
 
 const SUGGESTION_COUNT = 4;
 
@@ -13,7 +14,7 @@ const SUGGESTION_COUNT = 4;
 function suggestionQuery(gap, cartIds) {
   let query = supabase
     .from("products")
-    .select("productid, name:display_title, retailprice, productsizecolors!inner(stock)")
+    .select("productid, public_id, name:display_title, retailprice, productsizecolors!inner(stock)")
     .gt("productsizecolors.stock", 0)
     .gte("retailprice", gap);
   if (cartIds.length)
@@ -128,7 +129,7 @@ export default function FreeShippingNudge({ amount, cartItems = [], onNavigate }
           <ul className="grid grid-cols-4 gap-2">
             {suggestions.map((p) => (
               <li key={p.productid} className="min-w-0">
-                <Link to={`/product/${p.productid}`} onClick={onNavigate} className="block group">
+                <Link to={productPath(p)} onClick={onNavigate} className="block group">
                   <div className="aspect-[3/4] bg-storefront-cream overflow-hidden mb-1">
                     {p.image_url && (
                       <img

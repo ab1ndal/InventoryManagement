@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import {
   ArrowLeft,
   ShoppingBag,
@@ -33,6 +33,7 @@ import { missingChoiceLabel, missingChoiceRow } from "../lib/variantChoice";
 import { productImageAlt, productMetaDescription } from "../lib/seoText";
 import { categoryGroup } from "../lib/similarProducts";
 import { isSoldOut } from "../lib/stock";
+import { parseProductParam, productPath } from "../lib/productPath";
 
 const TRUST_POINTS = [
   { icon: Heart, label: "Handpicked with love" },
@@ -213,17 +214,45 @@ function ProductGallery({ paths, name, active, onSelect, onEnlarge }) {
   );
 }
 
-// Keyed by product so following a "More like this" card starts the new
-// product fresh (no selected variant, quantity or photo carried over).
-// StorefrontLayout scrolls each new page to the top.
-export default function ProductDetailPage() {
-  const { productid } = useParams();
-
-  return <ProductDetail key={productid} productid={productid} />;
+function ProductNotFound() {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 min-h-svh text-center">
+      <Seo title="Product not found" noindex />
+      <p className="font-sans text-storefront-muted text-sm mb-4">
+        Product not found.
+      </p>
+      <Link
+        to="/shop"
+        className="text-xs font-sans tracking-widest uppercase text-storefront-gold hover:underline"
+      >
+        ← Back to Shop
+      </Link>
+    </div>
+  );
 }
 
-function ProductDetail({ productid }) {
-  const { product, variants, loading, error } = useProduct(productid);
+// Keyed by public id so following a "More like this" card starts the new
+// product fresh (no selected variant, quantity or photo carried over), while
+// replacing a stale name in the address keeps the page as it is.
+// StorefrontLayout scrolls each new page to the top.
+export default function ProductDetailPage() {
+  const { productid: param } = useParams();
+  const parsed = parseProductParam(param);
+
+  // Old BC-code and malformed addresses cannot name a product: no query.
+  if (parsed.kind !== "id") return <ProductNotFound />;
+  return <ProductDetail key={parsed.publicId} publicId={parsed.publicId} param={param} />;
+}
+
+function ProductDetail({ publicId, param }) {
+  const { product, variants, loading, error } = useProduct(publicId);
+  const productid = product?.productid;
+  const canonicalPath = product ? productPath(product) : null;
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  // The address last replaced, so each canonical address is written at most
+  // once even if the param has not caught up by the next render.
+  const replacedTo = useRef(null);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [pickedSize, setPickedSize] = useState(null);
   // Picker row ringed after a tap on a button that is waiting for a choice.
@@ -249,7 +278,17 @@ function ProductDetail({ productid }) {
     [variants]
   );
 
+  // A stale name or an upper-case id still opens the product; the address
+  // bar is then corrected without adding a history entry.
   useEffect(() => {
+    if (!canonicalPath || replacedTo.current === canonicalPath) return;
+    if (param === canonicalPath.slice("/product/".length)) return;
+    replacedTo.current = canonicalPath;
+    navigate(canonicalPath + search, { replace: true });
+  }, [canonicalPath, param, search, navigate]);
+
+  useEffect(() => {
+    if (!productid) return;
     let active = true;
     getProductImagePaths(productid).then((paths) => {
       if (active) {
@@ -273,20 +312,7 @@ function ProductDetail({ productid }) {
   }
 
   if (error || !product) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 min-h-svh text-center">
-        <Seo title="Product not found" noindex />
-        <p className="font-sans text-storefront-muted text-sm mb-4">
-          Product not found.
-        </p>
-        <Link
-          to="/shop"
-          className="text-xs font-sans tracking-widest uppercase text-storefront-gold hover:underline"
-        >
-          ← Back to Shop
-        </Link>
-      </div>
-    );
+    return <ProductNotFound />;
   }
 
   const categoryName = product.categories?.name;
@@ -309,7 +335,7 @@ function ProductDetail({ productid }) {
   const whatsappHref = whatsappProductUrl({
     name: product.name,
     productid,
-    pageUrl: `${window.location.origin}/product/${productid}`,
+    pageUrl: `${window.location.origin}${canonicalPath}`,
     soldOut,
   });
 

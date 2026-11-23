@@ -15,10 +15,22 @@ jest.mock("../components/ProductCard", () => (props) => (
 describe("WishlistPage", () => {
   it("renders a saved item via ProductCard", () => {
     mockUseWishlist.mockReturnValue({
-      items: [{ productid: "BC1", name: "Silk Saree", retailprice: 1000 }],
+      items: [{ productid: "BC1", public_id: "k7x2m", name: "Silk Saree", retailprice: 1000 }],
     });
     render(<MemoryRouter><WishlistPage /></MemoryRouter>);
     expect(screen.getByTestId("product-card")).toHaveTextContent("Silk Saree");
+  });
+
+  it("holds back an item until its public id is known", () => {
+    mockUseWishlist.mockReturnValue({
+      items: [
+        { productid: "BC1", public_id: "k7x2m", name: "Silk Saree", retailprice: 1000 },
+        { productid: "BC2", name: "Old Kurta", retailprice: 800 },
+      ],
+    });
+    render(<MemoryRouter><WishlistPage /></MemoryRouter>);
+    expect(screen.getAllByTestId("product-card")).toHaveLength(1);
+    expect(screen.queryByText("Old Kurta")).not.toBeInTheDocument();
   });
 
   it("shows an empty state with a link to shop when there are no items", () => {

@@ -1,5 +1,6 @@
 import { COLLECTIONS } from "../storefront/lib/collections";
 import { imageUrl } from "../storefront/lib/imageVariant";
+import { productPath } from "../storefront/lib/productPath";
 import { SITE_URL, esc } from "./html";
 import { STATIC_PATHS } from "./pages";
 
@@ -12,19 +13,19 @@ async function allProducts(rest) {
   const products = [];
   for (let offset = 0; ; offset += PAGE) {
     const rows = await rest(
-      `products?select=productid,productimages(imageurl,displayorder)&order=productid&limit=${PAGE}&offset=${offset}`
+      `products?select=public_id,name:display_title,productimages(imageurl,displayorder)&order=productid&limit=${PAGE}&offset=${offset}`
     );
     products.push(...rows);
     if (rows.length < PAGE) return products;
   }
 }
 
-function productEntry({ productid, productimages }) {
-  const images = [...(productimages || [])]
+function productEntry(product) {
+  const images = [...(product.productimages || [])]
     .sort((a, b) => (a.displayorder ?? 0) - (b.displayorder ?? 0))
     .map((img) => `<image:image><image:loc>${esc(imageUrl(img.imageurl, { width: 1200 }))}</image:loc></image:image>`)
     .join("");
-  return `  <url><loc>${esc(`${SITE_URL}/product/${encodeURIComponent(productid)}`)}</loc>${images}</url>`;
+  return `  <url><loc>${esc(`${SITE_URL}${productPath(product)}`)}</loc>${images}</url>`;
 }
 
 export async function buildSitemap(rest) {

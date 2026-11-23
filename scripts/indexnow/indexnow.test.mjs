@@ -6,12 +6,12 @@ import { batches, changedUrls, sitemapProblem, sitemapUrls, SITE } from "./index
 test("reads page URLs on this site, not image entries or other hosts", () => {
   const xml = `<urlset>
   <url><loc>${SITE}/</loc></url>
-  <url><loc>${SITE}/product/BC1</loc><image:image><image:loc>${SITE}/images/BC1/a.webp</image:loc></image:image></url>
+  <url><loc>${SITE}/product/cotton-saree-k7x2m</loc><image:image><image:loc>${SITE}/images/BC1/a.webp</image:loc></image:image></url>
   <url><loc>${SITE}/shop?a=1&amp;b=2</loc></url>
-  <url><loc>${SITE}/product/BC1</loc></url>
+  <url><loc>${SITE}/product/cotton-saree-k7x2m</loc></url>
   <url><loc>https://other.example/x</loc></url>
 </urlset>`;
-  assert.deepEqual(sitemapUrls(xml), [`${SITE}/`, `${SITE}/product/BC1`, `${SITE}/shop?a=1&b=2`]);
+  assert.deepEqual(sitemapUrls(xml), [`${SITE}/`, `${SITE}/product/cotton-saree-k7x2m`, `${SITE}/shop?a=1&b=2`]);
 });
 
 test("sends every URL the first time, then only additions and removals", () => {

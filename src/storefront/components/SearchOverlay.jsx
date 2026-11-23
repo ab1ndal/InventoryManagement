@@ -4,6 +4,7 @@ import { Search, X } from "lucide-react";
 import { useProductSearch } from "../hooks/useProductSearch";
 import { SEARCH_MIN_CHARS } from "../lib/searchUtils";
 import { isSoldOut } from "../lib/stock";
+import { productPath } from "../lib/productPath";
 import SearchNoResults from "./SearchNoResults";
 
 // Command-palette style product search. Debounced name/category match; results
@@ -45,7 +46,7 @@ export default function SearchOverlay({ open, onClose }) {
   const clean = query.trim();
 
   const go = (product) => {
-    navigate(`/product/${product.productid}`);
+    navigate(productPath(product));
     onClose();
   };
 

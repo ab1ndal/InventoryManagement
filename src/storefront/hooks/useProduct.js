@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { supabase } from "lib/supabaseClient";
 
-export function useProduct(productId) {
+export function useProduct(publicId) {
   const [product, setProduct] = useState(null);
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!productId) return;
+    if (!publicId) return;
 
     let cancelled = false;
 
@@ -16,36 +16,35 @@ export function useProduct(productId) {
       setLoading(true);
       setError(null);
 
-      const [productRes, variantsRes] = await Promise.all([
-        supabase
-          .from("products")
-          .select("productid, name:display_title, description, categoryid, fabric, retailprice, producturl, unit_type, categories(name)")
-          .eq("productid", productId)
-          .single(),
-        supabase
-          .from("productsizecolors")
-          .select("variantid, size, color, stock")
-          .eq("productid", productId)
-          .order("size")
-          .order("color"),
-      ]);
+      // Variants come embedded: the route carries only the public id, and
+      // a second query keyed by the internal id would add a round trip.
+      const { data, error } = await supabase
+        .from("products")
+        .select(
+          "productid, public_id, name:display_title, description, categoryid, fabric, retailprice, producturl, unit_type, categories(name), productsizecolors(variantid, size, color, stock)"
+        )
+        .eq("public_id", publicId)
+        .order("size", { referencedTable: "productsizecolors" })
+        .order("color", { referencedTable: "productsizecolors" })
+        .single();
 
       if (cancelled) return;
 
-      if (productRes.error) {
-        setError(productRes.error);
+      if (error) {
+        setError(error);
         setLoading(false);
         return;
       }
 
-      setProduct(productRes.data);
-      setVariants(variantsRes.data ?? []);
+      const { productsizecolors, ...row } = data;
+      setProduct(row);
+      setVariants(productsizecolors ?? []);
       setLoading(false);
     }
 
     fetch();
     return () => { cancelled = true; };
-  }, [productId]);
+  }, [publicId]);
 
   return { product, variants, loading, error };
 }
