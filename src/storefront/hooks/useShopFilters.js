@@ -303,7 +303,7 @@ export default function useShopFilters({
       // The plain `productsizecolors(stock)` embed stays unfiltered because the
       // Sold-out badge needs every variant's stock.
       let select =
-        "productid, name:display_title, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
+        "productid, public_id, name:display_title, retailprice, producturl, fabric, categoryid, categories(name), productsizecolors(stock)";
       if (currentFilters.colors.length > 0 || currentFilters.sizes.length > 0)
         select += ", match:productsizecolors!inner(productid)";
 

@@ -26,7 +26,9 @@ export default function WishlistPage() {
       <Seo title="Wishlist" noindex />
       <h1 className="font-display text-3xl font-semibold text-storefront-charcoal mb-8">Your wishlist</h1>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
-        {items.map((i) => (
+        {/* An item saved before product addresses existed links only once its
+            public_id has been filled in (see WishlistContext). */}
+        {items.filter((i) => i.public_id).map((i) => (
           <ProductCard key={i.productid} product={i} />
         ))}
       </div>

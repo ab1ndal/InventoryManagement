@@ -1,6 +1,6 @@
 import { supabase } from "lib/supabaseClient";
 import {
-  fetchServerWishlist, addServerItems, removeServerItem, isMissingTableError,
+  fetchServerWishlist, addServerItems, removeServerItem, isMissingTableError, fetchPublicIds,
 } from "../lib/wishlistApi";
 
 jest.mock("lib/supabaseClient", () => ({ supabase: { from: jest.fn() } }));
@@ -10,7 +10,7 @@ describe("wishlistApi.fetchServerWishlist", () => {
   it("reads rows joined to products in one query and returns the snapshot shape", async () => {
     const order = jest.fn(async () => ({
       data: [
-        { product_id: "BC1", products: { productid: "BC1", name: "Silk Saree", retailprice: "1000" } },
+        { product_id: "BC1", products: { productid: "BC1", public_id: "k7x2m", name: "Silk Saree", retailprice: "1000" } },
         { product_id: "BC2", products: null }, // hidden by products RLS
       ],
       error: null,
@@ -21,15 +21,28 @@ describe("wishlistApi.fetchServerWishlist", () => {
     const items = await fetchServerWishlist();
 
     expect(supabase.from).toHaveBeenCalledWith("wishlist_items");
-    expect(select).toHaveBeenCalledWith("product_id, products(productid, name:display_title, retailprice)");
+    expect(select).toHaveBeenCalledWith("product_id, products(productid, public_id, name:display_title, retailprice)");
     expect(order).toHaveBeenCalledWith("created_at", { ascending: true });
-    expect(items).toEqual([{ productid: "BC1", name: "Silk Saree", retailprice: 1000 }]);
+    expect(items).toEqual([{ productid: "BC1", public_id: "k7x2m", name: "Silk Saree", retailprice: 1000 }]);
   });
 
   it("throws the PostgREST error so callers can detect a missing table", async () => {
     const err = { code: "PGRST205", message: "Could not find the table" };
     supabase.from.mockReturnValue({ select: () => ({ order: async () => ({ data: null, error: err }) }) });
     await expect(fetchServerWishlist()).rejects.toBe(err);
+  });
+});
+
+describe("wishlistApi.fetchPublicIds", () => {
+  it("maps each visible product to its public id", async () => {
+    const inFilter = jest.fn(async () => ({ data: [{ productid: "BC1", public_id: "k7x2m" }], error: null }));
+    const select = jest.fn(() => ({ in: inFilter }));
+    supabase.from.mockReturnValue({ select });
+    const ids = await fetchPublicIds(["BC1", "BC2"]);
+    expect(supabase.from).toHaveBeenCalledWith("products");
+    expect(select).toHaveBeenCalledWith("productid, public_id");
+    expect(inFilter).toHaveBeenCalledWith("productid", ["BC1", "BC2"]);
+    expect(ids).toEqual(new Map([["BC1", "k7x2m"]]));
   });
 });
 

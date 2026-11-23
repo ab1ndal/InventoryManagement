@@ -9,6 +9,7 @@ const { supabase } = require("lib/supabaseClient");
 
 const MOCK_PRODUCT = {
   productid: "BC25001",
+  public_id: "k7x2m",
   name: "Silk Kurta",
   retailprice: 3500,
   fabric: "Silk",
@@ -23,59 +24,28 @@ const MOCK_VARIANTS = [
   { variantid: "v3", size: "M", color: "Red", stock: 1 },
 ];
 
-function mockSuccess() {
-  supabase.from.mockImplementation((table) => {
-    if (table === "products") {
-      return {
-        select: () => ({
-          eq: () => ({
-            single: () => Promise.resolve({ data: MOCK_PRODUCT, error: null }),
-          }),
-        }),
-      };
-    }
-    return {
-      select: () => ({
-        eq: () => ({
-          order: () => ({
-            order: () => Promise.resolve({ data: MOCK_VARIANTS, error: null }),
-          }),
-        }),
-      }),
-    };
-  });
+// One embedded query: products with its variants.
+function mockQuery(result) {
+  const chain = {
+    select: jest.fn(() => chain),
+    eq: jest.fn(() => chain),
+    order: jest.fn(() => chain),
+    single: jest.fn(() => Promise.resolve(result)),
+  };
+  supabase.from.mockReturnValue(chain);
+  return chain;
 }
 
-function mockProductError() {
-  supabase.from.mockImplementation((table) => {
-    if (table === "products") {
-      return {
-        select: () => ({
-          eq: () => ({
-            single: () =>
-              Promise.resolve({ data: null, error: { message: "Not found" } }),
-          }),
-        }),
-      };
-    }
-    return {
-      select: () => ({
-        eq: () => ({
-          order: () => ({
-            order: () => Promise.resolve({ data: [], error: null }),
-          }),
-        }),
-      }),
-    };
-  });
-}
+const mockSuccess = () =>
+  mockQuery({ data: { ...MOCK_PRODUCT, productsizecolors: MOCK_VARIANTS }, error: null });
+const mockProductError = () => mockQuery({ data: null, error: { message: "Not found" } });
 
 beforeEach(() => jest.clearAllMocks());
 
 describe("useProduct", () => {
   it("starts in loading state", () => {
     mockSuccess();
-    const { result } = renderHook(() => useProduct("BC25001"));
+    const { result } = renderHook(() => useProduct("k7x2m"));
     expect(result.current.loading).toBe(true);
     expect(result.current.product).toBeNull();
     expect(result.current.variants).toEqual([]);
@@ -84,16 +54,31 @@ describe("useProduct", () => {
 
   it("returns product and variants on success", async () => {
     mockSuccess();
-    const { result } = renderHook(() => useProduct("BC25001"));
+    const { result } = renderHook(() => useProduct("k7x2m"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.product).toEqual(MOCK_PRODUCT);
     expect(result.current.variants).toEqual(MOCK_VARIANTS);
     expect(result.current.error).toBeNull();
   });
 
+  it("looks the product up by public id, with its variants in size then colour order", async () => {
+    const chain = mockSuccess();
+    const { result } = renderHook(() => useProduct("k7x2m"));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledWith("products");
+    expect(chain.select.mock.calls[0][0]).toMatch(/\bpublic_id\b/);
+    expect(chain.select.mock.calls[0][0]).toContain("productsizecolors(variantid, size, color, stock)");
+    expect(chain.eq).toHaveBeenCalledWith("public_id", "k7x2m");
+    expect(chain.order.mock.calls).toEqual([
+      ["size", { referencedTable: "productsizecolors" }],
+      ["color", { referencedTable: "productsizecolors" }],
+    ]);
+  });
+
   it("returns error when product fetch fails", async () => {
     mockProductError();
-    const { result } = renderHook(() => useProduct("BC25001"));
+    const { result } = renderHook(() => useProduct("k7x2m"));
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toEqual({ message: "Not found" });
     expect(result.current.product).toBeNull();

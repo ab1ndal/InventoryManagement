@@ -18,16 +18,28 @@ export function isMissingTableError(error) {
 export async function fetchServerWishlist() {
   const { data, error } = await supabase
     .from(TABLE)
-    .select("product_id, products(productid, name:display_title, retailprice)")
+    .select("product_id, products(productid, public_id, name:display_title, retailprice)")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data || [])
     .filter((row) => row.products)
     .map(({ products: p }) => ({
       productid: p.productid,
+      public_id: p.public_id,
       name: p.name,
       retailprice: Number(p.retailprice),
     }));
+}
+
+// productid -> public_id for the given products. Products the storefront RLS
+// hides are absent from the map.
+export async function fetchPublicIds(productIds) {
+  const { data, error } = await supabase
+    .from("products")
+    .select("productid, public_id")
+    .in("productid", productIds);
+  if (error) throw error;
+  return new Map((data || []).map((p) => [p.productid, p.public_id]));
 }
 
 // ignoreDuplicates (ON CONFLICT DO NOTHING) so re-adding an existing pair is a

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "lib/supabaseClient";
 import StaticPage from "../components/StaticPage";
+import { productPath } from "../lib/productPath";
 import {
   ALL_PRODUCTS_DESCRIPTION,
   ALL_PRODUCTS_PAGE,
@@ -13,7 +14,7 @@ async function fetchAllProducts() {
   for (let from = 0; ; from += ALL_PRODUCTS_PAGE) {
     const { data, error } = await supabase
       .from("products")
-      .select("productid, name:display_title")
+      .select("productid, public_id, name:display_title")
       .order("productid", { ascending: false })
       .range(from, from + ALL_PRODUCTS_PAGE - 1);
     if (error) throw error;
@@ -64,7 +65,7 @@ export default function AllProductsPage() {
         <ul className="grid gap-x-6 gap-y-2 text-sm font-sans sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => (
             <li key={p.productid}>
-              <Link to={`/product/${encodeURIComponent(p.productid)}`} className="hover:underline">
+              <Link to={productPath(p)} className="hover:underline">
                 {p.name}
               </Link>
             </li>

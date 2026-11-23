@@ -38,15 +38,15 @@ beforeEach(() => {
 });
 
 test("links every product across pages of results", async () => {
-  const full = Array.from({ length: 1000 }, (_, i) => ({ productid: `BC${i}`, name: `Piece ${i}` }));
+  const full = Array.from({ length: 1000 }, (_, i) => ({ productid: `BC${i}`, public_id: `id${i}`, name: `Piece ${i}` }));
   mockPages.push(
     { data: full, error: null },
-    { data: [{ productid: "BC-last", name: "Last Piece" }], error: null },
+    { data: [{ productid: "BC-last", public_id: "k7x2m", name: "Last Piece" }], error: null },
   );
   renderPage();
 
   const last = await screen.findByRole("link", { name: "Last Piece" });
-  expect(last).toHaveAttribute("href", "/product/BC-last");
+  expect(last).toHaveAttribute("href", "/product/last-piece-k7x2m");
   expect(screen.getAllByRole("listitem")).toHaveLength(1001);
   expect(mockRanges).toEqual([
     [0, 999],

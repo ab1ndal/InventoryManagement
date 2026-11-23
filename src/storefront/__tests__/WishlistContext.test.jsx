@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen, act } from "@testing-library/react";
 import { WishlistProvider, useWishlist } from "../context/WishlistContext";
-import { fetchServerWishlist, addServerItems, removeServerItem } from "../lib/wishlistApi";
+import { fetchServerWishlist, addServerItems, removeServerItem, fetchPublicIds } from "../lib/wishlistApi";
 
 jest.mock("../lib/wishlistApi", () => {
   const actual = jest.requireActual("../lib/wishlistApi");
@@ -10,6 +10,7 @@ jest.mock("../lib/wishlistApi", () => {
     fetchServerWishlist: jest.fn(async () => []),
     addServerItems: jest.fn(async () => {}),
     removeServerItem: jest.fn(async () => {}),
+    fetchPublicIds: jest.fn(async () => new Map()),
   };
 });
 let authCb;
@@ -25,8 +26,8 @@ jest.mock("lib/supabaseClient", () => ({
 }));
 
 
-const SAREE = { productid: "BC1", name: "Saree", retailprice: 1000 };
-const KURTA = { productid: "BC2", name: "Kurta", retailprice: 800 };
+const SAREE = { productid: "BC1", public_id: "aaaaa", name: "Saree", retailprice: 1000 };
+const KURTA = { productid: "BC2", public_id: "bbbbb", name: "Kurta", retailprice: 800 };
 const SESSION = { user: { id: "u1" } };
 
 function Probe() {
@@ -58,6 +59,7 @@ beforeEach(() => {
   fetchServerWishlist.mockResolvedValue([]);
   addServerItems.mockResolvedValue(undefined);
   removeServerItem.mockResolvedValue(undefined);
+  fetchPublicIds.mockResolvedValue(new Map());
   errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
   warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -77,6 +79,24 @@ describe("guest", () => {
     expect(screen.getByTestId("count").textContent).toBe("0");
     expect(addServerItems).not.toHaveBeenCalled();
     expect(removeServerItem).not.toHaveBeenCalled();
+  });
+
+  it("fills in public ids for items saved before they existed, dropping products no longer shown", async () => {
+    const { public_id: _s, ...oldSaree } = SAREE;
+    const { public_id: _k, ...oldKurta } = KURTA;
+    localStorage.setItem("bc_wishlist", JSON.stringify([oldSaree, oldKurta]));
+    fetchPublicIds.mockResolvedValue(new Map([["BC1", "aaaaa"]]));
+    renderProbe();
+    await flush();
+    expect(fetchPublicIds).toHaveBeenCalledWith(["BC1", "BC2"]);
+    expect(stored()).toEqual([SAREE]);
+  });
+
+  it("does not look up public ids when every item already has one", async () => {
+    localStorage.setItem("bc_wishlist", JSON.stringify([SAREE]));
+    renderProbe();
+    await flush();
+    expect(fetchPublicIds).not.toHaveBeenCalled();
   });
 
   it("keeps the guest list when INITIAL_SESSION fires with no session", async () => {

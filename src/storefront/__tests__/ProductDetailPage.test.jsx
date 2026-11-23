@@ -10,7 +10,13 @@ import { MEASURE_INTRO } from "../pages/sizeGuideContent";
 import { toast } from "sonner";
 import { flyToCart } from "../lib/flyToCart";
 import { DELIVERY_ESTIMATE } from "../lib/deliveryEstimate";
+import { productPath } from "../lib/productPath";
 
+const mockNavigate = jest.fn();
+jest.mock("react-router-dom", () => ({
+  ...jest.requireActual("react-router-dom"),
+  useNavigate: () => mockNavigate,
+}));
 jest.mock("lib/supabaseClient", () => ({
   supabase: { from: jest.fn() },
 }));
@@ -34,6 +40,7 @@ jest.mock("../components/ProductCard", () => (props) => (
 
 const PRODUCT = {
   productid: "BC252742",
+  public_id: "k7x2m",
   name: "Silk-Lehenga",
   description: "A shimmering **pistachio green** lehenga with **zari** work.",
   categoryid: "LE",
@@ -66,9 +73,10 @@ function mockRelated(data = RELATED) {
   return chain;
 }
 
-function renderRoute(productid) {
-  return render(
-    <MemoryRouter initialEntries={[`/product/${productid}`]}>
+// New elements on each call, so a rerender really renders the page again.
+function routeTree(path) {
+  return (
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/product/:productid" element={<ProductDetailPage />} />
       </Routes>
@@ -76,10 +84,16 @@ function renderRoute(productid) {
   );
 }
 
+// Takes a full path so tests can open stale or legacy addresses.
+function renderRoute(path) {
+  const view = render(routeTree(path));
+  return { ...view, rerenderRoutes: () => view.rerender(routeTree(path)) };
+}
+
 // Resolves once the page is past its loading state.
 async function renderPage(product = PRODUCT, variants = VARIANTS) {
   useProduct.mockReturnValue({ product, variants, loading: false, error: null });
-  const view = renderRoute(product.productid);
+  const view = renderRoute(productPath(product));
   await screen.findByRole("heading", { level: 1, hidden: true });
   return view;
 }
@@ -305,7 +319,7 @@ describe("ProductDetailPage — layout stability", () => {
   it("reserves the photo frame while the product loads", () => {
     getProductImagePaths.mockReturnValue(new Promise(() => {}));
     useProduct.mockReturnValue({ product: null, variants: [], loading: true, error: null });
-    renderRoute("BC252742");
+    renderRoute(productPath(PRODUCT));
     expectFrameKeepsShape(screen.getByTestId("product-loading-frame"));
   });
 
@@ -313,7 +327,7 @@ describe("ProductDetailPage — layout stability", () => {
     let resolvePaths;
     getProductImagePaths.mockReturnValue(new Promise((res) => { resolvePaths = res; }));
     useProduct.mockReturnValue({ product: PRODUCT, variants: VARIANTS, loading: false, error: null });
-    renderRoute(PRODUCT.productid);
+    renderRoute(productPath(PRODUCT));
     expect(screen.getByTestId("product-loading-frame")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, hidden: true })).not.toBeInTheDocument();
 
@@ -333,8 +347,100 @@ describe("ProductDetailPage — layout stability", () => {
   it("does not wait for photos when the product is not found", () => {
     getProductImagePaths.mockReturnValue(new Promise(() => {}));
     useProduct.mockReturnValue({ product: null, variants: [], loading: false, error: new Error("not found") });
-    renderRoute("NOPE");
+    renderRoute("/product/silk-lehenga-zzzzz");
     expect(screen.getByText("Product not found.")).toBeInTheDocument();
+  });
+});
+
+describe("ProductDetailPage — address", () => {
+  it("looks the product up by the public id at the end of the address", async () => {
+    await renderPage();
+    expect(useProduct).toHaveBeenCalledWith("k7x2m");
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("opens an upper-case id as the same product", async () => {
+    useProduct.mockReturnValue({ product: PRODUCT, variants: VARIANTS, loading: false, error: null });
+    renderRoute("/product/silk-lehenga-K7X2M");
+    await screen.findByRole("heading", { level: 1, hidden: true });
+    expect(useProduct).toHaveBeenCalledWith("k7x2m");
+    expect(mockNavigate).toHaveBeenCalledWith("/product/silk-lehenga-k7x2m", { replace: true });
+  });
+
+  it("replaces a stale name once, keeping the query string", async () => {
+    useProduct.mockReturnValue({ product: PRODUCT, variants: VARIANTS, loading: false, error: null });
+    const { rerenderRoutes } = renderRoute("/product/cotton-saree-k7x2m?x=1");
+    await screen.findByRole("heading", { level: 1, hidden: true });
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith("/product/silk-lehenga-k7x2m?x=1", { replace: true });
+
+    // Same title on a later render: no second replace.
+    const callsBefore = useProduct.mock.calls.length;
+    rerenderRoutes();
+    await screen.findByRole("heading", { level: 1, hidden: true });
+    expect(useProduct.mock.calls.length).toBeGreaterThan(callsBefore);
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("replaces again only when the title changes during the visit", async () => {
+    useProduct.mockReturnValue({ product: PRODUCT, variants: VARIANTS, loading: false, error: null });
+    const { rerenderRoutes } = renderRoute("/product/cotton-saree-k7x2m");
+    await screen.findByRole("heading", { level: 1, hidden: true });
+    useProduct.mockReturnValue({
+      product: { ...PRODUCT, name: "Rose Lehenga" },
+      variants: VARIANTS,
+      loading: false,
+      error: null,
+    });
+    rerenderRoutes();
+    await screen.findByRole("heading", { level: 1, name: "Rose Lehenga", hidden: true });
+    rerenderRoutes();
+    expect(mockNavigate.mock.calls).toEqual([
+      ["/product/silk-lehenga-k7x2m", { replace: true }],
+      ["/product/rose-lehenga-k7x2m", { replace: true }],
+    ]);
+  });
+
+  it("does not redirect an id-only address when the title gives no name", async () => {
+    const product = { ...PRODUCT, name: "" };
+    useProduct.mockReturnValue({ product, variants: VARIANTS, loading: false, error: null });
+    renderRoute("/product/k7x2m");
+    await screen.findByRole("heading", { level: 1, hidden: true });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it.each(["/product/BC253135", "/product/not-a-product"])(
+    "shows not found for %s without querying",
+    (path) => {
+      renderRoute(path);
+      expect(screen.getByText("Product not found.")).toBeInTheDocument();
+      expect(useProduct).not.toHaveBeenCalled();
+      expect(getProductImagePaths).not.toHaveBeenCalled();
+      expect(supabase.from).not.toHaveBeenCalled();
+    }
+  );
+
+  it("shows not found when the product row is hidden or missing", () => {
+    useProduct.mockReturnValue({ product: null, variants: [], loading: false, error: { code: "PGRST116" } });
+    renderRoute("/product/silk-lehenga-k7x2m");
+    expect(screen.getByText("Product not found.")).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("puts the product address, not the internal code, in the WhatsApp page link", async () => {
+    await renderPage();
+    const href = decodeURIComponent(screen.getByRole("link", { name: /ask on whatsapp/i }).getAttribute("href"));
+    expect(href).toContain(`${window.location.origin}/product/silk-lehenga-k7x2m`);
+    expect(href).not.toContain("/product/BC252742");
+  });
+
+  it("adds the product's own id to the cart", async () => {
+    mockAddItem.mockReturnValue(1);
+    await renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "Peach" }));
+    fireEvent.click(screen.getByRole("button", { name: /add to cart/i }));
+    expect(mockAddItem).toHaveBeenCalledWith(expect.objectContaining({ product_id: "BC252742" }));
+    expect(getProductImagePaths).toHaveBeenCalledWith("BC252742");
   });
 });
 

@@ -4,6 +4,7 @@ import { Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import { getProductImagePaths, imageColor } from "../lib/productImage";
 import { productImageAlt } from "../lib/seoText";
 import { isSoldOut } from "../lib/stock";
+import { productPath } from "../lib/productPath";
 import { useWishlist } from "../context/WishlistContext";
 import BlurFillImage from "./BlurFillImage";
 
@@ -96,7 +97,7 @@ export default function ProductCard({ product, priority = false }) {
 
   return (
     <Link
-      to={`/product/${product.productid}`}
+      to={productPath(product)}
       className="group block bg-white overflow-hidden border border-storefront-border/60 hover:border-storefront-gold/60 transition-colors duration-200"
     >
       {/* Image / carousel */}
