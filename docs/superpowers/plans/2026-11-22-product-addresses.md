@@ -16,7 +16,7 @@ the address; the slug is computed from `display_title` by one shared helper used
 ## Global Constraints
 
 - Public ID alphabet `abcdefghjkmnpqrstuvwxyz23456789`, length 5, random (`gen_random_bytes`), never derived from `productid`, never updated.
-- Slug: `display_title` up to the first ` with ` (case-insensitive, whole word), lower-case, `&` → `and`, apostrophes removed, other runs of non `[a-z0-9]` → `-`, trimmed of `-`, cut at the last `-` at or before 50 chars (a single word longer than 50 is cut at 50).
+- Slug: `display_title` up to the first word "with" (case-insensitive, `\bwith\b`, so "Suit (with Dupatta)" → `suit`), lower-case, `&` → `and`, apostrophes removed, other runs of non `[a-z0-9]` → `-`, trimmed of `-`, cut at the last `-` at or before 50 chars (a single word longer than 50 is cut at 50).
 - Address `/product/<slug>-<id>`; empty slug → `/product/<id>`.
 - Param parse: last `-` segment lower-cased matching `^[a-hj-km-np-z2-9]{5}$` → id. Whole param matching `/^bc\d{5,}$/i` → legacy (410). Anything else → invalid (404).
 - Feed `g:id` stays `productid`. Bills, admin, cart, wishlist, orders unchanged.
