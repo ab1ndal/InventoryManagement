@@ -22,6 +22,10 @@ Claude, next:
 - [x] Transactional bill save, step 1: `bill_save` live and unused since PR #171 (2026-11-05). Rolled-back
       production run 2026-11-08 09:46 IST: 114 pass, 0 fail; afterwards no fixtures, counter FY26 BoS still 395, max
       billid 440 (the run used up about 25 bill ids, so the next bill id jumps; bill numbers unaffected). Plan in the owner's private audit folder.
+- [ ] CLI gap (owner 2026-11-22): no way to edit or finalize an existing draft bill. `bill create` only makes new
+      bills; drafts must be finished on the Bills screen. Slip 472 (FY26-000495) had to be finished through the
+      browser (add 2 lines, Finalize). Add `bill draft add-line` / `bill finalize --number` (or `bill edit --spec`)
+      on the same path as the screen's Edit Bill, then `bill pdf`.
 - [ ] Transactional bill save, step 2: one supervised real paper slip through the admin CLI on `bill_save`, read
       back with `bill show`. Needs the CLI switched to the RPC first (small PR) and the owner's OK for the prod write.
 - [x] Tracking sweep checked 2026-11-07: 22 cron runs since 2026-11-05, all succeeded (HTTP 200). WEB-000006 out-for-delivery and delivered both arrived by webhook (`courier-status`), so the sweep had nothing to fix; no open shipments now. A sweep-applied change is still unproven, only matters if a webhook is lost.
